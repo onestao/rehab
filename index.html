@@ -5,11 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>REHAB PRO</title>
     
-    <!-- PWA 配置 -->
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#0061a4">
-    
-    <!-- 引入圆角图标库 -->
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
     
     <style>
@@ -26,7 +23,7 @@
             display: flex; flex-direction: column; align-items: center;
         }
 
-        /* 修复居中布局 */
+        /* 居中 Logo 布局 */
         .brand { 
             margin: 30px 0; width: 100%;
             display: flex; flex-direction: column; align-items: center;
@@ -38,7 +35,7 @@
             margin-bottom: 12px;
             box-shadow: 0 8px 24px rgba(0,97,164,0.25);
         }
-        /* 统一使用 rounded 类名 */
+        
         .material-symbols-rounded {
             font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 48;
         }
@@ -67,8 +64,7 @@
         .fab-stop { background: #ffdad6; color: #410002; }
 
         .section { display: none; width: 100%; max-width: 500px; }
-        .section.active { display: block; animation: slideUp 0.3s ease-out; }
-        @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        .section.active { display: block; }
         .hidden { display: none; }
     </style>
 </head>
@@ -94,8 +90,12 @@
         </div>
 
         <div class="card">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                <span style="font-size:14px; font-weight:600;">语速: <span id="rateLabel">1.1</span>x</span>
+                <input type="range" id="ttsRate" min="0.5" max="2" step="0.1" value="1.1" style="width:140px;" oninput="updateRate()">
+            </div>
             <div class="input-group">
-                <input type="text" id="name" class="full" placeholder="动作名称 (点击列表动作编辑)">
+                <input type="text" id="name" class="full" placeholder="动作名称 (点击列表编辑)">
                 <input type="number" id="sets" placeholder="组数">
                 <input type="number" id="work" placeholder="单次时长(s)">
                 <div class="full" style="display:flex; align-items:center; justify-content:space-between; font-size:14px; padding:4px;">
@@ -122,7 +122,6 @@
     <div id="routines" class="section"><div id="routineList"></div></div>
     <div id="history" class="section"><div id="historyList"></div></div>
 
-    <!-- 控制栏图标已统一 -->
     <div class="controls">
         <button class="fab fab-stop hidden" id="stopBtn" onclick="stopTrainer()">
             <span class="material-symbols-rounded" style="font-size:32px;">stop</span>
@@ -141,13 +140,28 @@
         actions: JSON.parse(localStorage.getItem('rp_v6_a')) || [],
         routines: JSON.parse(localStorage.getItem('rp_v6_r')) || [],
         history: JSON.parse(localStorage.getItem('rp_v6_h')) || [],
+        rate: localStorage.getItem('rp_v6_rate') || 1.1,
         isPlaying: false, isPaused: false, activeIdx: -1, timer: null
+    };
+
+    window.onload = () => { 
+        document.getElementById('ttsRate').value = db.rate;
+        document.getElementById('rateLabel').innerText = db.rate;
+        render(); 
     };
 
     function sync() {
         localStorage.setItem('rp_v6_a', JSON.stringify(db.actions));
         localStorage.setItem('rp_v6_r', JSON.stringify(db.routines));
         localStorage.setItem('rp_v6_h', JSON.stringify(db.history));
+        localStorage.setItem('rp_v6_rate', db.rate);
+    }
+
+    // --- 新增/修复的语速调节函数 ---
+    function updateRate() {
+        db.rate = document.getElementById('ttsRate').value;
+        document.getElementById('rateLabel').innerText = db.rate;
+        sync();
     }
 
     function setTab(id) {
@@ -161,7 +175,8 @@
     function speak(t) {
         window.speechSynthesis.cancel();
         const u = new SpeechSynthesisUtterance(t);
-        u.lang = 'zh-CN'; u.rate = 1.1;
+        u.lang = 'zh-CN'; 
+        u.rate = parseFloat(db.rate); // 关联 db 中的语速
         window.speechSynthesis.speak(u);
     }
 
@@ -258,7 +273,7 @@
         document.getElementById('switchRest').value = a.switchRest;
         document.getElementById('actionRest').value = a.actionRest;
         document.getElementById('groupRest').value = a.groupRest;
-        document.getElementById('saveBtnTxt').innerText = "修改动作";
+        document.getElementById('saveBtnTxt').innerText = "修改动作内容";
         document.getElementById('saveBtn').classList.add('btn-edit-mode');
         document.getElementById('cancelEdit').classList.remove('hidden');
         window.scrollTo({top: 150, behavior: 'smooth'});
