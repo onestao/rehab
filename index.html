@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>REHAB PRO</title>
+    <link rel="manifest" href="data:application/json;base64,ewogICJuYW1lIjogIktBTkdGVV9QUk8iLAogICJzaG9ydF9uYW1lIjogIlJFSEFCIFBSTyIsCiAgInN0YXJ0X3VybCI6ICIuIiwKICAiZGlzcGxheSI6ICJzdGFuZGFsb25lIiwKICAiYmFja2dyb3VuZF9jb2xvciI6ICIjZmRmY2ZmIiwKICAidGhlbWVfY29sb3IiOiAiIzAwNjFhNCIsCiAgImljb25zIjogW3sgInNyYyI6ICJodHRwczovL2Nkbi1pY29ucy1wbmcuZmxhdGljb24uY29tLzUxMi8yOTY2LzI5NjY0ODMucG5nIiwgInR5cGUiOiAiaW1hZ2UvcG5nIiwgInNpemVzIjogIjUxMng1MTIiIH1dCn0=">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
+    <style>
+        :root {
+            --primary: #0061a4; --on-primary: #ffffff; --primary-container: #d1e4ff;
+            --on-primary-container: #001d36; --surface: #fdfcff; --surface-variant: #dfe3eb;
+            --outline: #73777f; --tertiary: #7d5260; --error: #ba1a1a;
+        }
+        body {
+            background-color: var(--surface); color: #1a1c1e;
+            font-family: 'Segoe UI', system-ui, sans-serif; margin: 0;
+            padding: env(safe-area-inset-top) 16px 140px 16px;
+            display: flex; flex-direction: column; align-items: center;
+        }
+        .brand { margin: 30px 0; text-align: center; }
+        .logo-box {
+            width: 72px; height: 72px; background: var(--primary);
+            border-radius: 22px; display: flex; align-items: center; justify-content: center;
+            margin-bottom: 12px; box-shadow: 0 8px 16px rgba(0,97,164,0.2);
+        }
+        .logo-box span { color: white; font-size: 40px; }
+        .tabs { display: flex; gap: 8px; width: 100%; max-width: 500px; margin-bottom: 16px; position: sticky; top: 10px; z-index: 100; }
+        .tab-btn { flex: 1; padding: 12px; border-radius: 24px; border: none; background: var(--surface-variant); font-weight: 600; cursor: pointer; font-size: 14px; }
+        .tab-btn.active { background: var(--primary-container); color: var(--on-primary-container); }
+        .card { background-color: var(--surface-variant); border-radius: 28px; padding: 24px; width: 100%; max-width: 500px; box-sizing: border-box; margin-bottom: 12px; }
+        .timer-panel { background: linear-gradient(135deg, var(--primary-container), #eaf2ff); text-align: center; border: none; }
+        #mainTime { font-size: 110px; font-weight: 800; margin: 10px 0; font-variant-numeric: tabular-nums; color: var(--on-primary-container); }
+        .input-group { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .full { grid-column: span 2; }
+        input { width: 100%; padding: 14px; border: 1.5px solid var(--outline); border-radius: 16px; background: white; font-size: 15px; box-sizing: border-box; }
+        .edit-highlight { border-color: var(--tertiary); background: #fff9fa; outline: 2px solid var(--tertiary); }
+        .btn { height: 56px; border-radius: 28px; border: none; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer; }
+        .btn-primary { background: var(--primary); color: white; width: 100%; margin-top: 12px; }
+        .btn-edit-mode { background: var(--tertiary); }
+        .list-item { background: white; padding: 16px 20px; border-radius: 24px; margin: 10px 0; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 6px rgba(0,0,0,0.02); }
+        .action-content { flex: 1; cursor: pointer; }
+        .controls { position: fixed; bottom: 30px; display: flex; gap: 20px; z-index: 200; }
+        .fab { width: 76px; height: 76px; border-radius: 24px; background: var(--primary-container); display: flex; align-items: center; justify-content: center; border: none; cursor: pointer; box-shadow: 0 8px 24px rgba(0,0,0,0.15); }
+        .fab-stop { background: #ffdad6; color: #410002; }
+        .section { display: none; width: 100%; max-width: 500px; }
+        .section.active { display: block; }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+
+    <div class="brand">
+        <div class="logo-box"><span class="material-symbols-rounded">fitness_center</span></div>
+        <div style="font-weight: 800; font-size: 22px; letter-spacing: 2px;">REHAB PRO</div>
+    </div>
+
+    <div class="tabs">
+        <button class="tab-btn active" id="t-workout" onclick="setTab('workout')">训练</button>
+        <button class="tab-btn" id="t-routines" onclick="setTab('routines')">方案库</button>
+        <button class="tab-btn" id="t-history" onclick="setTab('history')">历史</button>
+    </div>
+
+    <div id="workout" class="section active">
+        <div class="card timer-panel">
+            <div id="statusText" style="font-weight: 700; opacity: 0.6; font-size: 14px;">READY</div>
+            <div id="mainTime">00</div>
+            <div id="subText" style="font-size: 18px; font-weight: 600;">点击播放按钮开始</div>
+            <div id="setInfo" style="margin-top: 8px; font-weight: 700; color: var(--primary);"></div>
+        </div>
+
+        <div class="card">
+            <div class="input-group">
+                <input type="text" id="name" class="full" placeholder="动作名称">
+                <input type="number" id="sets" placeholder="组数">
+                <input type="number" id="work" placeholder="单次时长(s)">
+                <div class="full" style="display:flex; align-items:center; justify-content:space-between; font-size:14px; padding:4px;">
+                    <span>开启交替?</span> <input type="checkbox" id="isAlt">
+                </div>
+                <input type="number" id="switchRest" placeholder="换边休(s)">
+                <input type="number" id="actionRest" placeholder="组内休(s)">
+                <input type="number" id="groupRest" class="full" placeholder="整套动作完后休(s)">
+            </div>
+            <button class="btn btn-primary" onclick="saveAction()" id="saveBtn">
+                <span class="material-symbols-rounded">add_task</span> <span id="saveBtnTxt">保存到列表</span>
+            </button>
+            <button class="hidden" id="cancelEdit" onclick="resetForm()" style="width:100%; border:none; background:none; color:gray; margin-top:10px;">取消编辑</button>
+        </div>
+        <div id="currentList"></div>
+        <div class="card" style="margin-top:20px; border: 2px dashed var(--outline); background:none;">
+            <input type="text" id="routineName" placeholder="为此方案取名...">
+            <button class="btn btn-primary" style="background:var(--tertiary);" onclick="librarySave()">保存方案</button>
+        </div>
+    </div>
+
+    <div id="routines" class="section">
+        <div id="routineList"></div>
+    </div>
+
+    <div id="history" class="section">
+        <div id="historyList"></div>
+    </div>
+
+    <div class="controls">
+        <button class="fab fab-stop hidden" id="stopBtn" onclick="stopTrainer()"><span class="material-symbols-rounded">stop</span></button>
+        <button class="fab" onclick="handlePlay()"><span class="material-symbols-rounded" id="playIcon" style="font-size: 40px;">play_arrow</span></button>
+    </div>
+
+<script>
+    // 2. 注入内部 Service Worker 以符合安装标准 (必须通过 http 访问生效)
+    if ('serviceWorker' in navigator) {
+        const sw = `
+            self.addEventListener('fetch', function(event) {});
+        `;
+        const blob = new Blob([sw], {type: 'text/javascript'});
+        navigator.serviceWorker.register(URL.createObjectURL(blob));
+    }
+
+    let db = {
+        actions: JSON.parse(localStorage.getItem('rp_v4_a')) || [],
+        routines: JSON.parse(localStorage.getItem('rp_v4_r')) || [],
+        history: JSON.parse(localStorage.getItem('rp_v4_h')) || [],
+        isPlaying: false, isPaused: false, activeIdx: -1, timer: null
+    };
+
+    function sync() {
+        localStorage.setItem('rp_v4_a', JSON.stringify(db.actions));
+        localStorage.setItem('rp_v4_r', JSON.stringify(db.routines));
+        localStorage.setItem('rp_v4_h', JSON.stringify(db.history));
+    }
+
+    function setTab(id) {
+        document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById(id).classList.add('active');
+        document.getElementById('t-'+id).classList.add('active');
+        render();
+    }
+
+    function speak(t) {
+        window.speechSynthesis.cancel();
+        const u = new SpeechSynthesisUtterance(t);
+        u.lang = 'zh-CN'; u.rate = 1.1;
+        window.speechSynthesis.speak(u);
+    }
+
+    async function handlePlay() {
+        if (!db.isPlaying) { 
+            if(db.actions.length === 0) return;
+            db.isPlaying = true; db.startTime = Date.now();
+            document.getElementById('playIcon').innerText = 'pause';
+            document.getElementById('stopBtn').classList.remove('hidden');
+            await startSequence();
+        } else {
+            db.isPaused = !db.isPaused;
+            document.getElementById('playIcon').innerText = db.isPaused ? 'play_arrow' : 'pause';
+            if (db.isPaused) window.speechSynthesis.pause(); else window.speechSynthesis.resume();
+        }
+    }
+
+    async function startSequence() {
+        for (let i = 0; i < db.actions.length; i++) {
+            if (!db.isPlaying) break;
+            const a = db.actions[i];
+            for (let s = 1; s <= a.sets; s++) {
+                if (!db.isPlaying) break;
+                document.getElementById('setInfo').innerText = `第 ${s} / ${a.sets} 组`;
+                if (a.isAlt) {
+                    speak(`开始：${a.name} 第一侧`);
+                    await runTimer(a.work, a.name + "(一)", 'WORK');
+                    speak(`换边`);
+                    await runTimer(a.switchRest, "换边", "REST");
+                    speak(`开始：第二侧`);
+                    await runTimer(a.work, a.name + "(二)", 'WORK');
+                } else {
+                    speak(`开始：${a.name}`);
+                    await runTimer(a.work, a.name, 'WORK');
+                }
+                if (s < a.sets && db.isPlaying) { speak(`休息`); await runTimer(a.actionRest, "休息", "REST"); }
+            }
+            if (i < db.actions.length - 1 && db.isPlaying) {
+                speak(`下一个动作是：${db.actions[i+1].name}`);
+                await runTimer(a.groupRest, "大休息", "BREAK");
+            }
+        }
+        finish();
+    }
+
+    function runTimer(sec, title, status) {
+        return new Promise(res => {
+            let left = sec;
+            document.getElementById('subText').innerText = title;
+            document.getElementById('statusText').innerText = status;
+            db.timer = setInterval(() => {
+                if (!db.isPlaying) { clearInterval(db.timer); res(); return; }
+                if (db.isPaused) return;
+                document.getElementById('mainTime').innerText = left;
+                if (left <= 3 && left > 0) speak(left.toString());
+                if (left <= 0) { clearInterval(db.timer); res(); }
+                left--;
+            }, 1000);
+        });
+    }
+
+    function stopTrainer() { db.isPlaying = false; clearInterval(db.timer); resetUI(); }
+    function finish() { speak("全部完成"); resetUI(); }
+    function resetUI() {
+        db.isPlaying = false; document.getElementById('playIcon').innerText = 'play_arrow';
+        document.getElementById('stopBtn').classList.add('hidden');
+        document.getElementById('mainTime').innerText = '00';
+    }
+
+    function saveAction() {
+        const item = {
+            name: document.getElementById('name').value || '未命名',
+            sets: parseInt(document.getElementById('sets').value) || 1,
+            work: parseInt(document.getElementById('work').value) || 10,
+            isAlt: document.getElementById('isAlt').checked,
+            switchRest: parseInt(document.getElementById('switchRest').value) || 0,
+            actionRest: parseInt(document.getElementById('actionRest').value) || 0,
+            groupRest: parseInt(document.getElementById('groupRest').value) || 0
+        };
+        if (db.activeIdx === -1) db.actions.push(item);
+        else { db.actions[db.activeIdx] = item; resetForm(); }
+        sync(); render();
+    }
+
+    function editAction(i) {
+        db.activeIdx = i; const a = db.actions[i];
+        document.getElementById('name').value = a.name;
+        document.getElementById('sets').value = a.sets;
+        document.getElementById('work').value = a.work;
+        document.getElementById('isAlt').checked = a.isAlt;
+        document.getElementById('switchRest').value = a.switchRest;
+        document.getElementById('actionRest').value = a.actionRest;
+        document.getElementById('groupRest').value = a.groupRest;
+        document.getElementById('saveBtnTxt').innerText = "修改动作";
+        document.getElementById('cancelEdit').classList.remove('hidden');
+        window.scrollTo({top: 200, behavior: 'smooth'});
+    }
+
+    function resetForm() { db.activeIdx = -1; document.getElementById('saveBtnTxt').innerText = "保存到列表"; document.getElementById('cancelEdit').classList.add('hidden'); }
+    function delAction(i) { db.actions.splice(i, 1); sync(); render(); }
+    function librarySave() { const n = document.getElementById('routineName').value; if(n){ db.routines.push({name:n, actions:[...db.actions]}); sync(); render(); } }
+    function loadRoutine(i) { db.actions = [...db.routines[i].actions]; sync(); setTab('workout'); }
+
+    function render() {
+        document.getElementById('currentList').innerHTML = db.actions.map((a, i) => `
+            <div class="list-item">
+                <div class="action-content" onclick="editAction(${i})"><strong>${a.name}</strong><br><small>${a.sets}组 | ${a.work}s</small></div>
+                <button onclick="delAction(${i})" style="border:none;background:none;color:red;"><span class="material-symbols-rounded">delete</span></button>
+            </div>
+        `).join('');
+        document.getElementById('routineList').innerHTML = db.routines.map((r, i) => `
+            <div class="list-item"><div><strong>${r.name}</strong></div><button onclick="loadRoutine(${i})">载入</button></div>
+        `).join('');
+    }
+
+    render();
+</script>
+</body>
+</html>
