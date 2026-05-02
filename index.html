@@ -118,4 +118,146 @@
 <script>
     // 正确注册独立的实体 sw.js
     if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('s
+        navigator.serviceWorker.register('sw.js');
+    }
+
+    let db = {
+        actions: JSON.parse(localStorage.getItem('rp_v6_a')) || [],
+        routines: JSON.parse(localStorage.getItem('rp_v6_r')) || [],
+        history: JSON.parse(localStorage.getItem('rp_v6_h')) || [],
+        isPlaying: false, isPaused: false, activeIdx: -1, timer: null
+    };
+
+    function sync() {
+        localStorage.setItem('rp_v6_a', JSON.stringify(db.actions));
+        localStorage.setItem('rp_v6_r', JSON.stringify(db.routines));
+        localStorage.setItem('rp_v6_h', JSON.stringify(db.history));
+    }
+
+    function setTab(id) {
+        document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById(id).classList.add('active');
+        document.getElementById('t-'+id).classList.add('active');
+        render();
+    }
+
+    function speak(t) {
+        window.speechSynthesis.cancel();
+        const u = new SpeechSynthesisUtterance(t);
+        u.lang = 'zh-CN'; u.rate = 1.1;
+        window.speechSynthesis.speak(u);
+    }
+
+    async function handlePlay() {
+        if (!db.isPlaying) {
+            if (db.actions.length === 0) return;
+            db.isPlaying = true; db.startTime = Date.now();
+            document.getElementById('playIcon').innerText = 'pause';
+            document.getElementById('stopBtn').classList.remove('hidden');
+            await runSequence();
+        } else {
+            db.isPaused = !db.isPaused;
+            document.getElementById('playIcon').innerText = db.isPaused ? 'play_arrow' : 'pause';
+            if (db.isPaused) window.speechSynthesis.pause(); else window.speechSynthesis.resume();
+        }
+    }
+
+    async function runSequence() {
+        for (let i = 0; i < db.actions.length; i++) {
+            if (!db.isPlaying) break;
+            const a = db.actions[i];
+            for (let s = 1; s <= a.sets; s++) {
+                if (!db.isPlaying) break;
+                document.getElementById('setInfo').innerText = `第 ${s} / ${a.sets} 组`;
+                if (a.isAlt) {
+                    speak(`开始：${a.name} 第一侧`);
+                    await timer(a.work, a.name+"(一)", 'WORK');
+                    speak(`换边`);
+                    await timer(a.switchRest, "准备另一侧", "REST");
+                    speak(`开始：第二侧`);
+                    await timer(a.work, a.name+"(二)", 'WORK');
+                } else {
+                    speak(`开始：${a.name}`);
+                    await timer(a.work, a.name, 'WORK');
+                }
+                if (s < a.sets && db.isPlaying) { speak(`休息`); await timer(a.actionRest, "休息", "REST"); }
+            }
+            if (i < db.actions.length - 1 && db.isPlaying) {
+                speak(`下一个动作是：${db.actions[i+1].name}`);
+                await timer(a.groupRest, "大休息", "BREAK");
+            }
+        }
+        if(db.isPlaying) { speak("全部完成"); resetUI(); }
+    }
+
+    function timer(sec, title, status) {
+        return new Promise(res => {
+            let left = sec;
+            document.getElementById('subText').innerText = title;
+            document.getElementById('statusText').innerText = status;
+            db.timer = setInterval(() => {
+                if (!db.isPlaying) { clearInterval(db.timer); res(); return; }
+                if (db.isPaused) return;
+                document.getElementById('mainTime').innerText = left;
+                if (left <= 3 && left > 0) speak(left.toString());
+                if (left <= 0) { clearInterval(db.timer); res(); }
+                left--;
+            }, 1000);
+        });
+    }
+
+    function stopTrainer() { db.isPlaying = false; clearInterval(db.timer); resetUI(); }
+    function resetUI() {
+        db.isPlaying = false; document.getElementById('playIcon').innerText = 'play_arrow';
+        document.getElementById('stopBtn').classList.add('hidden');
+        document.getElementById('mainTime').innerText = '00';
+    }
+
+    function saveAction() {
+        const item = {
+            name: document.getElementById('name').value || '未命名',
+            sets: parseInt(document.getElementById('sets').value) || 1,
+            work: parseInt(document.getElementById('work').value) || 10,
+            isAlt: document.getElementById('isAlt').checked,
+            switchRest: parseInt(document.getElementById('switchRest').value) || 0,
+            actionRest: parseInt(document.getElementById('actionRest').value) || 0,
+            groupRest: parseInt(document.getElementById('groupRest').value) || 0
+        };
+        if (db.activeIdx === -1) db.actions.push(item);
+        else { db.actions[db.activeIdx] = item; resetForm(); }
+        sync(); render();
+    }
+
+    function editAction(i) {
+        db.activeIdx = i; const a = db.actions[i];
+        document.getElementById('name').value = a.name;
+        document.getElementById('sets').value = a.sets;
+        document.getElementById('work').value = a.work;
+        document.getElementById('isAlt').checked = a.isAlt;
+        document.getElementById('switchRest').value = a.switchRest;
+        document.getElementById('actionRest').value = a.actionRest;
+        document.getElementById('groupRest').value = a.groupRest;
+        document.getElementById('saveBtnTxt').innerText = "修改动作内容";
+        document.getElementById('saveBtn').classList.add('btn-edit-mode');
+        document.getElementById('cancelEdit').classList.remove('hidden');
+        window.scrollTo({top: 150, behavior: 'smooth'});
+    }
+
+    function resetForm() { db.activeIdx = -1; document.getElementById('saveBtnTxt').innerText = "保存到列表"; document.getElementById('saveBtn').classList.remove('btn-edit-mode'); document.getElementById('cancelEdit').classList.add('hidden'); }
+    function delAction(i) { db.actions.splice(i, 1); sync(); render(); }
+    
+    function render() {
+        document.getElementById('currentList').innerHTML = db.actions.map((a, i) => `
+            <div class="list-item">
+                <div class="action-content" onclick="editAction(${i})"><strong>${a.name}</strong><br><small>${a.sets}组 | ${a.work}s</small></div>
+                <button onclick="delAction(${i})" style="border:none;background:none;color:red;"><span class="material-symbols-rounded">delete</span></button>
+            </div>
+        `).join('');
+    }
+
+    render();
+    if ('wakeLock' in navigator) { navigator.wakeLock.request('screen').catch(()=>{}); }
+</script>
+</body>
+</html>
