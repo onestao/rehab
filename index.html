@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>REHAB PRO V23</title>
+    <title>REHAB PRO V24</title>
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#0061a4">
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
@@ -34,8 +34,7 @@
         #mainTime { font-size: 80px; font-weight: 800; line-height: 1; margin: 8px 0; color: var(--primary-container); font-variant-numeric: tabular-nums; }
         .progress-info { display: flex; justify-content: space-around; font-size: 13px; opacity: 0.9; margin-top: 8px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 8px; }
         
-        .skip-btn { position: absolute; right: 12px; top: 12px; color: white; opacity: 0.5; cursor: pointer; padding: 4px; }
-        .skip-btn:active { opacity: 1; transform: scale(1.1); }
+        .skip-btn { position: absolute; right: 12px; top: 12px; color: white; opacity: 0.5; cursor: pointer; padding: 4px; z-index: 10; }
 
         .list-item { background: white; padding: 10px 12px; border-radius: 14px; margin: 6px 0; display: flex; align-items: center; border: 1px solid #eee; }
         .action-content { flex: 1; margin-left: 8px; cursor: pointer; }
@@ -49,7 +48,6 @@
         
         .btn { height: 44px; border-radius: 10px; border: none; font-weight: 700; font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; }
         .btn-primary { background: var(--primary); color: white; width: 100%; }
-        .btn-tonal { background: var(--primary-container); color: var(--on-primary-container); }
 
         .controls { position: fixed; bottom: 20px; display: flex; gap: 12px; align-items: center; z-index: 1000; }
         .fab { width: 64px; height: 64px; border-radius: 20px; background: var(--primary); color: white; display: flex; align-items: center; justify-content: center; border: none; box-shadow: 0 4px 15px rgba(0,97,164,0.3); }
@@ -60,7 +58,6 @@
         .hidden { display: none; }
         #silentAudio { display: none; }
         
-        .history-detail { margin-top: 8px; border-top: 1px solid #eee; padding-top: 8px; }
         .detail-row { font-size: 11px; color: #666; display: flex; justify-content: space-between; margin-bottom: 2px; }
     </style>
 </head>
@@ -79,11 +76,11 @@
     <nav class="tabs">
         <button class="tab-btn active" id="btn-workout" onclick="setTab('workout')">训练</button>
         <button class="tab-btn" id="btn-routines" onclick="setTab('routines')">方案库</button>
-        <button class="tab-btn" id="btn-history" onclick="setTab('history')">历史</button>
-        <button class="tab-btn" id="btn-sync" onclick="setTab('sync')">同步</button>
+        <button class="tab-btn" id="btn-history" onclick="setTab('history')">训练历史</button>
+        <button class="tab-btn" id="btn-sync" onclick="setTab('sync')">同步设置</button>
     </nav>
 
-    <!-- 1. 训练面板 -->
+    <!-- 训练面板 -->
     <div id="workout" class="section active">
         <div class="card timer-panel">
             <div id="statusText" style="font-size: 12px; font-weight: bold; color: var(--primary-container);">READY</div>
@@ -121,38 +118,35 @@
 
         <div class="card" style="border: 1px dashed var(--outline); background:transparent;">
             <input type="text" id="newRoutineName" placeholder="为此方案命名..." style="margin-bottom:8px;">
-            <button class="btn btn-primary" style="background:var(--tertiary);" onclick="saveToRoutines()">
-                <span class="material-symbols-rounded">stars</span> 保存为固定方案
-            </button>
+            <button class="btn btn-primary" style="background:var(--tertiary);" onclick="saveToRoutines()">保存为固定方案</button>
         </div>
     </div>
 
-    <!-- 2. 同步设置 -->
+    <!-- 同步设置 -->
     <div id="sync" class="section">
         <div class="card">
-            <h3 style="margin:0 0 10px 0; font-size:16px;">同步引擎</h3>
+            <h3 style="margin:0 0 10px 0; font-size:16px;">同步引擎 (支持历史同步)</h3>
             <select id="syncMode" onchange="toggleSyncFields()" style="margin-bottom:10px;">
                 <option value="none">关闭同步</option>
-                <option value="s3">S3 兼容协议 (CAS数据胶囊/R2)</option>
+                <option value="s3">S3 协议 (CAS数据胶囊/R2)</option>
                 <option value="webdav">WebDAV (坚果云等)</option>
             </select>
             <div id="s3Fields" class="hidden">
                 <input type="text" id="s3Endpoint" placeholder="Endpoint (含 https://)" style="margin-bottom:6px;">
                 <input type="text" id="s3Bucket" placeholder="Bucket Name" style="margin-bottom:6px;">
-                <input type="text" id="s3Region" placeholder="Region (如 auto)" style="margin-bottom:6px;">
+                <input type="text" id="s3Region" placeholder="Region" style="margin-bottom:6px;">
                 <div style="display:flex; gap:6px; margin-bottom:6px;"><input type="text" id="s3Key" placeholder="Access Key"><input type="password" id="s3Secret" placeholder="Secret Key"></div>
             </div>
             <div id="webdavFields" class="hidden">
                 <input type="text" id="davUrl" placeholder="WebDAV 地址" style="margin-bottom:6px;">
                 <div style="display:flex; gap:6px;"><input type="text" id="davUser" placeholder="用户名"><input type="password" id="davPass" placeholder="密码"></div>
             </div>
-            <button class="btn btn-primary" onclick="saveSyncConfig()" style="margin-top:10px; background:var(--tertiary);">保存配置</button>
+            <button class="btn btn-primary" onclick="saveSyncConfig()" style="margin-top:10px; background:var(--tertiary);">保存并同步配置</button>
             <div style="display:flex; gap:8px; margin-top:10px;">
-                <button class="btn btn-primary" style="flex:1" onclick="manualPush()">立即上传</button>
-                <button class="btn btn-primary" style="flex:1" onclick="manualPull()">立即下载</button>
+                <button class="btn btn-primary" style="flex:1" onclick="manualPush()">立即备份到云端</button>
+                <button class="btn btn-primary" style="flex:1" onclick="manualPull()">从云端下载数据</button>
             </div>
         </div>
-        <button class="btn" style="width:100%; border:1px solid #ccc; background:white;" onclick="exportData()">导出 JSON 备份</button>
     </div>
 
     <div id="routines" class="section"><div id="routineList"></div></div>
@@ -164,46 +158,46 @@
     </div>
 
 <script>
-    // --- 加密辅助 ---
+    // --- 算法辅助 ---
     async function sha256(str) { const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(str)); return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join(""); }
     async function hmac(key, data) { const cKey = typeof key === "string" ? new TextEncoder().encode(key) : key; const cryptoKey = await crypto.subtle.importKey("raw", cKey, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]); return await crypto.subtle.sign("HMAC", cryptoKey, new TextEncoder().encode(data)); }
 
-    // --- 数据持久化与向前兼容 ---
-    const DB_KEY = 'rp_v23_db';
-    const CFG_KEY = 'rp_v23_cfg';
+    // --- 数据持久化与向前兼容逻辑 ---
+    const DB_KEY = 'rp_v24_db';
+    const CFG_KEY = 'rp_v24_cfg';
 
-    function migrateData() {
-        const legacyKeys = ['rp_v21_main', 'rp_v20_a', 'rp_v18_a', 'rp_v15_a', 'rp_data_actions'];
-        let migratedData = { actions: [], routines: [], history: [], rate: 1.1 };
-        
-        // 尝试从旧版本导入动作列表
-        for (const key of legacyKeys) {
-            const old = localStorage.getItem(key);
-            if (old) {
+    function autoMigrate() {
+        const legacyKeys = ['rp_v23_db', 'rp_v22_db', 'rp_v21_main', 'rp_v20_a', 'rp_v18_a', 'rp_v15_a'];
+        let data = { actions: [], routines: [], history: [], rate: 1.1 };
+        let cfg = { mode: 'none', s3: {}, dav: {} };
+
+        // 迁移配置
+        const oldCfg = localStorage.getItem('rp_v23_cfg') || localStorage.getItem('rp_v21_config') || localStorage.getItem('rp_v16_cfg');
+        if(oldCfg) cfg = JSON.parse(oldCfg);
+
+        // 迁移数据
+        for (let k of legacyKeys) {
+            let val = localStorage.getItem(k);
+            if(val) {
                 try {
-                    const parsed = JSON.parse(old);
-                    // 兼容 v21 的全量结构或旧版的纯动作数组结构
-                    migratedData.actions = parsed.actions || parsed;
-                    break; 
-                } catch(e) {}
+                    let p = JSON.parse(val);
+                    data.actions = p.actions || (Array.isArray(p) ? p : []);
+                    data.routines = p.routines || [];
+                    data.history = p.history || [];
+                    data.rate = p.rate || 1.1;
+                    break;
+                } catch(e){}
             }
         }
-        // 导入配置
-        const oldCfg = localStorage.getItem('rp_v21_config') || localStorage.getItem('rp_v16_cfg');
-        let migratedCfg = { mode: 'none', s3: {}, dav: {} };
-        if (oldCfg) migratedCfg = JSON.parse(oldCfg);
-
-        return { data: migratedData, cfg: migratedCfg };
+        return { data, cfg };
     }
 
     let db = JSON.parse(localStorage.getItem(DB_KEY));
     let cfg = JSON.parse(localStorage.getItem(CFG_KEY));
 
-    // 如果是新安装或更新，执行迁移
-    if (!db) {
-        const migrated = migrateData();
-        db = migrated.data;
-        cfg = migrated.cfg;
+    if(!db) {
+        let m = autoMigrate();
+        db = m.data; cfg = m.cfg;
         localStorage.setItem(DB_KEY, JSON.stringify(db));
         localStorage.setItem(CFG_KEY, JSON.stringify(cfg));
     }
@@ -243,12 +237,12 @@
         render();
     }
 
-    // --- 同步请求引擎 ---
+    // --- S3 签名引擎 ---
     async function s3Req(method, body = null) {
         const { endpoint, bucket, region, key, secret } = cfg.s3;
         const urlObj = new URL(endpoint);
         const host = urlObj.host;
-        const path = `/${bucket}/rehab_v23.json`;
+        const path = `/${bucket}/rehab_v24_sync.json`;
         const datetime = new Date().toISOString().replace(/[:\-]|\.\d{3}/g, '');
         const date = datetime.slice(0, 8);
         const hashedPayload = body ? await sha256(body) : "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
@@ -266,13 +260,14 @@
     async function davReq(method, body = null) {
         const { url, user, pass } = cfg.dav;
         const auth = btoa(`${user}:${pass}`);
-        return fetch(url.endsWith('/') ? url+'rehab_v23.json' : url+'/rehab_v23.json', { method, headers: { 'Authorization': `Basic ${auth}`, 'Content-Type': 'application/json' }, body });
+        return fetch(url.endsWith('/') ? url+'rehab_v24_sync.json' : url+'/rehab_v24_sync.json', { method, headers: { 'Authorization': `Basic ${auth}`, 'Content-Type': 'application/json' }, body });
     }
 
     async function syncPush() {
         if(cfg.mode === 'none') return;
         updateStatus("● UPLOADING", "orange");
         try {
+            // 这里包含了 history 进行同步
             const res = (cfg.mode === 's3') ? await s3Req('PUT', JSON.stringify(db)) : await davReq('PUT', JSON.stringify(db));
             updateStatus(res.ok ? "● SYNCED" : "● ERROR", res.ok ? "green" : "red");
         } catch(e) { updateStatus("● OFFLINE", "red"); }
@@ -285,7 +280,12 @@
             const res = (cfg.mode === 's3') ? await s3Req('GET') : await davReq('GET');
             if(res.ok) {
                 const cloud = await res.json();
-                if(cloud && cloud.actions) { db = cloud; localStorage.setItem(DB_KEY, JSON.stringify(db)); render(); updateStatus("● SYNCED", "green"); }
+                if(cloud && cloud.actions) { 
+                    db = cloud; 
+                    localStorage.setItem(DB_KEY, JSON.stringify(db)); 
+                    render(); 
+                    updateStatus("● SYNCED", "green"); 
+                }
             }
         } catch(e) { updateStatus("● LOCAL", "gray"); }
     }
@@ -295,14 +295,14 @@
         cfg.s3 = { endpoint: document.getElementById('s3Endpoint').value, bucket: document.getElementById('s3Bucket').value, region: document.getElementById('s3Region').value, key: document.getElementById('s3Key').value, secret: document.getElementById('s3Secret').value };
         cfg.dav = { url: document.getElementById('davUrl').value, user: document.getElementById('davUser').value, pass: document.getElementById('davPass').value };
         localStorage.setItem(CFG_KEY, JSON.stringify(cfg));
-        alert("配置已保存");
+        alert("同步配置已保存");
     }
 
-    function manualPush() { if(confirm("上传本地数据覆盖云端？")) syncPush(); }
+    function manualPush() { if(confirm("上传本地全量数据（含历史）到云端？")) syncPush(); }
     function manualPull() { if(confirm("下载云端备份覆盖本地？")) autoPull().then(() => alert("拉取完成")); }
     function updateStatus(t, c) { const el = document.getElementById('syncStatus'); el.innerText = t; el.style.color = c; }
 
-    // --- 康复计时与语音引擎 ---
+    // --- 训练计时引擎 (语音补全版) ---
     function updateRate() { db.rate = document.getElementById('ttsRate').value; document.getElementById('rateLabel').innerText = db.rate; syncLocal(false); }
     function speak(t) { window.speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(t); u.lang='zh-CN'; u.rate=parseFloat(db.rate); window.speechSynthesis.speak(u); }
 
@@ -321,7 +321,9 @@
             document.getElementById('playIcon').innerText = 'pause';
             document.getElementById('stopBtn').classList.remove('hidden');
             document.getElementById('silentAudio').play();
-            await runSequence();
+            // 开始时立即播报第一个动作
+            speak(`现在开始训练：${db.actions[0].name}`);
+            await runFullSequence();
         } else {
             isPaused = !isPaused;
             document.getElementById('playIcon').innerText = isPaused ? 'play_arrow' : 'pause';
@@ -329,10 +331,11 @@
         }
     }
 
-    async function runSequence() {
+    async function runFullSequence() {
         for (let i = 0; i < db.actions.length; i++) {
             const a = db.actions[i];
             updateMediaMetadata(a.name, "正在训练");
+            
             for (let s = 1; s <= a.sets; s++) {
                 if (!isPlaying) return;
                 document.getElementById('totalSet').innerText = a.sets;
@@ -341,8 +344,10 @@
                 
                 for (let side of sides) {
                     if (!isPlaying) return;
-                    // 动作预告
-                    speak(s === 1 && side === sides[0] ? `现在开始训练：${a.name}` : (side || `第${s}组`));
+                    // 每一个新的侧向或新的组开始时播报
+                    if (!(i === 0 && s === 1 && side === sides[0])) {
+                        speak(side ? `${side}开始` : `第${s}组开始`);
+                    }
                     
                     for (let r = 1; r <= a.reps; r++) {
                         if (!isPlaying) return;
@@ -350,16 +355,19 @@
                         document.getElementById('curRep').innerText = r;
                         speak(`第${r}次`);
                         await timer(a.work, `${a.name} ${side}`, 'HOLD');
-                        if (r < a.reps && isPlaying) await timer(a.repRest, "次间休", "REST");
+                        if (r < a.reps && isPlaying) await timer(a.repRest, "放松", "REST");
                     }
                     if (a.isAlt && side === '左侧' && isPlaying) {
                         speak("准备换边");
-                        await timer(a.switchRest, "换边休息", "SWITCH");
+                        await timer(a.switchRest, "换边", "SWITCH");
                     }
                 }
                 if (s < a.sets && isPlaying) { speak(`组间休息`); await timer(a.actionRest, "组间休息", "SET REST"); }
             }
-            if (i < db.actions.length - 1 && isPlaying) { speak(`下一个：${db.actions[i+1].name}`); await timer(a.groupRest, "切换动作", "BREAK"); }
+            if (i < db.actions.length - 1 && isPlaying) { 
+                speak(`下一个动作：${db.actions[i+1].name}`); 
+                await timer(a.groupRest, "大休息", "BREAK"); 
+            }
         }
         finishTraining();
     }
@@ -373,7 +381,7 @@
                 if (!isPlaying || skipFlag) { clearInterval(timerInterval); skipFlag = false; res(); return; }
                 if (isPaused) return;
                 document.getElementById('mainTime').innerText = left;
-                if (left <= 3 && left > 0) speak(left.toString()); // 倒计时播报
+                if (left <= 3 && left > 0) speak(left.toString()); // 倒计时 3 2 1
                 if (left <= 0) { clearInterval(timerInterval); res(); }
                 left--;
             }, 1000);
@@ -381,10 +389,10 @@
     }
 
     function skipCurrent() { skipFlag = true; speak("跳过"); }
-    function stopTrainer() { if(confirm("停止训练？")) finishTraining(); }
+    function stopTrainer() { if(confirm("是否停止？")) finishTraining(); }
 
     function finishTraining() {
-        if(isPlaying) speak("训练圆满完成");
+        if(isPlaying) speak("训练已完成");
         isPlaying = false; clearInterval(timerInterval);
         document.getElementById('playIcon').innerText = 'play_arrow';
         document.getElementById('stopBtn').classList.add('hidden');
@@ -399,7 +407,7 @@
         }
     }
 
-    // --- 业务数据管理 ---
+    // --- 业务管理 ---
     function setTab(id) {
         document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -428,9 +436,9 @@
 
     function saveHistory() {
         const d = Math.round((Date.now()-startTime)/1000);
-        if(d < 10) return;
+        if(d < 5) return;
         db.history.unshift({ date: new Date().toLocaleString(), duration: d, actions: JSON.parse(JSON.stringify(db.actions)) });
-        syncLocal();
+        syncLocal(); // 这里触发的 syncLocal 会把 history 一起推向 S3
     }
 
     function render() {
@@ -441,7 +449,7 @@
                     <button class="sort-btn" onclick="moveAction(${i},1)"><span class="material-symbols-rounded">expand_more</span></button>
                 </div>
                 <div class="action-content" onclick="editAction(${i})">
-                    <strong>${a.name}</strong><br><small>${a.sets}组 x ${a.reps}次 | ${a.work}s | ${a.isAlt?'交替':''}</small>
+                    <strong>${a.name}</strong><br><small>${a.sets}组 x ${a.reps}次 | ${a.work}s</small>
                 </div>
                 <button onclick="db.actions.splice(${i},1);syncLocal();" style="border:none;background:none;color:var(--error);"><span class="material-symbols-rounded">delete</span></button>
             </div>
