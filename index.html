@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>REHAB PRO V29</title>
+    <title>REHAB PRO V30</title>
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#fdfcff">
     <!-- MD3 图标库 -->
@@ -11,6 +11,7 @@
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+    <!-- 必须存在的保活音频 -->
     <audio id="silentAudio" loop preload="auto">
         <source src="data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAgD4AAAB9AAACABAAZGF0YQAAAAA=" type="audio/wav">
     </audio>
@@ -20,19 +21,19 @@
             <div class="logo-container"><span class="material-symbols-rounded">fitness_center</span></div>
             <span class="brand-name">REHAB PRO</span>
         </div>
-        <div id="syncStatus" class="status-indicator">● LOCAL MODE</div>
+        <div id="syncStatus" class="status-indicator">● LOCAL</div>
     </header>
 
-    <main id="main-content">
+    <main id="main-app">
         <!-- 训练页 -->
         <section id="workout" class="page active">
             <div class="md-card timer-card">
                 <div class="timer-header">
                     <span id="statusText">READY</span>
-                    <button class="icon-btn-small skip-btn" onclick="skipCurrent()"><span class="material-symbols-rounded">skip_next</span></button>
+                    <button class="icon-btn-small" onclick="skipCurrent()"><span class="material-symbols-rounded">skip_next</span></button>
                 </div>
                 <div id="mainTime">00</div>
-                <div id="subText">准备就绪</div>
+                <div id="subText">准备开始</div>
                 <div class="progress-container">
                     <div class="progress-item"><small>总用时</small><b id="sessionTime">00:00</b></div>
                     <div class="progress-item"><small>组数</small><b><span id="curSet">0</span>/<span id="totalSet">0</span></b></div>
@@ -41,94 +42,81 @@
             </div>
 
             <div class="md-card">
-                <div class="tts-control">
-                    <span>语速: <span id="rateLabel">1.1</span>x</span>
+                <div class="tts-row">
+                    <span>播报语速: <span id="rateLabel">1.1</span>x</span>
                     <input type="range" id="ttsRate" min="0.5" max="2" step="0.1" value="1.1" oninput="updateRate()">
                 </div>
-                <div class="input-grid">
-                    <input type="text" id="name" class="span-3" placeholder="动作名称 (如: 踝泵)">
-                    <input type="number" id="sets" placeholder="组数">
-                    <input type="number" id="reps" placeholder="次数">
-                    <input type="number" id="work" placeholder="坚持(s)">
-                    <input type="number" id="repRest" placeholder="次休(s)">
-                    <input type="number" id="actionRest" placeholder="组休(s)">
-                    <input type="number" id="groupRest" placeholder="换项休(s)">
-                    <div class="alt-toggle span-3">
-                        <span>双侧交替训练</span>
+                <div class="adaptive-grid">
+                    <div class="field span-full"><input type="text" id="name" placeholder="动作名称"></div>
+                    <div class="field"><input type="number" id="sets" placeholder="组数"></div>
+                    <div class="field"><input type="number" id="reps" placeholder="次数"></div>
+                    <div class="field"><input type="number" id="work" placeholder="维持(s)"></div>
+                    <div class="field"><input type="number" id="repRest" placeholder="次休(s)"></div>
+                    <div class="field"><input type="number" id="actionRest" placeholder="组休(s)"></div>
+                    <div class="field"><input type="number" id="groupRest" placeholder="换项休(s)"></div>
+                    <div class="alt-box span-full">
+                        <span>左右交替训练</span>
                         <input type="checkbox" id="isAlt">
                     </div>
                 </div>
-                <button class="md-btn md-btn-primary" onclick="saveAction()" id="saveBtn">添加到计划</button>
+                <button class="md-btn md-btn-primary" onclick="saveAction()" id="saveBtn">添加到训练计划</button>
             </div>
 
-            <div id="currentActionList" class="action-list"></div>
+            <div id="currentActionList"></div>
 
-            <div class="md-card routine-save-card">
-                <input type="text" id="newRoutineName" placeholder="保存当前列表为方案...">
-                <button class="md-btn md-btn-tonal" onclick="saveToRoutines()">保存方案</button>
+            <div class="md-card routine-tool">
+                <input type="text" id="newRoutineName" placeholder="为此方案命名...">
+                <button class="md-btn md-btn-tonal" onclick="saveToRoutines()">保存为固定方案</button>
             </div>
-        </section>
-
-        <!-- 方案页 -->
-        <section id="routines" class="page">
-            <h2 class="page-title">方案库</h2>
-            <div id="routineList"></div>
-        </section>
-
-        <!-- 历史页 -->
-        <section id="history" class="page">
-            <h2 class="page-title">训练历史</h2>
-            <div id="historyList"></div>
         </section>
 
         <!-- 同步页 -->
         <section id="sync" class="page">
             <div class="md-card">
-                <h2>同步引擎</h2>
+                <h2 class="card-title">同步中心</h2>
                 <select id="syncMode" onchange="toggleSyncFields()" class="md-select">
-                    <option value="none">仅本地存储</option>
-                    <option value="s3">S3 兼容存储 (推荐)</option>
+                    <option value="none">关闭同步</option>
+                    <option value="s3">S3 兼容协议 (数据胶囊)</option>
                     <option value="webdav">WebDAV</option>
                 </select>
 
-                <div id="s3Fields" class="sync-fields hidden">
-                    <input type="text" id="s3Endpoint" placeholder="Endpoint (https://...)">
-                    <input type="text" id="s3Bucket" placeholder="Bucket Name">
-                    <input type="text" id="s3Region" placeholder="Region">
-                    <input type="text" id="s3Key" placeholder="Access Key">
-                    <input type="password" id="s3Secret" placeholder="Secret Key">
-                </div>
-
-                <div id="webdavFields" class="sync-fields hidden">
-                    <input type="text" id="davUrl" placeholder="WebDAV 地址">
-                    <input type="text" id="davUser" placeholder="用户名">
-                    <input type="password" id="davPass" placeholder="密码/应用密钥">
-                </div>
-
-                <div class="sync-actions">
-                    <button class="md-btn md-btn-primary" onclick="saveSyncConfig()">1. 保存配置</button>
-                    <div class="btn-group">
-                        <button class="md-btn md-btn-tonal" onclick="manualPull()">↓ 从云端下载</button>
-                        <button class="md-btn md-btn-tonal" onclick="manualPush()">↑ 备份到云端</button>
+                <div id="s3Fields" class="hidden">
+                    <div class="sync-input-group">
+                        <input type="text" id="s3Endpoint" placeholder="Endpoint (https://...)">
+                        <input type="text" id="s3Bucket" placeholder="Bucket Name">
+                        <input type="text" id="s3Region" placeholder="Region (如 auto)">
+                        <input type="text" id="s3Key" placeholder="Access Key">
+                        <input type="password" id="s3Secret" placeholder="Secret Key">
                     </div>
                 </div>
-                <p class="sync-tip">新设备同步：先保存配置，再点击“从云端下载”。</p>
+                
+                <div class="sync-ctrls">
+                    <button class="md-btn md-btn-primary" onclick="saveSyncConfig()">1. 保存配置</button>
+                    <div class="btn-group">
+                        <button class="md-btn md-btn-tonal" onclick="manualPull()">2. 下载云端数据</button>
+                        <button class="md-btn md-btn-tonal" onclick="manualPush()">立即备份</button>
+                    </div>
+                </div>
             </div>
         </section>
+
+        <section id="routines" class="page"><div id="routineList"></div></section>
+        <section id="history" class="page"><div id="historyList"></div></section>
     </main>
 
     <nav class="bottom-nav">
-        <button class="nav-item active" onclick="setTab('workout')"><span class="material-symbols-rounded">exercise</span><small>训练</small></button>
-        <button class="nav-item" onclick="setTab('routines')"><span class="material-symbols-rounded">bookmarks</span><small>方案</small></button>
-        <button class="nav-item" onclick="setTab('history')"><span class="material-symbols-rounded">history</span><small>历史</small></button>
-        <button class="nav-item" onclick="setTab('sync')"><span class="material-symbols-rounded">cloud_sync</span><small>同步</small></button>
+        <button class="nav-item active" onclick="tabNav('workout', this)"><span class="material-symbols-rounded">fitness_center</span><small>训练</small></button>
+        <button class="nav-item" onclick="tabNav('routines', this)"><span class="material-symbols-rounded">inventory_2</span><small>方案</small></button>
+        <button class="nav-item" onclick="tabNav('history', this)"><span class="material-symbols-rounded">history</span><small>历史</small></button>
+        <button class="nav-item" onclick="tabNav('sync', this)"><span class="material-symbols-rounded">sync</span><small>同步</small></button>
     </nav>
 
-    <div class="fab-container">
+    <div class="fab-stack">
         <button class="fab fab-stop hidden" id="stopBtn" onclick="stopTrainer()"><span class="material-symbols-rounded">stop</span></button>
         <button class="fab fab-play" id="playBtn" onclick="handlePlay()"><span class="material-symbols-rounded" id="playIcon">play_arrow</span></button>
     </div>
 
+    <!-- 先加载同步逻辑，再加载业务逻辑 -->
     <script src="sync.js"></script>
     <script src="app.js"></script>
 </body>
