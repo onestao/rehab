@@ -1,5 +1,23 @@
-self.addEventListener('install', () => self.skipWaiting());
-self.addEventListener('activate', () => self.clients.claim());
-self.addEventListener('fetch', (event) => {
-  // 这里可以留空，但必须存在这个监听器
+const CACHE = 'rehab-pro-v1';
+const ASSETS = ['index.html', 'styles.css', 'data.js', 'sync.js', 'workout.js', 'manifest.json'];
+
+self.addEventListener('install', e => {
+    e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
+    self.skipWaiting();
+});
+
+self.addEventListener('activate', e => {
+    e.waitUntil(
+        caches.keys().then(keys => Promise.all(
+            keys.filter(k => k !== CACHE).map(k => caches.delete(k))
+        ))
+    );
+    self.clients.claim();
+});
+
+self.addEventListener('fetch', e => {
+    if (e.request.method !== 'GET') return;
+    e.respondWith(
+        caches.match(e.request).then(cached => cached || fetch(e.request))
+    );
 });
