@@ -75,6 +75,9 @@
     --md-sys-motion-duration-short: 200ms;
     --md-sys-motion-duration-medium: 400ms;
     --md-sys-motion-duration-long: 500ms;
+    --md-state-hover: 0.08;
+    --md-state-press: 0.14;
+    --md-expressive-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 /* --- Reset & Base --- */
@@ -136,9 +139,9 @@ body {
 }
 
 /* --- Page --- */
-.page { display: none; padding-bottom: 100px; min-height: calc(100vh - 64px); }
+.page { display: none; padding-bottom: 108px; min-height: calc(100vh - 64px); }
 .page.active { display: block; animation: fadeSlideIn var(--md-sys-motion-duration-medium) var(--md-sys-motion-emphasized-decelerate); }
-#workout { padding-bottom: 210px; }
+#workout { padding-bottom: 184px; }
 
 @keyframes fadeSlideIn {
     from { opacity: 0; transform: translateY(8px); }
@@ -170,7 +173,13 @@ body {
     padding: 16px;
     border-radius: var(--md-sys-shape-lg);
     border: 1px solid var(--md-sys-outline-variant);
-    transition: box-shadow var(--md-sys-motion-duration-short) var(--md-sys-motion-emphasized);
+    transition:
+        box-shadow var(--md-sys-motion-duration-short) var(--md-sys-motion-emphasized),
+        transform var(--md-sys-motion-duration-short) var(--md-sys-motion-emphasized),
+        background var(--md-sys-motion-duration-short) var(--md-sys-motion-emphasized);
+}
+.md-card:active {
+    transform: scale(0.996);
 }
 
 /* --- Timer Panel (Expressive) --- */
@@ -183,6 +192,15 @@ body {
     border: none;
     overflow: hidden;
 }
+.timer-panel::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(115deg, transparent 0%, rgba(255,255,255,0.12) 46%, transparent 78%);
+    opacity: 0.62;
+    pointer-events: none;
+    z-index: 0;
+}
 .timer-panel::before {
     content: '';
     position: absolute;
@@ -193,6 +211,11 @@ body {
     background: radial-gradient(circle, var(--timer-orb) 0%, transparent 70%);
     border-radius: 50%;
     pointer-events: none;
+    z-index: 0;
+}
+.timer-panel > * {
+    position: relative;
+    z-index: 1;
 }
 #statusText {
     font-size: 12px;
@@ -261,7 +284,10 @@ body {
     font-size: 16px;
     color: var(--md-sys-on-surface);
     outline: none;
-    transition: border-color var(--md-sys-motion-duration-short) var(--md-sys-motion-emphasized);
+    transition:
+        border-color var(--md-sys-motion-duration-short) var(--md-sys-motion-emphasized),
+        box-shadow var(--md-sys-motion-duration-short) var(--md-sys-motion-emphasized),
+        background var(--md-sys-motion-duration-short) var(--md-sys-motion-emphasized);
     -webkit-appearance: none;
     appearance: none;
 }
@@ -292,6 +318,7 @@ body {
     border-color: var(--md-sys-primary);
     border-width: 2px;
     padding: 16px 11px 4px;
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--md-sys-primary) 14%, transparent);
 }
 .md-field input::placeholder { color: transparent; }
 .md-field select { cursor: pointer; padding-right: 32px; }
@@ -393,6 +420,7 @@ body {
     transition: opacity var(--md-sys-motion-duration-short);
 }
 .md-btn:active::after { opacity: 0.12; }
+.md-btn:hover::after { opacity: var(--md-state-hover); }
 .md-btn-filled {
     background: var(--md-sys-primary);
     color: var(--md-sys-on-primary);
@@ -403,6 +431,14 @@ body {
     height: 48px;
 }
 .md-btn-filled:hover { box-shadow: var(--md-sys-elevation-2); }
+.md-btn:focus-visible,
+.md-fab:focus-visible,
+.nav-item:focus-visible,
+.theme-swatch:focus-visible,
+.color-picker:focus-within {
+    outline: 3px solid color-mix(in srgb, var(--md-sys-primary) 45%, transparent);
+    outline-offset: 3px;
+}
 .md-btn-tonal {
     background: var(--md-sys-secondary-container);
     color: var(--md-sys-on-secondary-container);
@@ -524,11 +560,12 @@ body {
     position: fixed;
     bottom: 0;
     width: 100%;
-    height: 84px;
+    height: calc(76px + env(safe-area-inset-bottom));
     background: var(--md-sys-surface-container);
     display: flex;
     align-items: center;
-    padding-bottom: env(safe-area-inset-bottom);
+    justify-content: space-around;
+    padding: 6px 8px calc(6px + env(safe-area-inset-bottom));
     z-index: 100;
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
@@ -539,60 +576,70 @@ body {
     border: none;
     background: none;
     display: flex;
-    flex-direction: column;
     align-items: center;
     justify-content: center;
     color: var(--md-sys-on-surface-variant);
-    gap: 0;
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 500;
     padding: 0;
     cursor: pointer;
     position: relative;
     -webkit-tap-highlight-color: transparent;
-    letter-spacing: 0.3px;
-    height: calc(72px - env(safe-area-inset-bottom) / 2);
+    height: 64px;
+    min-width: 0;
 }
 .nav-content {
-    width: min(82%, 78px);
-    height: 58px;
+    width: 72px;
+    height: 56px;
     position: relative;
     z-index: 1;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 1px;
+    gap: 2px;
     border-radius: var(--md-sys-shape-full);
 }
 .nav-item .material-symbols-rounded {
     font-size: 24px;
-    transition: all var(--md-sys-motion-duration-medium) var(--md-sys-motion-emphasized);
+    transition:
+        transform var(--md-sys-motion-duration-medium) var(--md-expressive-spring),
+        color var(--md-sys-motion-duration-medium) var(--md-sys-motion-emphasized),
+        font-variation-settings var(--md-sys-motion-duration-medium) var(--md-sys-motion-emphasized);
 }
 .nav-indicator {
     position: absolute;
-    top: 50%;
-    transform: translateY(-50%);
+    top: 4px;
+    left: 50%;
+    transform: translateX(-50%);
     width: 0;
-    height: 32px;
+    height: 56px;
     border-radius: var(--md-sys-shape-full);
     background: var(--md-sys-secondary-container);
-    transition: all var(--md-sys-motion-duration-medium) var(--md-sys-motion-emphasized);
+    transition:
+        width var(--md-sys-motion-duration-medium) var(--md-expressive-spring),
+        height var(--md-sys-motion-duration-medium) var(--md-expressive-spring),
+        border-radius var(--md-sys-motion-duration-medium) var(--md-sys-motion-emphasized),
+        background var(--md-sys-motion-duration-medium) var(--md-sys-motion-emphasized);
     z-index: 0;
 }
 .nav-item small {
     display: block;
-    line-height: 1.1;
+    width: 100%;
+    font-size: 12px;
+    line-height: 1;
     text-align: center;
+    white-space: nowrap;
 }
 .nav-item.active { color: var(--md-sys-on-surface); }
 .nav-item.active .material-symbols-rounded {
     color: var(--md-sys-on-secondary-container);
     font-variation-settings: 'FILL' 1;
+    transform: translateY(-1px) scale(1.08);
 }
 .nav-item.active .nav-indicator {
-    width: min(82%, 78px);
-    height: 58px;
+    width: 72px;
+    border-radius: 24px;
 }
 .nav-item.active small { font-weight: 700; color: var(--md-sys-on-secondary-container); }
 
@@ -600,35 +647,65 @@ body {
 .workout-controls {
     position: fixed;
     left: 50%;
-    bottom: calc(104px + env(safe-area-inset-bottom));
+    bottom: calc(92px + env(safe-area-inset-bottom));
     transform: translateX(-50%);
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 18px;
+    gap: 14px;
+    min-height: 0;
+    margin: 0;
+    padding: 10px 12px;
+    border: none;
+    border-radius: 34px;
+    background: rgba(244, 243, 250, 0.76);
+    background:
+        linear-gradient(135deg, rgba(255,255,255,0.72), rgba(244,243,250,0.42)),
+        color-mix(in srgb, var(--md-sys-primary-container) 18%, transparent);
+    box-shadow:
+        0 14px 36px rgba(0, 29, 54, 0.18),
+        0 4px 12px rgba(0, 0, 0, 0.12);
+    backdrop-filter: blur(22px) saturate(1.35);
+    -webkit-backdrop-filter: blur(22px) saturate(1.35);
     z-index: 95;
-    padding: 8px 12px;
-    border-radius: 32px;
-    background: rgba(238, 237, 244, 0.86);
-    border: 1px solid var(--md-sys-outline-variant);
-    box-shadow: var(--md-sys-elevation-3);
-    backdrop-filter: blur(18px);
-    -webkit-backdrop-filter: blur(18px);
+    transition:
+        transform var(--md-sys-motion-duration-medium) var(--md-expressive-spring),
+        box-shadow var(--md-sys-motion-duration-medium) var(--md-sys-motion-emphasized),
+        background var(--md-sys-motion-duration-medium) var(--md-sys-motion-emphasized);
+}
+body.is-training .workout-controls {
+    transform: translateX(-50%) translateY(-4px);
+    box-shadow:
+        0 18px 44px rgba(0, 29, 54, 0.22),
+        0 6px 16px rgba(0, 0, 0, 0.14);
 }
 .md-fab {
     width: 64px;
     height: 64px;
     border-radius: 22px;
     border: none;
-    box-shadow: var(--md-sys-elevation-3);
+    box-shadow:
+        0 6px 18px rgba(0, 29, 54, 0.18),
+        0 2px 6px rgba(0, 0, 0, 0.12);
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    transition: all var(--md-sys-motion-duration-medium) var(--md-sys-motion-emphasized);
+    transition:
+        transform var(--md-sys-motion-duration-medium) var(--md-expressive-spring),
+        border-radius var(--md-sys-motion-duration-medium) var(--md-expressive-spring),
+        width var(--md-sys-motion-duration-medium) var(--md-expressive-spring),
+        height var(--md-sys-motion-duration-medium) var(--md-expressive-spring),
+        box-shadow var(--md-sys-motion-duration-medium) var(--md-sys-motion-emphasized),
+        background var(--md-sys-motion-duration-medium) var(--md-sys-motion-emphasized);
     -webkit-tap-highlight-color: transparent;
     position: relative;
     overflow: hidden;
+}
+.md-fab:hover {
+    box-shadow:
+        0 10px 24px rgba(0, 29, 54, 0.22),
+        0 3px 8px rgba(0, 0, 0, 0.14);
 }
 .md-fab::after {
     content: '';
@@ -639,23 +716,43 @@ body {
     transition: opacity var(--md-sys-motion-duration-short);
 }
 .md-fab:active { transform: scale(0.92); }
-.md-fab:active::after { opacity: 0.12; }
+.md-fab:hover::after { opacity: var(--md-state-hover); }
+.md-fab:active::after { opacity: var(--md-state-press); }
 .md-fab .material-symbols-rounded { font-size: 24px; position: relative; z-index: 1; }
 .fab-play {
-    width: 76px;
-    height: 76px;
-    border-radius: 26px;
+    width: 68px;
+    height: 68px;
+    border-radius: 24px;
 }
-.fab-play .material-symbols-rounded { font-size: 34px; }
+body.is-training .fab-play {
+    width: 76px;
+    border-radius: 28px;
+}
+body.is-paused .fab-play {
+    border-radius: 34px;
+}
+.fab-play .material-symbols-rounded { font-size: 32px; }
 .fab-play {
     background: var(--md-sys-primary-container);
     color: var(--md-sys-on-primary-container);
 }
+body.is-training .fab-play {
+    background: var(--md-sys-primary);
+    color: var(--md-sys-on-primary);
+}
+body.is-paused .fab-play {
+    background: var(--md-sys-tertiary-container);
+    color: var(--md-sys-on-tertiary-container);
+}
 .fab-stop {
     background: var(--md-sys-error-container);
     color: var(--md-sys-on-error-container);
-    width: 56px;
-    height: 56px;
+    width: 52px;
+    height: 52px;
+    border-radius: 18px;
+}
+body.is-training .fab-stop {
+    border-radius: 26px 18px 26px 18px;
 }
 
 /* --- Skip Button --- */
@@ -814,6 +911,17 @@ body {
     .md-nav-rail { max-width: 520px; left: 50%; transform: translateX(-50%); border-radius: var(--md-sys-shape-lg) var(--md-sys-shape-lg) 0 0; }
 }
 
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 1ms !important;
+        animation-iteration-count: 1 !important;
+        scroll-behavior: auto !important;
+        transition-duration: 1ms !important;
+    }
+}
+
 /* ============================================
    Dark Mode (M3 Expressive)
    ============================================ */
@@ -898,7 +1006,15 @@ body {
         background: var(--md-sys-surface-container-low);
         border-color: var(--md-sys-outline-variant);
     }
-    .workout-controls { background: rgba(30, 32, 36, 0.86); }
+    .workout-controls {
+        background: rgba(30, 32, 36, 0.78);
+        background:
+            linear-gradient(135deg, rgba(51,53,58,0.74), rgba(30,32,36,0.44)),
+            color-mix(in srgb, var(--md-sys-primary-container) 14%, transparent);
+        box-shadow:
+            0 16px 40px rgba(0, 0, 0, 0.42),
+            0 4px 14px rgba(0, 0, 0, 0.28);
+    }
     .nav-indicator { background: var(--md-sys-secondary-container); }
     .nav-item.active .material-symbols-rounded { color: var(--md-sys-on-secondary-container); }
 }

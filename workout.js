@@ -118,10 +118,16 @@ const workout = {
         localStorage.setItem(data.DB_KEY, JSON.stringify(data.db));
     },
 
+    updateStateClasses() {
+        document.body.classList.toggle('is-training', this.isPlaying);
+        document.body.classList.toggle('is-paused', this.isPlaying && this.isPaused);
+    },
+
     async toggle() {
         if (!this.isPlaying) {
             if (data.db.actions.length === 0) return;
             this.isPlaying = true; this.isPaused = false; this.totalSec = 0;
+            this.updateStateClasses();
             document.getElementById('playIcon').innerText = 'pause';
             document.getElementById('stopBtn').classList.remove('hidden');
             await this.acquireWakeLock();
@@ -135,6 +141,7 @@ const workout = {
             this.run();
         } else {
             this.isPaused = !this.isPaused;
+            this.updateStateClasses();
             document.getElementById('playIcon').innerText = this.isPaused ? 'play_arrow' : 'pause';
             if ('mediaSession' in navigator) navigator.mediaSession.playbackState = this.isPaused ? 'paused' : 'playing';
             if(this.isPaused) window.speechSynthesis.pause(); else window.speechSynthesis.resume();
@@ -235,6 +242,8 @@ const workout = {
     finish() {
         const duration = this.totalSec;
         this.isPlaying = false;
+        this.isPaused = false;
+        this.updateStateClasses();
         clearInterval(this.timer); clearInterval(this.sessionInt);
         clearInterval(this._speechWatchdog); clearInterval(this._audioKeepAliveInt);
         window.speechSynthesis.cancel();

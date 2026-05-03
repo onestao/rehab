@@ -41,11 +41,6 @@
                 </div>
             </div>
 
-            <div class="workout-controls">
-                <button class="md-fab fab-stop hidden" id="stopBtn" onclick="workout.stop()"><span class="material-symbols-rounded">stop</span></button>
-                <button class="md-fab fab-play" id="playBtn" onclick="workout.toggle()"><span class="material-symbols-rounded" id="playIcon">play_arrow</span></button>
-            </div>
-
             <div class="md-card input-card">
                 <div class="rate-row">
                     <span class="material-symbols-rounded" style="font-size:18px">speed</span>
@@ -72,6 +67,10 @@
                 <button class="md-btn md-btn-filled" onclick="data.addAction()">
                     <span class="material-symbols-rounded">add</span> 添加到计划
                 </button>
+            </div>
+            <div class="workout-controls" aria-label="训练控制">
+                <button class="md-fab fab-stop hidden" id="stopBtn" onclick="workout.stop()" aria-label="停止训练"><span class="material-symbols-rounded">stop</span></button>
+                <button class="md-fab fab-play" id="playBtn" onclick="workout.toggle()" aria-label="开始或暂停训练"><span class="material-symbols-rounded" id="playIcon">play_arrow</span></button>
             </div>
             <div id="currentActionList"></div>
             <div class="md-card routine-tool">
