@@ -40,6 +40,42 @@ const sync = {
         });
     },
 
+    davUrl() {
+        const cfg = data.cfg.dav || {};
+        const base = (cfg.url || '').trim().replace(/\/+$/, '');
+        const file = (cfg.path || 'training_assistant_data.json').trim().replace(/^\/+/, '');
+        if (!base) throw new Error('请填写 WebDAV 地址');
+        return `${base}/${file}`;
+    },
+
+    basicAuth(user, pass) {
+        const bytes = new TextEncoder().encode(`${user || ''}:${pass || ''}`);
+        let binary = '';
+        bytes.forEach(b => { binary += String.fromCharCode(b); });
+        return btoa(binary);
+    },
+
+    davHeaders() {
+        const { user, pass } = data.cfg.dav || {};
+        const headers = { 'Content-Type': 'application/json' };
+        if (user || pass) headers.Authorization = `Basic ${this.basicAuth(user, pass)}`;
+        return headers;
+    },
+
+    async davReq(method, body = null) {
+        return fetch(this.davUrl(), {
+            method,
+            headers: this.davHeaders(),
+            body
+        });
+    },
+
+    async syncReq(method, body = null) {
+        if (data.cfg.mode === 's3') return this.s3Req(method, body);
+        if (data.cfg.mode === 'webdav') return this.davReq(method, body);
+        throw new Error('请先选择并保存同步方式');
+    },
+
     saveConfig() {
         data.cfg.mode = document.getElementById('syncMode').value;
         data.cfg.s3 = {
@@ -49,15 +85,21 @@ const sync = {
             key: document.getElementById('s3Key').value,
             secret: document.getElementById('s3Secret').value
         };
+        data.cfg.dav = {
+            url: document.getElementById('davUrl').value,
+            user: document.getElementById('davUser').value,
+            pass: document.getElementById('davPass').value,
+            path: document.getElementById('davPath').value || 'training_assistant_data.json'
+        };
         localStorage.setItem(data.CFG_KEY, JSON.stringify(data.cfg));
-        this.setStatus(data.cfg.mode === 's3' ? 'cloud' : 'local');
+        this.setStatus(data.cfg.mode === 'none' ? 'local' : 'cloud');
         alert("配置已本地保存");
     },
 
     async pull() {
         try {
             this.setStatus('syncing');
-            const res = await this.s3Req('GET');
+            const res = await this.syncReq('GET');
             if (res.ok) {
                 const remote = await res.json();
                 data.db = { ...data.db, ...remote };
@@ -76,7 +118,7 @@ const sync = {
         try {
             this.setStatus('syncing');
             const payload = JSON.stringify(data.db);
-            const res = await this.s3Req('PUT', payload);
+            const res = await this.syncReq('PUT', payload);
             this.setStatus(res.ok ? 'cloud' : 'error');
             if (res.ok) alert("备份成功（含训练历史、方案库、动作列表）");
             else alert("备份失败，请检查参数");
@@ -84,12 +126,18 @@ const sync = {
     },
 
     async autoBackup(reason = 'auto') {
-        if (data.cfg.mode !== 's3') return;
-        const { endpoint, region, bucket, key, secret } = data.cfg.s3 || {};
-        if (!endpoint || !region || !bucket || !key || !secret) return;
+        if (data.cfg.mode === 'none') return;
+        if (data.cfg.mode === 's3') {
+            const { endpoint, region, bucket, key, secret } = data.cfg.s3 || {};
+            if (!endpoint || !region || !bucket || !key || !secret) return;
+        }
+        if (data.cfg.mode === 'webdav') {
+            const { url } = data.cfg.dav || {};
+            if (!url) return;
+        }
         this.setStatus('syncing');
         try {
-            const res = await this.s3Req('PUT', JSON.stringify(data.db));
+            const res = await this.syncReq('PUT', JSON.stringify(data.db));
             this.setStatus(res.ok ? 'cloud' : 'error');
             if (!res.ok) console.warn('Auto backup failed', reason, res.status);
         } catch (e) {
@@ -114,18 +162,24 @@ const sync = {
 
     toggleFields(m) {
         document.getElementById('s3Fields').classList.toggle('hidden', m !== 's3');
+        document.getElementById('webdavFields').classList.toggle('hidden', m !== 'webdav');
     },
 
     initUI() {
-        if (data.cfg.s3.endpoint) {
-            document.getElementById('s3Endpoint').value = data.cfg.s3.endpoint || '';
-            document.getElementById('s3Region').value = data.cfg.s3.region || 'us-east-1';
-            document.getElementById('s3Bucket').value = data.cfg.s3.bucket || '';
-            document.getElementById('s3Key').value = data.cfg.s3.key || '';
-            document.getElementById('s3Secret').value = data.cfg.s3.secret || '';
-            document.getElementById('syncMode').value = data.cfg.mode;
-            this.toggleFields(data.cfg.mode);
-        }
-        this.setStatus(data.cfg.mode === 's3' ? 'cloud' : 'local');
+        data.cfg.s3 = data.cfg.s3 || {};
+        data.cfg.dav = data.cfg.dav || {};
+        document.getElementById('s3Endpoint').value = data.cfg.s3.endpoint || '';
+        document.getElementById('s3Region').value = data.cfg.s3.region || 'us-east-1';
+        document.getElementById('s3Bucket').value = data.cfg.s3.bucket || '';
+        document.getElementById('s3Key').value = data.cfg.s3.key || '';
+        document.getElementById('s3Secret').value = data.cfg.s3.secret || '';
+        document.getElementById('davUrl').value = data.cfg.dav.url || '';
+        document.getElementById('davUser').value = data.cfg.dav.user || '';
+        document.getElementById('davPass').value = data.cfg.dav.pass || '';
+        document.getElementById('davPath').value = data.cfg.dav.path || 'training_assistant_data.json';
+        const mode = data.cfg.mode || 'none';
+        document.getElementById('syncMode').value = mode;
+        this.toggleFields(mode);
+        this.setStatus(mode === 'none' ? 'local' : 'cloud');
     }
 };

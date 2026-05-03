@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>康复助手 Pro</title>
+    <title>训练助手</title>
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#0061a4">
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
@@ -13,7 +13,7 @@
     <audio id="silentAudio" loop preload="auto"><source src="data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAgD4AAAB9AAACABAAZGF0YQAAAAA=" type="audio/wav"></audio>
 
     <header class="md-top-app-bar">
-        <div class="bar-leading"><span class="material-symbols-rounded app-icon">fitness_center</span><span class="app-title">康复助手</span></div>
+        <div class="bar-leading"><span class="material-symbols-rounded app-icon">fitness_center</span><span class="app-title">训练助手</span></div>
         <div id="syncStatus" class="md-chip"><span class="material-symbols-rounded" style="font-size:14px">cloud_off</span> 本地</div>
     </header>
 
@@ -109,6 +109,7 @@
                     <select id="syncMode" onchange="sync.toggleFields(this.value)">
                         <option value="none">关闭同步</option>
                         <option value="s3">S3 协议</option>
+                        <option value="webdav">WebDAV</option>
                     </select>
                     <label>同步方式</label>
                 </div>
@@ -118,6 +119,12 @@
                     <div class="md-field"><input type="text" id="s3Bucket" placeholder=" "><label>Bucket</label></div>
                     <div class="md-field"><input type="text" id="s3Key" placeholder=" "><label>Access Key</label></div>
                     <div class="md-field"><input type="password" id="s3Secret" placeholder=" "><label>Secret Key</label></div>
+                </div>
+                <div id="webdavFields" class="hidden">
+                    <div class="md-field"><input type="text" id="davUrl" placeholder=" "><label>WebDAV 地址</label></div>
+                    <div class="md-field"><input type="text" id="davUser" placeholder=" "><label>用户名</label></div>
+                    <div class="md-field"><input type="password" id="davPass" placeholder=" "><label>密码 / App Password</label></div>
+                    <div class="md-field"><input type="text" id="davPath" placeholder=" "><label>备份文件路径</label></div>
                 </div>
                 <div class="sync-actions">
                     <button class="md-btn md-btn-filled" onclick="sync.saveConfig()"><span class="material-symbols-rounded">save</span> 保存配置</button>

@@ -1,6 +1,6 @@
 {
-  "name": "REHAB PRO 康复助手",
-  "short_name": "REHAB",
+  "name": "训练助手",
+  "short_name": "训练助手",
   "start_url": "index.html",
   "display": "standalone",
   "background_color": "#fdfcff",

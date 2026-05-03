@@ -49,7 +49,7 @@ const workout = {
 
     setupMediaSession() {
         if (!('mediaSession' in navigator)) return;
-        navigator.mediaSession.metadata = new MediaMetadata({ title: '康复训练中', artist: '康复助手' });
+        navigator.mediaSession.metadata = new MediaMetadata({ title: '训练中', artist: '训练助手' });
         navigator.mediaSession.playbackState = 'playing';
         navigator.mediaSession.setActionHandler('play', () => { if (this.isPaused) this.toggle(); });
         navigator.mediaSession.setActionHandler('pause', () => { if (!this.isPaused && this.isPlaying) this.toggle(); });
@@ -137,7 +137,7 @@ const workout = {
             
             this.sessionInt = setInterval(() => { if(!this.isPaused) { this.totalSec++; this.updateUI(); }}, 1000);
             
-            await this.speak("康复训练开始");
+            await this.speak("训练开始");
             this.run();
         } else {
             this.isPaused = !this.isPaused;

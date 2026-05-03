@@ -1,4 +1,4 @@
-const CACHE = 'rehab-pro-v3';
+const CACHE = 'training-assistant-v4';
 const ASSETS = ['index.html', 'styles.css', 'theme.js', 'data.js', 'sync.js', 'workout.js', 'manifest.json'];
 
 self.addEventListener('install', e => {
