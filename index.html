@@ -3,355 +3,133 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>REHAB PRO V28</title>
+    <title>REHAB PRO V29</title>
     <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#0061a4">
-    <!-- 更换更稳定的图标库引入 -->
-    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Rounded" rel="stylesheet">
-    <style>
-        :root {
-            --primary: #0061a4; --on-primary: #ffffff; --primary-container: #d1e4ff;
-            --on-primary-container: #001d36; --surface: #fdfcff; --surface-variant: #f1f3f8;
-            --outline: #73777f; --tertiary: #7d5260; --error: #ba1a1a;
-        }
-        body {
-            background-color: var(--surface); color: #1a1c1e;
-            font-family: system-ui, -apple-system, sans-serif; margin: 0;
-            padding: env(safe-area-inset-top) 8px 140px 8px;
-            display: flex; flex-direction: column; align-items: center;
-        }
-        .header { width: 100%; max-width: 500px; display: flex; align-items: center; justify-content: space-between; padding: 8px; box-sizing: border-box; }
-        .brand-mini { display: flex; align-items: center; gap: 8px; }
-        .logo-mini { width: 28px; height: 28px; background: var(--primary); border-radius: 6px; display: flex; align-items: center; justify-content: center; color: white; }
-        .brand-text { font-weight: 800; font-size: 15px; color: var(--primary); }
-
-        .tabs { display: flex; width: 100%; max-width: 500px; background: #fff; border-radius: 12px; padding: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); margin-bottom: 10px; }
-        .tab-btn { flex: 1; padding: 8px 2px; border-radius: 8px; border: none; background: transparent; font-weight: 600; cursor: pointer; font-size: 12px; }
-        .tab-btn.active { background: var(--primary-container); color: var(--on-primary-container); }
-
-        .card { background: white; border-radius: 16px; padding: 14px; width: 100%; max-width: 500px; box-sizing: border-box; margin-bottom: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.02); }
-        .timer-panel { background: var(--on-primary-container); color: white; text-align: center; position: relative; overflow: hidden; }
-        #mainTime { font-size: 80px; font-weight: 800; line-height: 1; margin: 10px 0; color: var(--primary-container); font-variant-numeric: tabular-nums; }
-        
-        .progress-info { display: flex; justify-content: space-around; font-size: 13px; opacity: 0.9; margin-top: 8px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 8px; }
-        #sessionTime { color: #ffd166; font-weight: bold; }
-
-        .skip-btn { position: absolute; right: 10px; top: 10px; color: white; opacity: 0.5; cursor: pointer; padding: 8px; z-index: 10; }
-
-        .list-item { background: white; padding: 10px 12px; border-radius: 14px; margin: 6px 0; display: flex; align-items: center; border: 1px solid #eee; }
-        .action-content { flex: 1; margin-left: 8px; }
-        
-        .sort-btns { display: flex; flex-direction: column; gap: 2px; margin-right: 4px; }
-        .sort-btn { background: #f8f9fa; border: 1px solid #eee; border-radius: 4px; padding: 2px; line-height: 0; cursor: pointer; }
-        .sort-btn i { font-size: 20px; color: var(--primary); }
-
-        .input-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 5px; }
-        .span-3 { grid-column: span 3; }
-        input { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px; font-size: 13px; box-sizing: border-box; }
-        
-        .btn { height: 44px; border-radius: 10px; border: none; font-weight: 700; font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; }
-        .btn-primary { background: var(--primary); color: white; width: 100%; }
-
-        .controls { position: fixed; bottom: 20px; display: flex; gap: 12px; align-items: center; z-index: 1000; }
-        .fab { width: 64px; height: 64px; border-radius: 20px; background: var(--primary); color: white; display: flex; align-items: center; justify-content: center; border: none; box-shadow: 0 4px 15px rgba(0,97,164,0.3); }
-        .fab-stop { width: 50px; height: 50px; background: var(--error); }
-        
-        .section { display: none; width: 100%; max-width: 500px; }
-        .section.active { display: block; }
-        .hidden { display: none; }
-        #silentAudio { display: none; }
-    </style>
+    <meta name="theme-color" content="#fdfcff">
+    <!-- MD3 图标库 -->
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-
-    <!-- 增加静音视频/音频，用于保活后台 -->
     <audio id="silentAudio" loop preload="auto">
         <source src="data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAgD4AAAB9AAACABAAZGF0YQAAAAA=" type="audio/wav">
     </audio>
 
     <header class="header">
-        <div class="brand-mini">
-            <div class="logo-mini"><i class="material-icons-rounded">fitness_center</i></div>
-            <div class="brand-text">REHAB PRO V28</div>
+        <div class="brand">
+            <div class="logo-container"><span class="material-symbols-rounded">fitness_center</span></div>
+            <span class="brand-name">REHAB PRO</span>
         </div>
-        <div id="syncStatus" style="font-size: 10px; font-weight: bold; color: gray;">● LOCAL</div>
+        <div id="syncStatus" class="status-indicator">● LOCAL MODE</div>
     </header>
 
-    <nav class="tabs">
-        <button class="tab-btn active" id="btn-workout" onclick="setTab('workout')">当前训练</button>
-        <button class="tab-btn" id="btn-routines" onclick="setTab('routines')">方案库</button>
-        <button class="tab-btn" id="btn-history" onclick="setTab('history')">历史记录</button>
-        <button class="tab-btn" id="btn-sync" onclick="setTab('sync')">同步</button>
+    <main id="main-content">
+        <!-- 训练页 -->
+        <section id="workout" class="page active">
+            <div class="md-card timer-card">
+                <div class="timer-header">
+                    <span id="statusText">READY</span>
+                    <button class="icon-btn-small skip-btn" onclick="skipCurrent()"><span class="material-symbols-rounded">skip_next</span></button>
+                </div>
+                <div id="mainTime">00</div>
+                <div id="subText">准备就绪</div>
+                <div class="progress-container">
+                    <div class="progress-item"><small>总用时</small><b id="sessionTime">00:00</b></div>
+                    <div class="progress-item"><small>组数</small><b><span id="curSet">0</span>/<span id="totalSet">0</span></b></div>
+                    <div class="progress-item"><small>次数</small><b><span id="curRep">0</span>/<span id="totalRep">0</span></b></div>
+                </div>
+            </div>
+
+            <div class="md-card">
+                <div class="tts-control">
+                    <span>语速: <span id="rateLabel">1.1</span>x</span>
+                    <input type="range" id="ttsRate" min="0.5" max="2" step="0.1" value="1.1" oninput="updateRate()">
+                </div>
+                <div class="input-grid">
+                    <input type="text" id="name" class="span-3" placeholder="动作名称 (如: 踝泵)">
+                    <input type="number" id="sets" placeholder="组数">
+                    <input type="number" id="reps" placeholder="次数">
+                    <input type="number" id="work" placeholder="坚持(s)">
+                    <input type="number" id="repRest" placeholder="次休(s)">
+                    <input type="number" id="actionRest" placeholder="组休(s)">
+                    <input type="number" id="groupRest" placeholder="换项休(s)">
+                    <div class="alt-toggle span-3">
+                        <span>双侧交替训练</span>
+                        <input type="checkbox" id="isAlt">
+                    </div>
+                </div>
+                <button class="md-btn md-btn-primary" onclick="saveAction()" id="saveBtn">添加到计划</button>
+            </div>
+
+            <div id="currentActionList" class="action-list"></div>
+
+            <div class="md-card routine-save-card">
+                <input type="text" id="newRoutineName" placeholder="保存当前列表为方案...">
+                <button class="md-btn md-btn-tonal" onclick="saveToRoutines()">保存方案</button>
+            </div>
+        </section>
+
+        <!-- 方案页 -->
+        <section id="routines" class="page">
+            <h2 class="page-title">方案库</h2>
+            <div id="routineList"></div>
+        </section>
+
+        <!-- 历史页 -->
+        <section id="history" class="page">
+            <h2 class="page-title">训练历史</h2>
+            <div id="historyList"></div>
+        </section>
+
+        <!-- 同步页 -->
+        <section id="sync" class="page">
+            <div class="md-card">
+                <h2>同步引擎</h2>
+                <select id="syncMode" onchange="toggleSyncFields()" class="md-select">
+                    <option value="none">仅本地存储</option>
+                    <option value="s3">S3 兼容存储 (推荐)</option>
+                    <option value="webdav">WebDAV</option>
+                </select>
+
+                <div id="s3Fields" class="sync-fields hidden">
+                    <input type="text" id="s3Endpoint" placeholder="Endpoint (https://...)">
+                    <input type="text" id="s3Bucket" placeholder="Bucket Name">
+                    <input type="text" id="s3Region" placeholder="Region">
+                    <input type="text" id="s3Key" placeholder="Access Key">
+                    <input type="password" id="s3Secret" placeholder="Secret Key">
+                </div>
+
+                <div id="webdavFields" class="sync-fields hidden">
+                    <input type="text" id="davUrl" placeholder="WebDAV 地址">
+                    <input type="text" id="davUser" placeholder="用户名">
+                    <input type="password" id="davPass" placeholder="密码/应用密钥">
+                </div>
+
+                <div class="sync-actions">
+                    <button class="md-btn md-btn-primary" onclick="saveSyncConfig()">1. 保存配置</button>
+                    <div class="btn-group">
+                        <button class="md-btn md-btn-tonal" onclick="manualPull()">↓ 从云端下载</button>
+                        <button class="md-btn md-btn-tonal" onclick="manualPush()">↑ 备份到云端</button>
+                    </div>
+                </div>
+                <p class="sync-tip">新设备同步：先保存配置，再点击“从云端下载”。</p>
+            </div>
+        </section>
+    </main>
+
+    <nav class="bottom-nav">
+        <button class="nav-item active" onclick="setTab('workout')"><span class="material-symbols-rounded">exercise</span><small>训练</small></button>
+        <button class="nav-item" onclick="setTab('routines')"><span class="material-symbols-rounded">bookmarks</span><small>方案</small></button>
+        <button class="nav-item" onclick="setTab('history')"><span class="material-symbols-rounded">history</span><small>历史</small></button>
+        <button class="nav-item" onclick="setTab('sync')"><span class="material-symbols-rounded">cloud_sync</span><small>同步</small></button>
     </nav>
 
-    <!-- 1. 训练面板 -->
-    <div id="workout" class="section active">
-        <div class="card timer-panel">
-            <div id="statusText" style="font-size: 12px; font-weight: bold; color: var(--primary-container);">READY</div>
-            <div class="skip-btn" onclick="skipCurrent()"><i class="material-icons-rounded">skip_next</i></div>
-            <div id="mainTime">00</div>
-            <div id="subText" style="font-size: 16px; font-weight: bold; margin-bottom: 4px;">准备就绪</div>
-            <div class="progress-info">
-                <div>用时 <span id="sessionTime">00:00</span></div>
-                <div>组: <span id="curSet">0</span>/<span id="totalSet">0</span></div>
-                <div>次: <span id="curRep">0</span>/<span id="totalRep">0</span></div>
-            </div>
-        </div>
-
-        <div class="card">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-                <span style="font-size:12px; font-weight:600;">语速: <span id="rateLabel">1.1</span>x</span>
-                <input type="range" id="ttsRate" min="0.5" max="2" step="0.1" value="1.1" style="width:140px;" oninput="updateRate()">
-            </div>
-            <div class="input-grid">
-                <input type="text" id="name" class="span-3" placeholder="动作名称">
-                <input type="number" id="sets" placeholder="组数">
-                <input type="number" id="reps" placeholder="次数">
-                <input type="number" id="work" placeholder="维持(s)">
-                <input type="number" id="repRest" placeholder="次休(s)">
-                <input type="number" id="actionRest" placeholder="组休(s)">
-                <input type="number" id="groupRest" placeholder="换动休(s)">
-                <div class="span-3" style="display:flex; align-items:center; justify-content:space-between; font-size:12px; background:#f5f5f5; padding:8px; border-radius:8px;">
-                    <span>左右交替</span> <input type="checkbox" id="isAlt">
-                </div>
-                <input type="number" id="switchRest" class="span-3" placeholder="换边休息时长 (秒)">
-            </div>
-            <button class="btn btn-primary" onclick="saveAction()" style="margin-top:10px;">添加至列表</button>
-        </div>
-        <div id="currentActionList"></div>
+    <div class="fab-container">
+        <button class="fab fab-stop hidden" id="stopBtn" onclick="stopTrainer()"><span class="material-symbols-rounded">stop</span></button>
+        <button class="fab fab-play" id="playBtn" onclick="handlePlay()"><span class="material-symbols-rounded" id="playIcon">play_arrow</span></button>
     </div>
 
-    <!-- 同步设置页面 -->
-    <div id="sync" class="section">
-        <div class="card">
-            <h3 style="margin-top:0">云同步设置</h3>
-            <select id="syncMode" onchange="toggleSyncFields()" style="margin-bottom:10px; width:100%; padding:8px;">
-                <option value="none">关闭同步</option>
-                <option value="s3">S3 协议 (数据胶囊)</option>
-                <option value="webdav">WebDAV</option>
-            </select>
-            <div id="s3Fields" class="hidden">
-                <input type="text" id="s3Endpoint" placeholder="Endpoint"><input type="text" id="s3Bucket" placeholder="Bucket">
-                <div style="display:flex; gap:5px;"><input type="text" id="s3Key" placeholder="AccessKey"><input type="password" id="s3Secret" placeholder="SecretKey"></div>
-            </div>
-            <button class="btn btn-primary" onclick="saveSyncConfig()" style="margin-top:10px;">保存配置并下载</button>
-        </div>
-    </div>
-
-    <div id="routines" class="section"><div id="routineList"></div></div>
-    <div id="history" class="section"><div id="historyList"></div></div>
-
-    <div class="controls">
-        <button class="fab fab-stop hidden" id="stopBtn" onclick="stopTrainer()"><i class="material-icons-rounded">stop</i></button>
-        <button class="fab" onclick="handlePlay()"><i class="material-icons-rounded" style="font-size:48px;" id="playIcon">play_arrow</i></button>
-    </div>
-
-<script>
-    // --- 核心配置 ---
-    const DB_KEY = 'rp_v28_db';
-    const CFG_KEY = 'rp_v28_cfg';
-    let db = JSON.parse(localStorage.getItem(DB_KEY)) || { actions: [], routines: [], history: [], rate: 1.1 };
-    let cfg = JSON.parse(localStorage.getItem(CFG_KEY)) || { mode: 'none', s3: {}, dav: {} };
-
-    // 兼容迁移
-    const legacyKeys = ['rp_v27_db', 'rp_v26_db', 'rp_v21_main'];
-    if (db.actions.length === 0) {
-        for (let k of legacyKeys) {
-            let old = localStorage.getItem(k);
-            if (old) { try { db = JSON.parse(old); break; } catch(e){} }
-        }
-    }
-
-    // --- 稳定语音引擎 (非阻塞版) ---
-    function speak(t) {
-        if (!t) return;
-        window.speechSynthesis.cancel(); // 必须先取消之前的，防止堆栈
-        const u = new SpeechSynthesisUtterance(t);
-        u.lang = 'zh-CN';
-        u.rate = parseFloat(db.rate);
-        window.speechSynthesis.speak(u);
-    }
-
-    // --- 训练逻辑控制 ---
-    let isPlaying = false, isPaused = false, timerInterval = null, sessionInterval = null;
-    let skipFlag = false, totalSeconds = 0;
-
-    function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
-
-    async function handlePlay() {
-        if (!isPlaying) {
-            if (db.actions.length === 0) return;
-            // 激活音频
-            document.getElementById('silentAudio').play().catch(()=>{});
-            isPlaying = true; isPaused = false; totalSeconds = 0;
-            document.getElementById('playIcon').innerText = 'pause';
-            document.getElementById('stopBtn').classList.remove('hidden');
-            
-            // 总用时
-            sessionInterval = setInterval(() => { if(!isPaused) { totalSeconds++; updateSessionUI(); } }, 1000);
-
-            await startWorkoutFlow();
-        } else {
-            isPaused = !isPaused;
-            document.getElementById('playIcon').innerText = isPaused ? 'play_arrow' : 'pause';
-        }
-    }
-
-    async function startWorkoutFlow() {
-        speak("现在开始康复训练");
-        await sleep(2000); // 给语音留出时间
-
-        for (let i = 0; i < db.actions.length; i++) {
-            if (!isPlaying) break;
-            const a = db.actions[i];
-            speak("下一项：" + a.name);
-            await sleep(2000);
-
-            for (let s = 1; s <= a.sets; s++) {
-                if (!isPlaying) break;
-                document.getElementById('totalSet').innerText = a.sets;
-                document.getElementById('curSet').innerText = s;
-
-                const sides = a.isAlt ? ['左侧', '右侧'] : [''];
-                for (let side of sides) {
-                    if (!isPlaying) break;
-                    if (side) { speak(side + "开始"); await sleep(1500); }
-                    else if (a.sets > 1) { speak("第" + s + "组"); await sleep(1500); }
-
-                    for (let r = 1; r <= a.reps; r++) {
-                        if (!isPlaying) break;
-                        document.getElementById('totalRep').innerText = a.reps;
-                        document.getElementById('curRep').innerText = r;
-
-                        speak("第" + r + "次");
-                        await sleep(1000); 
-                        await timer(a.work, a.name + (side?' '+side:''), 'HOLD');
-                        
-                        if (r < a.reps && isPlaying) {
-                            speak("放松");
-                            await timer(a.repRest, "放松休息", "REST");
-                        }
-                    }
-                    if (a.isAlt && side === '左侧' && isPlaying) {
-                        speak("换边休息");
-                        await timer(a.switchRest, "准备换边", "SWITCH");
-                    }
-                }
-                if (s < a.sets && isPlaying) {
-                    speak("组间休息");
-                    await timer(a.actionRest, "请稍作休息", "SET REST");
-                }
-            }
-            if (i < db.actions.length - 1 && isPlaying) {
-                speak("更换动作休息");
-                await timer(a.groupRest, "准备下一项", "BREAK");
-            }
-        }
-        if (isPlaying) finishTraining();
-    }
-
-    function timer(sec, title, status) {
-        return new Promise(async (res) => {
-            let left = sec;
-            document.getElementById('subText').innerText = title;
-            document.getElementById('statusText').innerText = status;
-            document.getElementById('mainTime').innerText = left;
-
-            timerInterval = setInterval(() => {
-                if (!isPlaying || skipFlag) { clearInterval(timerInterval); skipFlag = false; res(); return; }
-                if (isPaused) return;
-
-                left--;
-                document.getElementById('mainTime').innerText = left;
-                if (left <= 3 && left > 0) speak(left.toString());
-                if (left <= 0) { clearInterval(timerInterval); res(); }
-            }, 1000);
-            
-            // 每一个计时结束都要等待 Promise
-            while(left > 0 && isPlaying && !skipFlag) { await sleep(100); }
-        });
-    }
-
-    function skipCurrent() { skipFlag = true; speak("跳过"); }
-    function stopTrainer() { if(confirm("确定停止？")) { isPlaying = false; finishTraining(); } }
-
-    function finishTraining() {
-        isPlaying = false;
-        clearInterval(timerInterval); clearInterval(sessionInterval);
-        document.getElementById('playIcon').innerText = 'play_arrow';
-        document.getElementById('stopBtn').classList.add('hidden');
-        speak("训练圆满完成");
-        saveHistory();
-    }
-
-    // --- 数据与 UI ---
-    function updateSessionUI() {
-        const m = Math.floor(totalSeconds / 60).toString().padStart(2, '0');
-        const s = (totalSeconds % 60).toString().padStart(2, '0');
-        document.getElementById('sessionTime').innerText = `${m}:${s}`;
-    }
-
-    function render() {
-        const list = document.getElementById('currentActionList');
-        list.innerHTML = db.actions.map((a, i) => `
-            <div class="list-item">
-                <div class="sort-btns">
-                    <button class="sort-btn" onclick="moveAction(${i},-1)"><i class="material-icons-rounded">expand_less</i></button>
-                    <button class="sort-btn" onclick="moveAction(${i},1)"><i class="material-icons-rounded">expand_more</i></button>
-                </div>
-                <div class="action-content">
-                    <strong>${a.name}</strong><br>
-                    <small>${a.sets}组 | ${a.reps}次 | ${a.work}s</small>
-                </div>
-                <button onclick="deleteAction(${i})" style="border:none;background:none;color:var(--error);"><i class="material-icons-rounded">delete</i></button>
-            </div>
-        `).join('');
-    }
-
-    function moveAction(idx, dir) {
-        if(dir === -1 && idx > 0) [db.actions[idx], db.actions[idx-1]] = [db.actions[idx-1], db.actions[idx]];
-        else if(dir === 1 && idx < db.actions.length-1) [db.actions[idx], db.actions[idx+1]] = [db.actions[idx+1], db.actions[idx]];
-        localStorage.setItem(DB_KEY, JSON.stringify(db)); render();
-    }
-
-    function saveAction() {
-        const n = document.getElementById('name').value || '未命名动作';
-        db.actions.push({
-            name: n,
-            sets: parseInt(document.getElementById('sets').value)||1,
-            reps: parseInt(document.getElementById('reps').value)||1,
-            work: parseInt(document.getElementById('work').value)||5,
-            repRest: parseInt(document.getElementById('repRest').value)||2,
-            actionRest: parseInt(document.getElementById('actionRest').value)||10,
-            groupRest: parseInt(document.getElementById('groupRest').value)||15,
-            switchRest: parseInt(document.getElementById('switchRest').value)||3,
-            isAlt: document.getElementById('isAlt').checked
-        });
-        localStorage.setItem(DB_KEY, JSON.stringify(db)); render();
-    }
-
-    function deleteAction(i) { db.actions.splice(i,1); localStorage.setItem(DB_KEY, JSON.stringify(db)); render(); }
-    function setTab(id) {
-        document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
-        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-        document.getElementById(id).classList.add('active');
-        document.getElementById('btn-' + id).classList.add('active');
-        render();
-    }
-    function updateRate() { db.rate = document.getElementById('ttsRate').value; document.getElementById('rateLabel').innerText = db.rate; }
-    function saveHistory() {
-        if(totalSeconds < 5) return;
-        db.history.unshift({ date: new Date().toLocaleString(), duration: totalSeconds, actions: [...db.actions] });
-        localStorage.setItem(DB_KEY, JSON.stringify(db));
-    }
-    function toggleSyncFields() { document.getElementById('s3Fields').classList.toggle('hidden', document.getElementById('syncMode').value !== 's3'); }
-    function saveSyncConfig() {
-        cfg.mode = document.getElementById('syncMode').value;
-        cfg.s3 = { endpoint: document.getElementById('s3Endpoint').value, bucket: document.getElementById('s3Bucket').value, key: document.getElementById('s3Key').value, secret: document.getElementById('s3Secret').value };
-        localStorage.setItem(CFG_KEY, JSON.stringify(cfg)); alert("配置已保存");
-    }
-
-    window.onload = () => { render(); toggleSyncFields(); };
-</script>
+    <script src="sync.js"></script>
+    <script src="app.js"></script>
 </body>
 </html>
