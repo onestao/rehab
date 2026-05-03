@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>康复助手 Pro</title>
     <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#0061a4">
+    <meta name="theme-color" content="#1a5e1f">
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
     <link rel="stylesheet" href="styles.css">
 </head>
@@ -13,8 +13,8 @@
     <audio id="silentAudio" loop preload="auto"><source src="data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAgD4AAAB9AAACABAAZGF0YQAAAAA=" type="audio/wav"></audio>
 
     <header class="md-top-app-bar">
-        <div class="bar-leading"><span class="material-symbols-rounded">fitness_center</span><span>康复助手 Pro</span></div>
-        <div id="syncStatus" class="md-badge">● LOCAL</div>
+        <div class="bar-leading"><span class="material-symbols-rounded app-icon">fitness_center</span><span class="app-title">康复助手</span></div>
+        <div id="syncStatus" class="md-chip"><span class="material-symbols-rounded" style="font-size:14px">cloud_off</span> 本地</div>
     </header>
 
     <main id="app">
@@ -26,69 +26,113 @@
                 <div id="mainTime">00</div>
                 <div id="subText">准备就绪</div>
                 <div class="timer-stats">
-                    <div class="stat-item">总用时<b id="sessionTime">00:00</b></div>
-                    <div class="stat-item">组数<b><span id="curSet">0</span>/<span id="totalSet">0</span></b></div>
-                    <div class="stat-item">次数<b><span id="curRep">0</span>/<span id="totalRep">0</span></b></div>
+                    <div class="stat-item">
+                        <span class="stat-label">总用时</span>
+                        <b id="sessionTime" class="session-time">00:00</b>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">组数</span>
+                        <b><span id="curSet">0</span>/<span id="totalSet">0</span></b>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">次数</span>
+                        <b><span id="curRep">0</span>/<span id="totalRep">0</span></b>
+                    </div>
                 </div>
             </div>
 
-            <div class="md-card">
+            <div class="md-card input-card">
                 <div class="rate-row">
-                    <span>播报语速: <span id="rateLabel">1.1</span>x</span>
+                    <span class="material-symbols-rounded" style="font-size:18px">speed</span>
+                    <span>语速 <span id="rateLabel">1.1</span>x</span>
                     <input type="range" id="ttsRate" min="0.5" max="2" step="0.1" value="1.1" oninput="workout.updateRate(this.value)">
                 </div>
+                <div class="md-divider"></div>
                 <div class="md-grid">
-                    <input type="text" id="name" class="span-full" placeholder="动作名称">
-                    <input type="number" id="sets" placeholder="组数">
-                    <input type="number" id="reps" placeholder="次数">
-                    <input type="number" id="work" placeholder="单次(s)">
-                    <input type="number" id="repRest" placeholder="次休(s)">
-                    <input type="number" id="actionRest" placeholder="组休(s)">
-                    <input type="number" id="groupRest" placeholder="项休(s)">
-                    <div class="md-switch span-full"><span>双侧交替训练</span><input type="checkbox" id="isAlt"></div>
+                    <div class="md-field span-full">
+                        <input type="text" id="name" placeholder=" " autocomplete="off">
+                        <label>动作名称</label>
+                    </div>
+                    <div class="md-field"><input type="number" id="sets" placeholder=" "><label>组数</label></div>
+                    <div class="md-field"><input type="number" id="reps" placeholder=" "><label>次数</label></div>
+                    <div class="md-field"><input type="number" id="work" placeholder=" "><label>单次秒数</label></div>
+                    <div class="md-field"><input type="number" id="repRest" placeholder=" "><label>次休秒数</label></div>
+                    <div class="md-field"><input type="number" id="actionRest" placeholder=" "><label>组休秒数</label></div>
+                    <div class="md-field"><input type="number" id="groupRest" placeholder=" "><label>项休秒数</label></div>
+                    <div class="md-switch span-full">
+                        <span><span class="material-symbols-rounded" style="font-size:18px;vertical-align:middle;margin-right:6px">swap_horiz</span>双侧交替训练</span>
+                        <label class="switch-track"><input type="checkbox" id="isAlt"><span class="switch-thumb"></span></label>
+                    </div>
                 </div>
-                <button class="md-btn md-btn-filled" onclick="data.addAction()">添加到计划</button>
+                <button class="md-btn md-btn-filled" onclick="data.addAction()">
+                    <span class="material-symbols-rounded">add</span> 添加到计划
+                </button>
             </div>
             <div id="currentActionList"></div>
             <div class="md-card routine-tool">
-                <input type="text" id="newRoutineName" placeholder="为此方案命名...">
-                <button class="md-btn md-btn-tonal" onclick="data.saveRoutine()">存入方案库</button>
+                <div class="md-field" style="flex:1"><input type="text" id="newRoutineName" placeholder=" "><label>方案名称</label></div>
+                <button class="md-btn md-btn-tonal" onclick="data.saveRoutine()"><span class="material-symbols-rounded">bookmark_add</span> 存入方案库</button>
             </div>
         </section>
 
         <!-- 方案页/历史页/同步页 -->
-        <section id="routines" class="page"><div id="routineList"></div></section>
-        <section id="history" class="page"><div id="historyList"></div></section>
+        <section id="routines" class="page">
+            <div class="page-header"><span class="material-symbols-rounded">bookmarks</span><h2>我的方案</h2></div>
+            <div id="routineList"></div>
+        </section>
+        <section id="history" class="page">
+            <div class="page-header"><span class="material-symbols-rounded">history</span><h2>训练记录</h2></div>
+            <div id="historyList"></div>
+        </section>
         <section id="sync" class="page">
-            <div class="md-card">
-                <h3>同步中心</h3>
-                <select id="syncMode" onchange="sync.toggleFields(this.value)" class="md-select">
-                    <option value="none">关闭同步</option>
-                    <option value="s3">S3 协议</option>
-                    <option value="webdav">WebDAV</option>
-                </select>
+            <div class="page-header"><span class="material-symbols-rounded">cloud_sync</span><h2>同步中心</h2></div>
+            <div class="md-card sync-card">
+                <div class="md-field">
+                    <select id="syncMode" onchange="sync.toggleFields(this.value)">
+                        <option value="none">关闭同步</option>
+                        <option value="s3">S3 协议</option>
+                    </select>
+                    <label>同步方式</label>
+                </div>
                 <div id="s3Fields" class="hidden">
-                    <input type="text" id="s3Endpoint" placeholder="Endpoint">
-                    <input type="text" id="s3Bucket" placeholder="Bucket">
-                    <input type="text" id="s3Key" placeholder="Access Key">
-                    <input type="password" id="s3Secret" placeholder="Secret Key">
+                    <div class="md-field"><input type="text" id="s3Endpoint" placeholder=" "><label>Endpoint URL</label></div>
+                    <div class="md-field"><input type="text" id="s3Region" placeholder=" "><label>Region (如 us-east-1)</label></div>
+                    <div class="md-field"><input type="text" id="s3Bucket" placeholder=" "><label>Bucket</label></div>
+                    <div class="md-field"><input type="text" id="s3Key" placeholder=" "><label>Access Key</label></div>
+                    <div class="md-field"><input type="password" id="s3Secret" placeholder=" "><label>Secret Key</label></div>
                 </div>
                 <div class="sync-actions">
-                    <button class="md-btn md-btn-filled" onclick="sync.saveConfig()">1. 保存配置</button>
+                    <button class="md-btn md-btn-filled" onclick="sync.saveConfig()"><span class="material-symbols-rounded">save</span> 保存配置</button>
                     <div class="md-row">
-                        <button class="md-btn md-btn-tonal" onclick="sync.pull()">↓ 下载</button>
-                        <button class="md-btn md-btn-tonal" onclick="sync.push()">↑ 备份</button>
+                        <button class="md-btn md-btn-tonal" onclick="sync.pull()"><span class="material-symbols-rounded">download</span> 下载恢复</button>
+                        <button class="md-btn md-btn-tonal" onclick="sync.push()"><span class="material-symbols-rounded">backup</span> 备份上传</button>
                     </div>
                 </div>
             </div>
         </section>
     </main>
 
-    <nav class="md-bottom-nav">
-        <button class="nav-item active" onclick="ui.tab('workout', this)"><span class="material-symbols-rounded">exercise</span><small>训练</small></button>
-        <button class="nav-item" onclick="ui.tab('routines', this)"><span class="material-symbols-rounded">bookmarks</span><small>方案</small></button>
-        <button class="nav-item" onclick="ui.tab('history', this)"><span class="material-symbols-rounded">history</span><small>历史</small></button>
-        <button class="nav-item" onclick="ui.tab('sync', this)"><span class="material-symbols-rounded">sync</span><small>同步</small></button>
+    <nav class="md-nav-rail">
+        <button class="nav-item active" onclick="ui.tab('workout', this)">
+            <div class="nav-indicator"></div>
+            <span class="material-symbols-rounded">exercise</span>
+            <small>训练</small>
+        </button>
+        <button class="nav-item" onclick="ui.tab('routines', this)">
+            <div class="nav-indicator"></div>
+            <span class="material-symbols-rounded">bookmarks</span>
+            <small>方案</small>
+        </button>
+        <button class="nav-item" onclick="ui.tab('history', this)">
+            <div class="nav-indicator"></div>
+            <span class="material-symbols-rounded">history</span>
+            <small>历史</small>
+        </button>
+        <button class="nav-item" onclick="ui.tab('sync', this)">
+            <div class="nav-indicator"></div>
+            <span class="material-symbols-rounded">sync</span>
+            <small>同步</small>
+        </button>
     </nav>
 
     <div class="fab-group">
@@ -96,7 +140,6 @@
         <button class="md-fab fab-play" id="playBtn" onclick="workout.toggle()"><span class="material-symbols-rounded" id="playIcon">play_arrow</span></button>
     </div>
 
-    <!-- 严格依赖顺序 -->
     <script src="data.js"></script>
     <script src="sync.js"></script>
     <script src="workout.js"></script>
@@ -115,6 +158,9 @@
             if ('serviceWorker' in navigator) {
                 navigator.serviceWorker.register('sw.js').catch(() => {});
             }
+            window.addEventListener('scroll', () => {
+                document.querySelector('.md-top-app-bar').classList.toggle('scrolled', window.scrollY > 8);
+            }, { passive: true });
         };
     </script>
 </body>

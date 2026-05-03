@@ -41,6 +41,7 @@ const data = {
         };
         this.db.actions.push(a);
         this.save();
+        document.getElementById('name').value = '';
     },
 
     saveRoutine() {
@@ -48,7 +49,11 @@ const data = {
         const name = nameInput.value.trim();
         if (!name) return alert('请输入方案名称');
         if (this.db.actions.length === 0) return alert('请先添加训练动作');
-        this.db.routines.push({ name, actions: JSON.parse(JSON.stringify(this.db.actions)), created: new Date().toLocaleDateString() });
+        this.db.routines.push({
+            name,
+            actions: JSON.parse(JSON.stringify(this.db.actions)),
+            created: new Date().toLocaleDateString()
+        });
         nameInput.value = '';
         this.save();
         alert('方案 "' + name + '" 已保存');
@@ -81,14 +86,26 @@ const data = {
     renderActions() {
         const list = document.getElementById('currentActionList');
         if (!list) return;
+        if (this.db.actions.length === 0) {
+            list.innerHTML = `
+                <div class="empty-state">
+                    <span class="material-symbols-rounded">playlist_add</span>
+                    <p>还没有动作，添加一个开始吧</p>
+                </div>`;
+            return;
+        }
         list.innerHTML = this.db.actions.map((a, i) => `
             <div class="list-item">
-                <div style="flex:1"><strong>${a.name}</strong><br><small>${a.sets}组 | ${a.reps}次 | ${a.work}s | 组休${a.actionRest}s | 项休${a.groupRest}s</small></div>
-                <div style="display:flex; flex-direction:column">
-                    <button onclick="data.move(${i},-1)" style="border:none;background:none"><span class="material-symbols-rounded">expand_less</span></button>
-                    <button onclick="data.move(${i},1)" style="border:none;background:none"><span class="material-symbols-rounded">expand_more</span></button>
+                <div class="sort-btns">
+                    <button class="sort-btn" onclick="data.move(${i},-1)"><span class="material-symbols-rounded">expand_less</span></button>
+                    <button class="sort-btn" onclick="data.move(${i},1)"><span class="material-symbols-rounded">expand_more</span></button>
                 </div>
-                <button onclick="data.db.actions.splice(${i},1);data.save();" style="border:none;background:none;color:red"><span class="material-symbols-rounded">delete</span></button>
+                <div style="flex:1;min-width:0">
+                    <strong>${a.name}</strong>
+                    <small>${a.sets}组 &middot; ${a.reps}次 &middot; ${a.work}s</small>
+                    <div class="item-chip">组休${a.actionRest}s &middot; 项休${a.groupRest}s${a.isAlt ? ' &middot; 双侧' : ''}</div>
+                </div>
+                <button class="delete-btn" onclick="data.db.actions.splice(${i},1);data.save();"><span class="material-symbols-rounded">delete</span></button>
             </div>`).join('');
     },
 
@@ -96,14 +113,21 @@ const data = {
         const list = document.getElementById('routineList');
         if (!list) return;
         if (this.db.routines.length === 0) {
-            list.innerHTML = '<div class="md-card" style="text-align:center;color:#73777f">暂无保存的方案</div>';
+            list.innerHTML = `
+                <div class="empty-state">
+                    <span class="material-symbols-rounded">bookmark_border</span>
+                    <p>暂无保存的方案</p>
+                </div>`;
             return;
         }
         list.innerHTML = this.db.routines.map((r, i) => `
             <div class="list-item">
-                <div style="flex:1"><strong>${r.name}</strong><br><small>${r.actions.length}个动作 | ${r.created}</small></div>
-                <button class="md-btn md-btn-tonal" style="flex:none;padding:0 12px;height:32px" onclick="data.loadRoutine(${i})">载入</button>
-                <button onclick="data.deleteRoutine(${i})" style="border:none;background:none;color:red"><span class="material-symbols-rounded">delete</span></button>
+                <div style="flex:1;min-width:0">
+                    <strong>${r.name}</strong>
+                    <small>${r.actions.length}个动作 &middot; ${r.created}</small>
+                </div>
+                <button class="md-btn md-btn-tonal" style="flex:none;padding:0 14px;height:32px;font-size:12px" onclick="data.loadRoutine(${i})">载入</button>
+                <button class="delete-btn" onclick="data.deleteRoutine(${i})"><span class="material-symbols-rounded">delete</span></button>
             </div>`).join('');
     },
 
@@ -111,7 +135,11 @@ const data = {
         const list = document.getElementById('historyList');
         if (!list) return;
         if (this.db.history.length === 0) {
-            list.innerHTML = '<div class="md-card" style="text-align:center;color:#73777f">暂无训练记录</div>';
+            list.innerHTML = `
+                <div class="empty-state">
+                    <span class="material-symbols-rounded">trophy</span>
+                    <p>暂无训练记录，完成一次训练后自动记录</p>
+                </div>`;
             return;
         }
         list.innerHTML = this.db.history.map((h, i) => {
@@ -119,8 +147,12 @@ const data = {
             const secs = h.duration % 60;
             const names = h.actions.map(a => a.name).join('、');
             return `<div class="list-item">
-                <div style="flex:1"><strong>${h.date}</strong><br><small>${mins}分${secs}秒 | ${names}</small></div>
-                <button onclick="data.deleteHistory(${i})" style="border:none;background:none;color:red"><span class="material-symbols-rounded">delete</span></button>
+                <div style="flex:1;min-width:0">
+                    <strong>${h.date}</strong>
+                    <small>${mins}分${secs}秒 &middot; ${h.actions.length}个动作</small>
+                    <div class="item-chip">${names.length > 20 ? names.slice(0, 20) + '...' : names}</div>
+                </div>
+                <button class="delete-btn" onclick="data.deleteHistory(${i})"><span class="material-symbols-rounded">delete</span></button>
             </div>`;
         }).join('');
     },
