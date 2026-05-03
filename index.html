@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>REHAB PRO V20</title>
+    <title>REHAB PRO V21</title>
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#0061a4">
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
@@ -19,7 +19,6 @@
             padding: env(safe-area-inset-top) 8px 120px 8px;
             display: flex; flex-direction: column; align-items: center;
         }
-        /* 极度压缩的 Header */
         .header { width: 100%; max-width: 500px; display: flex; align-items: center; justify-content: space-between; padding: 8px; box-sizing: border-box; }
         .brand-mini { display: flex; align-items: center; gap: 6px; }
         .logo-mini { width: 28px; height: 28px; background: var(--primary); border-radius: 6px; display: flex; align-items: center; justify-content: center; }
@@ -33,14 +32,10 @@
         .card { background: white; border-radius: 16px; padding: 14px; width: 100%; max-width: 500px; box-sizing: border-box; margin-bottom: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.02); }
         .timer-panel { background: var(--on-primary-container); color: white; text-align: center; position: relative; }
         #mainTime { font-size: 72px; font-weight: 800; line-height: 1; margin: 6px 0; color: var(--primary-container); }
-        .progress-info { display: flex; justify-content: space-around; font-size: 12px; opacity: 0.8; margin-top: 6px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 6px; }
-
+        
         .list-item { background: white; padding: 8px 12px; border-radius: 12px; margin: 5px 0; display: flex; align-items: center; border: 1px solid #eee; }
         .action-content { flex: 1; margin-left: 8px; cursor: pointer; }
-        .sort-btns { display: flex; flex-direction: column; gap: 1px; }
-        .sort-btn { background: #f8f9fa; border: 1px solid #eee; border-radius: 4px; padding: 1px; line-height: 0; cursor: pointer; }
-        .sort-btn span { font-size: 16px; color: var(--primary); }
-
+        
         .input-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 5px; }
         .span-3 { grid-column: span 3; }
         input { width: 100%; padding: 9px; border: 1px solid #ddd; border-radius: 8px; font-size: 13px; box-sizing: border-box; }
@@ -82,7 +77,7 @@
             <div id="statusText" style="font-size: 11px; font-weight: bold; color: var(--primary-container);">READY</div>
             <div id="mainTime">00</div>
             <div id="subText" style="font-size: 15px; font-weight: bold;">等待开始</div>
-            <div class="progress-info">
+            <div style="display:flex; justify-content:space-around; font-size:12px; margin-top:8px; opacity:0.8;">
                 <div>组: <span id="curSet">0</span>/<span id="totalSet">0</span></div>
                 <div>次: <span id="curRep">0</span>/<span id="totalRep">0</span></div>
             </div>
@@ -104,9 +99,9 @@
                 <div class="span-3" style="display:flex; align-items:center; justify-content:space-between; font-size:12px; background:#f5f5f5; padding:6px; border-radius:8px;">
                     <span>左右交替</span> <input type="checkbox" id="isAlt">
                 </div>
-                <input type="number" id="switchRest" class="span-3" placeholder="换边休息时长 (秒)">
+                <input type="number" id="switchRest" class="span-3" placeholder="换边休息(s)">
             </div>
-            <button class="btn btn-primary" onclick="saveAction()" id="saveBtn" style="margin-top:8px;">添加到训练列表</button>
+            <button class="btn btn-primary" onclick="saveAction()" style="margin-top:8px;">添加到列表</button>
         </div>
 
         <div id="currentActionList"></div>
@@ -117,26 +112,37 @@
         </div>
     </div>
 
-    <!-- 2. 同步设置 -->
+    <!-- 2. 同步设置 (关键修复区) -->
     <div id="sync" class="section">
         <div class="card">
-            <h3 style="margin:0 0 10px 0; font-size:16px;">S3/WebDAV 同步</h3>
+            <h3 style="margin:0 0 10px 0; font-size:15px;">数据同步设置</h3>
             <select id="syncMode" onchange="toggleSyncFields()" style="margin-bottom:8px; width:100%; padding:8px; border-radius:8px;">
                 <option value="none">仅本地</option>
-                <option value="webdav">WebDAV</option>
                 <option value="s3">S3 兼容协议 (CAS 数据胶囊)</option>
+                <option value="webdav">WebDAV</option>
             </select>
+
             <div id="s3Fields" class="hidden">
-                <input type="text" id="s3Endpoint" placeholder="Endpoint (含 https://)" style="margin-bottom:5px;">
+                <input type="text" id="s3Endpoint" placeholder="Endpoint (需含 https://)" style="margin-bottom:5px;">
                 <input type="text" id="s3Bucket" placeholder="Bucket Name" style="margin-bottom:5px;">
-                <input type="text" id="s3Region" placeholder="Region" style="margin-bottom:5px;">
-                <div style="display:flex; gap:5px; margin-bottom:5px;"><input type="text" id="s3Key" placeholder="Access Key"><input type="password" id="s3Secret" placeholder="Secret Key"></div>
+                <input type="text" id="s3Region" placeholder="Region (如 us-east-1)" style="margin-bottom:5px;">
+                <input type="text" id="s3Key" placeholder="Access Key" style="margin-bottom:5px;">
+                <input type="password" id="s3Secret" placeholder="Secret Key" style="margin-bottom:5px;">
             </div>
+
             <div id="webdavFields" class="hidden">
                 <input type="text" id="davUrl" placeholder="WebDAV 地址" style="margin-bottom:5px;">
-                <div style="display:flex; gap:5px;"><input type="text" id="davUser" placeholder="用户名"><input type="password" id="davPass" placeholder="应用密码"></div>
+                <input type="text" id="davUser" placeholder="用户名" style="margin-bottom:5px;">
+                <input type="password" id="davPass" placeholder="密码" style="margin-bottom:5px;">
             </div>
-            <button class="btn btn-primary" onclick="testAndSaveSync()" style="margin-top:10px;">保存并拉取云端配置</button>
+
+            <button class="btn btn-primary" onclick="saveSyncConfig()" style="margin-top:10px; background:var(--tertiary);">1. 保存配置</button>
+            
+            <div style="display:flex; gap:8px; margin-top:8px;">
+                <button class="btn btn-primary" style="flex:1" onclick="manualPush()">上传到云端</button>
+                <button class="btn btn-primary" style="flex:1" onclick="manualPull()">从云端下载</button>
+            </div>
+            <p id="debugLog" style="font-size:10px; color:red; margin-top:8px;"></p>
         </div>
     </div>
 
@@ -149,35 +155,60 @@
     </div>
 
 <script>
-    // --- 签名算法 ---
+    // --- 算法辅助 ---
     async function sha256(str) { const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(str)); return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join(""); }
     async function hmac(key, data) { const cKey = typeof key === "string" ? new TextEncoder().encode(key) : key; const cryptoKey = await crypto.subtle.importKey("raw", cKey, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]); return await crypto.subtle.sign("HMAC", cryptoKey, new TextEncoder().encode(data)); }
 
     // --- 数据持久化 ---
-    let db = {
-        actions: JSON.parse(localStorage.getItem('rp_v20_a')) || [],
-        routines: JSON.parse(localStorage.getItem('rp_v20_r')) || [],
-        history: JSON.parse(localStorage.getItem('rp_v20_h')) || [],
-        config: JSON.parse(localStorage.getItem('rp_v20_cfg')) || { mode:'none', dav:{}, s3:{} },
-        rate: localStorage.getItem('rp_v20_rate') || 1.1,
-        isPlaying: false, isPaused: false, timer: null
+    const DB_KEY = 'rp_v21_main';
+    const CFG_KEY = 'rp_v21_config';
+
+    let db = JSON.parse(localStorage.getItem(DB_KEY)) || { actions: [], routines: [], history: [], rate: 1.1 };
+    let cfg = JSON.parse(localStorage.getItem(CFG_KEY)) || { mode: 'none', s3: {}, dav: {} };
+
+    window.onload = () => {
+        initUI();
+        render();
+        if (cfg.mode !== 'none') autoPull();
     };
 
-    function syncLocal(push = true) {
-        localStorage.setItem('rp_v20_a', JSON.stringify(db.actions));
-        localStorage.setItem('rp_v20_r', JSON.stringify(db.routines));
-        localStorage.setItem('rp_v20_h', JSON.stringify(db.history));
-        localStorage.setItem('rp_v20_cfg', JSON.stringify(db.config));
-        localStorage.setItem('rp_v20_rate', db.rate);
-        if(push && db.config.mode !== 'none') syncPush();
+    function initUI() {
+        document.getElementById('ttsRate').value = db.rate;
+        document.getElementById('rateLabel').innerText = db.rate;
+        document.getElementById('syncMode').value = cfg.mode;
+        if(cfg.s3) {
+            document.getElementById('s3Endpoint').value = cfg.s3.endpoint || '';
+            document.getElementById('s3Bucket').value = cfg.s3.bucket || '';
+            document.getElementById('s3Region').value = cfg.s3.region || '';
+            document.getElementById('s3Key').value = cfg.s3.key || '';
+            document.getElementById('s3Secret').value = cfg.s3.secret || '';
+        }
+        if(cfg.dav) {
+            document.getElementById('davUrl').value = cfg.dav.url || '';
+            document.getElementById('davUser').value = cfg.dav.user || '';
+            document.getElementById('davPass').value = cfg.dav.pass || '';
+        }
+        toggleSyncFields();
+    }
+
+    function toggleSyncFields() {
+        const m = document.getElementById('syncMode').value;
+        document.getElementById('s3Fields').classList.toggle('hidden', m !== 's3');
+        document.getElementById('webdavFields').classList.toggle('hidden', m !== 'webdav');
+    }
+
+    function saveLocal(shouldPush = true) {
+        localStorage.setItem(DB_KEY, JSON.stringify(db));
+        if (shouldPush && cfg.mode !== 'none') syncPush();
         render();
     }
 
-    // --- S3 签名请求 ---
+    // --- S3 签名逻辑 (核心修复) ---
     async function s3Req(method, body = null) {
-        const { endpoint, bucket, region, key, secret } = db.config.s3;
-        const host = new URL(endpoint).host;
-        const path = `/${bucket}/rehab_data_v20.json`;
+        const { endpoint, bucket, region, key, secret } = cfg.s3;
+        const urlObj = new URL(endpoint);
+        const host = urlObj.host;
+        const path = `/${bucket}/rehab_v21.json`;
         const datetime = new Date().toISOString().replace(/[:\-]|\.\d{3}/g, '');
         const date = datetime.slice(0, 8);
         const hashedPayload = body ? await sha256(body) : "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
@@ -189,55 +220,107 @@
         const kService = await hmac(kRegion, "s3");
         const kSigning = await hmac(kService, "aws4_request");
         const signature = Array.from(new Uint8Array(await hmac(kSigning, stringToSign))).map(b => b.toString(16).padStart(2, "0")).join("");
-        return fetch(`${endpoint}${path}`, { method, headers: { 'Authorization': `AWS4-HMAC-SHA256 Credential=${key}/${scope}, SignedHeaders=host;x-amz-content-sha256;x-amz-date, Signature=${signature}`, 'x-amz-date': datetime, 'x-amz-content-sha256': hashedPayload }, body });
+        return fetch(`${endpoint}${path}`, { 
+            method, 
+            headers: { 
+                'Authorization': `AWS4-HMAC-SHA256 Credential=${key}/${scope}, SignedHeaders=host;x-amz-content-sha256;x-amz-date, Signature=${signature}`, 
+                'x-amz-date': datetime, 
+                'x-amz-content-sha256': hashedPayload 
+            }, 
+            body 
+        });
     }
 
     async function davReq(method, body = null) {
-        const { url, user, pass } = db.config.dav;
+        const { url, user, pass } = cfg.dav;
         const auth = btoa(`${user}:${pass}`);
-        return fetch(url.endsWith('/') ? url+'rehab_v20.json' : url+'/rehab_v20.json', { method, headers: { 'Authorization': `Basic ${auth}`, 'Content-Type': 'application/json' }, body });
+        return fetch(url.endsWith('/') ? url+'rehab_v21.json' : url+'/rehab_v21.json', { method, headers: { 'Authorization': `Basic ${auth}`, 'Content-Type': 'application/json' }, body });
     }
 
+    // --- 同步执行 ---
     async function syncPush() {
-        if(db.config.mode === 'none') return;
+        if (cfg.mode === 'none') return;
         updateStatus("● UPLOADING", "orange");
-        const data = JSON.stringify({ a:db.actions, r:db.routines, h:db.history, rate:db.rate });
         try {
-            const res = (db.config.mode === 's3') ? await s3Req('PUT', data) : await davReq('PUT', data);
+            const res = (cfg.mode === 's3') ? await s3Req('PUT', JSON.stringify(db)) : await davReq('PUT', JSON.stringify(db));
             updateStatus(res.ok ? "● SYNCED" : "● ERROR", res.ok ? "green" : "red");
         } catch(e) { updateStatus("● OFFLINE", "red"); }
     }
 
     async function autoPull() {
-        if(db.config.mode === 'none') return;
+        if (cfg.mode === 'none') return;
         updateStatus("● PULLING", "orange");
         try {
-            const res = (db.config.mode === 's3') ? await s3Req('GET') : await davReq('GET');
-            if(res.ok) {
+            const res = (cfg.mode === 's3') ? await s3Req('GET') : await davReq('GET');
+            if (res.ok) {
                 const cloud = await res.json();
-                db.actions = cloud.a || []; db.routines = cloud.r || []; db.history = cloud.h || []; db.rate = cloud.rate || 1.1;
-                syncLocal(false); updateStatus("● SYNCED", "green");
+                if (cloud && cloud.actions) {
+                    db = cloud;
+                    localStorage.setItem(DB_KEY, JSON.stringify(db));
+                    render();
+                    updateStatus("● SYNCED", "green");
+                }
             }
-        } catch(e) { updateStatus("● ERROR", "red"); }
+        } catch(e) { updateStatus("● LOCAL", "gray"); }
     }
 
+    function saveSyncConfig() {
+        cfg.mode = document.getElementById('syncMode').value;
+        cfg.s3 = { endpoint: document.getElementById('s3Endpoint').value, bucket: document.getElementById('s3Bucket').value, region: document.getElementById('s3Region').value, key: document.getElementById('s3Key').value, secret: document.getElementById('s3Secret').value };
+        cfg.dav = { url: document.getElementById('davUrl').value, user: document.getElementById('davUser').value, pass: document.getElementById('davPass').value };
+        localStorage.setItem(CFG_KEY, JSON.stringify(cfg));
+        alert("同步配置已本地保存！建议手动点击一次“下载”同步历史数据。");
+    }
+
+    function manualPush() { if(confirm("上传本地数据覆盖云端备份？")) syncPush(); }
+    function manualPull() { if(confirm("下载云端备份覆盖本地数据？")) autoPull().then(() => alert("拉取完成")); }
+    
     function updateStatus(t, c) { const el = document.getElementById('syncStatus'); el.innerText = t; el.style.color = c; }
-    function toggleSyncFields() {
-        const m = document.getElementById('syncMode').value;
-        document.getElementById('s3Fields').classList.toggle('hidden', m !== 's3');
-        document.getElementById('webdavFields').classList.toggle('hidden', m !== 'webdav');
+
+    // --- 其余逻辑 ---
+    function setTab(id) {
+        document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById(id).classList.add('active');
+        document.getElementById('btn-' + id).classList.add('active');
     }
-    function testAndSaveSync() {
-        db.config.mode = document.getElementById('syncMode').value;
-        db.config.s3 = { endpoint:document.getElementById('s3Endpoint').value, bucket:document.getElementById('s3Bucket').value, region:document.getElementById('s3Region').value, key:document.getElementById('s3Key').value, secret:document.getElementById('s3Secret').value };
-        db.config.dav = { url:document.getElementById('davUrl').value, user:document.getElementById('davUser').value, pass:document.getElementById('davPass').value };
-        syncLocal(false);
-        autoPull().then(() => alert("配置已保存并尝试拉取云端数据"));
+    function updateRate() { db.rate = document.getElementById('ttsRate').value; document.getElementById('rateLabel').innerText = db.rate; saveLocal(false); }
+    function speak(t) { window.speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(t); u.lang='zh-CN'; u.rate=parseFloat(db.rate); window.speechSynthesis.speak(u); }
+    function saveAction() {
+        const a = { name: document.getElementById('name').value || '未命名', sets: parseInt(document.getElementById('sets').value) || 1, reps: parseInt(document.getElementById('reps').value) || 1, work: parseInt(document.getElementById('work').value) || 5, repRest: parseInt(document.getElementById('repRest').value) || 2, isAlt: document.getElementById('isAlt').checked, switchRest: parseInt(document.getElementById('switchRest').value) || 3, actionRest: parseInt(document.getElementById('actionRest').value) || 10, groupRest: parseInt(document.getElementById('groupRest').value) || 15 };
+        db.actions.push(a); saveLocal();
+    }
+    function saveToRoutines() {
+        const n = document.getElementById('newRoutineName').value;
+        if(!n || db.actions.length === 0) return;
+        db.routines.push({ name: n, actions: JSON.parse(JSON.stringify(db.actions)) });
+        document.getElementById('newRoutineName').value = ''; saveLocal(); alert("方案已入库");
+    }
+    function render() {
+        document.getElementById('currentActionList').innerHTML = db.actions.map((a, i) => `
+            <div class="list-item">
+                <div class="action-content" onclick="db.actions.splice(${i},1); saveLocal();">
+                    <strong>${a.name}</strong><br><small>${a.sets}组 x ${a.reps}次 | ${a.work}s</small>
+                </div>
+                <button onclick="db.actions.splice(${i},1);saveLocal();" style="border:none;background:none;color:var(--error);"><span class="material-symbols-rounded">delete</span></button>
+            </div>
+        `).join('');
+        document.getElementById('routineList').innerHTML = db.routines.map((r, i) => `<div class="list-item"><strong>${r.name}</strong><button class="tab-btn active" style="width:auto; margin-left:10px;" onclick="db.actions=JSON.parse(JSON.stringify(db.routines[${i}].actions)); saveLocal(); setTab('workout');">载入</button></div>`).join('');
+        document.getElementById('historyList').innerHTML = db.history.map(h => `<div class="list-item" style="flex-direction:column; align-items:flex-start;"><small>${h.date}</small><strong>时长: ${Math.floor(h.duration/60)}分</strong></div>`).join('');
     }
 
-    // --- 训练逻辑 ---
-    function updateRate() { db.rate = document.getElementById('ttsRate').value; document.getElementById('rateLabel').innerText = db.rate; syncLocal(false); }
-    function speak(t) { window.speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(t); u.lang='zh-CN'; u.rate=parseFloat(db.rate); window.speechSynthesis.speak(u); }
+    async function handlePlay() {
+        if (!db.isPlaying) {
+            if (db.actions.length === 0) return;
+            db.isPlaying = true; db.startTime = Date.now();
+            document.getElementById('playIcon').innerText = 'pause';
+            document.getElementById('stopBtn').classList.remove('hidden');
+            await runSequence();
+        } else {
+            db.isPaused = !db.isPaused;
+            document.getElementById('playIcon').innerText = db.isPaused ? 'play_arrow' : 'pause';
+        }
+    }
 
     async function runSequence() {
         for (let i = 0; i < db.actions.length; i++) {
@@ -250,7 +333,7 @@
                 const sides = a.isAlt ? ['左侧', '右侧'] : [''];
                 for (let side of sides) {
                     if (!db.isPlaying) return;
-                    speak(s === 1 && side === sides[0] ? `开始：${a.name}` : (side || `第${s}组`));
+                    speak(s === 1 && side === sides[0] ? `开始训练：${a.name}` : (side || `第${s}组`));
                     for (let r = 1; r <= a.reps; r++) {
                         if (!db.isPlaying) return;
                         document.getElementById('curRep').innerText = r;
@@ -259,7 +342,7 @@
                     }
                     if (a.isAlt && side === '左侧' && db.isPlaying) await timer(a.switchRest, "换边", "SWITCH");
                 }
-                if (s < a.sets && db.isPlaying) await timer(a.actionRest, "组间休息", "SET REST");
+                if (s < a.sets && db.isPlaying) await timer(a.actionRest, "组间休", "SET REST");
             }
             if (i < db.actions.length - 1 && db.isPlaying) await timer(a.groupRest, "下一项", "BREAK");
         }
@@ -290,69 +373,8 @@
             speak("训练圆满完成");
             const d = Math.round((Date.now()-db.startTime)/1000);
             db.history.unshift({date:new Date().toLocaleString(), duration:d, actions:[...db.actions]});
-            syncLocal();
+            saveLocal();
         }
-    }
-
-    async function handlePlay() {
-        if (!db.isPlaying) {
-            if (db.actions.length === 0) return;
-            db.isPlaying = true; db.isPaused = false; db.startTime = Date.now();
-            document.getElementById('playIcon').innerText = 'pause';
-            document.getElementById('stopBtn').classList.remove('hidden');
-            document.getElementById('silentAudio').play();
-            await runSequence();
-        } else {
-            db.isPaused = !db.isPaused;
-            document.getElementById('playIcon').innerText = db.isPaused ? 'play_arrow' : 'pause';
-        }
-    }
-
-    function setTab(id) {
-        document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
-        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-        document.getElementById(id).classList.add('active');
-        document.getElementById('btn-' + id).classList.add('active');
-    }
-
-    function saveAction() {
-        const a = { name: document.getElementById('name').value || '未命名', sets: parseInt(document.getElementById('sets').value) || 1, reps: parseInt(document.getElementById('reps').value) || 1, work: parseInt(document.getElementById('work').value) || 5, repRest: parseInt(document.getElementById('repRest').value) || 2, isAlt: document.getElementById('isAlt').checked, switchRest: parseInt(document.getElementById('switchRest').value) || 3, actionRest: parseInt(document.getElementById('actionRest').value) || 10, groupRest: parseInt(document.getElementById('groupRest').value) || 15 };
-        db.actions.push(a); syncLocal(); document.getElementById('name').value = '';
-    }
-
-    function saveToRoutines() {
-        const n = document.getElementById('newRoutineName').value;
-        if(!n || db.actions.length === 0) return;
-        db.routines.push({ name: n, actions: JSON.parse(JSON.stringify(db.actions)) });
-        document.getElementById('newRoutineName').value = ''; syncLocal(); alert("方案已入库");
-    }
-
-    function render() {
-        document.getElementById('currentActionList').innerHTML = db.actions.map((a, i) => `
-            <div class="list-item">
-                <div class="sort-btns">
-                    <button class="sort-btn" onclick="moveAction(${i},-1)"><span class="material-symbols-rounded">expand_less</span></button>
-                    <button class="sort-btn" onclick="moveAction(${i},1)"><span class="material-symbols-rounded">expand_more</span></button>
-                </div>
-                <div class="action-content" onclick="db.actions.splice(${i},1); syncLocal();">
-                    <strong>${a.name}</strong><br><small>${a.sets}组 x ${a.reps}次 | ${a.work}s</small>
-                </div>
-                <button onclick="db.actions.splice(${i},1);syncLocal();" style="border:none;background:none;color:var(--error);"><span class="material-symbols-rounded">delete</span></button>
-            </div>
-        `).join('');
-
-        document.getElementById('routineList').innerHTML = db.routines.map((r, i) => `<div class="list-item"><strong>${r.name}</strong><button class="tab-btn active" style="width:auto; margin-left:10px;" onclick="db.actions=JSON.parse(JSON.stringify(db.routines[${i}].actions)); syncLocal(); setTab('workout');">载入</button></div>`).join('');
-        document.getElementById('historyList').innerHTML = db.history.map(h => `<div class="list-item" style="flex-direction:column; align-items:flex-start;"><small>${h.date}</small><strong>时长: ${Math.floor(h.duration/60)}分</strong></div>`).join('');
-    }
-
-    function moveAction(idx, dir) { if(dir===-1 && idx>0) [db.actions[idx], db.actions[idx-1]] = [db.actions[idx-1], db.actions[idx]]; else if(dir===1 && idx<db.actions.length-1) [db.actions[idx], db.actions[idx+1]] = [db.actions[idx+1], db.actions[idx]]; syncLocal(); }
-
-    function initUI() {
-        const cfg = db.config;
-        document.getElementById('syncMode').value = cfg.mode;
-        if(cfg.mode === 's3') { document.getElementById('s3Endpoint').value = cfg.s3.endpoint; document.getElementById('s3Bucket').value = cfg.s3.bucket; document.getElementById('s3Region').value = cfg.s3.region; document.getElementById('s3Key').value = cfg.s3.key; document.getElementById('s3Secret').value = cfg.s3.secret; }
-        if(cfg.mode === 'webdav') { document.getElementById('davUrl').value = cfg.dav.url; document.getElementById('davUser').value = cfg.dav.user; document.getElementById('davPass').value = cfg.dav.pass; }
-        toggleSyncFields();
     }
 
     if ('wakeLock' in navigator) { navigator.wakeLock.request('screen').catch(()=>{}); }
