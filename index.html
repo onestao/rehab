@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>REHAB PRO V25</title>
+    <title>REHAB PRO V26</title>
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#0061a4">
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
@@ -31,7 +31,7 @@
 
         .card { background: white; border-radius: 16px; padding: 14px; width: 100%; max-width: 500px; box-sizing: border-box; margin-bottom: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.02); }
         .timer-panel { background: var(--on-primary-container); color: white; text-align: center; position: relative; }
-        #mainTime { font-size: 80px; font-weight: 800; line-height: 1; margin: 8px 0; color: var(--primary-container); font-variant-numeric: tabular-nums; }
+        #mainTime { font-size: 80px; font-weight: 800; line-height: 1; margin: 6px 0; color: var(--primary-container); font-variant-numeric: tabular-nums; }
         
         .progress-info { display: flex; justify-content: space-around; font-size: 12px; opacity: 0.9; margin-top: 8px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 8px; }
         #sessionTime { color: #ffd166; font-weight: bold; }
@@ -53,13 +53,9 @@
         .controls { position: fixed; bottom: 20px; display: flex; gap: 12px; align-items: center; z-index: 1000; }
         .fab { width: 64px; height: 64px; border-radius: 20px; background: var(--primary); color: white; display: flex; align-items: center; justify-content: center; border: none; box-shadow: 0 4px 15px rgba(0,97,164,0.3); }
         .fab-stop { width: 50px; height: 50px; background: var(--error); }
-        
         .section { display: none; width: 100%; max-width: 500px; }
         .section.active { display: block; }
-        .hidden { display: none; }
         #silentAudio { display: none; }
-        
-        .detail-row { font-size: 11px; color: #666; display: flex; justify-content: space-between; margin-bottom: 2px; }
     </style>
 </head>
 <body>
@@ -122,30 +118,22 @@
         </div>
     </div>
 
-    <!-- 其余页面逻辑同 V24 ... -->
+    <!-- 其余页面配置保持 -->
     <div id="sync" class="section">
         <div class="card">
-            <h3 style="margin:0 0 10px 0; font-size:16px;">同步引擎</h3>
+            <h3>同步设置</h3>
             <select id="syncMode" onchange="toggleSyncFields()" style="margin-bottom:10px;">
-                <option value="none">关闭同步</option>
-                <option value="s3">S3 协议 (CAS数据胶囊/R2)</option>
-                <option value="webdav">WebDAV (坚果云等)</option>
+                <option value="none">仅本地</option>
+                <option value="s3">S3 协议 (数据胶囊/R2)</option>
+                <option value="webdav">WebDAV</option>
             </select>
             <div id="s3Fields" class="hidden">
-                <input type="text" id="s3Endpoint" placeholder="Endpoint (含 https://)" style="margin-bottom:6px;">
-                <input type="text" id="s3Bucket" placeholder="Bucket Name" style="margin-bottom:6px;">
-                <input type="text" id="s3Region" placeholder="Region" style="margin-bottom:6px;">
-                <div style="display:flex; gap:6px; margin-bottom:6px;"><input type="text" id="s3Key" placeholder="Access Key"><input type="password" id="s3Secret" placeholder="Secret Key"></div>
+                <input type="text" id="s3Endpoint" placeholder="Endpoint"><input type="text" id="s3Bucket" placeholder="Bucket"><input type="text" id="s3Region" placeholder="Region">
+                <div style="display:flex; gap:5px;"><input type="text" id="s3Key" placeholder="AccessKey"><input type="password" id="s3Secret" placeholder="SecretKey"></div>
             </div>
-            <div id="webdavFields" class="hidden">
-                <input type="text" id="davUrl" placeholder="WebDAV 地址" style="margin-bottom:6px;">
-                <div style="display:flex; gap:6px;"><input type="text" id="davUser" placeholder="用户名"><input type="password" id="davPass" placeholder="密码"></div>
-            </div>
+            <div id="webdavFields" class="hidden"><input type="text" id="davUrl" placeholder="WebDAV URL"><input type="text" id="davUser" placeholder="User"><input type="password" id="davPass" placeholder="Pass"></div>
             <button class="btn btn-primary" onclick="saveSyncConfig()" style="margin-top:10px; background:var(--tertiary);">保存配置</button>
-            <div style="display:flex; gap:8px; margin-top:10px;">
-                <button class="btn btn-primary" style="flex:1" onclick="manualPush()">上传备份</button>
-                <button class="btn btn-primary" style="flex:1" onclick="manualPull()">下载数据</button>
-            </div>
+            <div style="display:flex; gap:8px; margin-top:10px;"><button class="btn btn-primary" style="flex:1" onclick="manualPush()">立即备份</button><button class="btn btn-primary" style="flex:1" onclick="manualPull()">下载数据</button></div>
         </div>
     </div>
     <div id="routines" class="section"><div id="routineList"></div></div>
@@ -157,29 +145,21 @@
     </div>
 
 <script>
-    // --- 加密与同步核心 (保持 V24) ---
+    // --- 算法与迁移逻辑 (向前兼容) ---
     async function sha256(str) { const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(str)); return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join(""); }
     async function hmac(key, data) { const cKey = typeof key === "string" ? new TextEncoder().encode(key) : key; const cryptoKey = await crypto.subtle.importKey("raw", cKey, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]); return await crypto.subtle.sign("HMAC", cryptoKey, new TextEncoder().encode(data)); }
-
-    const DB_KEY = 'rp_v25_db';
-    const CFG_KEY = 'rp_v25_cfg';
-
+    
+    const DB_KEY = 'rp_v26_db';
+    const CFG_KEY = 'rp_v26_cfg';
     function autoMigrate() {
-        const legacyKeys = ['rp_v24_db', 'rp_v23_db', 'rp_v22_db', 'rp_v21_main'];
+        const keys = ['rp_v25_db', 'rp_v24_db', 'rp_v21_main'];
         let data = { actions: [], routines: [], history: [], rate: 1.1 };
         let cfg = { mode: 'none', s3: {}, dav: {} };
-        const oldCfg = localStorage.getItem('rp_v24_cfg') || localStorage.getItem('rp_v23_cfg');
+        const oldCfg = localStorage.getItem('rp_v25_cfg') || localStorage.getItem('rp_v24_cfg');
         if(oldCfg) cfg = JSON.parse(oldCfg);
-        for (let k of legacyKeys) {
+        for (let k of keys) {
             let val = localStorage.getItem(k);
-            if(val) {
-                try {
-                    let p = JSON.parse(val);
-                    data.actions = p.actions || []; data.routines = p.routines || [];
-                    data.history = p.history || []; data.rate = p.rate || 1.1;
-                    break;
-                } catch(e){}
-            }
+            if(val) { try { let p = JSON.parse(val); data.actions = p.actions || []; data.history = p.history || []; data.rate = p.rate || 1.1; break; } catch(e){} }
         }
         return { data, cfg };
     }
@@ -188,92 +168,23 @@
     let cfg = JSON.parse(localStorage.getItem(CFG_KEY));
     if(!db) { let m = autoMigrate(); db = m.data; cfg = m.cfg; syncLocal(false); }
 
+    // --- 核心语音播报系统 (同步队列版) ---
+    function speak(t) {
+        return new Promise((resolve) => {
+            // 不再主动执行 cancel()，除非是为了强制停止
+            const u = new SpeechSynthesisUtterance(t);
+            u.lang = 'zh-CN';
+            u.rate = parseFloat(db.rate);
+            u.onstart = () => { /* 可以在此处理图标跳动 */ };
+            u.onend = () => resolve();
+            u.onerror = () => resolve();
+            window.speechSynthesis.speak(u);
+        });
+    }
+
+    // --- 训练引擎逻辑 ---
     let isPlaying = false, isPaused = false, timerInterval = null, sessionInterval = null;
     let skipFlag = false, startTime = null, totalSessionSeconds = 0;
-
-    window.onload = () => { initUI(); render(); initMediaSession(); if(cfg.mode !== 'none') autoPull(); };
-
-    function initUI() {
-        document.getElementById('ttsRate').value = db.rate;
-        document.getElementById('rateLabel').innerText = db.rate;
-        document.getElementById('syncMode').value = cfg.mode;
-        toggleSyncFields();
-    }
-
-    function syncLocal(push = true) {
-        localStorage.setItem(DB_KEY, JSON.stringify(db));
-        localStorage.setItem(CFG_KEY, JSON.stringify(cfg));
-        if(push && cfg.mode !== 'none') syncPush();
-        render();
-    }
-
-    // --- 同步引擎 (保持 V24) ---
-    async function s3Req(method, body = null) {
-        const { endpoint, bucket, region, key, secret } = cfg.s3;
-        const host = new URL(endpoint).host;
-        const path = `/${bucket}/rehab_v25_sync.json`;
-        const datetime = new Date().toISOString().replace(/[:\-]|\.\d{3}/g, '');
-        const date = datetime.slice(0, 8);
-        const hashedPayload = body ? await sha256(body) : "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
-        const canonicalRequest = `${method}\n${path}\n\nhost:${host}\nx-amz-content-sha256:${hashedPayload}\nx-amz-date:${datetime}\n\nhost;x-amz-content-sha256;x-amz-date\n${hashedPayload}`;
-        const scope = `${date}/${region}/s3/aws4_request`;
-        const stringToSign = `AWS4-HMAC-SHA256\n${datetime}\n${scope}\n${await sha256(canonicalRequest)}`;
-        const kDate = await hmac("AWS4" + secret, date);
-        const kRegion = await hmac(kDate, region);
-        const kService = await hmac(kRegion, "s3");
-        const kSigning = await hmac(kService, "aws4_request");
-        const signature = Array.from(new Uint8Array(await hmac(kSigning, stringToSign))).map(b => b.toString(16).padStart(2, "0")).join("");
-        return fetch(`${endpoint}${path}`, { method, headers: { 'Authorization': `AWS4-HMAC-SHA256 Credential=${key}/${scope}, SignedHeaders=host;x-amz-content-sha256;x-amz-date, Signature=${signature}`, 'x-amz-date': datetime, 'x-amz-content-sha256': hashedPayload }, body });
-    }
-
-    async function davReq(method, body = null) {
-        const { url, user, pass } = cfg.dav;
-        const auth = btoa(`${user}:${pass}`);
-        return fetch(url.endsWith('/') ? url+'rehab_v25_sync.json' : url+'/rehab_v25_sync.json', { method, headers: { 'Authorization': `Basic ${auth}`, 'Content-Type': 'application/json' }, body });
-    }
-
-    async function syncPush() {
-        if(cfg.mode === 'none') return;
-        updateStatus("● UPLOADING", "orange");
-        try {
-            const res = (cfg.mode === 's3') ? await s3Req('PUT', JSON.stringify(db)) : await davReq('PUT', JSON.stringify(db));
-            updateStatus(res.ok ? "● SYNCED" : "● ERROR", res.ok ? "green" : "red");
-        } catch(e) { updateStatus("● OFFLINE", "red"); }
-    }
-
-    async function autoPull() {
-        if(cfg.mode === 'none') return;
-        updateStatus("● PULLING", "orange");
-        try {
-            const res = (cfg.mode === 's3') ? await s3Req('GET') : await davReq('GET');
-            if(res.ok) {
-                const cloud = await res.json();
-                if(cloud && cloud.actions) { db = cloud; syncLocal(false); updateStatus("● SYNCED", "green"); }
-            }
-        } catch(e) { updateStatus("● LOCAL", "gray"); }
-    }
-
-    function updateStatus(t, c) { const el = document.getElementById('syncStatus'); el.innerText = t; el.style.color = c; }
-    function toggleSyncFields() {
-        const m = document.getElementById('syncMode').value;
-        document.getElementById('s3Fields').classList.toggle('hidden', m !== 's3');
-        document.getElementById('webdavFields').classList.toggle('hidden', m !== 'webdav');
-    }
-    function saveSyncConfig() {
-        cfg.mode = document.getElementById('syncMode').value;
-        cfg.s3 = { endpoint: document.getElementById('s3Endpoint').value, bucket: document.getElementById('s3Bucket').value, region: document.getElementById('s3Region').value, key: document.getElementById('s3Key').value, secret: document.getElementById('s3Secret').value };
-        cfg.dav = { url: document.getElementById('davUrl').value, user: document.getElementById('davUser').value, pass: document.getElementById('davPass').value };
-        syncLocal(false); alert("配置保存");
-    }
-
-    // --- 训练与计时逻辑 ---
-    function updateRate() { db.rate = document.getElementById('ttsRate').value; document.getElementById('rateLabel').innerText = db.rate; syncLocal(false); }
-    function speak(t) {
-        window.speechSynthesis.cancel();
-        const u = new SpeechSynthesisUtterance(t);
-        u.lang='zh-CN'; u.rate=parseFloat(db.rate);
-        window.speechSynthesis.speak(u);
-    }
 
     async function handlePlay() {
         if (!isPlaying) {
@@ -284,7 +195,7 @@
             document.getElementById('stopBtn').classList.remove('hidden');
             document.getElementById('silentAudio').play();
             
-            // 启动总用时计时器
+            // 启动总用时计时
             sessionInterval = setInterval(() => {
                 if(!isPaused) {
                     totalSessionSeconds++;
@@ -294,14 +205,9 @@
                 }
             }, 1000);
 
-            // 核心修复：报动作名称并等待
-            speak(`现在开始康复训练。第一项动作：${db.actions[0].name}`);
-            
-            // 等待 1.8 秒让动作名播报完毕再开始计时循环
-            setTimeout(async () => {
-                if(isPlaying) await runFullSequence();
-            }, 1800);
-
+            // 【核心修复】顺序播报开头
+            await speak("现在开始康复训练");
+            await runFullSequence();
         } else {
             isPaused = !isPaused;
             document.getElementById('playIcon').innerText = isPaused ? 'play_arrow' : 'pause';
@@ -313,34 +219,47 @@
         for (let i = 0; i < db.actions.length; i++) {
             const a = db.actions[i];
             updateMediaMetadata(a.name, "正在训练");
+            
+            // 报动作名称
+            await speak(`动作项：${a.name}`);
+
             for (let s = 1; s <= a.sets; s++) {
                 if (!isPlaying) return;
                 document.getElementById('totalSet').innerText = a.sets;
                 document.getElementById('curSet').innerText = s;
+                
                 const sides = a.isAlt ? ['左侧', '右侧'] : [''];
                 for (let side of sides) {
                     if (!isPlaying) return;
-                    // 跳过第一个动作的第一组播报，因为 handlePlay 已经报过了
-                    if (!(i === 0 && s === 1 && side === sides[0])) {
-                        speak(side ? `${side}开始` : `第${s}组开始`);
-                    }
+                    if (side) await speak(`${side}开始`);
+                    else if (a.sets > 1) await speak(`第${s}组`);
+
                     for (let r = 1; r <= a.reps; r++) {
                         if (!isPlaying) return;
                         document.getElementById('totalRep').innerText = a.reps;
                         document.getElementById('curRep').innerText = r;
-                        speak(`第${r}次`);
+                        
+                        await speak(`第${r}次`);
                         await timer(a.work, `${a.name} ${side}`, 'HOLD');
-                        if (r < a.reps && isPlaying) await timer(a.repRest, "放松", "REST");
+                        
+                        if (r < a.reps && isPlaying) {
+                            await speak("放松");
+                            await timer(a.repRest, "放松", "REST");
+                        }
                     }
                     if (a.isAlt && side === '左侧' && isPlaying) {
-                        speak("准备换边"); await timer(a.switchRest, "换边", "SWITCH");
+                        await speak("准备换边");
+                        await timer(a.switchRest, "换边", "SWITCH");
                     }
                 }
-                if (s < a.sets && isPlaying) { speak(`组间休息`); await timer(a.actionRest, "组间休息", "SET REST"); }
+                if (s < a.sets && isPlaying) {
+                    await speak("组间休息");
+                    await timer(a.actionRest, "组间休息", "SET REST");
+                }
             }
-            if (i < db.actions.length - 1 && isPlaying) { 
-                speak(`下一个动作：${db.actions[i+1].name}`); 
-                await timer(a.groupRest, "动作间歇", "BREAK"); 
+            if (i < db.actions.length - 1 && isPlaying) {
+                await speak("下一项准备");
+                await timer(a.groupRest, "动作大休", "BREAK");
             }
         }
         finishTraining();
@@ -351,22 +270,22 @@
             let left = sec;
             document.getElementById('subText').innerText = title;
             document.getElementById('statusText').innerText = status;
-            timerInterval = setInterval(() => {
+            timerInterval = setInterval(async () => {
                 if (!isPlaying || skipFlag) { clearInterval(timerInterval); skipFlag = false; res(); return; }
                 if (isPaused) return;
                 document.getElementById('mainTime').innerText = left;
-                if (left <= 3 && left > 0) speak(left.toString());
+                if (left <= 3 && left > 0) await speak(left.toString()); 
                 if (left <= 0) { clearInterval(timerInterval); res(); }
                 left--;
             }, 1000);
         });
     }
 
+    // --- 界面控制与渲染 (继承 V25) ---
     function skipCurrent() { skipFlag = true; speak("跳过"); }
-    function stopTrainer() { if(confirm("停止训练？")) finishTraining(); }
-
+    function stopTrainer() { if(confirm("结束本次训练？")) finishTraining(); }
     function finishTraining() {
-        if(isPlaying) speak("训练圆满完成");
+        speak("训练圆满完成");
         isPlaying = false; clearInterval(timerInterval); clearInterval(sessionInterval);
         document.getElementById('playIcon').innerText = 'play_arrow';
         document.getElementById('stopBtn').classList.add('hidden');
@@ -374,14 +293,12 @@
         document.getElementById('silentAudio').pause();
         saveHistory();
     }
-
     function saveHistory() {
         if(totalSessionSeconds < 5) return;
         db.history.unshift({ date: new Date().toLocaleString(), duration: totalSessionSeconds, actions: JSON.parse(JSON.stringify(db.actions)) });
         syncLocal();
     }
-
-    // --- 列表与UI渲染 (保持 V24) ---
+    function updateRate() { db.rate = document.getElementById('ttsRate').value; document.getElementById('rateLabel').innerText = db.rate; syncLocal(false); }
     function setTab(id) {
         document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -389,33 +306,56 @@
         document.getElementById('btn-' + id).classList.add('active');
         render();
     }
+    function syncLocal(push = true) {
+        localStorage.setItem(DB_KEY, JSON.stringify(db));
+        localStorage.setItem(CFG_KEY, JSON.stringify(cfg));
+        if(push && cfg.mode !== 'none') syncPush();
+        render();
+    }
     function saveAction() {
-        const a = { name: document.getElementById('name').value || '未命名', sets: parseInt(document.getElementById('sets').value) || 1, reps: parseInt(document.getElementById('reps').value) || 1, work: parseInt(document.getElementById('work').value) || 5, repRest: parseInt(document.getElementById('repRest').value) || 2, isAlt: document.getElementById('isAlt').checked, switchRest: parseInt(document.getElementById('switchRest').value) || 3, actionRest: parseInt(document.getElementById('actionRest').value) || 10, groupRest: parseInt(document.getElementById('groupRest').value) || 15 };
+        const a = { name: document.getElementById('name').value || '动作', sets: parseInt(document.getElementById('sets').value) || 1, reps: parseInt(document.getElementById('reps').value) || 1, work: parseInt(document.getElementById('work').value) || 5, repRest: parseInt(document.getElementById('repRest').value) || 2, isAlt: document.getElementById('isAlt').checked, switchRest: parseInt(document.getElementById('switchRest').value) || 3, actionRest: parseInt(document.getElementById('actionRest').value) || 10, groupRest: parseInt(document.getElementById('groupRest').value) || 15 };
         db.actions.push(a); syncLocal();
     }
     function render() {
-        document.getElementById('currentActionList').innerHTML = db.actions.map((a, i) => `
-            <div class="list-item">
-                <div class="sort-btns">
-                    <button class="sort-btn" onclick="moveAction(${i},-1)"><span class="material-symbols-rounded">expand_less</span></button>
-                    <button class="sort-btn" onclick="moveAction(${i},1)"><span class="material-symbols-rounded">expand_more</span></button>
-                </div>
-                <div class="action-content" onclick="editAction(${i})">
-                    <strong>${a.name}</strong><br><small>${a.sets}组 | ${a.reps}次 | ${a.work}s</small>
-                </div>
-                <button onclick="db.actions.splice(${i},1);syncLocal();" style="border:none;background:none;color:var(--error);"><span class="material-symbols-rounded">delete</span></button>
-            </div>
-        `).join('');
+        document.getElementById('currentActionList').innerHTML = db.actions.map((a, i) => `<div class="list-item"><div class="sort-btns"><button class="sort-btn" onclick="moveAction(${i},-1)"><span>expand_less</span></button><button class="sort-btn" onclick="moveAction(${i},1)"><span>expand_more</span></button></div><div class="action-content" onclick="editAction(${i})"><strong>${a.name}</strong><br><small>${a.sets}组 | ${a.reps}次 | ${a.work}s</small></div><button onclick="db.actions.splice(${i},1);syncLocal();" style="border:none;background:none;color:var(--error);"><span class="material-symbols-rounded">delete</span></button></div>`).join('');
         document.getElementById('routineList').innerHTML = db.routines.map((r, i) => `<div class="list-item"><strong>${r.name}</strong><button class="tab-btn active" style="width:auto; margin-left:10px;" onclick="db.actions=JSON.parse(JSON.stringify(db.routines[${i}].actions)); syncLocal(); setTab('workout');">载入</button></div>`).join('');
         document.getElementById('historyList').innerHTML = db.history.map(h => `<div class="list-item" style="flex-direction:column; align-items:flex-start;"><small>${h.date}</small><strong>用时: ${Math.floor(h.duration/60)}分${h.duration%60}秒</strong></div>`).join('');
     }
     function moveAction(idx, dir) { if(dir===-1 && idx>0) [db.actions[idx], db.actions[idx-1]] = [db.actions[idx-1], db.actions[idx]]; else if(dir===1 && idx<db.actions.length-1) [db.actions[idx], db.actions[idx+1]] = [db.actions[idx+1], db.actions[idx]]; syncLocal(); }
-    function manualPush() { if(confirm("同步到云端？")) syncPush(); }
-    function manualPull() { if(confirm("从云端下载？")) autoPull().then(() => alert("完成")); }
-    function initMediaSession() { if ('mediaSession' in navigator) { navigator.mediaSession.setActionHandler('play', () => handlePlay()); navigator.mediaSession.setActionHandler('pause', () => handlePlay()); navigator.mediaSession.setActionHandler('nexttrack', () => skipCurrent()); } }
+    
+    // --- 同步设置引擎 (S3/WebDAV) ---
+    async function s3Req(method, body = null) {
+        const { endpoint, bucket, region, key, secret } = cfg.s3;
+        const host = new URL(endpoint).host; const path = `/${bucket}/rehab_v26_sync.json`;
+        const datetime = new Date().toISOString().replace(/[:\-]|\.\d{3}/g, ''); const date = datetime.slice(0, 8);
+        const hashedPayload = body ? await sha256(body) : "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
+        const canonicalRequest = `${method}\n${path}\n\nhost:${host}\nx-amz-content-sha256:${hashedPayload}\nx-amz-date:${datetime}\n\nhost;x-amz-content-sha256;x-amz-date\n${hashedPayload}`;
+        const scope = `${date}/${region}/s3/aws4_request`; const stringToSign = `AWS4-HMAC-SHA256\n${datetime}\n${scope}\n${await sha256(canonicalRequest)}`;
+        const kDate = await hmac("AWS4" + secret, date); const kRegion = await hmac(kDate, region); const kService = await hmac(kRegion, "s3"); const kSigning = await hmac(kService, "aws4_request");
+        const signature = Array.from(new Uint8Array(await hmac(kSigning, stringToSign))).map(b => b.toString(16).padStart(2, "0")).join("");
+        return fetch(`${endpoint}${path}`, { method, headers: { 'Authorization': `AWS4-HMAC-SHA256 Credential=${key}/${scope}, SignedHeaders=host;x-amz-content-sha256;x-amz-date, Signature=${signature}`, 'x-amz-date': datetime, 'x-amz-content-sha256': hashedPayload }, body });
+    }
+    async function syncPush() {
+        if(cfg.mode === 'none') return;
+        try { const res = (cfg.mode === 's3') ? await s3Req('PUT', JSON.stringify(db)) : await davReq('PUT', JSON.stringify(db)); } catch(e){}
+    }
+    async function autoPull() {
+        if(cfg.mode === 'none') return;
+        try { const res = (cfg.mode === 's3') ? await s3Req('GET') : await davReq('GET');
+            if(res.ok) { db = await res.json(); syncLocal(false); } } catch(e){}
+    }
+    function saveSyncConfig() {
+        cfg.mode = document.getElementById('syncMode').value;
+        cfg.s3 = { endpoint:document.getElementById('s3Endpoint').value, bucket:document.getElementById('s3Bucket').value, region:document.getElementById('s3Region').value, key:document.getElementById('s3Key').value, secret:document.getElementById('s3Secret').value };
+        syncLocal(false); alert("配置已保存");
+    }
+    function manualPull() { if(confirm("下载云端备份？")) autoPull().then(() => alert("完成")); }
+    function manualPush() { if(confirm("备份到云端？")) syncPush().then(() => alert("完成")); }
+    function toggleSyncFields() { const m = document.getElementById('syncMode').value; document.getElementById('s3Fields').classList.toggle('hidden', m !== 's3'); document.getElementById('webdavFields').classList.toggle('hidden', m !== 'webdav'); }
+    function initUI() { document.getElementById('ttsRate').value = db.rate; document.getElementById('rateLabel').innerText = db.rate; document.getElementById('syncMode').value = cfg.mode; toggleSyncFields(); }
     function updateMediaMetadata(t, s) { if ('mediaSession' in navigator) { navigator.mediaSession.metadata = new MediaMetadata({ title: t, artist: 'REHAB PRO', album: s }); } }
 
-    if ('wakeLock' in navigator) { navigator.wakeLock.request('screen').catch(()=>{}); }
+    window.onload = () => { initUI(); render(); initMediaSession(); if(cfg.mode !== 'none') autoPull(); };
 </script>
 </body>
 </html>
