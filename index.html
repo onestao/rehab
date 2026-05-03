@@ -39,22 +39,13 @@
                         <b><span id="curRep">0</span>/<span id="totalRep">0</span></b>
                     </div>
                 </div>
+                <div class="workout-controls">
+                    <button class="md-fab fab-stop hidden" id="stopBtn" onclick="workout.stop()"><span class="material-symbols-rounded">stop</span></button>
+                    <button class="md-fab fab-play" id="playBtn" onclick="workout.toggle()"><span class="material-symbols-rounded" id="playIcon">play_arrow</span></button>
+                </div>
             </div>
 
             <div class="md-card input-card">
-                <div class="theme-panel">
-                    <div class="theme-panel-title"><span class="material-symbols-rounded">palette</span> 主题颜色</div>
-                    <div class="theme-actions">
-                        <button class="theme-swatch theme-blue active" data-theme="blue" onclick="theme.setPreset('blue')" aria-label="蓝色主题"></button>
-                        <button class="theme-swatch theme-purple" data-theme="purple" onclick="theme.setPreset('purple')" aria-label="紫色主题"></button>
-                        <button class="theme-swatch theme-green" data-theme="green" onclick="theme.setPreset('green')" aria-label="绿色主题"></button>
-                        <button class="theme-swatch theme-orange" data-theme="orange" onclick="theme.setPreset('orange')" aria-label="橙色主题"></button>
-                        <button class="theme-swatch theme-rose" data-theme="rose" onclick="theme.setPreset('rose')" aria-label="玫红主题"></button>
-                        <button class="md-btn md-btn-tonal theme-monet" data-theme="monet" onclick="theme.useMonet()"><span class="material-symbols-rounded">auto_awesome</span> 莫奈</button>
-                        <label class="color-picker"><input type="color" id="themeColor" value="#0061a4" oninput="theme.setCustom(this.value)"><span class="material-symbols-rounded">format_color_fill</span></label>
-                    </div>
-                </div>
-                <div class="md-divider"></div>
                 <div class="rate-row">
                     <span class="material-symbols-rounded" style="font-size:18px">speed</span>
                     <span>语速 <span id="rateLabel">1.1</span>x</span>
@@ -99,6 +90,20 @@
         </section>
         <section id="sync" class="page">
             <div class="page-header"><span class="material-symbols-rounded">cloud_sync</span><h2>同步中心</h2></div>
+            <div class="md-card theme-card">
+                <div class="theme-panel">
+                    <div class="theme-panel-title"><span class="material-symbols-rounded">palette</span> 主题颜色</div>
+                    <div class="theme-actions">
+                        <button class="theme-swatch theme-blue active" data-theme="blue" onclick="theme.setPreset('blue')" aria-label="蓝色主题"></button>
+                        <button class="theme-swatch theme-purple" data-theme="purple" onclick="theme.setPreset('purple')" aria-label="紫色主题"></button>
+                        <button class="theme-swatch theme-green" data-theme="green" onclick="theme.setPreset('green')" aria-label="绿色主题"></button>
+                        <button class="theme-swatch theme-orange" data-theme="orange" onclick="theme.setPreset('orange')" aria-label="橙色主题"></button>
+                        <button class="theme-swatch theme-rose" data-theme="rose" onclick="theme.setPreset('rose')" aria-label="玫红主题"></button>
+                        <button class="md-btn md-btn-tonal theme-monet" data-theme="monet" onclick="theme.useMonet()"><span class="material-symbols-rounded">auto_awesome</span> 莫奈</button>
+                        <label class="color-picker"><input type="color" id="themeColor" value="#0061a4" oninput="theme.setCustom(this.value)"><span class="material-symbols-rounded">format_color_fill</span></label>
+                    </div>
+                </div>
+            </div>
             <div class="md-card sync-card">
                 <div class="md-field">
                     <select id="syncMode" onchange="sync.toggleFields(this.value)">
@@ -147,11 +152,6 @@
             <small>同步</small>
         </button>
     </nav>
-
-    <div class="fab-group">
-        <button class="md-fab fab-stop hidden" id="stopBtn" onclick="workout.stop()"><span class="material-symbols-rounded">stop</span></button>
-        <button class="md-fab fab-play" id="playBtn" onclick="workout.toggle()"><span class="material-symbols-rounded" id="playIcon">play_arrow</span></button>
-    </div>
 
     <script src="theme.js"></script>
     <script src="data.js"></script>

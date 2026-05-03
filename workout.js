@@ -1,19 +1,106 @@
 const workout = {
     isPlaying: false, isPaused: false, skipFlag: false,
     timer: null, sessionInt: null, totalSec: 0,
-    _countResolve: null,
+    _countResolve: null, _speakResolve: null, _speechWatchdog: null,
+    _audioListenerBound: false,
+    _backGuardBound: false,
+    _backToastTimer: null,
+    wakeLock: null,
 
     async speak(text) {
         if (!text) return;
         return new Promise(resolve => {
+            if (this.skipFlag || !this.isPlaying) { resolve(); return; }
+            let settled = false;
+            const done = () => {
+                if (settled) return;
+                settled = true;
+                clearInterval(this._speechWatchdog);
+                this._speakResolve = null;
+                setTimeout(resolve, 160);
+            };
+            this._speakResolve = done;
             window.speechSynthesis.cancel();
             const u = new SpeechSynthesisUtterance(text);
             u.lang = 'zh-CN'; u.rate = parseFloat(data.db.rate);
-            const done = () => { setTimeout(resolve, 200); };
             u.onend = done; u.onerror = done;
-            setTimeout(done, text.length * 400 + 1000);
+            this._speechWatchdog = setInterval(() => {
+                if (this.isPaused || this.skipFlag || !this.isPlaying) return;
+                if (document.hidden && window.speechSynthesis.paused) window.speechSynthesis.resume();
+            }, 4000);
+            setTimeout(done, text.length * 450 + 1200);
             window.speechSynthesis.speak(u);
         });
+    },
+
+    async acquireWakeLock() {
+        if (!('wakeLock' in navigator)) return;
+        try {
+            this.wakeLock = await navigator.wakeLock.request('screen');
+        } catch (e) { console.warn('Wake Lock unavailable', e); }
+    },
+
+    releaseWakeLock() {
+        if (this.wakeLock) this.wakeLock.release().catch(() => {});
+        this.wakeLock = null;
+    },
+
+    setupMediaSession() {
+        if (!('mediaSession' in navigator)) return;
+        navigator.mediaSession.metadata = new MediaMetadata({ title: '康复训练中', artist: '康复助手' });
+        navigator.mediaSession.setActionHandler('play', () => { if (this.isPaused) this.toggle(); });
+        navigator.mediaSession.setActionHandler('pause', () => { if (!this.isPaused && this.isPlaying) this.toggle(); });
+        navigator.mediaSession.setActionHandler('stop', () => this.stop());
+        navigator.mediaSession.setActionHandler('nexttrack', () => this.skip());
+    },
+
+    keepAudioAlive() {
+        const audio = document.getElementById('silentAudio');
+        audio.play().catch(()=>{});
+        if (this._audioListenerBound) return;
+        this._audioListenerBound = true;
+        document.addEventListener('visibilitychange', () => {
+            if (!this.isPlaying) return;
+            if (!document.hidden) this.acquireWakeLock();
+            audio.play().catch(()=>{});
+            window.speechSynthesis.resume();
+        });
+    },
+
+    initBackGuard() {
+        const pushGuard = () => history.pushState({ rehabGuard: true }, '');
+        if (this._backGuardBound) { pushGuard(); return; }
+        this._backGuardBound = true;
+        history.replaceState({ rehabRoot: true }, '');
+        pushGuard();
+        window.addEventListener('popstate', () => {
+            if (!this.isPlaying) {
+                return;
+            }
+            pushGuard();
+            this.showBackToast();
+            if (!this.isPaused) window.speechSynthesis.resume();
+            document.getElementById('silentAudio').play().catch(()=>{});
+        });
+        window.addEventListener('beforeunload', (e) => {
+            if (!this.isPlaying) return;
+            e.preventDefault();
+            e.returnValue = '训练正在进行，退出会中断后台播放。';
+        });
+    },
+
+    showBackToast() {
+        let toast = document.getElementById('backToast');
+        if (!toast) {
+            toast = document.createElement('div');
+            toast.id = 'backToast';
+            toast.className = 'md-toast';
+            document.body.appendChild(toast);
+        }
+        toast.textContent = '训练正在进行：按 Home 进入后台，或点停止结束训练';
+        toast.classList.add('show');
+        clearTimeout(this._backToastTimer);
+        this._backToastTimer = setTimeout(() => toast.classList.remove('show'), 2600);
     },
 
     updateRate(val) {
@@ -28,7 +115,10 @@ const workout = {
             this.isPlaying = true; this.isPaused = false; this.totalSec = 0;
             document.getElementById('playIcon').innerText = 'pause';
             document.getElementById('stopBtn').classList.remove('hidden');
-            document.getElementById('silentAudio').play().catch(()=>{});
+            await this.acquireWakeLock();
+            this.setupMediaSession();
+            this.keepAudioAlive();
+            this.initBackGuard();
             
             this.sessionInt = setInterval(() => { if(!this.isPaused) { this.totalSec++; this.updateUI(); }}, 1000);
             
@@ -110,7 +200,17 @@ const workout = {
         });
     },
 
-    skip() { this.skipFlag = true; this.speak("跳过"); },
+    skip() {
+        if (!this.isPlaying) return;
+        this.skipFlag = true;
+        window.speechSynthesis.cancel();
+        if (this._speakResolve) { this._speakResolve(); this._speakResolve = null; }
+        if (this._countResolve) { this._countResolve(); this._countResolve = null; }
+        clearInterval(this.timer);
+        document.getElementById('statusText').innerText = 'SKIP';
+        document.getElementById('subText').innerText = '已跳过当前阶段';
+        this.skipFlag = false;
+    },
     updateUI() {
         const m = Math.floor(this.totalSec/60).toString().padStart(2,'0');
         const s = (this.totalSec%60).toString().padStart(2,'0');
@@ -124,13 +224,24 @@ const workout = {
         }
     },
     finish() {
+        const duration = this.totalSec;
         this.isPlaying = false;
         clearInterval(this.timer); clearInterval(this.sessionInt);
+        clearInterval(this._speechWatchdog);
+        window.speechSynthesis.cancel();
+        this.releaseWakeLock();
         this._countResolve = null;
+        this._speakResolve = null;
         document.getElementById('playIcon').innerText = 'play_arrow';
         document.getElementById('stopBtn').classList.add('hidden');
+        if (duration < 20) {
+            this.speak("训练时间过短，无法记录");
+            alert("训练时间低于20秒，无法记录历史");
+            data.save();
+            return;
+        }
         this.speak("训练完成");
-        data.db.history.unshift({ date: new Date().toLocaleString(), duration: this.totalSec, actions: [...data.db.actions] });
+        data.db.history.unshift({ date: new Date().toLocaleString(), duration, actions: [...data.db.actions] });
         data.saveAndBackup();
     }
 };
