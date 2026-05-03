@@ -39,17 +39,18 @@
                         <b><span id="curRep">0</span>/<span id="totalRep">0</span></b>
                     </div>
                 </div>
-                <div class="workout-controls">
-                    <button class="md-fab fab-stop hidden" id="stopBtn" onclick="workout.stop()"><span class="material-symbols-rounded">stop</span></button>
-                    <button class="md-fab fab-play" id="playBtn" onclick="workout.toggle()"><span class="material-symbols-rounded" id="playIcon">play_arrow</span></button>
-                </div>
+            </div>
+
+            <div class="workout-controls">
+                <button class="md-fab fab-stop hidden" id="stopBtn" onclick="workout.stop()"><span class="material-symbols-rounded">stop</span></button>
+                <button class="md-fab fab-play" id="playBtn" onclick="workout.toggle()"><span class="material-symbols-rounded" id="playIcon">play_arrow</span></button>
             </div>
 
             <div class="md-card input-card">
                 <div class="rate-row">
                     <span class="material-symbols-rounded" style="font-size:18px">speed</span>
                     <span>语速 <span id="rateLabel">1.1</span>x</span>
-                    <input type="range" id="ttsRate" min="0.5" max="2" step="0.1" value="1.1" oninput="workout.updateRate(this.value)">
+                    <input type="range" id="ttsRate" min="0.5" max="3" step="0.1" value="1.1" oninput="workout.updateRate(this.value)">
                 </div>
                 <div class="md-divider compact-divider"></div>
                 <div class="md-grid">
@@ -89,7 +90,7 @@
             <div id="historyList"></div>
         </section>
         <section id="sync" class="page">
-            <div class="page-header"><span class="material-symbols-rounded">cloud_sync</span><h2>同步中心</h2></div>
+            <div class="page-header"><span class="material-symbols-rounded">settings</span><h2>设置</h2></div>
             <div class="md-card theme-card">
                 <div class="theme-panel">
                     <div class="theme-panel-title"><span class="material-symbols-rounded">palette</span> 主题颜色</div>
@@ -133,23 +134,19 @@
     <nav class="md-nav-rail">
         <button class="nav-item active" onclick="ui.tab('workout', this)">
             <div class="nav-indicator"></div>
-            <span class="material-symbols-rounded">exercise</span>
-            <small>训练</small>
+            <span class="nav-content"><span class="material-symbols-rounded">exercise</span><small>训练</small></span>
         </button>
         <button class="nav-item" onclick="ui.tab('routines', this)">
             <div class="nav-indicator"></div>
-            <span class="material-symbols-rounded">bookmarks</span>
-            <small>方案</small>
+            <span class="nav-content"><span class="material-symbols-rounded">bookmarks</span><small>方案</small></span>
         </button>
         <button class="nav-item" onclick="ui.tab('history', this)">
             <div class="nav-indicator"></div>
-            <span class="material-symbols-rounded">history</span>
-            <small>历史</small>
+            <span class="nav-content"><span class="material-symbols-rounded">history</span><small>历史</small></span>
         </button>
         <button class="nav-item" onclick="ui.tab('sync', this)">
             <div class="nav-indicator"></div>
-            <span class="material-symbols-rounded">sync</span>
-            <small>同步</small>
+            <span class="nav-content"><span class="material-symbols-rounded">settings</span><small>设置</small></span>
         </button>
     </nav>
 

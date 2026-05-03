@@ -3,6 +3,7 @@ const workout = {
     timer: null, sessionInt: null, totalSec: 0,
     _countResolve: null, _speakResolve: null, _speechWatchdog: null,
     _audioListenerBound: false,
+    _audioKeepAliveInt: null,
     _backGuardBound: false,
     _backToastTimer: null,
     wakeLock: null,
@@ -26,8 +27,9 @@ const workout = {
             u.onend = done; u.onerror = done;
             this._speechWatchdog = setInterval(() => {
                 if (this.isPaused || this.skipFlag || !this.isPlaying) return;
-                if (document.hidden && window.speechSynthesis.paused) window.speechSynthesis.resume();
-            }, 4000);
+                window.speechSynthesis.resume();
+                document.getElementById('silentAudio').play().catch(()=>{});
+            }, 2500);
             setTimeout(done, text.length * 450 + 1200);
             window.speechSynthesis.speak(u);
         });
@@ -48,6 +50,7 @@ const workout = {
     setupMediaSession() {
         if (!('mediaSession' in navigator)) return;
         navigator.mediaSession.metadata = new MediaMetadata({ title: '康复训练中', artist: '康复助手' });
+        navigator.mediaSession.playbackState = 'playing';
         navigator.mediaSession.setActionHandler('play', () => { if (this.isPaused) this.toggle(); });
         navigator.mediaSession.setActionHandler('pause', () => { if (!this.isPaused && this.isPlaying) this.toggle(); });
         navigator.mediaSession.setActionHandler('stop', () => this.stop());
@@ -57,6 +60,12 @@ const workout = {
     keepAudioAlive() {
         const audio = document.getElementById('silentAudio');
         audio.play().catch(()=>{});
+        clearInterval(this._audioKeepAliveInt);
+        this._audioKeepAliveInt = setInterval(() => {
+            if (!this.isPlaying || this.isPaused) return;
+            audio.play().catch(()=>{});
+            window.speechSynthesis.resume();
+        }, 5000);
         if (this._audioListenerBound) return;
         this._audioListenerBound = true;
         document.addEventListener('visibilitychange', () => {
@@ -127,6 +136,7 @@ const workout = {
         } else {
             this.isPaused = !this.isPaused;
             document.getElementById('playIcon').innerText = this.isPaused ? 'play_arrow' : 'pause';
+            if ('mediaSession' in navigator) navigator.mediaSession.playbackState = this.isPaused ? 'paused' : 'playing';
             if(this.isPaused) window.speechSynthesis.pause(); else window.speechSynthesis.resume();
         }
     },
@@ -184,6 +194,7 @@ const workout = {
             document.getElementById('subText').innerText = sub;
             document.getElementById('statusText').innerText = status;
             document.getElementById('mainTime').innerText = left;
+            if (sec > 12 && status !== 'HOLD') this.speak(`${sub}，${sec}秒`);
             this.timer = setInterval(() => {
                 if (!this.isPlaying || this.skipFlag) {
                     clearInterval(this.timer); this.skipFlag = false;
@@ -192,9 +203,7 @@ const workout = {
                 if (this.isPaused) return;
                 left--;
                 document.getElementById('mainTime').innerText = left;
-                if (left <= 3 && left > 0) {
-                    window.speechSynthesis.speak(new SpeechSynthesisUtterance(left.toString()));
-                }
+                if (left <= 3 && left > 0) this.speak(left.toString());
                 if (left <= 0) { clearInterval(this.timer); this._countResolve = null; resolve(); }
             }, 1000);
         });
@@ -227,8 +236,9 @@ const workout = {
         const duration = this.totalSec;
         this.isPlaying = false;
         clearInterval(this.timer); clearInterval(this.sessionInt);
-        clearInterval(this._speechWatchdog);
+        clearInterval(this._speechWatchdog); clearInterval(this._audioKeepAliveInt);
         window.speechSynthesis.cancel();
+        if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'none';
         this.releaseWakeLock();
         this._countResolve = null;
         this._speakResolve = null;

@@ -138,6 +138,7 @@ body {
 /* --- Page --- */
 .page { display: none; padding-bottom: 100px; min-height: calc(100vh - 64px); }
 .page.active { display: block; animation: fadeSlideIn var(--md-sys-motion-duration-medium) var(--md-sys-motion-emphasized-decelerate); }
+#workout { padding-bottom: 210px; }
 
 @keyframes fadeSlideIn {
     from { opacity: 0; transform: translateY(8px); }
@@ -552,13 +553,21 @@ body {
     letter-spacing: 0.3px;
     height: calc(72px - env(safe-area-inset-bottom) / 2);
 }
-.nav-item .material-symbols-rounded {
-    font-size: 24px;
-    border-radius: var(--md-sys-shape-full);
-    padding: 4px 20px;
-    transition: all var(--md-sys-motion-duration-medium) var(--md-sys-motion-emphasized);
+.nav-content {
+    width: min(82%, 78px);
+    height: 58px;
     position: relative;
     z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1px;
+    border-radius: var(--md-sys-shape-full);
+}
+.nav-item .material-symbols-rounded {
+    font-size: 24px;
+    transition: all var(--md-sys-motion-duration-medium) var(--md-sys-motion-emphasized);
 }
 .nav-indicator {
     position: absolute;
@@ -572,9 +581,9 @@ body {
     z-index: 0;
 }
 .nav-item small {
-    position: relative;
-    z-index: 1;
-    margin-top: 1px;
+    display: block;
+    line-height: 1.1;
+    text-align: center;
 }
 .nav-item.active { color: var(--md-sys-on-surface); }
 .nav-item.active .material-symbols-rounded {
@@ -582,20 +591,29 @@ body {
     font-variation-settings: 'FILL' 1;
 }
 .nav-item.active .nav-indicator {
-    width: min(82%, 76px);
+    width: min(82%, 78px);
     height: 58px;
 }
-.nav-item.active small { font-weight: 700; color: var(--md-sys-on-surface); }
+.nav-item.active small { font-weight: 700; color: var(--md-sys-on-secondary-container); }
 
 /* --- FAB (Expressive) --- */
 .workout-controls {
+    position: fixed;
+    left: 50%;
+    bottom: calc(104px + env(safe-area-inset-bottom));
+    transform: translateX(-50%);
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 18px;
-    margin-top: 18px;
-    position: relative;
-    z-index: 1;
+    z-index: 95;
+    padding: 8px 12px;
+    border-radius: 32px;
+    background: rgba(238, 237, 244, 0.86);
+    border: 1px solid var(--md-sys-outline-variant);
+    box-shadow: var(--md-sys-elevation-3);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
 }
 .md-fab {
     width: 64px;
@@ -880,6 +898,7 @@ body {
         background: var(--md-sys-surface-container-low);
         border-color: var(--md-sys-outline-variant);
     }
+    .workout-controls { background: rgba(30, 32, 36, 0.86); }
     .nav-indicator { background: var(--md-sys-secondary-container); }
     .nav-item.active .material-symbols-rounded { color: var(--md-sys-on-secondary-container); }
 }
