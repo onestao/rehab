@@ -3,8 +3,8 @@
   "short_name": "REHAB",
   "start_url": "index.html",
   "display": "standalone",
-  "background_color": "#f8fbf1",
-  "theme_color": "#1a5e1f",
+  "background_color": "#fdfcff",
+  "theme_color": "#0061a4",
   "icons": [
     {
       "src": "https://cdn-icons-png.flaticon.com/512/2964/2964514.png",

@@ -131,6 +131,6 @@ const workout = {
         document.getElementById('stopBtn').classList.add('hidden');
         this.speak("训练完成");
         data.db.history.unshift({ date: new Date().toLocaleString(), duration: this.totalSec, actions: [...data.db.actions] });
-        data.save();
+        data.saveAndBackup();
     }
 };

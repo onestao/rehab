@@ -50,30 +50,66 @@ const sync = {
             secret: document.getElementById('s3Secret').value
         };
         localStorage.setItem(data.CFG_KEY, JSON.stringify(data.cfg));
+        this.setStatus(data.cfg.mode === 's3' ? 'cloud' : 'local');
         alert("配置已本地保存");
     },
 
     async pull() {
         try {
+            this.setStatus('syncing');
             const res = await this.s3Req('GET');
             if (res.ok) {
                 const remote = await res.json();
                 data.db = { ...data.db, ...remote };
                 data.save();
                 data.render();
+                this.setStatus('cloud');
                 alert("下载恢复成功（含训练历史）");
             } else {
+                this.setStatus('error');
                 alert("拉取失败，请检查参数");
             }
-        } catch (e) { alert("同步失败: " + e.message); }
+        } catch (e) { this.setStatus('error'); alert("同步失败: " + e.message); }
     },
 
     async push() {
         try {
+            this.setStatus('syncing');
             const payload = JSON.stringify(data.db);
             const res = await this.s3Req('PUT', payload);
+            this.setStatus(res.ok ? 'cloud' : 'error');
             if (res.ok) alert("备份成功（含训练历史、方案库、动作列表）");
-        } catch (e) { alert("备份失败: " + e.message); }
+            else alert("备份失败，请检查参数");
+        } catch (e) { this.setStatus('error'); alert("备份失败: " + e.message); }
+    },
+
+    async autoBackup(reason = 'auto') {
+        if (data.cfg.mode !== 's3') return;
+        const { endpoint, region, bucket, key, secret } = data.cfg.s3 || {};
+        if (!endpoint || !region || !bucket || !key || !secret) return;
+        this.setStatus('syncing');
+        try {
+            const res = await this.s3Req('PUT', JSON.stringify(data.db));
+            this.setStatus(res.ok ? 'cloud' : 'error');
+            if (!res.ok) console.warn('Auto backup failed', reason, res.status);
+        } catch (e) {
+            this.setStatus('error');
+            console.warn('Auto backup failed', reason, e);
+        }
+    },
+
+    setStatus(state) {
+        const el = document.getElementById('syncStatus');
+        if (!el) return;
+        const map = {
+            local: ['cloud_off', '本地'],
+            syncing: ['sync', '同步中'],
+            cloud: ['cloud_done', '云端'],
+            error: ['cloud_alert', '同步失败']
+        };
+        const [icon, label] = map[state] || map.local;
+        el.innerHTML = `<span class="material-symbols-rounded" style="font-size:14px">${icon}</span> ${label}`;
+        el.dataset.state = state;
     },
 
     toggleFields(m) {
@@ -90,5 +126,6 @@ const sync = {
             document.getElementById('syncMode').value = data.cfg.mode;
             this.toggleFields(data.cfg.mode);
         }
+        this.setStatus(data.cfg.mode === 's3' ? 'cloud' : 'local');
     }
 };

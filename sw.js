@@ -1,5 +1,5 @@
-const CACHE = 'rehab-pro-v2';
-const ASSETS = ['index.html', 'styles.css', 'data.js', 'sync.js', 'workout.js', 'manifest.json'];
+const CACHE = 'rehab-pro-v3';
+const ASSETS = ['index.html', 'styles.css', 'theme.js', 'data.js', 'sync.js', 'workout.js', 'manifest.json'];
 
 self.addEventListener('install', e => {
     e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));

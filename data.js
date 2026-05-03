@@ -27,6 +27,11 @@ const data = {
         this.render();
     },
 
+    async saveAndBackup() {
+        this.save();
+        await sync.autoBackup('history');
+    },
+
     addAction() {
         const a = {
             name: document.getElementById('name').value || '未命名',
