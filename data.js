@@ -42,6 +42,15 @@ const data = {
         this.render();
     },
 
+    setFoodSource(label = '') {
+        this._foodSource = label;
+        const el = document.getElementById('foodSourceHint');
+        if (el) {
+            el.textContent = label ? `当前营养来源：${label}，你仍可手动修改` : '输入食物后可从食物库或 AI 自动填充营养';
+            el.classList.toggle('active', !!label);
+        }
+    },
+
     async saveAndBackup() {
         this.save();
         await sync.autoBackup('history');
@@ -207,6 +216,7 @@ const data = {
         if (document.getElementById('foodPro')) document.getElementById('foodPro').value = '';
         if (document.getElementById('foodCarb')) document.getElementById('foodCarb').value = '';
         if (document.getElementById('foodFat')) document.getElementById('foodFat').value = '';
+        this.setFoodSource('');
         this._aiFoodResults = [];
         this._aiFoodAdded = null;
         const searchEl = document.getElementById('foodSearchResults');
@@ -257,6 +267,11 @@ const data = {
             carb: Number(goal.carbGoal || (cal ? Math.round(cal * 0.4 / 4) : 180)),
             fat: Number(goal.fatGoal || (cal ? Math.round(cal * 0.3 / 9) : 55))
         };
+    },
+
+    ratio(value, total) {
+        if (!total || total <= 0) return 0;
+        return Math.max(0, Math.min(100, Math.round((value / total) * 100)));
     },
 
     addManualExercise() {
@@ -336,6 +351,7 @@ const data = {
         document.getElementById('foodSearchResults').innerHTML = '';
         this._aiFoodResults = [];
         this._aiFoodAdded = null;
+        this.setFoodSource(item.cat === '自定义' ? '自定义食物库' : '本地食物库');
         this.updateFoodComputedPreview();
     },
 
@@ -348,6 +364,13 @@ const data = {
         el.innerHTML = results.map(item =>
             `<button class="food-result-item" onclick="data.applyFoodItem('${item.id}')"><span>${item.name}</span><small>${item.cal} kcal/100g</small></button>`
         ).join('');
+    },
+
+    autoFillFoodByName() {
+        const kw = document.getElementById('foodName')?.value?.trim() || '';
+        if (!kw) return;
+        const exact = fooddb.getAll().find(i => i.name === kw);
+        if (exact) this.applyFoodItem(exact.id);
     },
 
     updateFoodComputedPreview() {
@@ -364,6 +387,11 @@ const data = {
         const c = (carb * grams / 100).toFixed(1);
         const f = (fat * grams / 100).toFixed(1);
         el.textContent = `本次记录：${kcal} kcal · 蛋白 ${p}g · 碳水 ${c}g · 脂肪 ${f}g`;
+    },
+
+    foodSourceTag() {
+        if (!this._foodSource) return '';
+        return `<span class="food-source-tag">${this._foodSource}</span>`;
     },
 
     async aiParseFood() {
@@ -476,6 +504,7 @@ const data = {
         if (document.getElementById('foodCarb')) document.getElementById('foodCarb').value = item.carb || 0;
         if (document.getElementById('foodFat')) document.getElementById('foodFat').value = item.fat || 0;
         document.getElementById('foodSearchResults').innerHTML = '';
+        this.setFoodSource('AI 识别结果');
         this.updateFoodComputedPreview();
     },
 
@@ -537,6 +566,9 @@ const data = {
             deficit: p.deficit,
             weeklyLoss: p.weeklyLoss,
             days: p.days,
+            proteinGoal: Math.round(p.dailyCal * 0.3 / 4),
+            carbGoal: Math.round(p.dailyCal * 0.4 / 4),
+            fatGoal: Math.round(p.dailyCal * 0.3 / 9),
             appliedAt: new Date().toISOString()
         };
         this.saveAndBackup();
@@ -577,14 +609,37 @@ const data = {
     },
 
     renderRoutines() {
+        const overview = document.getElementById('routineOverview');
         const list = document.getElementById('routineList');
-        if (!list) return;
+        if (!list || !overview) return;
+        overview.innerHTML = this.renderRoutineOverview();
         list.innerHTML = `
             <div class="record-tabs" role="tablist" aria-label="方案视图">
                 <button class="record-tab ${this.routineView === 'library' ? 'active' : ''}" onclick="data.setRoutineView('library')"><span class="material-symbols-rounded">bookmarks</span>动作组库</button>
                 <button class="record-tab ${this.routineView === 'weightloss' ? 'active' : ''}" onclick="data.setRoutineView('weightloss')"><span class="material-symbols-rounded">trending_down</span>AI减重指导</button>
             </div>
             ${this.routineView === 'library' ? this.renderRoutineLibrary() : this.renderWeightLossPlanCard()}`;
+    },
+
+    renderRoutineOverview() {
+        const routineCount = this.db.routines.length;
+        const actionCount = this.db.actions.length;
+        const goal = this.db.health.dietGoal;
+        return `<div class="md-card hero-card routines-hero">
+            <div class="hero-kicker">方案总览</div>
+            <div class="hero-title-row">
+                <div>
+                    <h3>${routineCount} 个方案</h3>
+                    <p>${goal ? `当前减重方案：${goal.dailyCal} kcal / 日` : '可在此管理训练动作库与 AI 减重方案'}</p>
+                </div>
+                <span class="hero-icon material-symbols-rounded">inventory_2</span>
+            </div>
+            <div class="hero-stat-row">
+                <div class="hero-stat"><b>${actionCount}</b><small>当前动作</small></div>
+                <div class="hero-stat"><b>${routineCount}</b><small>已存方案</small></div>
+                <div class="hero-stat"><b>${goal?.weeklyLoss || '--'}</b><small>目标 kg/周</small></div>
+            </div>
+        </div>`;
     },
 
     renderRoutineLibrary() {
@@ -607,8 +662,10 @@ const data = {
     },
 
     renderHistory() {
+        const top = document.getElementById('todayActionTop');
         const list = document.getElementById('historyList');
-        if (!list) return;
+        if (!list || !top) return;
+        top.innerHTML = this.renderTodayActionHero();
         list.innerHTML = `
             <div class="record-tabs" role="tablist" aria-label="记录视图">
                 <button class="record-tab ${this.recordView === 'daily' ? 'active' : ''}" onclick="data.setRecordView('daily')"><span class="material-symbols-rounded">today</span>每日行动</button>
@@ -617,9 +674,25 @@ const data = {
             ${this.recordView === 'daily' ? this.renderDailyActions() : this.renderFitnessCalendar()}`;
     },
 
+    renderTodayActionHero() {
+        const today = this.dateKey(new Date());
+        const weight = (this.db.health.weights || []).find(w => w.date === today) || this.sortedWeights().slice(-1)[0];
+        const intake = this.todayCalories();
+        const exerciseCal = this.todayTrainingCalories();
+        return `<div class="md-card hero-card daily-hero">
+            <div class="hero-kicker">今日行动</div>
+            <div class="hero-title-row">
+                <div>
+                    <h3>${weight ? `${weight.weight.toFixed(1)} kg` : '记录今天'}</h3>
+                    <p>${intake} kcal 摄入 · ${exerciseCal} kcal 运动消耗 · 净热量 ${intake - exerciseCal}</p>
+                </div>
+                <span class="hero-icon material-symbols-rounded">monitoring</span>
+            </div>
+        </div>`;
+    },
+
     renderDailyActions() {
         return `
-            <div class="record-section-title">今日行动</div>
             ${this.renderTodaySummary()}
             ${this.renderWeightPanel()}
             ${this.renderDietPanel()}
@@ -698,19 +771,30 @@ const data = {
                     <h3>${totalCal} kcal</h3>
                     <small>今日摄入 · ${todayLogs.length} 条记录</small>
                 </div>
+                ${this.foodSourceTag()}
                 <button class="collapse-btn" onclick="data.toggleCollapse('dietPanel')"><span class="material-symbols-rounded">${collapsed ? 'expand_more' : 'expand_less'}</span></button>
             </div>
-            <div class="macro-summary">
-                <div><b>${macros.pro.toFixed(1)}g</b><small>蛋白 / 目标 ${goals.pro}g</small></div>
-                <div><b>${macros.carb.toFixed(1)}g</b><small>碳水 / 目标 ${goals.carb}g</small></div>
-                <div><b>${macros.fat.toFixed(1)}g</b><small>脂肪 / 目标 ${goals.fat}g</small></div>
+            <div class="macro-summary macro-progress-grid">
+                <div class="macro-card protein">
+                    <div class="macro-head"><b>${macros.pro.toFixed(1)}g</b><small>蛋白 / 目标 ${goals.pro}g</small></div>
+                    <div class="macro-track"><span style="width:${this.ratio(macros.pro, goals.pro)}%"></span></div>
+                </div>
+                <div class="macro-card carb">
+                    <div class="macro-head"><b>${macros.carb.toFixed(1)}g</b><small>碳水 / 目标 ${goals.carb}g</small></div>
+                    <div class="macro-track"><span style="width:${this.ratio(macros.carb, goals.carb)}%"></span></div>
+                </div>
+                <div class="macro-card fat">
+                    <div class="macro-head"><b>${macros.fat.toFixed(1)}g</b><small>脂肪 / 目标 ${goals.fat}g</small></div>
+                    <div class="macro-track"><span style="width:${this.ratio(macros.fat, goals.fat)}%"></span></div>
+                </div>
             </div>
             <div class="collapse-content">
             <div class="diet-input-area">
                 <div class="md-grid diet-input-grid">
                     <div class="md-field"><select id="foodMeal"><option value="breakfast">早餐</option><option value="lunch" selected>午餐</option><option value="dinner">晚餐</option><option value="snack">加餐</option></select><label>餐次</label></div>
                     <div class="md-field"><input type="number" id="foodGrams" step="1" placeholder=" " oninput="data.updateFoodComputedPreview()"><label>克数</label></div>
-                    <div class="md-field span-full"><input type="text" id="foodName" placeholder=" " oninput="data.onFoodSearchInput()"><label>食物名称</label></div>
+                    <div class="md-field span-full"><input type="text" id="foodName" placeholder=" " oninput="data.onFoodSearchInput()" onblur="data.autoFillFoodByName()"><label>食物名称</label></div>
+                    <div id="foodSourceHint" class="food-source-hint span-full">输入食物后可从食物库或 AI 自动填充营养</div>
                     <div class="md-field"><input type="number" id="foodCal" step="1" placeholder=" " oninput="data.updateFoodComputedPreview()"><label>kcal/100g</label></div>
                     <div class="md-field"><input type="number" id="foodPro" step="0.1" placeholder=" " oninput="data.updateFoodComputedPreview()"><label>蛋白/100g</label></div>
                     <div class="md-field"><input type="number" id="foodCarb" step="0.1" placeholder=" " oninput="data.updateFoodComputedPreview()"><label>碳水/100g</label></div>
