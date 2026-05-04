@@ -23,10 +23,10 @@ const data = {
         this.db.health.foodLogs = this.db.health.foodLogs || [];
         this.db.health.exerciseLogs = this.db.health.exerciseLogs || [];
         this.db.health.aiAdviceChat = this.db.health.aiAdviceChat || [];
-        if (window.ai) ai.init();
         this.render();
         sync.initUI();
         if (window.cardio) cardio.initUI();
+        if (window.ai) { ai.init(); }
     },
 
     migrateLegacy() {
@@ -130,7 +130,7 @@ const data = {
     toggleCollapse(id) {
         this._collapse = this._collapse || {};
         this._collapse[id] = !this._collapse[id];
-        this.renderHistory();
+        this.render();
     },
 
     isCollapsed(id, defaultState = true) {
@@ -311,6 +311,8 @@ const data = {
         const input = document.getElementById('advicePrompt');
         const prompt = input?.value?.trim();
         if (!prompt) return;
+        this._collapse = this._collapse || {};
+        this._collapse['advicePanel'] = false;
         const history = this.db.history.slice(0, 20);
         const foods = this.todayFoodLogs();
         const weights = this.sortedWeights().slice(-12);
@@ -331,7 +333,7 @@ const data = {
             input.value = '';
             this.save();
             if (statusEl) statusEl.textContent = '分析完成';
-            this.renderHistory();
+            this.render();
         } catch (e) {
             if (statusEl) statusEl.textContent = '分析失败: ' + e.message;
         } finally {

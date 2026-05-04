@@ -1,5 +1,6 @@
 const ai = {
     KEY: 'rehab_pro_ai_cfg',
+    MODELS_KEY: 'rehab_pro_ai_models',
     cfg: { provider: 'openai', model: '', baseUrl: '', enabled: false },
     models: [],
 
@@ -8,6 +9,11 @@ const ai = {
             const saved = localStorage.getItem(this.KEY);
             if (saved) this.cfg = { ...this.cfg, ...JSON.parse(saved) };
         } catch {}
+        try {
+            const savedModels = localStorage.getItem(this.MODELS_KEY);
+            if (savedModels) this.models = JSON.parse(savedModels);
+        } catch {}
+        this.syncUI();
         this.checkEncrypted();
     },
 
@@ -66,6 +72,7 @@ const ai = {
                 models = await this.fetchOpenAIModels(baseUrl, apiKey);
             }
             this.models = models;
+            localStorage.setItem(this.MODELS_KEY, JSON.stringify(models));
             this.renderModels(models);
             if (statusEl) statusEl.textContent = `已获取 ${models.length} 个模型`;
         } catch (e) {
