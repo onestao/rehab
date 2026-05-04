@@ -6,6 +6,7 @@ const data = {
     historyMonthOffset: 0,
     recordView: 'daily',
     weightRange: 'month',
+    selectedCalendarDate: null,
     historyColors: ['#2563eb', '#7c3aed', '#059669', '#f59e0b', '#e11d48', '#0891b2', '#9333ea', '#ea580c'],
 
     init() {
@@ -94,6 +95,12 @@ const data = {
 
     shiftHistoryMonth(delta) {
         this.historyMonthOffset += delta;
+        this.selectedCalendarDate = null;
+        this.renderHistory();
+    },
+
+    selectCalendarDate(dateStr) {
+        this.selectedCalendarDate = this.selectedCalendarDate === dateStr ? null : dateStr;
         this.renderHistory();
     },
 
@@ -430,6 +437,7 @@ const data = {
     renderFitnessCalendar() {
         return `
             ${this.renderHistoryCalendar()}
+            ${this.renderCalendarDayDetail()}
             <div class="record-section-title">记录明细</div>
             ${this.renderHistoryList()}`;
     },
@@ -579,6 +587,9 @@ const data = {
         const previous = weights[weights.length - 2];
         const delta = latest && previous ? latest.weight - previous.weight : 0;
         const analysis = this.weightAnalysis();
+        const h = this.db.health.height || 0;
+        const bmi = (latest && h > 0) ? (latest.weight / ((h / 100) ** 2)) : 0;
+        const bmiInfo = bmi > 0 ? this.bmiCategory(bmi) : null;
         return `<div class="md-card weight-card">
             <div class="weight-head">
                 <div>
@@ -587,6 +598,14 @@ const data = {
                     <small>${latest ? `${latest.date}${delta ? ` · 较上次 ${delta > 0 ? '+' : ''}${delta.toFixed(1)} kg` : ''}` : '点击下方添加第一条体重记录'}</small>
                 </div>
                 <span class="material-symbols-rounded weight-icon">monitor_weight</span>
+            </div>
+            <div class="bmi-row">
+                <div class="md-field" style="max-width:100px"><input type="number" id="inputHeight" step="1" value="${h || ''}" placeholder=" " oninput="data.saveHeight(this.value)"><label>身高 cm</label></div>
+                ${bmiInfo ? `<div class="bmi-display">
+                    <span class="bmi-value">${bmi.toFixed(1)}</span>
+                    <span class="bmi-label" style="color:${bmiInfo.color}">${bmiInfo.label}</span>
+                    <span class="bmi-range">BMI ${bmiInfo.range}</span>
+                </div>` : '<div class="bmi-display bmi-empty"><small>填写身高计算 BMI</small></div>'}
             </div>
             <div class="weight-input-row">
                 <div class="md-field"><input type="date" id="weightDate" value="${this.dateKey(new Date())}" placeholder=" "><label>日期</label></div>
@@ -661,6 +680,18 @@ const data = {
         return { avgText: `${avg > 0 ? '+' : ''}${avg.toFixed(2)} kg/日`, trend };
     },
 
+    saveHeight(val) {
+        const h = parseFloat(val);
+        if (h > 0) { this.db.health.height = h; localStorage.setItem(this.DB_KEY, JSON.stringify(this.db)); }
+    },
+
+    bmiCategory(bmi) {
+        if (bmi < 18.5) return { label: '偏瘦', color: '#0891b2', range: '< 18.5' };
+        if (bmi < 24) return { label: '正常', color: '#059669', range: '18.5 - 24' };
+        if (bmi < 28) return { label: '偏胖', color: '#f59e0b', range: '24 - 28' };
+        return { label: '肥胖', color: '#e11d48', range: '≥ 28' };
+    },
+
     renderHistoryCalendar() {
         const view = new Date();
         view.setDate(1);
@@ -678,8 +709,9 @@ const data = {
             const entries = byDate[key] || [];
             const names = this.uniqueActionNames(entries).slice(0, 3);
             const totalMin = Math.round(entries.reduce((sum, h) => sum + (h.duration || 0), 0) / 60);
+            const isSelected = this.selectedCalendarDate === key;
             cells.push(`
-                <div class="calendar-day ${entries.length ? 'has-record' : ''}">
+                <div class="calendar-day ${entries.length ? 'has-record' : ''} ${isSelected ? 'selected' : ''}" onclick="data.selectCalendarDate('${key}')">
                     <div class="calendar-day-head">
                         <span>${day}</span>
                         ${entries.length ? `<b>${totalMin}分</b>` : ''}
@@ -713,6 +745,44 @@ const data = {
             <div class="calendar-legend">
                 ${names.map(name => `<span><i style="background:${this.actionColor(name)}"></i>${name}</span>`).join('')}
             </div>`;
+    },
+
+    renderCalendarDayDetail() {
+        if (!this.selectedCalendarDate) return '';
+        const date = this.selectedCalendarDate;
+        const entries = this.db.history.filter(h => this.dateKey(this.parseHistoryDate(h.date)) === date);
+        const foods = (this.db.health.foodLogs || []).filter(f => f.date === date);
+        const weight = (this.db.health.weights || []).find(w => w.date === date);
+        const totalMin = Math.round(entries.reduce((s, h) => s + (h.duration || 0), 0) / 60);
+        const totalCal = Math.round(entries.reduce((s, h) => s + (h.cardio?.calories || 0), 0));
+        const foodCal = foods.reduce((s, f) => s + (f.cal || 0), 0);
+        const mealNames = { breakfast: '早餐', lunch: '午餐', dinner: '晚餐', snack: '加餐' };
+        if (entries.length === 0 && foods.length === 0 && !weight) {
+            return `<div class="md-card day-detail-card">
+                <div class="day-detail-head"><span class="material-symbols-rounded">event</span><strong>${date}</strong><button class="icon-btn" onclick="data.selectCalendarDate('${date}')"><span class="material-symbols-rounded">close</span></button></div>
+                <div class="empty-state" style="padding:20px"><p>当天暂无记录</p></div>
+            </div>`;
+        }
+        return `<div class="md-card day-detail-card">
+            <div class="day-detail-head"><span class="material-symbols-rounded">event</span><strong>${date}</strong><button class="icon-btn" onclick="data.selectCalendarDate('${date}')"><span class="material-symbols-rounded">close</span></button></div>
+            <div class="day-detail-stats">
+                <span>${totalMin} 分钟训练</span>
+                ${totalCal ? `<span>${totalCal} kcal 运动消耗</span>` : ''}
+                ${foodCal ? `<span>${foodCal} kcal 摄入</span>` : ''}
+                ${weight ? `<span>${weight.weight.toFixed(1)} kg</span>` : ''}
+            </div>
+            ${entries.length ? `<div class="day-detail-section"><b>训练</b>${entries.map(h => {
+                const icon = this.historyIcon(h);
+                const names = this.historyNames(h).join('、');
+                const mins = Math.floor(h.duration / 60);
+                const secs = h.duration % 60;
+                return `<div class="day-detail-item"><span class="record-icon material-symbols-rounded">${icon}</span><span>${names}</span><small>${mins}分${secs}秒${h.cardio ? ' · ' + Math.round(h.cardio.calories || 0) + ' kcal' : ''}</small></div>`;
+            }).join('')}</div>` : ''}
+            ${foods.length ? `<div class="day-detail-section"><b>饮食 · ${foodCal} kcal</b>${foods.map(f => {
+                return `<div class="day-detail-item"><span class="food-tag">${mealNames[f.meal] || f.meal}</span><span>${f.name}${f.grams ? ' ' + f.grams + 'g' : ''}</span><small>${f.cal} kcal</small></div>`;
+            }).join('')}</div>` : ''}
+            ${weight ? `<div class="day-detail-section"><b>体重</b><div class="day-detail-item"><span class="material-symbols-rounded" style="font-size:18px">monitor_weight</span><span>${weight.weight.toFixed(1)} kg</span>${weight.note ? `<small>${weight.note}</small>` : ''}</div></div>` : ''}
+        </div>`;
     },
 
     groupHistoryByDate() {

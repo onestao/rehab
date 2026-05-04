@@ -759,7 +759,49 @@ body {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 8px;
 }
+.bmi-row {
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+}
+.bmi-display {
+    display: flex; align-items: baseline; gap: 6px; flex: 1;
+}
+.bmi-value { font-size: 28px; font-weight: 900; color: var(--md-sys-primary); }
+.bmi-label { font-size: 13px; font-weight: 700; }
+.bmi-range { font-size: 11px; color: var(--md-sys-on-surface-variant); }
+.bmi-empty { color: var(--md-sys-on-surface-variant); }
 .goal-stat { background: color-mix(in srgb, var(--md-sys-primary-container) 30%, var(--md-sys-surface-container-lowest)); }
+.calendar-day { cursor: pointer; }
+.calendar-day.selected {
+    border-color: var(--md-sys-primary);
+    box-shadow: 0 0 0 2px var(--md-sys-primary-container);
+    background: color-mix(in srgb, var(--md-sys-primary-container) 20%, var(--md-sys-surface-container-lowest));
+}
+.day-detail-card { display: grid; gap: 10px; animation: fadeSlideIn 0.25s ease-out; }
+.day-detail-head {
+    display: flex; align-items: center; gap: 8px;
+}
+.day-detail-head .material-symbols-rounded { color: var(--md-sys-primary); font-variation-settings: 'FILL' 1; }
+.day-detail-head strong { flex: 1; font-size: 16px; }
+.day-detail-stats {
+    display: flex; gap: 10px; flex-wrap: wrap; font-size: 12px; color: var(--md-sys-on-surface-variant);
+}
+.day-detail-stats span {
+    padding: 3px 10px; border-radius: var(--md-sys-shape-full);
+    background: var(--md-sys-surface-container); font-weight: 600;
+}
+.day-detail-section { display: grid; gap: 4px; }
+.day-detail-section b { font-size: 13px; color: var(--md-sys-on-surface); margin-bottom: 2px; }
+.day-detail-item {
+    display: flex; align-items: center; gap: 8px; padding: 6px 8px;
+    background: var(--md-sys-surface-container-lowest); border-radius: var(--md-sys-shape-sm); font-size: 13px;
+}
+.day-detail-item span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.day-detail-item small { color: var(--md-sys-on-surface-variant); white-space: nowrap; }
+.food-tag {
+    flex: none !important; font-size: 10px !important; font-weight: 700; padding: 2px 8px;
+    border-radius: var(--md-sys-shape-full); background: var(--md-sys-secondary-container);
+    color: var(--md-sys-on-secondary-container); white-space: nowrap; overflow: visible; text-overflow: unset;
+}
 
 /* --- Diet Card --- */
 .diet-card { display: grid; gap: 14px; }
@@ -1525,6 +1567,10 @@ body.is-training .fab-stop {
     .calendar-day.empty { background: transparent; }
     .calendar-day.has-record {
         background: color-mix(in srgb, var(--md-sys-primary-container) 28%, var(--md-sys-surface-container-high));
+    }
+    .calendar-day.selected {
+        background: color-mix(in srgb, var(--md-sys-primary-container) 25%, var(--md-sys-surface-container-high));
+        box-shadow: 0 0 0 2px var(--md-sys-primary);
     }
     .calendar-event {
         background: color-mix(in srgb, var(--event-color) 28%, var(--md-sys-surface-container-highest));
