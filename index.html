@@ -41,7 +41,12 @@
                 </div>
             </div>
 
-            <div class="md-card input-card">
+            <div class="mode-tabs" role="tablist" aria-label="训练模式">
+                <button id="modeStrengthBtn" class="mode-tab active" onclick="workout.setMode('strength')" type="button"><span class="material-symbols-rounded">exercise</span>动作</button>
+                <button id="modeCardioBtn" class="mode-tab" onclick="workout.setMode('cardio')" type="button"><span class="material-symbols-rounded">directions_run</span>有氧</button>
+            </div>
+
+            <div class="md-card input-card" id="strengthCard">
                 <div class="rate-row">
                     <span class="material-symbols-rounded" style="font-size:18px">speed</span>
                     <span>语速 <span id="rateLabel">1.1</span>x</span>
@@ -71,6 +76,32 @@
             <div class="workout-controls" aria-label="训练控制">
                 <button class="md-fab fab-stop hidden" id="stopBtn" onclick="workout.stop()" aria-label="停止训练"><span class="material-symbols-rounded">stop</span></button>
                 <button class="md-fab fab-play" id="playBtn" onclick="workout.toggle()" aria-label="开始或暂停训练"><span class="material-symbols-rounded" id="playIcon">play_arrow</span></button>
+            </div>
+            <div class="md-card cardio-card hidden">
+                <div class="cardio-header">
+                    <div>
+                        <span class="cardio-kicker">有氧模式</span>
+                        <h3>有氧计时与热量</h3>
+                    </div>
+                    <span class="material-symbols-rounded">directions_run</span>
+                </div>
+                <div class="md-grid cardio-grid">
+                    <div class="md-field span-full">
+                        <select id="cardioType" onchange="cardio.updatePlan()">
+                            <option value="walk">步行 3.5 MET</option>
+                            <option value="brisk_walk">快走 4.3 MET</option>
+                            <option value="jog">慢跑 7.0 MET</option>
+                            <option value="run">跑步 9.8 MET</option>
+                            <option value="cycling">骑行 6.8 MET</option>
+                            <option value="swim">游泳 7.0 MET</option>
+                            <option value="elliptical">椭圆机 5.0 MET</option>
+                            <option value="rowing">划船机 7.0 MET</option>
+                        </select>
+                        <label>有氧项目</label>
+                    </div>
+                    <div class="md-field"><input type="number" id="cardioWeight" placeholder=" " value="70" oninput="cardio.updatePlan()"><label>体重 kg</label></div>
+                    <div class="md-field"><input type="number" id="cardioTarget" placeholder=" " value="30" oninput="cardio.updatePlan()"><label>目标分钟</label></div>
+                </div>
             </div>
             <div id="currentActionList"></div>
             <div class="md-card routine-tool">
@@ -102,6 +133,36 @@
                         <button class="md-btn md-btn-tonal theme-monet" data-theme="monet" onclick="theme.useMonet()"><span class="material-symbols-rounded">auto_awesome</span> 莫奈</button>
                         <label class="color-picker"><input type="color" id="themeColor" value="#0061a4" oninput="theme.setCustom(this.value)"><span class="material-symbols-rounded">format_color_fill</span></label>
                     </div>
+                </div>
+            </div>
+            <div class="md-card sync-card">
+                <div class="ai-card-header"><span class="material-symbols-rounded">psychology</span><strong>AI 配置</strong><span id="aiStatus" class="ai-status ai-off">未配置</span></div>
+                <div class="md-field">
+                    <select id="aiProvider">
+                        <option value="openai">OpenAI 兼容</option>
+                        <option value="gemini">Gemini</option>
+                    </select>
+                    <label>AI 服务</label>
+                </div>
+                <div class="md-field"><input type="text" id="aiBaseUrl" placeholder=" "><label>Base URL</label></div>
+                <div class="md-field"><input type="password" id="aiApiKey" placeholder=" "><label>API Key</label></div>
+                <button class="md-btn md-btn-tonal" onclick="ai.fetchModels()"><span class="material-symbols-rounded">refresh</span> 获取可用模型</button>
+                <div id="aiFetchStatus" class="food-ai-status"></div>
+                <div id="aiModelList" class="ai-model-list hidden"></div>
+                <div class="md-field"><input type="text" id="aiModel" placeholder=" "><label>模型名称</label></div>
+                <button class="md-btn md-btn-filled" onclick="ai.saveConfig()"><span class="material-symbols-rounded">save</span> 保存 AI 配置</button>
+                <div class="md-divider"></div>
+                <div class="ai-encrypt-section">
+                    <div class="ai-encrypt-title"><span class="material-symbols-rounded">lock</span> 加密同步 AI 配置</div>
+                    <small>设置密码后可将 AI 配置加密存入同步数据，在其他设备输入密码恢复</small>
+                    <div class="md-field"><input type="password" id="aiEncryptPass" placeholder=" "><label>加密密码</label></div>
+                    <button class="md-btn md-btn-tonal" onclick="ai.exportToSync()"><span class="material-symbols-rounded">upload</span> 加密并存入同步</button>
+                </div>
+                <div id="aiDecryptSection" class="ai-encrypt-section hidden">
+                    <div class="ai-encrypt-title"><span class="material-symbols-rounded">lock_open</span> 恢复 AI 配置</div>
+                    <small>检测到加密的 AI 配置，输入密码恢复</small>
+                    <div class="md-field"><input type="password" id="aiDecryptPass" placeholder=" "><label>解密密码</label></div>
+                    <button class="md-btn md-btn-tonal" onclick="ai.importFromSync()"><span class="material-symbols-rounded">download</span> 解密恢复</button>
                 </div>
             </div>
             <div class="md-card sync-card">
@@ -157,6 +218,8 @@
     </nav>
 
     <script src="theme.js"></script>
+    <script src="fooddb.js"></script>
+    <script src="ai.js"></script>
     <script src="data.js"></script>
     <script src="sync.js"></script>
     <script src="workout.js"></script>
@@ -172,7 +235,9 @@
         };
         window.onload = () => {
             theme.init();
+            ai.init();
             data.init();
+            workout.setMode('strength');
             if ('serviceWorker' in navigator) {
                 navigator.serviceWorker.register('sw.js').catch(() => {});
             }

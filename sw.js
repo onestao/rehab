@@ -1,5 +1,5 @@
-const CACHE = 'training-assistant-v5';
-const ASSETS = ['index.html', 'styles.css', 'theme.js', 'data.js', 'sync.js', 'workout.js', 'manifest.json'];
+const CACHE = 'training-assistant-v8';
+const ASSETS = ['index.html', 'styles.css', 'theme.js', 'fooddb.js', 'ai.js', 'data.js', 'sync.js', 'workout.js', 'manifest.json'];
 
 self.addEventListener('install', e => {
     e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
