@@ -107,7 +107,7 @@ body {
     transition: box-shadow var(--md-sys-motion-duration-short) var(--md-sys-motion-emphasized);
 }
 .md-top-app-bar.scrolled { box-shadow: var(--md-sys-elevation-2); }
-body:not(.show-app-bar) .md-top-app-bar { display: none !important; }
+.workout-only-bar { margin-bottom: 8px; }
 .bar-leading {
     display: flex;
     align-items: center;

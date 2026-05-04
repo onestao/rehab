@@ -12,14 +12,13 @@
 <body>
     <audio id="silentAudio" loop preload="auto"><source src="data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAgD4AAAB9AAACABAAZGF0YQAAAAA=" type="audio/wav"></audio>
 
-    <header class="md-top-app-bar">
-        <div class="bar-leading"><span class="material-symbols-rounded app-icon">fitness_center</span><span class="app-title">训练助手</span></div>
-        <div id="syncStatus" class="md-chip"><span class="material-symbols-rounded" style="font-size:14px">cloud_off</span> 本地</div>
-    </header>
-
     <main id="app">
         <!-- 训练页 -->
         <section id="workout" class="page active">
+            <header class="md-top-app-bar workout-only-bar">
+                <div class="bar-leading"><span class="material-symbols-rounded app-icon">fitness_center</span><span class="app-title">训练助手</span></div>
+                <div id="syncStatus" class="md-chip"><span class="material-symbols-rounded" style="font-size:14px">cloud_off</span> 本地</div>
+            </header>
             <div class="md-card timer-panel">
                 <span class="skip-btn" onclick="workout.skip()"><span class="material-symbols-rounded">skip_next</span></span>
                 <div id="statusText">READY</div>
@@ -230,7 +229,6 @@
                 document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
                 document.getElementById(id).classList.add('active');
                 el.classList.add('active');
-                document.body.classList.toggle('show-app-bar', id === 'workout');
                 data.render();
             }
         };
@@ -239,7 +237,6 @@
             ai.init();
             data.init();
             workout.setMode('strength');
-            document.body.classList.add('show-app-bar');
             if ('serviceWorker' in navigator) {
                 navigator.serviceWorker.register('sw.js').catch(() => {});
             }

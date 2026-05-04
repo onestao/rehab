@@ -332,7 +332,7 @@ const data = {
         if (statusEl) statusEl.textContent = 'AI 分析中...';
         try {
             const plan = await ai.weightLossPlan({ currentWeight, targetWeight, activityLevel, dailyTrainMin, height, weeklyFreq, intensity, sportType });
-            this.db.health.weightPlan = plan;
+            this.db.health.weightPlan = this.normalizeWeightPlan(plan, { currentWeight, targetWeight });
             this.save();
             if (statusEl) statusEl.textContent = 'AI 方案已生成，请选择';
             this.renderHistory();
@@ -340,6 +340,26 @@ const data = {
             if (statusEl) statusEl.textContent = '生成失败: ' + e.message;
             alert('AI 减重方案生成失败: ' + e.message);
         }
+    },
+
+    normalizeWeightPlan(plan, meta) {
+        const diff = Math.max(0, (meta.currentWeight || 0) - (meta.targetWeight || 0));
+        const fixed = { ...plan, meta };
+        ['fast', 'moderate', 'slow'].forEach(key => {
+            const p = fixed[key];
+            if (!p) return;
+            const weeklyLoss = Math.max(0.1, Number(p.weeklyLoss) || (key === 'fast' ? 0.8 : key === 'moderate' ? 0.5 : 0.25));
+            const weeks = diff > 0 ? diff / weeklyLoss : 0;
+            const days = Math.max(7, Math.round(weeks * 7));
+            fixed[key] = {
+                ...p,
+                weeklyLoss: Number(weeklyLoss.toFixed(2)),
+                days,
+                dailyCal: Math.round(Number(p.dailyCal) || 0),
+                deficit: Math.round(Number(p.deficit) || 0)
+            };
+        });
+        return fixed;
     },
 
     applyWeightLossPlan(pace) {
@@ -541,7 +561,7 @@ const data = {
                 <div>
                     <span class="cardio-kicker">AI 减重指导</span>
                     <h3>制定减重计划</h3>
-                    <small>${goal ? `当前方案：${goal.pace === 'fast' ? '快速' : goal.pace === 'moderate' ? '中等' : '慢速'} · 每日 ${goal.dailyCal} kcal` : '填写信息后 AI 帮你生成方案'}</small>
+                    <small>${goal ? `当前方案：${goal.pace === 'fast' ? '快速' : goal.pace === 'moderate' ? '中等' : '慢速'} · 每日 ${goal.dailyCal} kcal · 目标减重 ${(plan?.meta?.currentWeight - plan?.meta?.targetWeight).toFixed(1)} kg` : '填写信息后 AI 帮你生成方案'}</small>
                 </div>
                 <span class="material-symbols-rounded weightloss-icon">trending_down</span>
             </div>
