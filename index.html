@@ -230,6 +230,7 @@
                 document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
                 document.getElementById(id).classList.add('active');
                 el.classList.add('active');
+                document.body.classList.toggle('no-app-bar', id !== 'workout');
                 data.render();
             }
         };
