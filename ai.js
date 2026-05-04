@@ -246,9 +246,11 @@ const ai = {
     },
 
     async weightLossPlan(params) {
-        const { currentWeight, targetWeight, activityLevel, dailyTrainMin, height } = params;
+        const { currentWeight, targetWeight, activityLevel, dailyTrainMin, height, weeklyFreq, intensity, sportType } = params;
         const diff = currentWeight - targetWeight;
-        const prompt = `你是运动营养师。请为用户制定减重计划。\n用户信息：\n- 当前体重：${currentWeight} kg\n- 目标体重：${targetWeight} kg（需减 ${diff.toFixed(1)} kg）\n- 身高：${height || '未知'} cm\n- 日常活动水平：${activityLevel}\n- 每天可运动时间：${dailyTrainMin} 分钟\n\n请严格只返回如下 JSON，不要其他文字：\n{\n  "fast": { "days": 天数, "weeklyLoss": 每周减重kg, "dailyCal": 建议每日摄入kcal, "deficit": 每日热量缺口kcal, "desc": "一句话说明" },\n  "moderate": { "days": 天数, "weeklyLoss": 每周减重kg, "dailyCal": 建议每日摄入kcal, "deficit": 每日热量缺口kcal, "desc": "一句话说明" },\n  "slow": { "days": 天数, "weeklyLoss": 每周减重kg, "dailyCal": 建议每日摄入kcal, "deficit": 每日热量缺口kcal, "desc": "一句话说明" },\n  "tips": ["建议1", "建议2", "建议3"]\n}`;
+        const intensityMap = { light: '低强度(散步/瑜伽)', moderate: '中等强度(慢跑/游泳)', vigorous: '高强度(HIIT/快速跑)' };
+        const sportMap = { strength: '力量训练', cardio: '有氧运动', mixed: '力量+有氧混合', flexibility: '拉伸/瑜伽' };
+        const prompt = `你是运动营养师。请为用户制定减重计划。\n用户信息：\n- 当前体重：${currentWeight} kg\n- 目标体重：${targetWeight} kg（需减 ${diff.toFixed(1)} kg）\n- 身高：${height || '未知'} cm\n- 日常活动水平：${activityLevel}\n- 每次运动时间：${dailyTrainMin} 分钟\n- 每周运动次数：${weeklyFreq} 次\n- 运动强度：${intensityMap[intensity] || intensity}\n- 主要运动项目：${sportMap[sportType] || sportType}\n\n请严格只返回如下 JSON，不要其他文字：\n{\n  "fast": { "days": 天数, "weeklyLoss": 每周减重kg, "dailyCal": 建议每日摄入kcal, "deficit": 每日热量缺口kcal, "desc": "一句话说明" },\n  "moderate": { "days": 天数, "weeklyLoss": 每周减重kg, "dailyCal": 建议每日摄入kcal, "deficit": 每日热量缺口kcal, "desc": "一句话说明" },\n  "slow": { "days": 天数, "weeklyLoss": 每周减重kg, "dailyCal": 建议每日摄入kcal, "deficit": 每日热量缺口kcal, "desc": "一句话说明" },\n  "tips": ["建议1", "建议2", "建议3"]\n}`;
         const raw = await this.call([
             { role: 'system', content: '你是运动营养师，只返回纯 JSON，不要 markdown，不要解释。' },
             { role: 'user', content: prompt }

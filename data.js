@@ -154,6 +154,10 @@ const data = {
         if (document.getElementById('foodName')) document.getElementById('foodName').value = '';
         if (document.getElementById('foodGrams')) document.getElementById('foodGrams').value = '';
         if (document.getElementById('foodCal')) document.getElementById('foodCal').value = '';
+        this._aiFoodResults = [];
+        this._aiFoodAdded = null;
+        const searchEl = document.getElementById('foodSearchResults');
+        if (searchEl) searchEl.innerHTML = '';
         this.saveAndBackup();
     },
 
@@ -185,6 +189,8 @@ const data = {
         if (document.getElementById('foodCal')) document.getElementById('foodCal').value = item.cal;
         if (document.getElementById('foodGrams')) document.getElementById('foodGrams').value = '';
         document.getElementById('foodSearchResults').innerHTML = '';
+        this._aiFoodResults = [];
+        this._aiFoodAdded = null;
     },
 
     onFoodSearchInput() {
@@ -214,19 +220,84 @@ const data = {
         try {
             const items = await ai.parseFood(text);
             if (!items.length) throw new Error('未识别到食物');
-            const el = document.getElementById('foodSearchResults');
-            if (el) {
-                el.innerHTML = items.map((item) =>
-                    `<button class="food-result-item food-ai-result" onclick='data.applyAiFood(${JSON.stringify(item)})'>
-                        <span>${item.name} ${item.grams ? item.grams + 'g' : ''}</span>
-                        <small>${item.cal} kcal${item.pro ? ' · 蛋白' + item.pro + 'g' : ''}</small>
-                    </button>`
-                ).join('');
-            }
-            if (statusEl) statusEl.textContent = 'AI 已识别，点击选择';
+            this._aiFoodResults = items;
+            this.renderAiFoodResults();
+            if (statusEl) statusEl.textContent = `AI 已识别 ${items.length} 项，点击逐个添加或批量添加`;
         } catch (e) {
             if (statusEl) statusEl.textContent = 'AI 识别失败: ' + e.message;
         }
+    },
+
+    renderAiFoodResults() {
+        const items = this._aiFoodResults || [];
+        const el = document.getElementById('foodSearchResults');
+        if (!el) return;
+        if (items.length === 0) { el.innerHTML = ''; return; }
+        el.innerHTML = `
+            <button class="food-result-item food-add-all" onclick="data.addAllAiFoods()"><span class="material-symbols-rounded">done_all</span><span>全部添加</span><small>${items.length} 项 · ${items.reduce((s, i) => s + (i.cal || 0), 0)} kcal</small></button>
+            ${items.map((item, idx) => {
+                const added = this._aiFoodAdded && this._aiFoodAdded.has(idx);
+                return `<div class="food-result-item food-ai-result ${added ? 'food-added' : ''}">
+                    <span>${item.name} ${item.grams ? item.grams + 'g' : ''}</span>
+                    <small>${item.cal} kcal${item.pro ? ' · 蛋白' + item.pro + 'g' : ''}</small>
+                    ${added
+                        ? '<span class="food-added-badge">已添加</span>'
+                        : `<button class="food-add-btn" onclick="data.addSingleAiFood(${idx})"><span class="material-symbols-rounded">add</span></button>`}
+                </div>`;
+            }).join('')}`;
+    },
+
+    addSingleAiFood(idx) {
+        const items = this._aiFoodResults || [];
+        const item = items[idx];
+        if (!item) return;
+        if (!this._aiFoodAdded) this._aiFoodAdded = new Set();
+        const meal = document.getElementById('foodMeal')?.value || 'lunch';
+        this.db.health.foodLogs.push({
+            id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${idx}`,
+            date: this.dateKey(new Date()),
+            meal,
+            name: item.name,
+            grams: item.grams || 0,
+            cal: Math.round(item.cal || 0),
+            calPer100g: item.grams ? Math.round(item.cal * 100 / item.grams) : 0,
+            createdAt: new Date().toISOString()
+        });
+        this._aiFoodAdded.add(idx);
+        this.renderAiFoodResults();
+        this.save();
+    },
+
+    addAllAiFoods() {
+        const items = this._aiFoodResults || [];
+        if (items.length === 0) return;
+        if (!this._aiFoodAdded) this._aiFoodAdded = new Set();
+        const meal = document.getElementById('foodMeal')?.value || 'lunch';
+        items.forEach((item, idx) => {
+            if (this._aiFoodAdded.has(idx)) return;
+            this.db.health.foodLogs.push({
+                id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${idx}`,
+                date: this.dateKey(new Date()),
+                meal,
+                name: item.name,
+                grams: item.grams || 0,
+                cal: Math.round(item.cal || 0),
+                calPer100g: item.grams ? Math.round(item.cal * 100 / item.grams) : 0,
+                createdAt: new Date().toISOString()
+            });
+            this._aiFoodAdded.add(idx);
+        });
+        this.renderAiFoodResults();
+        this.saveAndBackup();
+    },
+
+    clearAiResults() {
+        this._aiFoodResults = [];
+        this._aiFoodAdded = null;
+        const el = document.getElementById('foodSearchResults');
+        if (el) el.innerHTML = '';
+        const statusEl = document.getElementById('foodAiStatus');
+        if (statusEl) statusEl.textContent = '';
     },
 
     applyAiFood(item) {
@@ -244,12 +315,15 @@ const data = {
         const height = parseFloat(document.getElementById('planHeight')?.value);
         const activityLevel = document.getElementById('planActivity')?.value || 'sedentary';
         const dailyTrainMin = parseInt(document.getElementById('planTrainMin')?.value) || 30;
+        const weeklyFreq = parseInt(document.getElementById('planWeeklyFreq')?.value) || 3;
+        const intensity = document.getElementById('planIntensity')?.value || 'moderate';
+        const sportType = document.getElementById('planSportType')?.value || 'mixed';
         if (!targetWeight || targetWeight <= 0) return alert('请输入目标体重');
         if (targetWeight >= currentWeight) return alert('目标体重需低于当前体重');
         const statusEl = document.getElementById('planStatus');
         if (statusEl) statusEl.textContent = 'AI 分析中...';
         try {
-            const plan = await ai.weightLossPlan({ currentWeight, targetWeight, activityLevel, dailyTrainMin, height });
+            const plan = await ai.weightLossPlan({ currentWeight, targetWeight, activityLevel, dailyTrainMin, height, weeklyFreq, intensity, sportType });
             this.db.health.weightPlan = plan;
             this.save();
             if (statusEl) statusEl.textContent = 'AI 方案已生成，请选择';
@@ -466,8 +540,11 @@ const data = {
                 <div class="md-grid weightloss-grid">
                     <div class="md-field"><input type="number" id="planTargetWeight" step="0.1" placeholder=" "><label>目标体重 kg</label></div>
                     <div class="md-field"><input type="number" id="planHeight" step="1" placeholder=" "><label>身高 cm</label></div>
-                    <div class="md-field"><select id="planActivity"><option value="sedentary">久坐</option><option value="light">轻度活动</option><option value="moderate">中等活动</option><option value="active">高强度活动</option></select><label>活动水平</label></div>
-                    <div class="md-field"><input type="number" id="planTrainMin" value="30" step="5" placeholder=" "><label>每天运动分钟</label></div>
+                    <div class="md-field"><select id="planActivity"><option value="sedentary">久坐</option><option value="light">轻度活动</option><option value="moderate">中等活动</option><option value="active">高强度活动</option></select><label>日常活动水平</label></div>
+                    <div class="md-field"><input type="number" id="planTrainMin" value="30" step="5" placeholder=" "><label>每次运动分钟</label></div>
+                    <div class="md-field"><input type="number" id="planWeeklyFreq" value="3" step="1" min="0" max="7" placeholder=" "><label>每周运动次数</label></div>
+                    <div class="md-field"><select id="planIntensity"><option value="light">低强度</option><option value="moderate" selected>中等强度</option><option value="vigorous">高强度</option></select><label>运动强度</label></div>
+                    <div class="md-field span-full"><select id="planSportType"><option value="strength">力量训练</option><option value="cardio">有氧运动</option><option value="mixed" selected>力量+有氧混合</option><option value="flexibility">拉伸/瑜伽</option></select><label>主要运动项目</label></div>
                 </div>
                 <button class="md-btn md-btn-filled" onclick="data.requestWeightLossPlan()"><span class="material-symbols-rounded">psychology</span> AI 生成减重方案</button>
                 <div id="planStatus" class="food-ai-status"></div>
