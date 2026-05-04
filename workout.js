@@ -319,7 +319,9 @@ const cardio = {
         cycling: { name: '骑行', met: 6.8 },
         swim: { name: '游泳', met: 7.0 },
         elliptical: { name: '椭圆机', met: 5.0 },
-        rowing: { name: '划船机', met: 7.0 }
+        rowing: { name: '划船机', met: 7.0 },
+        battle_rope: { name: '战绳', met: 8.0 },
+        spin_bike: { name: '动感单车', met: 7.5 }
     },
     isRunning: false,
     isPaused: false,

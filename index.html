@@ -95,6 +95,8 @@
                             <option value="swim">游泳 7.0 MET</option>
                             <option value="elliptical">椭圆机 5.0 MET</option>
                             <option value="rowing">划船机 7.0 MET</option>
+                            <option value="battle_rope">战绳 8.0 MET</option>
+                            <option value="spin_bike">动感单车 7.5 MET</option>
                         </select>
                         <label>有氧项目</label>
                     </div>
@@ -222,6 +224,25 @@
     <script src="data.js"></script>
     <script src="sync.js"></script>
     <script src="workout.js"></script>
+    <div id="weightModal" class="md-modal hidden" aria-hidden="true">
+        <div class="md-modal-backdrop" onclick="data.closeWeightModal()"></div>
+        <div class="md-modal-card">
+            <div class="md-modal-head">
+                <strong>添加体重记录</strong>
+                <button class="icon-btn" onclick="data.closeWeightModal()" aria-label="关闭"><span class="material-symbols-rounded">close</span></button>
+            </div>
+            <div class="md-grid modal-grid">
+                <div class="md-field"><input type="date" id="modalWeightDate" placeholder=" "><label>日期</label></div>
+                <div class="md-field"><input type="number" id="modalWeightValue" step="0.1" placeholder=" "><label>体重 kg</label></div>
+                <div class="md-field"><input type="number" id="modalHeight" step="1" placeholder=" "><label>身高 cm</label></div>
+                <div class="md-field span-full"><input type="text" id="modalWeightNote" placeholder=" "><label>备注</label></div>
+            </div>
+            <div class="md-row modal-actions">
+                <button class="md-btn md-btn-tonal" onclick="data.closeWeightModal()">取消</button>
+                <button class="md-btn md-btn-filled" onclick="data.addWeight()"><span class="material-symbols-rounded">save</span> 保存记录</button>
+            </div>
+        </div>
+    </div>
     <script>
         const ui = {
             tab: (id, el) => {

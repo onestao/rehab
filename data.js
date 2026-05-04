@@ -1,12 +1,14 @@
 const data = {
     DB_KEY: 'rehab_pro_universal_db',
     CFG_KEY: 'rehab_pro_universal_cfg',
-    db: { actions: [], routines: [], history: [], rate: 1.1, cardio: { weight: 70, target: 30, type: 'walk' }, health: { weights: [], foodLogs: [], weightPlan: null } },
+    db: { actions: [], routines: [], history: [], rate: 1.1, cardio: { weight: 70, target: 30, type: 'walk' }, health: { weights: [], foodLogs: [], exerciseLogs: [], weightPlan: null, dietGoal: null, aiAdviceChat: [] } },
     cfg: { mode: 'none', s3: {}, dav: {} },
     historyMonthOffset: 0,
+    routineView: 'library',
     recordView: 'daily',
     weightRange: 'month',
     selectedCalendarDate: null,
+    adviceModel: '__current__',
     historyColors: ['#2563eb', '#7c3aed', '#059669', '#f59e0b', '#e11d48', '#0891b2', '#9333ea', '#ea580c'],
 
     init() {
@@ -16,9 +18,11 @@ const data = {
         else this.migrateLegacy();
         if (localCfg) this.cfg = JSON.parse(localCfg);
         this.db.cardio = { weight: 70, target: 30, type: 'walk', ...(this.db.cardio || {}) };
-        this.db.health = { weights: [], foodLogs: [], weightPlan: null, ...(this.db.health || {}) };
+        this.db.health = { weights: [], foodLogs: [], exerciseLogs: [], weightPlan: null, dietGoal: null, aiAdviceChat: [], ...(this.db.health || {}) };
         this.db.health.weights = this.db.health.weights || [];
         this.db.health.foodLogs = this.db.health.foodLogs || [];
+        this.db.health.exerciseLogs = this.db.health.exerciseLogs || [];
+        this.db.health.aiAdviceChat = this.db.health.aiAdviceChat || [];
         if (window.ai) ai.init();
         this.render();
         sync.initUI();
@@ -109,18 +113,36 @@ const data = {
         this.renderHistory();
     },
 
+    setRoutineView(view) {
+        this.routineView = view;
+        this.renderRoutines();
+    },
+
+    toggleCollapse(id) {
+        this._collapse = this._collapse || {};
+        this._collapse[id] = !this._collapse[id];
+        this.renderHistory();
+    },
+
+    isCollapsed(id, defaultState = true) {
+        this._collapse = this._collapse || {};
+        return this._collapse[id] ?? defaultState;
+    },
+
     setWeightRange(range) {
         this.weightRange = range;
         this.renderHistory();
     },
 
     addWeight() {
-        const date = document.getElementById('weightDate').value || this.dateKey(new Date());
-        const weight = parseFloat(document.getElementById('weightValue').value);
-        const note = document.getElementById('weightNote').value.trim();
+        const date = document.getElementById('modalWeightDate').value || this.dateKey(new Date());
+        const weight = parseFloat(document.getElementById('modalWeightValue').value);
+        const note = document.getElementById('modalWeightNote').value.trim();
+        const height = parseFloat(document.getElementById('modalHeight').value);
         if (!weight || weight <= 0) return alert('请输入有效体重');
         this.db.health = this.db.health || { weights: [] };
         this.db.health.weights = this.db.health.weights || [];
+        if (height > 0) this.db.health.height = height;
         this.db.health.weights.push({
             id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
             date,
@@ -129,9 +151,20 @@ const data = {
             createdAt: new Date().toISOString()
         });
         this.db.health.weights.sort((a, b) => new Date(b.date) - new Date(a.date));
-        document.getElementById('weightValue').value = '';
-        document.getElementById('weightNote').value = '';
+        document.getElementById('modalWeightValue').value = '';
+        document.getElementById('modalWeightNote').value = '';
+        this.closeWeightModal();
         this.saveAndBackup();
+    },
+
+    openWeightModal() {
+        document.getElementById('modalWeightDate').value = this.dateKey(new Date());
+        document.getElementById('modalHeight').value = this.db.health.height || '';
+        document.getElementById('weightModal').classList.remove('hidden');
+    },
+
+    closeWeightModal() {
+        document.getElementById('weightModal').classList.add('hidden');
     },
 
     deleteWeight(id) {
@@ -144,23 +177,36 @@ const data = {
         const name = document.getElementById('foodName')?.value?.trim();
         const grams = parseFloat(document.getElementById('foodGrams')?.value);
         const cal = parseFloat(document.getElementById('foodCal')?.value);
+        const pro = parseFloat(document.getElementById('foodPro')?.value) || 0;
+        const carb = parseFloat(document.getElementById('foodCarb')?.value) || 0;
+        const fat = parseFloat(document.getElementById('foodFat')?.value) || 0;
         const meal = document.getElementById('foodMeal')?.value || 'lunch';
         if (!name) return alert('请输入食物名称');
-        if (!cal || cal <= 0) return alert('请输入有效热量');
+        if (!grams || grams <= 0) return alert('请输入食物重量');
+        if (!cal || cal <= 0) return alert('请先选择食物或填写每100g热量');
         const log = {
             id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
             date: this.dateKey(new Date()),
             meal,
             name,
-            grams: grams || 0,
-            cal: grams ? Math.round(cal * grams / 100) : Math.round(cal),
-            calPer100g: grams ? cal : 0,
+            grams,
+            cal: Math.round(cal * grams / 100),
+            calPer100g: cal,
+            pro: Number((pro * grams / 100).toFixed(1)),
+            carb: Number((carb * grams / 100).toFixed(1)),
+            fat: Number((fat * grams / 100).toFixed(1)),
+            proPer100g: pro,
+            carbPer100g: carb,
+            fatPer100g: fat,
             createdAt: new Date().toISOString()
         };
         this.db.health.foodLogs.push(log);
         if (document.getElementById('foodName')) document.getElementById('foodName').value = '';
         if (document.getElementById('foodGrams')) document.getElementById('foodGrams').value = '';
         if (document.getElementById('foodCal')) document.getElementById('foodCal').value = '';
+        if (document.getElementById('foodPro')) document.getElementById('foodPro').value = '';
+        if (document.getElementById('foodCarb')) document.getElementById('foodCarb').value = '';
+        if (document.getElementById('foodFat')) document.getElementById('foodFat').value = '';
         this._aiFoodResults = [];
         this._aiFoodAdded = null;
         const searchEl = document.getElementById('foodSearchResults');
@@ -184,9 +230,98 @@ const data = {
 
     todayTrainingCalories() {
         const today = this.dateKey(new Date());
-        return this.db.history
+        const autoCal = this.db.history
             .filter(h => this.dateKey(this.parseHistoryDate(h.date)) === today)
             .reduce((sum, h) => sum + (h.cardio?.calories || 0), 0);
+        const manualCal = (this.db.health.exerciseLogs || [])
+            .filter(e => e.date === today)
+            .reduce((sum, e) => sum + (e.calories || 0), 0);
+        return autoCal + manualCal;
+    },
+
+    todayMacros() {
+        return this.todayFoodLogs().reduce((acc, f) => {
+            acc.pro += Number(f.pro || 0);
+            acc.carb += Number(f.carb || 0);
+            acc.fat += Number(f.fat || 0);
+            return acc;
+        }, { pro: 0, carb: 0, fat: 0 });
+    },
+
+    defaultDietGoals() {
+        const goal = this.db.health.dietGoal || {};
+        const cal = Number(goal.dailyCal || 0);
+        return {
+            cal,
+            pro: Number(goal.proteinGoal || (cal ? Math.round(cal * 0.3 / 4) : 90)),
+            carb: Number(goal.carbGoal || (cal ? Math.round(cal * 0.4 / 4) : 180)),
+            fat: Number(goal.fatGoal || (cal ? Math.round(cal * 0.3 / 9) : 55))
+        };
+    },
+
+    addManualExercise() {
+        const date = this.dateKey(new Date());
+        const type = document.getElementById('manualExerciseType')?.value || 'walk';
+        const minutes = parseInt(document.getElementById('manualExerciseMinutes')?.value) || 0;
+        const calories = parseInt(document.getElementById('manualExerciseCalories')?.value) || 0;
+        const note = document.getElementById('manualExerciseNote')?.value?.trim() || '';
+        if (minutes <= 0) return alert('请输入有效运动时长');
+        this.db.health.exerciseLogs.push({
+            id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            date,
+            type,
+            minutes,
+            calories,
+            note,
+            createdAt: new Date().toISOString()
+        });
+        document.getElementById('manualExerciseMinutes').value = '';
+        document.getElementById('manualExerciseCalories').value = '';
+        document.getElementById('manualExerciseNote').value = '';
+        this.saveAndBackup();
+    },
+
+    deleteManualExercise(id) {
+        this.db.health.exerciseLogs = (this.db.health.exerciseLogs || []).filter(e => e.id !== id);
+        this.saveAndBackup();
+    },
+
+    todayExerciseLogs() {
+        const today = this.dateKey(new Date());
+        return (this.db.health.exerciseLogs || []).filter(e => e.date === today);
+    },
+
+    async sendAiAdvice() {
+        if (!ai.cfg.enabled) return alert('请先在设置中配置 AI');
+        const input = document.getElementById('advicePrompt');
+        const prompt = input?.value?.trim();
+        if (!prompt) return;
+        const history = this.db.history.slice(0, 20);
+        const foods = this.todayFoodLogs();
+        const weights = this.sortedWeights().slice(-12);
+        const exerciseLogs = this.todayExerciseLogs();
+        const macros = this.todayMacros();
+        const dietGoal = this.db.health.dietGoal || {};
+        const model = document.getElementById('adviceModel')?.value || ai.cfg.model;
+        const sys = '你是训练与营养健康顾问。基于用户记录给出简洁、可执行的建议。不要输出markdown表格。';
+        const user = `用户提问：${prompt}\n\n最近训练记录：${JSON.stringify(history)}\n今日饮食记录：${JSON.stringify(foods)}\n今日宏量营养：${JSON.stringify(macros)}\n当前饮食目标：${JSON.stringify(dietGoal)}\n最近体重记录：${JSON.stringify(weights)}\n今日手动运动：${JSON.stringify(exerciseLogs)}`;
+        const oldModel = ai.cfg.model;
+        ai.cfg.model = model;
+        const statusEl = document.getElementById('adviceStatus');
+        if (statusEl) statusEl.textContent = 'AI 分析中...';
+        try {
+            const reply = await ai.call([{ role: 'system', content: sys }, { role: 'user', content: user }], 1800);
+            this.db.health.aiAdviceChat.push({ role: 'user', content: prompt, at: new Date().toISOString() });
+            this.db.health.aiAdviceChat.push({ role: 'assistant', content: reply, at: new Date().toISOString(), model });
+            input.value = '';
+            this.save();
+            if (statusEl) statusEl.textContent = '分析完成';
+            this.renderHistory();
+        } catch (e) {
+            if (statusEl) statusEl.textContent = '分析失败: ' + e.message;
+        } finally {
+            ai.cfg.model = oldModel;
+        }
     },
 
     applyFoodItem(id) {
@@ -194,10 +329,14 @@ const data = {
         if (!item) return;
         if (document.getElementById('foodName')) document.getElementById('foodName').value = item.name;
         if (document.getElementById('foodCal')) document.getElementById('foodCal').value = item.cal;
+        if (document.getElementById('foodPro')) document.getElementById('foodPro').value = item.pro || 0;
+        if (document.getElementById('foodCarb')) document.getElementById('foodCarb').value = item.carb || 0;
+        if (document.getElementById('foodFat')) document.getElementById('foodFat').value = item.fat || 0;
         if (document.getElementById('foodGrams')) document.getElementById('foodGrams').value = '';
         document.getElementById('foodSearchResults').innerHTML = '';
         this._aiFoodResults = [];
         this._aiFoodAdded = null;
+        this.updateFoodComputedPreview();
     },
 
     onFoodSearchInput() {
@@ -209,6 +348,22 @@ const data = {
         el.innerHTML = results.map(item =>
             `<button class="food-result-item" onclick="data.applyFoodItem('${item.id}')"><span>${item.name}</span><small>${item.cal} kcal/100g</small></button>`
         ).join('');
+    },
+
+    updateFoodComputedPreview() {
+        const grams = parseFloat(document.getElementById('foodGrams')?.value) || 0;
+        const cal = parseFloat(document.getElementById('foodCal')?.value) || 0;
+        const pro = parseFloat(document.getElementById('foodPro')?.value) || 0;
+        const carb = parseFloat(document.getElementById('foodCarb')?.value) || 0;
+        const fat = parseFloat(document.getElementById('foodFat')?.value) || 0;
+        const el = document.getElementById('foodComputed');
+        if (!el) return;
+        if (!grams || !cal) { el.textContent = '输入食物和重量后自动计算'; return; }
+        const kcal = Math.round(cal * grams / 100);
+        const p = (pro * grams / 100).toFixed(1);
+        const c = (carb * grams / 100).toFixed(1);
+        const f = (fat * grams / 100).toFixed(1);
+        el.textContent = `本次记录：${kcal} kcal · 蛋白 ${p}g · 碳水 ${c}g · 脂肪 ${f}g`;
     },
 
     async aiParseFood() {
@@ -268,6 +423,9 @@ const data = {
             grams: item.grams || 0,
             cal: Math.round(item.cal || 0),
             calPer100g: item.grams ? Math.round(item.cal * 100 / item.grams) : 0,
+            pro: Number(item.pro || 0),
+            carb: Number(item.carb || 0),
+            fat: Number(item.fat || 0),
             createdAt: new Date().toISOString()
         });
         this._aiFoodAdded.add(idx);
@@ -290,6 +448,9 @@ const data = {
                 grams: item.grams || 0,
                 cal: Math.round(item.cal || 0),
                 calPer100g: item.grams ? Math.round(item.cal * 100 / item.grams) : 0,
+                pro: Number(item.pro || 0),
+                carb: Number(item.carb || 0),
+                fat: Number(item.fat || 0),
                 createdAt: new Date().toISOString()
             });
             this._aiFoodAdded.add(idx);
@@ -311,7 +472,11 @@ const data = {
         if (document.getElementById('foodName')) document.getElementById('foodName').value = item.name;
         if (document.getElementById('foodGrams')) document.getElementById('foodGrams').value = item.grams || '';
         if (document.getElementById('foodCal')) document.getElementById('foodCal').value = item.cal || '';
+        if (document.getElementById('foodPro')) document.getElementById('foodPro').value = item.pro || 0;
+        if (document.getElementById('foodCarb')) document.getElementById('foodCarb').value = item.carb || 0;
+        if (document.getElementById('foodFat')) document.getElementById('foodFat').value = item.fat || 0;
         document.getElementById('foodSearchResults').innerHTML = '';
+        this.updateFoodComputedPreview();
     },
 
     // --- Weight Loss Plan ---
@@ -414,15 +579,19 @@ const data = {
     renderRoutines() {
         const list = document.getElementById('routineList');
         if (!list) return;
+        list.innerHTML = `
+            <div class="record-tabs" role="tablist" aria-label="方案视图">
+                <button class="record-tab ${this.routineView === 'library' ? 'active' : ''}" onclick="data.setRoutineView('library')"><span class="material-symbols-rounded">bookmarks</span>动作组库</button>
+                <button class="record-tab ${this.routineView === 'weightloss' ? 'active' : ''}" onclick="data.setRoutineView('weightloss')"><span class="material-symbols-rounded">trending_down</span>AI减重指导</button>
+            </div>
+            ${this.routineView === 'library' ? this.renderRoutineLibrary() : this.renderWeightLossPlanCard()}`;
+    },
+
+    renderRoutineLibrary() {
         if (this.db.routines.length === 0) {
-            list.innerHTML = `
-                <div class="empty-state">
-                    <span class="material-symbols-rounded">bookmark_border</span>
-                    <p>暂无保存的方案</p>
-                </div>`;
-            return;
+            return `<div class="empty-state"><span class="material-symbols-rounded">bookmark_border</span><p>暂无保存的方案</p></div>`;
         }
-        list.innerHTML = this.db.routines.map((r, i) => `
+        return this.db.routines.map((r, i) => `
             <div class="list-item">
                 <div style="flex:1;min-width:0">
                     <strong>${r.name}</strong>
@@ -431,6 +600,10 @@ const data = {
                 <button class="md-btn md-btn-tonal" style="flex:none;padding:0 14px;height:32px;font-size:12px" onclick="data.loadRoutine(${i})">载入</button>
                 <button class="delete-btn" onclick="data.deleteRoutine(${i})"><span class="material-symbols-rounded">delete</span></button>
             </div>`).join('');
+    },
+
+    renderWeightLossPlanCard() {
+        return `${this.renderWeightLossPanel()}${this.renderAdvicePanel()}`;
     },
 
     renderHistory() {
@@ -446,11 +619,11 @@ const data = {
 
     renderDailyActions() {
         return `
-            ${this.renderWeightPanel()}
-            ${this.renderDietPanel()}
-            ${this.renderWeightLossPanel()}
             <div class="record-section-title">今日行动</div>
             ${this.renderTodaySummary()}
+            ${this.renderWeightPanel()}
+            ${this.renderDietPanel()}
+            ${this.renderManualExercisePanel()}
             <div class="record-section-title">训练明细</div>
             ${this.renderHistoryList()}`;
     },
@@ -494,6 +667,7 @@ const data = {
         const calories = Math.round(entries.reduce((sum, h) => sum + (h.cardio?.calories || 0), 0));
         const names = this.uniqueActionNames(entries);
         const intake = this.todayCalories();
+        const macros = this.todayMacros();
         const dietGoal = this.db.health.dietGoal;
         const goalCal = dietGoal?.dailyCal || 0;
         const net = intake - calories;
@@ -504,30 +678,44 @@ const data = {
             <div class="daily-stat"><span class="material-symbols-rounded">balance</span><b>${net > 0 ? '+' : ''}${net}</b><small>净热量</small></div>
             ${goalCal ? `<div class="daily-stat goal-stat"><span class="material-symbols-rounded">flag</span><b>${goalCal}</b><small>目标 kcal</small></div>` : ''}
             <div class="daily-stat"><span class="material-symbols-rounded">fitness_center</span><b>${names.length}</b><small>项目数</small></div>
+            <div class="daily-stat"><span class="material-symbols-rounded">egg_alt</span><b>${macros.pro.toFixed(0)}</b><small>蛋白 g</small></div>
         </div>`;
     },
 
     renderDietPanel() {
         const todayLogs = this.todayFoodLogs();
         const totalCal = this.todayCalories();
+        const macros = this.todayMacros();
+        const goals = this.defaultDietGoals();
         const mealGroups = { breakfast: [], lunch: [], dinner: [], snack: [] };
         todayLogs.forEach(f => { (mealGroups[f.meal] || mealGroups.snack).push(f); });
         const mealNames = { breakfast: '早餐', lunch: '午餐', dinner: '晚餐', snack: '加餐' };
-        return `<div class="md-card diet-card">
+        const collapsed = this.isCollapsed('dietPanel', false);
+        return `<div class="md-card diet-card collapsible-card ${collapsed ? 'collapsed' : ''}">
             <div class="diet-head">
                 <div>
                     <span class="cardio-kicker">饮食记录</span>
                     <h3>${totalCal} kcal</h3>
                     <small>今日摄入 · ${todayLogs.length} 条记录</small>
                 </div>
-                <span class="material-symbols-rounded diet-icon">restaurant</span>
+                <button class="collapse-btn" onclick="data.toggleCollapse('dietPanel')"><span class="material-symbols-rounded">${collapsed ? 'expand_more' : 'expand_less'}</span></button>
             </div>
+            <div class="macro-summary">
+                <div><b>${macros.pro.toFixed(1)}g</b><small>蛋白 / 目标 ${goals.pro}g</small></div>
+                <div><b>${macros.carb.toFixed(1)}g</b><small>碳水 / 目标 ${goals.carb}g</small></div>
+                <div><b>${macros.fat.toFixed(1)}g</b><small>脂肪 / 目标 ${goals.fat}g</small></div>
+            </div>
+            <div class="collapse-content">
             <div class="diet-input-area">
                 <div class="md-grid diet-input-grid">
                     <div class="md-field"><select id="foodMeal"><option value="breakfast">早餐</option><option value="lunch" selected>午餐</option><option value="dinner">晚餐</option><option value="snack">加餐</option></select><label>餐次</label></div>
-                    <div class="md-field"><input type="number" id="foodGrams" step="1" placeholder=" "><label>克数</label></div>
+                    <div class="md-field"><input type="number" id="foodGrams" step="1" placeholder=" " oninput="data.updateFoodComputedPreview()"><label>克数</label></div>
                     <div class="md-field span-full"><input type="text" id="foodName" placeholder=" " oninput="data.onFoodSearchInput()"><label>食物名称</label></div>
-                    <div class="md-field"><input type="number" id="foodCal" step="1" placeholder=" "><label>kcal/100g</label></div>
+                    <div class="md-field"><input type="number" id="foodCal" step="1" placeholder=" " oninput="data.updateFoodComputedPreview()"><label>kcal/100g</label></div>
+                    <div class="md-field"><input type="number" id="foodPro" step="0.1" placeholder=" " oninput="data.updateFoodComputedPreview()"><label>蛋白/100g</label></div>
+                    <div class="md-field"><input type="number" id="foodCarb" step="0.1" placeholder=" " oninput="data.updateFoodComputedPreview()"><label>碳水/100g</label></div>
+                    <div class="md-field"><input type="number" id="foodFat" step="0.1" placeholder=" " oninput="data.updateFoodComputedPreview()"><label>脂肪/100g</label></div>
+                    <div id="foodComputed" class="food-computed span-full">输入食物和重量后自动计算</div>
                     <div class="diet-btn-row">
                         <button class="md-btn md-btn-filled" onclick="data.addFoodLog()"><span class="material-symbols-rounded">add</span> 添加</button>
                         <button class="md-btn md-btn-tonal" onclick="data.aiParseFood()" title="AI 智能识别"><span class="material-symbols-rounded">psychology</span></button>
@@ -543,11 +731,61 @@ const data = {
                     <div class="diet-meal-title">${mealNames[key]} <small>${subTotal} kcal</small></div>
                     ${items.map(f => `<div class="diet-log-item">
                         <span>${f.name}${f.grams ? ' ' + f.grams + 'g' : ''}</span>
+                        <small>P ${Number(f.pro || 0).toFixed(1)} / C ${Number(f.carb || 0).toFixed(1)} / F ${Number(f.fat || 0).toFixed(1)}</small>
                         <b>${f.cal} kcal</b>
                         <button class="delete-btn" onclick="data.deleteFoodLog('${f.id}')"><span class="material-symbols-rounded">delete</span></button>
                     </div>`).join('')}
                 </div>`;
             }).join('')}
+            </div>
+        </div>`;
+    },
+
+    renderManualExercisePanel() {
+        const collapsed = this.isCollapsed('exercisePanel', true);
+        const items = this.todayExerciseLogs();
+        const total = items.reduce((s, e) => s + (e.calories || 0), 0);
+        return `<div class="md-card collapsible-card ${collapsed ? 'collapsed' : ''}">
+            <div class="panel-head">
+                <div>
+                    <span class="cardio-kicker">手动运动</span>
+                    <h3>${items.length} 条记录</h3>
+                    <small>今日手动运动消耗 ${total} kcal</small>
+                </div>
+                <button class="collapse-btn" onclick="data.toggleCollapse('exercisePanel')"><span class="material-symbols-rounded">${collapsed ? 'expand_more' : 'expand_less'}</span></button>
+            </div>
+            <div class="collapse-content">
+                <div class="md-grid exercise-grid">
+                    <div class="md-field"><select id="manualExerciseType"><option value="walk">步行</option><option value="run">跑步</option><option value="cycling">骑行</option><option value="battle_rope">战绳</option><option value="spin_bike">动感单车</option><option value="strength">力量训练</option><option value="stretch">拉伸/瑜伽</option></select><label>运动种类</label></div>
+                    <div class="md-field"><input type="number" id="manualExerciseMinutes" step="1" placeholder=" "><label>时长 分钟</label></div>
+                    <div class="md-field"><input type="number" id="manualExerciseCalories" step="1" placeholder=" "><label>热量 kcal</label></div>
+                    <div class="md-field span-full"><input type="text" id="manualExerciseNote" placeholder=" "><label>备注</label></div>
+                </div>
+                <button class="md-btn md-btn-filled" onclick="data.addManualExercise()"><span class="material-symbols-rounded">add</span> 添加运动记录</button>
+                ${items.length ? `<div class="manual-ex-list">${items.map(e => `<div class="day-detail-item"><span class="record-icon material-symbols-rounded">${this.sportIcon(e.type)}</span><span>${this.exerciseLabel(e.type)} ${e.minutes} 分钟</span><small>${e.calories || 0} kcal</small><button class="delete-btn" onclick="data.deleteManualExercise('${e.id}')"><span class="material-symbols-rounded">delete</span></button></div>`).join('')}</div>` : ''}
+            </div>
+        </div>`;
+    },
+
+    renderAdvicePanel() {
+        const collapsed = this.isCollapsed('advicePanel', true);
+        const messages = this.db.health.aiAdviceChat || [];
+        const modelOptions = (ai.models && ai.models.length ? ai.models : [{ id: ai.cfg.model || '当前配置模型' }]);
+        return `<div class="md-card collapsible-card ${collapsed ? 'collapsed' : ''}">
+            <div class="panel-head">
+                <div>
+                    <span class="cardio-kicker">AI 分析建议</span>
+                    <h3>基于训练 / 饮食 / 体重数据</h3>
+                    <small>${messages.length ? `已生成 ${Math.floor(messages.length / 2)} 轮建议` : '可选择模型并提问'}</small>
+                </div>
+                <button class="collapse-btn" onclick="data.toggleCollapse('advicePanel')"><span class="material-symbols-rounded">${collapsed ? 'expand_more' : 'expand_less'}</span></button>
+            </div>
+            <div class="collapse-content advice-panel">
+                <div class="md-field"><select id="adviceModel">${modelOptions.map(m => `<option value="${m.id}" ${m.id === ai.cfg.model ? 'selected' : ''}>${m.id}</option>`).join('')}</select><label>分析模型</label></div>
+                <div class="advice-chat-list">${messages.length ? messages.map(msg => `<div class="advice-bubble ${msg.role}"><b>${msg.role === 'user' ? '我' : 'AI'}</b><p>${String(msg.content).replace(/\n/g, '<br>')}</p></div>`).join('') : '<div class="empty-state" style="padding:12px"><p>还没有 AI 建议</p></div>'}</div>
+                <div class="md-field span-full"><input type="text" id="advicePrompt" placeholder=" "><label>向 AI 提问，例如：我最近减重停滞的原因是什么？</label></div>
+                <div class="advice-actions"><button class="md-btn md-btn-filled" onclick="data.sendAiAdvice()"><span class="material-symbols-rounded">send</span> 获取建议</button><div id="adviceStatus" class="food-ai-status"></div></div>
+            </div>
         </div>`;
     },
 
@@ -622,18 +860,12 @@ const data = {
                 <span class="material-symbols-rounded weight-icon">monitor_weight</span>
             </div>
             <div class="bmi-row">
-                <div class="md-field" style="max-width:100px"><input type="number" id="inputHeight" step="1" value="${h || ''}" placeholder=" " oninput="data.saveHeight(this.value)"><label>身高 cm</label></div>
+                <button class="md-btn md-btn-tonal weight-open-btn" onclick="data.openWeightModal()"><span class="material-symbols-rounded">edit_note</span> 记录体重</button>
                 ${bmiInfo ? `<div class="bmi-display">
                     <span class="bmi-value">${bmi.toFixed(1)}</span>
                     <span class="bmi-label" style="color:${bmiInfo.color}">${bmiInfo.label}</span>
                     <span class="bmi-range">BMI ${bmiInfo.range}</span>
                 </div>` : '<div class="bmi-display bmi-empty"><small>填写身高计算 BMI</small></div>'}
-            </div>
-            <div class="weight-input-row">
-                <div class="md-field"><input type="date" id="weightDate" value="${this.dateKey(new Date())}" placeholder=" "><label>日期</label></div>
-                <div class="md-field"><input type="number" id="weightValue" step="0.1" placeholder=" "><label>体重 kg</label></div>
-                <div class="md-field span-full"><input type="text" id="weightNote" placeholder=" "><label>备注</label></div>
-                <button class="md-btn md-btn-filled span-full" onclick="data.addWeight()"><span class="material-symbols-rounded">add</span> 添加体重记录</button>
             </div>
             <div class="weight-range-tabs">
                 ${['week','month','year'].map(r => `<button class="weight-range ${this.weightRange === r ? 'active' : ''}" onclick="data.setWeightRange('${r}')">${r === 'week' ? '周' : r === 'month' ? '月' : '年'}</button>`).join('')}
@@ -704,7 +936,7 @@ const data = {
 
     saveHeight(val) {
         const h = parseFloat(val);
-        if (h > 0) { this.db.health.height = h; localStorage.setItem(this.DB_KEY, JSON.stringify(this.db)); }
+        if (h > 0) { this.db.health.height = h; localStorage.setItem(this.DB_KEY, JSON.stringify(this.db)); this.renderHistory(); }
     },
 
     bmiCategory(bmi) {
@@ -774,12 +1006,16 @@ const data = {
         const date = this.selectedCalendarDate;
         const entries = this.db.history.filter(h => this.dateKey(this.parseHistoryDate(h.date)) === date);
         const foods = (this.db.health.foodLogs || []).filter(f => f.date === date);
+        const manualExercises = (this.db.health.exerciseLogs || []).filter(e => e.date === date);
         const weight = (this.db.health.weights || []).find(w => w.date === date);
         const totalMin = Math.round(entries.reduce((s, h) => s + (h.duration || 0), 0) / 60);
-        const totalCal = Math.round(entries.reduce((s, h) => s + (h.cardio?.calories || 0), 0));
+        const totalCal = Math.round(entries.reduce((s, h) => s + (h.cardio?.calories || 0), 0) + manualExercises.reduce((s, e) => s + (e.calories || 0), 0));
         const foodCal = foods.reduce((s, f) => s + (f.cal || 0), 0);
+        const foodPro = foods.reduce((s, f) => s + Number(f.pro || 0), 0);
+        const foodCarb = foods.reduce((s, f) => s + Number(f.carb || 0), 0);
+        const foodFat = foods.reduce((s, f) => s + Number(f.fat || 0), 0);
         const mealNames = { breakfast: '早餐', lunch: '午餐', dinner: '晚餐', snack: '加餐' };
-        if (entries.length === 0 && foods.length === 0 && !weight) {
+        if (entries.length === 0 && foods.length === 0 && manualExercises.length === 0 && !weight) {
             return `<div class="md-card day-detail-card">
                 <div class="day-detail-head"><span class="material-symbols-rounded">event</span><strong>${date}</strong><button class="icon-btn" onclick="data.selectCalendarDate('${date}')"><span class="material-symbols-rounded">close</span></button></div>
                 <div class="empty-state" style="padding:20px"><p>当天暂无记录</p></div>
@@ -800,9 +1036,10 @@ const data = {
                 const secs = h.duration % 60;
                 return `<div class="day-detail-item"><span class="record-icon material-symbols-rounded">${icon}</span><span>${names}</span><small>${mins}分${secs}秒${h.cardio ? ' · ' + Math.round(h.cardio.calories || 0) + ' kcal' : ''}</small></div>`;
             }).join('')}</div>` : ''}
-            ${foods.length ? `<div class="day-detail-section"><b>饮食 · ${foodCal} kcal</b>${foods.map(f => {
-                return `<div class="day-detail-item"><span class="food-tag">${mealNames[f.meal] || f.meal}</span><span>${f.name}${f.grams ? ' ' + f.grams + 'g' : ''}</span><small>${f.cal} kcal</small></div>`;
+            ${foods.length ? `<div class="day-detail-section"><b>饮食 · ${foodCal} kcal · P${foodPro.toFixed(0)} C${foodCarb.toFixed(0)} F${foodFat.toFixed(0)}</b>${foods.map(f => {
+                return `<div class="day-detail-item"><span class="food-tag">${mealNames[f.meal] || f.meal}</span><span>${f.name}${f.grams ? ' ' + f.grams + 'g' : ''}</span><small>${f.cal} kcal · P${Number(f.pro || 0).toFixed(0)} C${Number(f.carb || 0).toFixed(0)} F${Number(f.fat || 0).toFixed(0)}</small></div>`;
             }).join('')}</div>` : ''}
+            ${manualExercises.length ? `<div class="day-detail-section"><b>手动运动</b>${manualExercises.map(e => `<div class="day-detail-item"><span class="record-icon material-symbols-rounded">${this.sportIcon(e.type)}</span><span>${this.exerciseLabel(e.type)} ${e.minutes} 分钟</span><small>${e.calories || 0} kcal</small></div>`).join('')}</div>` : ''}
             ${weight ? `<div class="day-detail-section"><b>体重</b><div class="day-detail-item"><span class="material-symbols-rounded" style="font-size:18px">monitor_weight</span><span>${weight.weight.toFixed(1)} kg</span>${weight.note ? `<small>${weight.note}</small>` : ''}</div></div>` : ''}
         </div>`;
     },
@@ -852,6 +1089,8 @@ const data = {
         if (/walk|步行|快走/.test(text)) return 'directions_walk';
         if (/run|jog|跑|慢跑/.test(text)) return 'directions_run';
         if (/cycling|骑/.test(text)) return 'directions_bike';
+        if (/战绳|battle/.test(text)) return 'waterfall_chart';
+        if (/动感单车|spin/.test(text)) return 'pedal_bike';
         if (/swim|游泳/.test(text)) return 'pool';
         if (/row|划船/.test(text)) return 'rowing';
         if (/elliptical|椭圆/.test(text)) return 'exercise';
@@ -860,6 +1099,19 @@ const data = {
         if (/肩|臂|手|推|拉|胸|背/.test(text)) return 'fitness_center';
         if (/核心|腹|腰|平板|plank/.test(text)) return 'sports_gymnastics';
         return 'fitness_center';
+    },
+
+    exerciseLabel(type = '') {
+        const map = {
+            walk: '步行',
+            run: '跑步',
+            cycling: '骑行',
+            battle_rope: '战绳',
+            spin_bike: '动感单车',
+            strength: '力量训练',
+            stretch: '拉伸/瑜伽'
+        };
+        return map[type] || type || '运动';
     },
 
     actionColor(name) {
