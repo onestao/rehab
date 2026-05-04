@@ -107,8 +107,7 @@ body {
     transition: box-shadow var(--md-sys-motion-duration-short) var(--md-sys-motion-emphasized);
 }
 .md-top-app-bar.scrolled { box-shadow: var(--md-sys-elevation-2); }
-body.no-app-bar .md-top-app-bar { display: none; }
-body.no-app-bar .page { min-height: 100vh; }
+body:not(.show-app-bar) .md-top-app-bar { display: none !important; }
 .bar-leading {
     display: flex;
     align-items: center;

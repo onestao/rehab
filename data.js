@@ -317,7 +317,7 @@ const data = {
     // --- Weight Loss Plan ---
     async requestWeightLossPlan() {
         const latest = this.sortedWeights().slice(-1)[0];
-        const currentWeight = latest?.weight || 70;
+        const currentWeight = parseFloat(document.getElementById('planCurrentWeight')?.value) || latest?.weight;
         const targetWeight = parseFloat(document.getElementById('planTargetWeight')?.value);
         const height = parseFloat(document.getElementById('planHeight')?.value);
         const activityLevel = document.getElementById('planActivity')?.value || 'sedentary';
@@ -325,6 +325,7 @@ const data = {
         const weeklyFreq = parseInt(document.getElementById('planWeeklyFreq')?.value) || 3;
         const intensity = document.getElementById('planIntensity')?.value || 'moderate';
         const sportType = document.getElementById('planSportType')?.value || 'mixed';
+        if (!currentWeight || currentWeight <= 0) return alert('请先填写当前体重');
         if (!targetWeight || targetWeight <= 0) return alert('请输入目标体重');
         if (targetWeight >= currentWeight) return alert('目标体重需低于当前体重');
         const statusEl = document.getElementById('planStatus');
@@ -546,6 +547,7 @@ const data = {
             </div>
             <div class="weightloss-form">
                 <div class="md-grid weightloss-grid">
+                    <div class="md-field"><input type="number" id="planCurrentWeight" step="0.1" value="${currentWeight || ''}" placeholder=" "><label>当前体重 kg</label></div>
                     <div class="md-field"><input type="number" id="planTargetWeight" step="0.1" placeholder=" "><label>目标体重 kg</label></div>
                     <div class="md-field"><input type="number" id="planHeight" step="1" placeholder=" "><label>身高 cm</label></div>
                     <div class="md-field"><select id="planActivity"><option value="sedentary">久坐</option><option value="light">轻度活动</option><option value="moderate">中等活动</option><option value="active">高强度活动</option></select><label>日常活动水平</label></div>
