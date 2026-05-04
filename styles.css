@@ -1199,6 +1199,16 @@ body {
 }
 .ai-vision-badge .material-symbols-rounded { font-size: 12px; }
 .ai-model-empty { text-align: center; padding: 12px; color: var(--md-sys-on-surface-variant); font-size: 13px; }
+.ai-profile-actions {
+    align-items: flex-end;
+    gap: 8px;
+}
+.ai-profile-actions .md-btn {
+    flex: none;
+    margin-top: 0;
+    white-space: nowrap;
+    padding: 0 14px;
+}
 .ai-encrypt-section {
     display: grid; gap: 8px; padding-top: 10px; margin-top: 10px;
     border-top: 1px solid var(--md-sys-outline-variant);

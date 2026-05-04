@@ -1,7 +1,7 @@
 const data = {
     DB_KEY: 'rehab_pro_universal_db',
     CFG_KEY: 'rehab_pro_universal_cfg',
-    db: { actions: [], routines: [], history: [], rate: 1.1, cardio: { weight: 70, target: 30, type: 'walk' }, health: { weights: [], foodLogs: [], exerciseLogs: [], weightPlan: null, dietGoal: null, aiAdviceChat: [] } },
+    db: { actions: [], routines: [], history: [], rate: 1.1, cardio: { weight: 70, target: 30, type: 'walk' }, health: { weights: [], foodLogs: [], exerciseLogs: [], weightPlan: null, dietGoal: null, aiAdviceChat: [] }, aiProfiles: [], aiActiveId: '', aiModels: [] },
     cfg: { mode: 'none', s3: {}, dav: {} },
     historyMonthOffset: 0,
     routineView: 'library',
@@ -23,6 +23,9 @@ const data = {
         this.db.health.foodLogs = this.db.health.foodLogs || [];
         this.db.health.exerciseLogs = this.db.health.exerciseLogs || [];
         this.db.health.aiAdviceChat = this.db.health.aiAdviceChat || [];
+        this.db.aiProfiles = this.db.aiProfiles || [];
+        this.db.aiActiveId = this.db.aiActiveId || '';
+        this.db.aiModels = this.db.aiModels || [];
         this.render();
         sync.initUI();
         if (window.cardio) cardio.initUI();

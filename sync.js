@@ -103,6 +103,7 @@ const sync = {
             if (res.ok) {
                 const remote = await res.json();
                 data.db = { ...data.db, ...remote };
+                if (window.ai) ai.init();
                 data.save();
                 data.render();
                 this.setStatus('cloud');
