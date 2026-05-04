@@ -233,7 +233,7 @@ const workout = {
         document.getElementById('sessionTime').innerText = `${m}:${s}`;
     },
     stop() {
-        if(confirm("停止并记录历史？")) {
+        if(confirm("停止并保存记录？")) {
             this.isPlaying = false;
             if (this._countResolve) { this._countResolve(); this._countResolve = null; }
             this.finish();
@@ -255,7 +255,7 @@ const workout = {
         document.getElementById('stopBtn').classList.add('hidden');
         if (duration < 20) {
             this.speak("训练时间过短，无法记录");
-            alert("训练时间低于20秒，无法记录历史");
+            alert("训练时间低于20秒，无法保存记录");
             data.save();
             return;
         }

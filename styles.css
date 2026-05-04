@@ -515,6 +515,135 @@ body {
 }
 .delete-btn:active { opacity: 1; background: var(--md-sys-error-container); }
 
+/* --- Record Calendar --- */
+.record-section-title {
+    margin: 18px 20px 8px;
+    font-size: 14px;
+    font-weight: 800;
+    color: var(--md-sys-on-surface);
+}
+.calendar-card {
+    padding: 14px;
+    background:
+        linear-gradient(180deg, rgba(255,255,255,0.68), rgba(255,255,255,0.2)),
+        var(--md-sys-surface-container-low);
+    box-shadow: var(--md-sys-elevation-1);
+}
+.calendar-toolbar {
+    display: grid;
+    grid-template-columns: 40px 1fr 40px;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+.calendar-toolbar strong {
+    text-align: center;
+    font-size: 18px;
+    font-weight: 900;
+    color: var(--md-sys-on-surface);
+}
+.icon-btn {
+    width: 40px;
+    height: 40px;
+    border: none;
+    border-radius: var(--md-sys-shape-full);
+    background: var(--md-sys-secondary-container);
+    color: var(--md-sys-on-secondary-container);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition:
+        transform var(--md-sys-motion-duration-medium) var(--md-expressive-spring),
+        background var(--md-sys-motion-duration-short) var(--md-sys-motion-emphasized);
+}
+.icon-btn:active { transform: scale(0.9); }
+.calendar-weekdays,
+.calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+.calendar-weekdays {
+    gap: 4px;
+    margin-bottom: 6px;
+    color: var(--md-sys-on-surface-variant);
+    font-size: 11px;
+    font-weight: 800;
+    text-align: center;
+}
+.calendar-grid { gap: 4px; }
+.calendar-day {
+    min-height: 62px;
+    border-radius: 10px;
+    padding: 5px 4px;
+    background: var(--md-sys-surface-container-lowest);
+    border: 1px solid transparent;
+    overflow: hidden;
+}
+.calendar-day.empty {
+    background: transparent;
+}
+.calendar-day.has-record {
+    border-color: color-mix(in srgb, var(--md-sys-primary) 18%, transparent);
+    background: color-mix(in srgb, var(--md-sys-primary-container) 30%, var(--md-sys-surface-container-lowest));
+}
+.calendar-day-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 14px;
+    gap: 2px;
+    font-size: 11px;
+    font-weight: 800;
+    color: var(--md-sys-on-surface);
+}
+.calendar-day-head b {
+    font-size: 9px;
+    color: var(--md-sys-primary);
+    white-space: nowrap;
+}
+.calendar-events {
+    display: grid;
+    gap: 2px;
+    margin-top: 3px;
+}
+.calendar-event {
+    min-width: 0;
+    padding: 1px 3px;
+    border-radius: 4px;
+    background: color-mix(in srgb, var(--event-color) 18%, white);
+    color: color-mix(in srgb, var(--event-color) 72%, black);
+    font-size: 9px;
+    font-weight: 800;
+    line-height: 1.35;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    border-left: 2px solid var(--event-color);
+}
+.calendar-legend {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding-top: 12px;
+    margin-top: 12px;
+    border-top: 1px solid var(--md-sys-outline-variant);
+}
+.calendar-legend span {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--md-sys-on-surface-variant);
+}
+.calendar-legend i {
+    width: 9px;
+    height: 9px;
+    border-radius: var(--md-sys-shape-full);
+    flex: none;
+}
+
 /* --- Rate Row --- */
 .rate-row {
     display: flex;
@@ -997,6 +1126,20 @@ body.is-training .fab-stop {
         border-color: var(--md-sys-outline-variant);
     }
     .list-item:active { background: var(--md-sys-surface-container-highest); }
+    .calendar-card {
+        background:
+            linear-gradient(180deg, rgba(51,53,58,0.62), rgba(30,32,36,0.22)),
+            var(--md-sys-surface-container-low);
+    }
+    .calendar-day { background: var(--md-sys-surface-container-high); }
+    .calendar-day.empty { background: transparent; }
+    .calendar-day.has-record {
+        background: color-mix(in srgb, var(--md-sys-primary-container) 28%, var(--md-sys-surface-container-high));
+    }
+    .calendar-event {
+        background: color-mix(in srgb, var(--event-color) 28%, var(--md-sys-surface-container-highest));
+        color: color-mix(in srgb, var(--event-color) 24%, var(--md-sys-on-surface));
+    }
 
     .md-btn-tonal {
         background: var(--md-sys-secondary-container);

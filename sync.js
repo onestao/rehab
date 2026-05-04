@@ -106,7 +106,7 @@ const sync = {
                 data.save();
                 data.render();
                 this.setStatus('cloud');
-                alert("下载恢复成功（含训练历史）");
+                alert("下载恢复成功（含训练记录）");
             } else {
                 this.setStatus('error');
                 alert("拉取失败，请检查参数");
@@ -120,7 +120,7 @@ const sync = {
             const payload = JSON.stringify(data.db);
             const res = await this.syncReq('PUT', payload);
             this.setStatus(res.ok ? 'cloud' : 'error');
-            if (res.ok) alert("备份成功（含训练历史、方案库、动作列表）");
+            if (res.ok) alert("备份成功（含训练记录、方案库、动作列表）");
             else alert("备份失败，请检查参数");
         } catch (e) { this.setStatus('error'); alert("备份失败: " + e.message); }
     },

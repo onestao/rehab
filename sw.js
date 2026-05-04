@@ -1,4 +1,4 @@
-const CACHE = 'training-assistant-v4';
+const CACHE = 'training-assistant-v5';
 const ASSETS = ['index.html', 'styles.css', 'theme.js', 'data.js', 'sync.js', 'workout.js', 'manifest.json'];
 
 self.addEventListener('install', e => {
