@@ -129,7 +129,11 @@ const data = {
 
     toggleCollapse(id) {
         this._collapse = this._collapse || {};
-        this._collapse[id] = !this._collapse[id];
+        if (this._collapse[id] === undefined) {
+            this._collapse[id] = id === 'dietPanel' ? true : false;
+        } else {
+            this._collapse[id] = !this._collapse[id];
+        }
         this.render();
     },
 
@@ -311,8 +315,6 @@ const data = {
         const input = document.getElementById('advicePrompt');
         const prompt = input?.value?.trim();
         if (!prompt) return;
-        this._collapse = this._collapse || {};
-        this._collapse['advicePanel'] = false;
         const history = this.db.history.slice(0, 20);
         const foods = this.todayFoodLogs();
         const weights = this.sortedWeights().slice(-12);
@@ -618,9 +620,10 @@ const data = {
         list.innerHTML = `
             <div class="record-tabs" role="tablist" aria-label="方案视图">
                 <button class="record-tab ${this.routineView === 'library' ? 'active' : ''}" onclick="data.setRoutineView('library')"><span class="material-symbols-rounded">bookmarks</span>动作组库</button>
-                <button class="record-tab ${this.routineView === 'weightloss' ? 'active' : ''}" onclick="data.setRoutineView('weightloss')"><span class="material-symbols-rounded">trending_down</span>AI减重指导</button>
+                <button class="record-tab ${this.routineView === 'weightloss' ? 'active' : ''}" onclick="data.setRoutineView('weightloss')"><span class="material-symbols-rounded">trending_down</span>减重指导</button>
+                <button class="record-tab ${this.routineView === 'advice' ? 'active' : ''}" onclick="data.setRoutineView('advice')"><span class="material-symbols-rounded">psychology</span>AI建议</button>
             </div>
-            ${this.routineView === 'library' ? this.renderRoutineLibrary() : this.renderWeightLossPlanCard()}`;
+            ${this.routineView === 'library' ? this.renderRoutineLibrary() : this.routineView === 'weightloss' ? this.renderWeightLossPlanCard() : this.renderAdvicePanel()}`;
     },
 
     renderRoutineOverview() {
@@ -648,19 +651,33 @@ const data = {
         if (this.db.routines.length === 0) {
             return `<div class="empty-state"><span class="material-symbols-rounded">bookmark_border</span><p>暂无保存的方案</p></div>`;
         }
-        return this.db.routines.map((r, i) => `
-            <div class="list-item">
-                <div style="flex:1;min-width:0">
-                    <strong>${r.name}</strong>
-                    <small>${r.actions.length}个动作 &middot; ${r.created}</small>
+        return this.db.routines.map((r, i) => {
+            const expanded = this.isCollapsed('routine_' + i, true) === false;
+            return `<div class="routine-card">
+                <div class="routine-card-head" onclick="data.toggleCollapse('routine_${i}')">
+                    <div style="flex:1;min-width:0">
+                        <strong>${r.name}</strong>
+                        <small>${r.actions.length}个动作 &middot; ${r.created}</small>
+                    </div>
+                    <span class="routine-expand-icon material-symbols-rounded">${expanded ? 'expand_less' : 'expand_more'}</span>
                 </div>
-                <button class="md-btn md-btn-tonal" style="flex:none;padding:0 14px;height:32px;font-size:12px" onclick="data.loadRoutine(${i})">载入</button>
-                <button class="delete-btn" onclick="data.deleteRoutine(${i})"><span class="material-symbols-rounded">delete</span></button>
-            </div>`).join('');
+                ${expanded ? `<div class="routine-action-list">
+                    ${r.actions.map((a, ai) => `<div class="routine-action-item">
+                        <span class="routine-action-idx">${ai + 1}</span>
+                        <span>${a.name}</span>
+                        <small>${a.sets}组×${a.reps}次·${a.work}s</small>
+                    </div>`).join('')}
+                    <div class="routine-card-actions">
+                        <button class="md-btn md-btn-tonal" style="padding:0 14px;height:32px;font-size:12px" onclick="event.stopPropagation();data.loadRoutine(${i})"><span class="material-symbols-rounded" style="font-size:16px">upload</span> 载入</button>
+                        <button class="delete-btn" onclick="event.stopPropagation();data.deleteRoutine(${i})"><span class="material-symbols-rounded">delete</span></button>
+                    </div>
+                </div>` : ''}
+            </div>`;
+        }).join('');
     },
 
     renderWeightLossPlanCard() {
-        return `${this.renderWeightLossPanel()}${this.renderAdvicePanel()}`;
+        return this.renderWeightLossPanel();
     },
 
     renderHistory() {
@@ -854,19 +871,17 @@ const data = {
     },
 
     renderAdvicePanel() {
-        const collapsed = this.isCollapsed('advicePanel', true);
         const messages = this.db.health.aiAdviceChat || [];
         const modelOptions = (ai.models && ai.models.length ? ai.models : [{ id: ai.cfg.model || '当前配置模型' }]);
-        return `<div class="md-card collapsible-card ${collapsed ? 'collapsed' : ''}">
+        return `<div class="md-card advice-main-card">
             <div class="panel-head">
                 <div>
                     <span class="cardio-kicker">AI 分析建议</span>
                     <h3>基于训练 / 饮食 / 体重数据</h3>
                     <small>${messages.length ? `已生成 ${Math.floor(messages.length / 2)} 轮建议` : '可选择模型并提问'}</small>
                 </div>
-                <button class="collapse-btn" onclick="data.toggleCollapse('advicePanel')"><span class="material-symbols-rounded">${collapsed ? 'expand_more' : 'expand_less'}</span></button>
             </div>
-            <div class="collapse-content advice-panel">
+            <div class="advice-panel">
                 <div class="md-field"><select id="adviceModel">${modelOptions.map(m => `<option value="${m.id}" ${m.id === ai.cfg.model ? 'selected' : ''}>${m.id}</option>`).join('')}</select><label>分析模型</label></div>
                 <div class="advice-chat-list">${messages.length ? messages.map(msg => `<div class="advice-bubble ${msg.role}"><b>${msg.role === 'user' ? '我' : 'AI'}</b><p>${String(msg.content).replace(/\n/g, '<br>')}</p></div>`).join('') : '<div class="empty-state" style="padding:12px"><p>还没有 AI 建议</p></div>'}</div>
                 <div class="md-field span-full"><input type="text" id="advicePrompt" placeholder=" "><label>向 AI 提问，例如：我最近减重停滞的原因是什么？</label></div>
