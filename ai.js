@@ -17,7 +17,8 @@ const ai = {
     keyMap: {},
     dbPromise: null,
 
-    async init() {
+    async init(options = {}) {
+        const { saveData = true, renderData = false } = options;
         this.cfg = {
             activeProfileId: '',
             profiles: [],
@@ -45,14 +46,14 @@ const ai = {
             if (savedKeys) this.keyMap = JSON.parse(savedKeys);
         } catch {}
 
-        // 2) 回退到 localStorage（兼容旧版本）
-        if (!this.cfg.profiles.length) {
+        // 2) 回退到 localStorage（兼容旧版本 / IndexedDB 不可用）
+        if (!this.cfg.profiles?.length) {
             try {
                 const saved = localStorage.getItem(this.KEY);
                 if (saved) this.cfg = { ...this.cfg, ...JSON.parse(saved) };
             } catch {}
         }
-        if (!this.models.length) {
+        if (!this.models?.length) {
             try {
                 const savedModels = localStorage.getItem(this.MODELS_KEY);
                 if (savedModels) this.models = JSON.parse(savedModels);
@@ -65,12 +66,12 @@ const ai = {
             } catch {}
         }
 
-        // 3) 从 data.db 回退（同步恢复）
-        if ((!this.cfg.profiles || !this.cfg.profiles.length) && data.db?.aiProfiles?.length) {
+        // 3) 从主数据回退。这样即使单独的 AI 存储被清理，也能恢复档案、Base URL、模型等非敏感配置。
+        if ((!this.cfg.profiles || !this.cfg.profiles.length) && typeof data !== 'undefined' && data.db?.aiProfiles?.length) {
             this.cfg.profiles = data.db.aiProfiles;
             this.cfg.activeProfileId = data.db.aiActiveId || this.cfg.profiles[0]?.id || '';
         }
-        if ((!this.models || !this.models.length) && data.db?.aiModels?.length) {
+        if ((!this.models || !this.models.length) && typeof data !== 'undefined' && data.db?.aiModels?.length) {
             this.models = data.db.aiModels;
         }
 
@@ -80,7 +81,9 @@ const ai = {
             if (legacy && !this.keyMap[p.id]) this.keyMap[p.id] = legacy;
         });
 
-        this.cfg.profiles = this.cfg.profiles || [];
+        this.cfg.profiles = Array.isArray(this.cfg.profiles) ? this.cfg.profiles : [];
+        this.models = Array.isArray(this.models) ? this.models : [];
+        this.keyMap = this.keyMap && typeof this.keyMap === 'object' ? this.keyMap : {};
         if (!this.cfg.activeProfileId && this.cfg.profiles.length) {
             this.cfg.activeProfileId = this.cfg.profiles[0].id;
         }
@@ -88,6 +91,7 @@ const ai = {
         this.loadActiveProfileToForm();
         await this.persist();
         await this.persistKeyMap();
+        if (saveData) this.persistDataDb(renderData);
         this.syncUI();
         this.checkEncrypted();
     },
@@ -200,7 +204,7 @@ const ai = {
         this.keyMap[profile.id] = profile.apiKey;
         await this.persistKeyMap();
         await this.persist();
-        this.syncToDataDb();
+        this.persistDataDb(false);
         this.syncUI();
         alert(forceNew ? '已另存为新档案' : 'AI 档案已保存');
     },
@@ -219,7 +223,7 @@ const ai = {
         this.cfg.activeProfileId = this.cfg.profiles[0]?.id || '';
         this.loadActiveProfileToForm();
         await this.persist();
-        this.syncToDataDb();
+        this.persistDataDb(false);
         this.syncUI();
     },
 
@@ -227,6 +231,7 @@ const ai = {
         this.cfg.activeProfileId = id || '';
         this.loadActiveProfileToForm();
         await this.persist();
+        this.persistDataDb(false);
         this.syncUI();
     },
 
@@ -258,8 +263,18 @@ const ai = {
         try { localStorage.setItem(this.KEY, payload); } catch {}
     },
 
+    persistDataDb(render = true) {
+        this.syncToDataDb();
+        if (typeof data === 'undefined' || !data.db) return;
+        if (render && typeof data.save === 'function') {
+            data.save();
+            return;
+        }
+        try { localStorage.setItem(data.DB_KEY, JSON.stringify(data.db)); } catch {}
+    },
+
     syncToDataDb() {
-        if (!data.db) return;
+        if (typeof data === 'undefined' || !data.db) return;
         data.db.aiProfiles = this.cfg.profiles || [];
         data.db.aiActiveId = this.cfg.activeProfileId || '';
         data.db.aiModels = this.models || [];
@@ -315,7 +330,7 @@ const ai = {
             this.models = models.map(m => ({ ...m, provider }));
             await this.idbSet(this.MODELS_KEY, JSON.stringify(this.models));
             try { localStorage.setItem(this.MODELS_KEY, JSON.stringify(this.models)); } catch {}
-            this.syncToDataDb();
+            this.persistDataDb(false);
             this.renderModels(this.models, false);
             if (statusEl) statusEl.textContent = `已获取 ${models.length} 个模型`;
         } catch (e) {
@@ -376,14 +391,14 @@ const ai = {
         if (!keepHidden) container.classList.remove('hidden');
     },
 
-    selectModel(id) {
+    async selectModel(id) {
         const input = document.getElementById('aiModel');
         if (input) input.value = id;
         this.cfg.model = id;
         const idx = this.cfg.profiles.findIndex(p => p.id === this.cfg.activeProfileId);
         if (idx >= 0) this.cfg.profiles[idx].model = id;
-        this.persist();
-        this.syncToDataDb();
+        await this.persist();
+        this.persistDataDb(false);
         const container = document.getElementById('aiModelList');
         if (container) container.classList.add('hidden');
     },
@@ -442,7 +457,7 @@ const ai = {
             try { localStorage.setItem(this.MODELS_KEY, JSON.stringify(this.models)); } catch {}
             this.loadActiveProfileToForm();
             await this.persist();
-            this.syncToDataDb();
+            this.persistDataDb(false);
             document.getElementById('aiDecryptPass').value = '';
             this.syncUI();
             alert('AI 配置档案已恢复');
@@ -493,3 +508,5 @@ const ai = {
         return JSON.parse(match[0]);
     }
 };
+
+if (typeof window !== 'undefined') window.ai = ai;

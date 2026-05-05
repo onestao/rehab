@@ -11,12 +11,20 @@ const data = {
     adviceModel: '__current__',
     historyColors: ['#2563eb', '#7c3aed', '#059669', '#f59e0b', '#e11d48', '#0891b2', '#9333ea', '#ea580c'],
 
-    init() {
+    async init() {
         const localDb = localStorage.getItem(this.DB_KEY);
         const localCfg = localStorage.getItem(this.CFG_KEY);
         if (localDb) this.db = JSON.parse(localDb);
         else this.migrateLegacy();
         if (localCfg) this.cfg = JSON.parse(localCfg);
+        this.normalizeDb();
+        sync.initUI();
+        if (typeof ai !== 'undefined') await ai.init({ saveData: true, renderData: false });
+        this.render();
+        if (window.cardio) cardio.initUI();
+    },
+
+    normalizeDb() {
         this.db.cardio = { weight: 70, target: 30, type: 'walk', ...(this.db.cardio || {}) };
         this.db.health = { weights: [], foodLogs: [], exerciseLogs: [], weightPlan: null, dietGoal: null, aiAdviceChat: [], ...(this.db.health || {}) };
         this.db.health.weights = this.db.health.weights || [];
@@ -26,10 +34,6 @@ const data = {
         this.db.aiProfiles = this.db.aiProfiles || [];
         this.db.aiActiveId = this.db.aiActiveId || '';
         this.db.aiModels = this.db.aiModels || [];
-        this.render();
-        sync.initUI();
-        if (window.cardio) cardio.initUI();
-        if (window.ai) { ai.init(); }
     },
 
     migrateLegacy() {
@@ -1235,3 +1239,5 @@ const data = {
         }
     }
 };
+
+if (typeof window !== 'undefined') window.data = data;

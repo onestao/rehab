@@ -103,8 +103,9 @@ const sync = {
             if (res.ok) {
                 const remote = await res.json();
                 data.db = { ...data.db, ...remote };
-                if (window.ai) ai.init();
+                if (typeof data.normalizeDb === 'function') data.normalizeDb();
                 data.save();
+                if (typeof ai !== 'undefined') await ai.init({ saveData: true, renderData: false });
                 data.render();
                 this.setStatus('cloud');
                 alert("下载恢复成功（含训练记录）");
@@ -184,3 +185,5 @@ const sync = {
         this.setStatus(mode === 'none' ? 'local' : 'cloud');
     }
 };
+
+if (typeof window !== 'undefined') window.sync = sync;
