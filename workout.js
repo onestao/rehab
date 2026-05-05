@@ -8,6 +8,8 @@ const workout = {
     _backGuardBound: false,
     _backToastTimer: null,
     wakeLock: null,
+    pipWindow: null,
+    pipSyncInt: null,
 
     async speak(text) {
         if (!text) return;
@@ -74,7 +76,17 @@ const workout = {
             if (!document.hidden) this.acquireWakeLock();
             audio.play().catch(()=>{});
             window.speechSynthesis.resume();
+            this.renderPip();
         });
+    },
+
+    reinforceKeepAlive() {
+        if (!this.isPlaying) return;
+        const audio = document.getElementById('silentAudio');
+        if (audio && !this.isPaused) audio.play().catch(()=>{});
+        if (!this.isPaused) window.speechSynthesis.resume();
+        if (!document.hidden) this.acquireWakeLock();
+        this.setupMediaSession();
     },
 
     initBackGuard() {
@@ -99,7 +111,7 @@ const workout = {
         });
     },
 
-    showBackToast() {
+    showToast(message) {
         let toast = document.getElementById('backToast');
         if (!toast) {
             toast = document.createElement('div');
@@ -107,10 +119,128 @@ const workout = {
             toast.className = 'md-toast';
             document.body.appendChild(toast);
         }
-        toast.textContent = '训练正在进行：按 Home 进入后台，或点停止结束训练';
+        toast.textContent = message;
         toast.classList.add('show');
         clearTimeout(this._backToastTimer);
         this._backToastTimer = setTimeout(() => toast.classList.remove('show'), 2600);
+    },
+
+    showBackToast() {
+        this.showToast('训练正在进行：按 Home 进入后台，或点停止结束训练');
+    },
+
+    isPipSupported() {
+        return 'documentPictureInPicture' in window && typeof window.documentPictureInPicture.requestWindow === 'function';
+    },
+
+    updatePipButton() {
+        const btn = document.getElementById('pipBtn');
+        const icon = document.getElementById('pipIcon');
+        if (!btn || !icon) return;
+        const active = !!(this.pipWindow && !this.pipWindow.closed);
+        btn.classList.toggle('active', active);
+        btn.classList.toggle('unsupported', !this.isPipSupported());
+        btn.setAttribute('aria-label', active ? '关闭训练画中画' : '打开训练画中画');
+        icon.innerText = active ? 'close_fullscreen' : 'picture_in_picture_alt';
+    },
+
+    async togglePip() {
+        if (this.pipWindow && !this.pipWindow.closed) {
+            this.closePip();
+            return;
+        }
+        await this.openPip();
+    },
+
+    async openPip() {
+        if (!this.isPlaying) {
+            this.showToast('请先开始训练，再打开画中画保活小窗');
+            return;
+        }
+        this.reinforceKeepAlive();
+        if (!this.isPipSupported()) {
+            this.showToast('当前浏览器不支持可交互画中画，已继续使用后台音频保活');
+            return;
+        }
+        try {
+            const pip = await window.documentPictureInPicture.requestWindow({ width: 320, height: 420 });
+            this.pipWindow = pip;
+            this.writePipDocument(pip.document);
+            this.bindPipControls(pip);
+            pip.addEventListener('pagehide', () => {
+                if (this.pipWindow === pip) {
+                    clearInterval(this.pipSyncInt);
+                    this.pipSyncInt = null;
+                    this.pipWindow = null;
+                    this.updatePipButton();
+                }
+            });
+            clearInterval(this.pipSyncInt);
+            this.pipSyncInt = setInterval(() => {
+                this.reinforceKeepAlive();
+                this.renderPip();
+            }, 1000);
+            this.renderPip();
+            this.updatePipButton();
+        } catch (e) {
+            console.warn('Picture-in-Picture unavailable', e);
+            this.pipWindow = null;
+            this.updatePipButton();
+            this.showToast('画中画打开失败，已继续使用后台音频保活');
+        }
+    },
+
+    closePip() {
+        clearInterval(this.pipSyncInt);
+        this.pipSyncInt = null;
+        const pip = this.pipWindow;
+        this.pipWindow = null;
+        if (pip && !pip.closed) pip.close();
+        this.updatePipButton();
+    },
+
+    writePipDocument(doc) {
+        doc.open();
+        doc.write(`<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>训练画中画</title><style>${this.pipStyles()}</style></head><body><main class="pip-card"><div class="pip-head"><span class="pip-kicker">训练助手</span><button id="pipClose" class="pip-icon-btn" aria-label="关闭">×</button></div><div id="pipStatus" class="pip-status">READY</div><div id="pipTime" class="pip-time">00</div><div id="pipSub" class="pip-sub">准备就绪</div><div class="pip-stats"><div><small id="pipLabelA">总用时</small><b id="pipValueA">00:00</b></div><div><small id="pipLabelB">组数</small><b id="pipValueB">0/0</b></div><div><small id="pipLabelC">次数</small><b id="pipValueC">0/0</b></div></div><div class="pip-actions"><button id="pipPlay" class="pip-btn pip-primary">暂停</button><button id="pipSkip" class="pip-btn">跳过</button><button id="pipStop" class="pip-btn pip-danger">停止</button></div><p class="pip-hint">保持此小窗可降低后台暂停概率</p></main></body></html>`);
+        doc.close();
+    },
+
+    pipStyles() {
+        return `:root{color-scheme:dark;--primary:#a0cafd;--primary-container:#00497d;--surface:#111418;--surface-high:#1e2024;--surface-higher:#282a2f;--on:#e3e2e6;--muted:#c3c7cf;--danger:#ffb4ab;--danger-bg:#93000a}*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;background:radial-gradient(circle at top right,rgba(160,202,253,.22),transparent 46%),linear-gradient(145deg,#001d36,#00497d 52%,#0061a4);font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans SC',sans-serif;color:var(--on);overflow:hidden}.pip-card{width:100%;min-height:100vh;padding:16px;display:grid;grid-template-rows:auto auto auto auto auto 1fr auto;gap:10px}.pip-head{display:flex;align-items:center;justify-content:space-between}.pip-kicker{font-size:12px;font-weight:900;letter-spacing:.18em;color:var(--primary);text-transform:uppercase}.pip-icon-btn{width:34px;height:34px;border:0;border-radius:999px;background:rgba(255,255,255,.12);color:var(--on);font-size:24px;line-height:1;cursor:pointer}.pip-status{justify-self:start;padding:4px 10px;border-radius:999px;background:rgba(209,228,255,.14);color:var(--primary);font-size:12px;font-weight:900;letter-spacing:.16em}.pip-time{font-size:clamp(58px,27vw,96px);font-weight:950;line-height:.95;color:#d1e4ff;text-shadow:0 8px 32px rgba(160,202,253,.28);font-variant-numeric:tabular-nums;letter-spacing:-2px}.pip-sub{min-height:42px;color:rgba(255,255,255,.72);font-size:16px;font-weight:700;line-height:1.35;word-break:break-word}.pip-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.pip-stats div{padding:10px 8px;border-radius:18px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.1)}.pip-stats small{display:block;color:rgba(255,255,255,.58);font-size:11px;font-weight:700}.pip-stats b{display:block;margin-top:3px;color:#fff;font-size:15px;font-variant-numeric:tabular-nums}.pip-actions{align-self:end;display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:8px}.pip-btn{height:46px;border:0;border-radius:999px;background:rgba(255,255,255,.14);color:var(--on);font-size:14px;font-weight:900;cursor:pointer}.pip-btn:disabled{opacity:.42;cursor:not-allowed}.pip-primary{background:var(--primary);color:#003258}.pip-danger{background:var(--danger-bg);color:var(--danger)}.pip-hint{margin:0;text-align:center;color:rgba(255,255,255,.48);font-size:11px}.paused .pip-status{background:rgba(242,218,255,.18);color:#f2daff}.paused .pip-primary{background:#f2daff;color:#3b2948}`;
+    },
+
+    bindPipControls(pip) {
+        const doc = pip.document;
+        doc.getElementById('pipClose').addEventListener('click', () => this.closePip());
+        doc.getElementById('pipPlay').addEventListener('click', () => this.toggle());
+        doc.getElementById('pipSkip').addEventListener('click', () => this.skip());
+        doc.getElementById('pipStop').addEventListener('click', () => {
+            if (this.mode === 'cardio') cardio.stop();
+            else this.stop();
+        });
+    },
+
+    renderPip() {
+        const pip = this.pipWindow;
+        if (!pip || pip.closed) {
+            this.updatePipButton();
+            return;
+        }
+        const doc = pip.document;
+        const text = id => document.getElementById(id)?.innerText || '';
+        doc.body.classList.toggle('paused', this.isPaused);
+        doc.getElementById('pipStatus').innerText = this.isPaused ? 'PAUSED' : text('statusText');
+        doc.getElementById('pipTime').innerText = text('mainTime');
+        doc.getElementById('pipSub').innerText = text('subText');
+        doc.getElementById('pipLabelA').innerText = document.querySelectorAll('.stat-label')[0]?.innerText || '总用时';
+        doc.getElementById('pipValueA').innerText = text('sessionTime');
+        doc.getElementById('pipLabelB').innerText = document.querySelectorAll('.stat-label')[1]?.innerText || '组数';
+        doc.getElementById('pipValueB').innerText = `${text('curSet')}/${text('totalSet')}`;
+        doc.getElementById('pipLabelC').innerText = document.querySelectorAll('.stat-label')[2]?.innerText || '次数';
+        doc.getElementById('pipValueC').innerText = `${text('curRep')}/${text('totalRep')}`;
+        doc.getElementById('pipPlay').innerText = this.isPaused ? '继续' : '暂停';
+        doc.getElementById('pipSkip').disabled = this.mode === 'cardio' || !this.isPlaying;
+        this.updatePipButton();
     },
 
     updateRate(val) {
@@ -123,6 +253,8 @@ const workout = {
         document.body.classList.toggle('is-training', this.isPlaying);
         document.body.classList.toggle('is-paused', this.isPlaying && this.isPaused);
         document.body.classList.toggle('is-cardio-mode', this.mode === 'cardio');
+        this.updatePipButton();
+        this.renderPip();
     },
 
     setMode(mode) {
@@ -188,6 +320,7 @@ const workout = {
             document.getElementById('playIcon').innerText = this.isPaused ? 'play_arrow' : 'pause';
             if ('mediaSession' in navigator) navigator.mediaSession.playbackState = this.isPaused ? 'paused' : 'playing';
             if(this.isPaused) window.speechSynthesis.pause(); else window.speechSynthesis.resume();
+            this.renderPip();
         }
     },
 
@@ -253,6 +386,7 @@ const workout = {
                 if (this.isPaused) return;
                 left--;
                 document.getElementById('mainTime').innerText = left;
+                this.renderPip();
                 if (left <= 3 && left > 0) this.speak(left.toString());
                 if (left <= 0) { clearInterval(this.timer); this._countResolve = null; resolve(); }
             }, 1000);
@@ -274,6 +408,7 @@ const workout = {
         const m = Math.floor(this.totalSec/60).toString().padStart(2,'0');
         const s = (this.totalSec%60).toString().padStart(2,'0');
         document.getElementById('sessionTime').innerText = `${m}:${s}`;
+        this.renderPip();
     },
     stop() {
         if (this.mode === 'cardio') return cardio.stop();
@@ -290,6 +425,7 @@ const workout = {
         this.updateStateClasses();
         clearInterval(this.timer); clearInterval(this.sessionInt);
         clearInterval(this._speechWatchdog); clearInterval(this._audioKeepAliveInt);
+        this.closePip();
         window.speechSynthesis.cancel();
         if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'none';
         this.releaseWakeLock();
@@ -390,6 +526,7 @@ const cardio = {
         workout.updateStateClasses();
         document.body.classList.toggle('is-cardio-paused', this.isPaused);
         document.getElementById('playIcon').innerText = this.isPaused ? 'play_arrow' : 'pause';
+        workout.renderPip();
     },
 
     tick() {
@@ -409,6 +546,7 @@ const cardio = {
         const s = (this.seconds % 60).toString().padStart(2, '0');
         document.getElementById('mainTime').innerText = `${m}:${s}`;
         document.getElementById('sessionTime').innerText = `${Math.round(this.calories())} kcal`;
+        workout.renderPip();
     },
 
     async stop() {
@@ -450,6 +588,7 @@ const cardio = {
         workout.isPaused = false;
         workout.totalSec = 0;
         clearInterval(workout._speechWatchdog); clearInterval(workout._audioKeepAliveInt);
+        workout.closePip();
         window.speechSynthesis.cancel();
         if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'none';
         workout.releaseWakeLock();

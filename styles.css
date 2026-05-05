@@ -1646,6 +1646,30 @@ body.is-paused .fab-play {
 body.is-training .fab-stop {
     border-radius: 26px 18px 26px 18px;
 }
+.fab-pip {
+    background: var(--md-sys-secondary-container);
+    color: var(--md-sys-on-secondary-container);
+    width: 52px;
+    height: 52px;
+    border-radius: 18px;
+}
+.fab-pip.active {
+    background: var(--md-sys-tertiary-container);
+    color: var(--md-sys-on-tertiary-container);
+    border-radius: 26px;
+    box-shadow:
+        0 8px 22px color-mix(in srgb, var(--md-sys-tertiary) 26%, transparent),
+        0 2px 8px rgba(0, 0, 0, 0.14);
+}
+.fab-pip.unsupported {
+    opacity: 0.72;
+}
+body.is-training .fab-pip {
+    border-radius: 18px 26px 18px 26px;
+}
+body.is-training .fab-pip.active {
+    border-radius: 28px;
+}
 
 /* --- Skip Button --- */
 .skip-btn {
