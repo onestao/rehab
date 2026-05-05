@@ -1,6 +1,10 @@
 const ai = {
     KEY: 'rehab_pro_ai_cfg',
     MODELS_KEY: 'rehab_pro_ai_models',
+    KEYS_KEY: 'rehab_pro_ai_keys',
+    IDB_NAME: 'rehab_ai_store',
+    IDB_VERSION: 1,
+    IDB_STORE: 'kv',
     cfg: {
         activeProfileId: '',
         profiles: [],
@@ -10,42 +14,140 @@ const ai = {
         enabled: false
     },
     models: [],
+    keyMap: {},
+    dbPromise: null,
 
-    init() {
-        this.cfg = { activeProfileId: '', profiles: [], provider: 'openai', model: '', baseUrl: '', enabled: false };
+    async init() {
+        this.cfg = {
+            activeProfileId: '',
+            profiles: [],
+            provider: 'openai',
+            model: '',
+            baseUrl: '',
+            enabled: false
+        };
         this.models = [];
-        // 1) 从 localStorage 恢复
+        this.keyMap = {};
+
+        await this.initDb();
+
+        // 1) 先从 IndexedDB 恢复（主来源）
         try {
-            const saved = localStorage.getItem(this.KEY);
+            const saved = await this.idbGet(this.KEY);
             if (saved) this.cfg = { ...this.cfg, ...JSON.parse(saved) };
         } catch {}
         try {
-            const savedModels = localStorage.getItem(this.MODELS_KEY);
+            const savedModels = await this.idbGet(this.MODELS_KEY);
             if (savedModels) this.models = JSON.parse(savedModels);
         } catch {}
-        // 2) 如果 localStorage 为空，尝试从 data.db 恢复
+        try {
+            const savedKeys = await this.idbGet(this.KEYS_KEY);
+            if (savedKeys) this.keyMap = JSON.parse(savedKeys);
+        } catch {}
+
+        // 2) 回退到 localStorage（兼容旧版本）
+        if (!this.cfg.profiles.length) {
+            try {
+                const saved = localStorage.getItem(this.KEY);
+                if (saved) this.cfg = { ...this.cfg, ...JSON.parse(saved) };
+            } catch {}
+        }
+        if (!this.models.length) {
+            try {
+                const savedModels = localStorage.getItem(this.MODELS_KEY);
+                if (savedModels) this.models = JSON.parse(savedModels);
+            } catch {}
+        }
+        if (!Object.keys(this.keyMap).length) {
+            try {
+                const savedKeys = localStorage.getItem(this.KEYS_KEY);
+                if (savedKeys) this.keyMap = JSON.parse(savedKeys);
+            } catch {}
+        }
+
+        // 3) 从 data.db 回退（同步恢复）
         if ((!this.cfg.profiles || !this.cfg.profiles.length) && data.db?.aiProfiles?.length) {
             this.cfg.profiles = data.db.aiProfiles;
             this.cfg.activeProfileId = data.db.aiActiveId || this.cfg.profiles[0]?.id || '';
-            this.persist();
         }
         if ((!this.models || !this.models.length) && data.db?.aiModels?.length) {
             this.models = data.db.aiModels;
-            localStorage.setItem(this.MODELS_KEY, JSON.stringify(this.models));
         }
+
+        // 4) 兼容旧 per-profile localStorage key
+        (this.cfg.profiles || []).forEach(p => {
+            const legacy = this.apiKeyForLegacy(p.id);
+            if (legacy && !this.keyMap[p.id]) this.keyMap[p.id] = legacy;
+        });
+
         this.cfg.profiles = this.cfg.profiles || [];
         if (!this.cfg.activeProfileId && this.cfg.profiles.length) {
             this.cfg.activeProfileId = this.cfg.profiles[0].id;
         }
+
         this.loadActiveProfileToForm();
+        await this.persist();
+        await this.persistKeyMap();
         this.syncUI();
         this.checkEncrypted();
     },
 
-    // --- Storage helper ---
-    lsGet(key) { try { return localStorage.getItem(key) || ''; } catch { return ''; } },
-    lsSet(key, val) { try { localStorage.setItem(key, val); } catch {} },
-    lsDel(key) { try { localStorage.removeItem(key); } catch {} },
+    // --- IndexedDB ---
+    initDb() {
+        if (this.dbPromise) return this.dbPromise;
+        this.dbPromise = new Promise((resolve, reject) => {
+            if (!('indexedDB' in window)) {
+                resolve(null);
+                return;
+            }
+            const req = indexedDB.open(this.IDB_NAME, this.IDB_VERSION);
+            req.onupgradeneeded = () => {
+                const db = req.result;
+                if (!db.objectStoreNames.contains(this.IDB_STORE)) {
+                    db.createObjectStore(this.IDB_STORE);
+                }
+            };
+            req.onsuccess = () => resolve(req.result);
+            req.onerror = () => reject(req.error);
+        }).catch(() => null);
+        return this.dbPromise;
+    },
+
+    async idbGet(key) {
+        const db = await this.initDb();
+        if (!db) return '';
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(this.IDB_STORE, 'readonly');
+            const store = tx.objectStore(this.IDB_STORE);
+            const req = store.get(key);
+            req.onsuccess = () => resolve(req.result || '');
+            req.onerror = () => reject(req.error);
+        }).catch(() => '');
+    },
+
+    async idbSet(key, value) {
+        const db = await this.initDb();
+        if (!db) return;
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(this.IDB_STORE, 'readwrite');
+            const store = tx.objectStore(this.IDB_STORE);
+            store.put(value, key);
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error);
+        }).catch(() => {});
+    },
+
+    async idbDelete(key) {
+        const db = await this.initDb();
+        if (!db) return;
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(this.IDB_STORE, 'readwrite');
+            const store = tx.objectStore(this.IDB_STORE);
+            store.delete(key);
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error);
+        }).catch(() => {});
+    },
 
     // --- Profiles ---
     currentFormProfile(forceNew = false) {
@@ -56,54 +158,75 @@ const ai = {
             provider: document.getElementById('aiProvider')?.value || 'openai',
             baseUrl: (document.getElementById('aiBaseUrl')?.value || '').trim().replace(/\/+$/, ''),
             model: (document.getElementById('aiModel')?.value || '').trim(),
-            apiKey: (document.getElementById('aiApiKey')?.value || '').trim() || this.apiKeyFor(this.cfg.activeProfileId)
+            apiKey: (document.getElementById('aiApiKey')?.value || '').trim() || this.apiKeyFor(activeId)
         };
     },
 
     apiKeyKey(id) { return `rehab_pro_ai_key_${id}`; },
-    apiKeyFor(id) { return id ? (this.lsGet(this.apiKeyKey(id)) || '') : ''; },
+    apiKeyForLegacy(id) {
+        if (!id) return '';
+        try { return localStorage.getItem(this.apiKeyKey(id)) || ''; } catch { return ''; }
+    },
+    apiKeyFor(id) { return id ? (this.keyMap[id] || '') : ''; },
 
-    saveProfile(forceNew = false) {
+    async persistKeyMap() {
+        await this.idbSet(this.KEYS_KEY, JSON.stringify(this.keyMap));
+        try { localStorage.setItem(this.KEYS_KEY, JSON.stringify(this.keyMap)); } catch {}
+    },
+
+    async saveProfile(forceNew = false) {
         const profile = this.currentFormProfile(forceNew);
         if (!profile.baseUrl) return alert('请填写 Base URL');
         if (!profile.model) return alert('请填写或选择模型');
         if (!profile.apiKey) return alert('请填写 API Key');
+
         const idx = this.cfg.profiles.findIndex(p => p.id === profile.id);
-        const meta = { id: profile.id, name: profile.name, provider: profile.provider, baseUrl: profile.baseUrl, model: profile.model };
+        const meta = {
+            id: profile.id,
+            name: profile.name,
+            provider: profile.provider,
+            baseUrl: profile.baseUrl,
+            model: profile.model
+        };
         if (idx >= 0) this.cfg.profiles[idx] = meta;
         else this.cfg.profiles.push(meta);
+
         this.cfg.activeProfileId = profile.id;
         this.cfg.provider = profile.provider;
         this.cfg.baseUrl = profile.baseUrl;
         this.cfg.model = profile.model;
         this.cfg.enabled = true;
-        this.lsSet(this.apiKeyKey(profile.id), profile.apiKey);
-        if (document.getElementById('aiApiKey')) document.getElementById('aiApiKey').value = '';
-        this.persist();
+
+        this.keyMap[profile.id] = profile.apiKey;
+        await this.persistKeyMap();
+        await this.persist();
         this.syncToDataDb();
         this.syncUI();
         alert(forceNew ? '已另存为新档案' : 'AI 档案已保存');
     },
 
-    saveCurrentProfile() { this.saveProfile(false); },
-    saveAsNewProfile() { this.saveProfile(true); },
+    saveCurrentProfile() { return this.saveProfile(false); },
+    saveAsNewProfile() { return this.saveProfile(true); },
 
-    deleteCurrentProfile() {
+    async deleteCurrentProfile() {
         const id = this.cfg.activeProfileId;
         if (!id) return;
         this.cfg.profiles = this.cfg.profiles.filter(p => p.id !== id);
-        this.lsDel(this.apiKeyKey(id));
+        delete this.keyMap[id];
+        await this.persistKeyMap();
+        await this.idbDelete(this.apiKeyKey(id));
+        try { localStorage.removeItem(this.apiKeyKey(id)); } catch {}
         this.cfg.activeProfileId = this.cfg.profiles[0]?.id || '';
         this.loadActiveProfileToForm();
-        this.persist();
+        await this.persist();
         this.syncToDataDb();
         this.syncUI();
     },
 
-    selectProfile(id) {
+    async selectProfile(id) {
         this.cfg.activeProfileId = id || '';
         this.loadActiveProfileToForm();
-        this.persist();
+        await this.persist();
         this.syncUI();
     },
 
@@ -122,15 +245,17 @@ const ai = {
         }
     },
 
-    persist() {
-        this.lsSet(this.KEY, JSON.stringify({
+    async persist() {
+        const payload = JSON.stringify({
             activeProfileId: this.cfg.activeProfileId,
             profiles: this.cfg.profiles,
             provider: this.cfg.provider,
             model: this.cfg.model,
             baseUrl: this.cfg.baseUrl,
             enabled: this.cfg.enabled
-        }));
+        });
+        await this.idbSet(this.KEY, payload);
+        try { localStorage.setItem(this.KEY, payload); } catch {}
     },
 
     syncToDataDb() {
@@ -138,7 +263,6 @@ const ai = {
         data.db.aiProfiles = this.cfg.profiles || [];
         data.db.aiActiveId = this.cfg.activeProfileId || '';
         data.db.aiModels = this.models || [];
-        data.save();
     },
 
     checkEncrypted() {
@@ -150,12 +274,14 @@ const ai = {
         const p = document.getElementById('aiProvider');
         const b = document.getElementById('aiBaseUrl');
         const m = document.getElementById('aiModel');
+        const k = document.getElementById('aiApiKey');
         const n = document.getElementById('aiProfileName');
         const select = document.getElementById('aiProfileSelect');
         const current = this.cfg.profiles.find(x => x.id === this.cfg.activeProfileId);
         if (p) p.value = this.cfg.provider || 'openai';
         if (b) b.value = this.cfg.baseUrl || '';
         if (m) m.value = this.cfg.model || '';
+        if (k) k.value = this.apiKeyFor(this.cfg.activeProfileId) || '';
         if (n) n.value = current?.name || '';
         if (select) {
             const options = this.cfg.profiles.length
@@ -187,7 +313,8 @@ const ai = {
             if (provider === 'gemini') models = await this.fetchGeminiModels(baseUrl, apiKey);
             else models = await this.fetchOpenAIModels(baseUrl, apiKey);
             this.models = models.map(m => ({ ...m, provider }));
-            this.lsSet(this.MODELS_KEY, JSON.stringify(this.models));
+            await this.idbSet(this.MODELS_KEY, JSON.stringify(this.models));
+            try { localStorage.setItem(this.MODELS_KEY, JSON.stringify(this.models)); } catch {}
             this.syncToDataDb();
             this.renderModels(this.models, false);
             if (statusEl) statusEl.textContent = `已获取 ${models.length} 个模型`;
@@ -250,7 +377,8 @@ const ai = {
     },
 
     selectModel(id) {
-        document.getElementById('aiModel').value = id;
+        const input = document.getElementById('aiModel');
+        if (input) input.value = id;
         this.cfg.model = id;
         const idx = this.cfg.profiles.findIndex(p => p.id === this.cfg.activeProfileId);
         if (idx >= 0) this.cfg.profiles[idx].model = id;
@@ -306,11 +434,14 @@ const ai = {
             const cfg = JSON.parse(plaintext);
             this.cfg.profiles = (cfg.profiles || []).map(p => ({ id: p.id, name: p.name, provider: p.provider, baseUrl: p.baseUrl, model: p.model }));
             this.cfg.activeProfileId = cfg.activeProfileId || this.cfg.profiles[0]?.id || '';
-            (cfg.profiles || []).forEach(p => { if (p.apiKey) this.lsSet(this.apiKeyKey(p.id), p.apiKey); });
+            this.keyMap = {};
+            (cfg.profiles || []).forEach(p => { if (p.apiKey) this.keyMap[p.id] = p.apiKey; });
+            await this.persistKeyMap();
             this.models = cfg.models || this.models;
-            this.lsSet(this.MODELS_KEY, JSON.stringify(this.models));
+            await this.idbSet(this.MODELS_KEY, JSON.stringify(this.models));
+            try { localStorage.setItem(this.MODELS_KEY, JSON.stringify(this.models)); } catch {}
             this.loadActiveProfileToForm();
-            this.persist();
+            await this.persist();
             this.syncToDataDb();
             document.getElementById('aiDecryptPass').value = '';
             this.syncUI();
