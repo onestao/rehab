@@ -10,6 +10,10 @@ const workout = {
     wakeLock: null,
     pipWindow: null,
     pipSyncInt: null,
+    pipMode: null,
+    pipCanvas: null,
+    pipCtx: null,
+    pipStream: null,
 
     async speak(text) {
         if (!text) return;
@@ -129,15 +133,28 @@ const workout = {
         this.showToast('训练正在进行：按 Home 进入后台，或点停止结束训练');
     },
 
-    isPipSupported() {
+    isDocPipSupported() {
         return 'documentPictureInPicture' in window && typeof window.documentPictureInPicture.requestWindow === 'function';
+    },
+
+    isVideoPipSupported() {
+        const video = document.getElementById('pipVideo');
+        return !!(video && 'pictureInPictureEnabled' in document && document.pictureInPictureEnabled && typeof video.requestPictureInPicture === 'function');
+    },
+
+    isPipSupported() {
+        return this.isDocPipSupported() || this.isVideoPipSupported();
+    },
+
+    isPipActive() {
+        return !!((this.pipWindow && !this.pipWindow.closed) || document.pictureInPictureElement === document.getElementById('pipVideo'));
     },
 
     updatePipButton() {
         const btn = document.getElementById('pipBtn');
         const icon = document.getElementById('pipIcon');
         if (!btn || !icon) return;
-        const active = !!(this.pipWindow && !this.pipWindow.closed);
+        const active = this.isPipActive();
         btn.classList.toggle('active', active);
         btn.classList.toggle('unsupported', !this.isPipSupported());
         btn.setAttribute('aria-label', active ? '关闭训练画中画' : '打开训练画中画');
@@ -145,7 +162,7 @@ const workout = {
     },
 
     async togglePip() {
-        if (this.pipWindow && !this.pipWindow.closed) {
+        if (this.isPipActive()) {
             this.closePip();
             return;
         }
@@ -158,44 +175,95 @@ const workout = {
             return;
         }
         this.reinforceKeepAlive();
-        if (!this.isPipSupported()) {
-            this.showToast('当前浏览器不支持可交互画中画，已继续使用后台音频保活');
-            return;
+        if (this.isDocPipSupported()) {
+            try {
+                await this.openDocumentPip();
+                return;
+            } catch (e) {
+                console.warn('Document Picture-in-Picture unavailable', e);
+            }
         }
-        try {
-            const pip = await window.documentPictureInPicture.requestWindow({ width: 320, height: 420 });
-            this.pipWindow = pip;
-            this.writePipDocument(pip.document);
-            this.bindPipControls(pip);
-            pip.addEventListener('pagehide', () => {
-                if (this.pipWindow === pip) {
-                    clearInterval(this.pipSyncInt);
-                    this.pipSyncInt = null;
-                    this.pipWindow = null;
-                    this.updatePipButton();
-                }
-            });
-            clearInterval(this.pipSyncInt);
-            this.pipSyncInt = setInterval(() => {
-                this.reinforceKeepAlive();
-                this.renderPip();
-            }, 1000);
+        if (this.isVideoPipSupported()) {
+            try {
+                await this.openVideoPip();
+                return;
+            } catch (e) {
+                console.warn('Video Picture-in-Picture unavailable', e);
+            }
+        }
+        this.pipWindow = null;
+        this.pipMode = null;
+        this.updatePipButton();
+        this.showToast('当前浏览器不支持画中画保活，已继续使用后台音频保活');
+    },
+
+    async openDocumentPip() {
+        const pip = await window.documentPictureInPicture.requestWindow({ width: 320, height: 420 });
+        this.pipWindow = pip;
+        this.pipMode = 'document';
+        this.writePipDocument(pip.document);
+        this.bindPipControls(pip);
+        pip.addEventListener('pagehide', () => {
+            if (this.pipWindow === pip) {
+                this.stopPipSync();
+                this.pipWindow = null;
+                this.pipMode = null;
+                this.updatePipButton();
+            }
+        });
+        this.startPipSync();
+        this.renderPip();
+        this.updatePipButton();
+    },
+
+    async openVideoPip() {
+        const video = document.getElementById('pipVideo');
+        if (!video) throw new Error('pipVideo not found');
+        this.ensureVideoPipStream(video);
+        video.muted = true;
+        video.playsInline = true;
+        await video.play();
+        await video.requestPictureInPicture();
+        this.pipMode = 'video';
+        video.onleavepictureinpicture = () => {
+            if (this.pipMode === 'video') {
+                this.stopPipSync();
+                this.pipMode = null;
+                this.updatePipButton();
+            }
+        };
+        video.onpause = () => {
+            if (this.pipMode === 'video' && this.isPlaying && !this.isPaused) video.play().catch(()=>{});
+        };
+        this.startPipSync();
+        this.renderPip();
+        this.showToast('已打开视频画中画：小窗显示训练状态，控制请用通知栏或返回页面');
+        this.updatePipButton();
+    },
+
+    startPipSync() {
+        clearInterval(this.pipSyncInt);
+        this.pipSyncInt = setInterval(() => {
+            this.reinforceKeepAlive();
             this.renderPip();
-            this.updatePipButton();
-        } catch (e) {
-            console.warn('Picture-in-Picture unavailable', e);
-            this.pipWindow = null;
-            this.updatePipButton();
-            this.showToast('画中画打开失败，已继续使用后台音频保活');
-        }
+        }, 1000);
+    },
+
+    stopPipSync() {
+        clearInterval(this.pipSyncInt);
+        this.pipSyncInt = null;
     },
 
     closePip() {
-        clearInterval(this.pipSyncInt);
-        this.pipSyncInt = null;
+        this.stopPipSync();
         const pip = this.pipWindow;
         this.pipWindow = null;
         if (pip && !pip.closed) pip.close();
+        const video = document.getElementById('pipVideo');
+        if (document.pictureInPictureElement === video && typeof document.exitPictureInPicture === 'function') {
+            document.exitPictureInPicture().catch(() => {});
+        }
+        this.pipMode = null;
         this.updatePipButton();
     },
 
@@ -221,6 +289,11 @@ const workout = {
     },
 
     renderPip() {
+        if (this.pipMode === 'video') {
+            this.drawVideoPipFrame();
+            this.updatePipButton();
+            return;
+        }
         const pip = this.pipWindow;
         if (!pip || pip.closed) {
             this.updatePipButton();
@@ -241,6 +314,96 @@ const workout = {
         doc.getElementById('pipPlay').innerText = this.isPaused ? '继续' : '暂停';
         doc.getElementById('pipSkip').disabled = this.mode === 'cardio' || !this.isPlaying;
         this.updatePipButton();
+    },
+
+    ensureVideoPipStream(video) {
+        if (!this.pipCanvas) {
+            this.pipCanvas = document.createElement('canvas');
+            this.pipCanvas.width = 640;
+            this.pipCanvas.height = 360;
+            this.pipCtx = this.pipCanvas.getContext('2d');
+        }
+        this.drawVideoPipFrame();
+        if (!this.pipStream) this.pipStream = this.pipCanvas.captureStream(2);
+        if (video.srcObject !== this.pipStream) video.srcObject = this.pipStream;
+    },
+
+    drawVideoPipFrame() {
+        if (!this.pipCanvas || !this.pipCtx) return;
+        const ctx = this.pipCtx;
+        const w = this.pipCanvas.width;
+        const h = this.pipCanvas.height;
+        const text = id => document.getElementById(id)?.innerText || '';
+        const labels = document.querySelectorAll('.stat-label');
+        const status = this.isPaused ? 'PAUSED' : text('statusText');
+        const time = text('mainTime') || '00';
+        const sub = text('subText') || '训练中';
+        const labelA = labels[0]?.innerText || '总用时';
+        const labelB = labels[1]?.innerText || '组数';
+        const labelC = labels[2]?.innerText || '次数';
+        const valueA = text('sessionTime');
+        const valueB = `${text('curSet')}/${text('totalSet')}`;
+        const valueC = `${text('curRep')}/${text('totalRep')}`;
+        const grd = ctx.createLinearGradient(0, 0, w, h);
+        grd.addColorStop(0, '#001d36');
+        grd.addColorStop(0.55, this.isPaused ? '#523f5f' : '#00497d');
+        grd.addColorStop(1, '#0061a4');
+        ctx.fillStyle = grd;
+        ctx.fillRect(0, 0, w, h);
+        ctx.fillStyle = 'rgba(209,228,255,0.12)';
+        ctx.beginPath();
+        ctx.arc(w - 70, 72, 120, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = 'rgba(255,255,255,0.10)';
+        ctx.roundRect(28, 24, w - 56, h - 48, 28);
+        ctx.fill();
+        ctx.fillStyle = '#a0cafd';
+        ctx.font = '800 20px system-ui, sans-serif';
+        ctx.fillText('训练助手', 52, 58);
+        ctx.fillStyle = this.isPaused ? '#f2daff' : '#d1e4ff';
+        ctx.font = '900 22px system-ui, sans-serif';
+        ctx.fillText(status, 52, 96);
+        ctx.fillStyle = '#d1e4ff';
+        ctx.font = '900 110px system-ui, sans-serif';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(time, 52, 174);
+        ctx.textBaseline = 'alphabetic';
+        ctx.fillStyle = 'rgba(255,255,255,0.78)';
+        ctx.font = '700 28px system-ui, sans-serif';
+        this.wrapCanvasText(ctx, sub, 52, 254, w - 104, 34, 2);
+        this.drawVideoPipStat(ctx, 52, 306, labelA, valueA);
+        this.drawVideoPipStat(ctx, 238, 306, labelB, valueB);
+        this.drawVideoPipStat(ctx, 424, 306, labelC, valueC);
+    },
+
+    drawVideoPipStat(ctx, x, y, label, value) {
+        ctx.fillStyle = 'rgba(255,255,255,0.15)';
+        ctx.roundRect(x, y, 164, 36, 16);
+        ctx.fill();
+        ctx.fillStyle = 'rgba(255,255,255,0.62)';
+        ctx.font = '700 13px system-ui, sans-serif';
+        ctx.fillText(label, x + 14, y + 15);
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '900 16px system-ui, sans-serif';
+        ctx.fillText(value || '-', x + 14, y + 31);
+    },
+
+    wrapCanvasText(ctx, text, x, y, maxWidth, lineHeight, maxLines) {
+        const chars = String(text).split('');
+        let line = '';
+        let lineNo = 0;
+        for (const ch of chars) {
+            const testLine = line + ch;
+            if (ctx.measureText(testLine).width > maxWidth && line) {
+                ctx.fillText(line, x, y + lineNo * lineHeight);
+                line = ch;
+                lineNo++;
+                if (lineNo >= maxLines) return;
+            } else {
+                line = testLine;
+            }
+        }
+        if (lineNo < maxLines) ctx.fillText(line, x, y + lineNo * lineHeight);
     },
 
     updateRate(val) {
