@@ -149,6 +149,10 @@ const data = {
         return this._collapse[id] ?? defaultState;
     },
 
+    escapeHtml(value = '') {
+        return String(value).replace(/[&<>'"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[ch]));
+    },
+
     setWeightRange(range) {
         this.weightRange = range;
         this.renderHistory();
@@ -350,6 +354,53 @@ const data = {
         }
     },
 
+    deleteAiAdviceMessage(idx) {
+        const messages = this.db.health.aiAdviceChat || [];
+        if (idx < 0 || idx >= messages.length) return;
+        messages.splice(idx, 1);
+        this.db.health.aiAdviceChat = messages;
+        this.saveAndBackup();
+    },
+
+    renderAdviceMessages(messages) {
+        if (!messages.length) return '<div class="empty-state" style="padding:12px"><p>还没有 AI 建议</p></div>';
+        const groups = messages.reduce((acc, msg, idx) => {
+            const date = this.dateKey(this.parseHistoryDate(msg.at));
+            if (!acc[date]) acc[date] = [];
+            acc[date].push({ ...msg, idx });
+            return acc;
+        }, {});
+        return Object.keys(groups).sort((a, b) => b.localeCompare(a)).map(date => {
+            const collapsed = this.isCollapsed(`advice_${date}`, date !== this.dateKey(new Date()));
+            const list = groups[date];
+            return `<section class="advice-date-group ${collapsed ? 'collapsed' : ''}">
+                <button class="advice-date-head" onclick="data.toggleCollapse('advice_${date}')" type="button">
+                    <span class="material-symbols-rounded">event_note</span>
+                    <strong>${date}</strong>
+                    <small>${list.length} 条</small>
+                    <span class="material-symbols-rounded">${collapsed ? 'expand_more' : 'expand_less'}</span>
+                </button>
+                <div class="advice-date-content">
+                    ${list.map(msg => this.renderAdviceMessage(msg)).join('')}
+                </div>
+            </section>`;
+        }).join('');
+    },
+
+    renderAdviceMessage(msg) {
+        const label = msg.role === 'user' ? '我' : 'AI';
+        const time = this.parseHistoryDate(msg.at).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+        const model = msg.model ? ` · ${this.escapeHtml(msg.model)}` : '';
+        const content = this.escapeHtml(msg.content).replace(/\n/g, '<br>');
+        return `<div class="advice-bubble ${msg.role}">
+            <div class="advice-bubble-head">
+                <b>${label}<small>${time}${model}</small></b>
+                <button class="advice-delete-btn" onclick="data.deleteAiAdviceMessage(${msg.idx})" aria-label="删除这条建议"><span class="material-symbols-rounded">delete</span></button>
+            </div>
+            <p>${content}</p>
+        </div>`;
+    },
+
     applyFoodItem(id) {
         const item = fooddb.getAll().find(f => f.id === id);
         if (!item) return;
@@ -422,6 +473,7 @@ const data = {
             const items = await ai.parseFood(text);
             if (!items.length) throw new Error('未识别到食物');
             this._aiFoodResults = items;
+            this._aiFoodAdded = new Set();
             this.renderAiFoodResults();
             if (statusEl) statusEl.textContent = `AI 已识别 ${items.length} 项，点击逐个添加或批量添加`;
         } catch (e) {
@@ -435,11 +487,11 @@ const data = {
         if (!el) return;
         if (items.length === 0) { el.innerHTML = ''; return; }
         el.innerHTML = `
-            <button class="food-result-item food-add-all" onclick="data.addAllAiFoods()"><span class="material-symbols-rounded">done_all</span><span>全部添加</span><small>${items.length} 项 · ${items.reduce((s, i) => s + (i.cal || 0), 0)} kcal</small></button>
+            <button class="food-result-item food-add-all" onclick="data.addAllAiFoods()"><span class="material-symbols-rounded">done_all</span><span>全部添加</span><small>${items.filter((_, idx) => !(this._aiFoodAdded && this._aiFoodAdded.has(idx))).length}/${items.length} 项 · ${items.reduce((s, i) => s + (i.cal || 0), 0)} kcal</small></button>
             ${items.map((item, idx) => {
                 const added = this._aiFoodAdded && this._aiFoodAdded.has(idx);
                 return `<div class="food-result-item food-ai-result ${added ? 'food-added' : ''}">
-                    <span>${item.name} ${item.grams ? item.grams + 'g' : ''}</span>
+                    <span>${this.escapeHtml(item.name)} ${item.grams ? item.grams + 'g' : ''}</span>
                     <small>${item.cal} kcal${item.pro ? ' · 蛋白' + item.pro + 'g' : ''}</small>
                     ${added
                         ? '<span class="food-added-badge">已添加</span>'
@@ -453,20 +505,9 @@ const data = {
         const item = items[idx];
         if (!item) return;
         if (!this._aiFoodAdded) this._aiFoodAdded = new Set();
+        if (this._aiFoodAdded.has(idx)) return;
         const meal = document.getElementById('foodMeal')?.value || 'lunch';
-        this.db.health.foodLogs.push({
-            id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${idx}`,
-            date: this.dateKey(new Date()),
-            meal,
-            name: item.name,
-            grams: item.grams || 0,
-            cal: Math.round(item.cal || 0),
-            calPer100g: item.grams ? Math.round(item.cal * 100 / item.grams) : 0,
-            pro: Number(item.pro || 0),
-            carb: Number(item.carb || 0),
-            fat: Number(item.fat || 0),
-            createdAt: new Date().toISOString()
-        });
+        this.db.health.foodLogs.push(this.aiFoodLog(item, meal, idx));
         this._aiFoodAdded.add(idx);
         this.renderAiFoodResults();
         this.save();
@@ -477,25 +518,37 @@ const data = {
         if (items.length === 0) return;
         if (!this._aiFoodAdded) this._aiFoodAdded = new Set();
         const meal = document.getElementById('foodMeal')?.value || 'lunch';
+        const addedNow = [];
         items.forEach((item, idx) => {
             if (this._aiFoodAdded.has(idx)) return;
-            this.db.health.foodLogs.push({
-                id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${idx}`,
-                date: this.dateKey(new Date()),
-                meal,
-                name: item.name,
-                grams: item.grams || 0,
-                cal: Math.round(item.cal || 0),
-                calPer100g: item.grams ? Math.round(item.cal * 100 / item.grams) : 0,
-                pro: Number(item.pro || 0),
-                carb: Number(item.carb || 0),
-                fat: Number(item.fat || 0),
-                createdAt: new Date().toISOString()
-            });
+            addedNow.push(idx);
+            this.db.health.foodLogs.push(this.aiFoodLog(item, meal, idx));
+        });
+        addedNow.forEach(idx => {
             this._aiFoodAdded.add(idx);
         });
         this.renderAiFoodResults();
+        const statusEl = document.getElementById('foodAiStatus');
+        if (statusEl) statusEl.textContent = addedNow.length ? `已添加 ${addedNow.length} 项 AI 食物` : '这些 AI 食物已全部添加';
         this.saveAndBackup();
+    },
+
+    aiFoodLog(item, meal, idx = 0) {
+        const grams = Number(item.grams || 0);
+        const cal = Number(item.cal || 0);
+        return {
+            id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${idx}`,
+            date: this.dateKey(new Date()),
+            meal,
+            name: item.name || 'AI 识别食物',
+            grams,
+            cal: Math.round(cal),
+            calPer100g: grams ? Math.round(cal * 100 / grams) : 0,
+            pro: Number(item.pro || 0),
+            carb: Number(item.carb || 0),
+            fat: Number(item.fat || 0),
+            createdAt: new Date().toISOString()
+        };
     },
 
     clearAiResults() {
@@ -890,7 +943,7 @@ const data = {
             </div>
             <div class="advice-panel">
                 <div class="md-field"><select id="adviceModel">${modelOptions.map(m => `<option value="${m.id}" ${m.id === ai.cfg.model ? 'selected' : ''}>${m.id}</option>`).join('')}</select><label>分析模型</label></div>
-                <div class="advice-chat-list">${messages.length ? messages.map(msg => `<div class="advice-bubble ${msg.role}"><b>${msg.role === 'user' ? '我' : 'AI'}</b><p>${String(msg.content).replace(/\n/g, '<br>')}</p></div>`).join('') : '<div class="empty-state" style="padding:12px"><p>还没有 AI 建议</p></div>'}</div>
+                <div class="advice-chat-list">${this.renderAdviceMessages(messages)}</div>
                 <div class="md-field span-full"><input type="text" id="advicePrompt" placeholder=" "><label>向 AI 提问，例如：我最近减重停滞的原因是什么？</label></div>
                 <div class="advice-actions"><button class="md-btn md-btn-filled" onclick="data.sendAiAdvice()"><span class="material-symbols-rounded">send</span> 获取建议</button><div id="adviceStatus" class="food-ai-status"></div></div>
             </div>
