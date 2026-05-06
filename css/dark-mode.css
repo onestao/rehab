@@ -1,0 +1,149 @@
+/* ============================================
+   Responsive
+   ============================================ */
+@media (max-width: 360px) {
+    .md-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .md-card { margin: 6px 10px; padding: 14px; }
+    .input-card { padding: 12px; }
+    .timer-stats b { font-size: 14px; }
+    .list-item { margin: 4px 10px; padding: 10px 12px; }
+}
+
+@media (min-width: 600px) {
+    .md-grid { grid-template-columns: repeat(3, 1fr); }
+    #app { max-width: 520px; margin: 0 auto; }
+    .md-nav-rail { max-width: 520px; left: 50%; transform: translateX(-50%); border-radius: var(--md-sys-shape-lg) var(--md-sys-shape-lg) 0 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 1ms !important;
+        animation-iteration-count: 1 !important;
+        scroll-behavior: auto !important;
+        transition-duration: 1ms !important;
+    }
+}
+
+/* ============================================
+   Dark Mode (M3 Expressive)
+   ============================================ */
+@media (prefers-color-scheme: dark) {
+    :root {
+        --md-sys-primary: #a0cafd;
+        --md-sys-on-primary: #003258;
+        --md-sys-primary-container: #00497d;
+        --md-sys-on-primary-container: #d1e4ff;
+
+        --md-sys-secondary: #bbc7db;
+        --md-sys-on-secondary: #253141;
+        --md-sys-secondary-container: #3b4858;
+        --md-sys-on-secondary-container: #d7e3f8;
+
+        --md-sys-tertiary: #d6bee4;
+        --md-sys-on-tertiary: #3b2948;
+        --md-sys-tertiary-container: #523f5f;
+        --md-sys-on-tertiary-container: #f2daff;
+
+        --md-sys-amber: #fbbf24;
+        --md-sys-amber-container: #78350f;
+
+        --md-sys-surface: #111418;
+        --md-sys-surface-dim: #111418;
+        --md-sys-surface-container-lowest: #0b0e12;
+        --md-sys-surface-container-low: #1a1c20;
+        --md-sys-surface-container: #1e2024;
+        --md-sys-surface-container-high: #282a2f;
+        --md-sys-surface-container-highest: #33353a;
+        --md-sys-on-surface: #e3e2e6;
+        --md-sys-on-surface-variant: #c3c7cf;
+        --md-sys-inverse-surface: #e1e4db;
+        --md-sys-inverse-on-surface: #30322e;
+
+        --md-sys-outline: #8d9199;
+        --md-sys-outline-variant: #43474e;
+        --timer-gradient-start: #001d36;
+        --timer-gradient-mid: #00497d;
+        --timer-gradient-end: #0061a4;
+        --timer-time-color: #d1e4ff;
+        --timer-orb: rgba(209, 228, 255, 0.12);
+
+        --md-sys-error: #ffb4ab;
+        --md-sys-error-container: #93000a;
+        --md-sys-on-error-container: #ffdad6;
+    }
+
+    body { background: var(--md-sys-surface); }
+    .md-top-app-bar { background: var(--md-sys-surface); }
+    .md-nav-rail { background: var(--md-sys-surface-container); backdrop-filter: blur(20px); }
+
+    .timer-panel {
+        background: linear-gradient(145deg, var(--timer-gradient-start), var(--timer-gradient-mid) 42%, var(--timer-gradient-end) 100%);
+    }
+    #mainTime { color: var(--timer-time-color); text-shadow: 0 2px 20px rgba(160, 202, 253, 0.26); }
+    .session-time { color: #fbbf24 !important; text-shadow: 0 0 12px rgba(251,191,36,0.25) !important; }
+
+    .md-field input,
+    .md-field select {
+        background: var(--md-sys-surface-container-high);
+        border-color: var(--md-sys-outline-variant);
+        color: var(--md-sys-on-surface);
+    }
+    .md-field input:focus,
+    .md-field select:focus { border-color: var(--md-sys-primary); }
+    .md-field input:focus + label,
+    .md-field input:not(:placeholder-shown) + label,
+    .md-field select:focus + label { color: var(--md-sys-primary); }
+
+    .list-item {
+        background: var(--md-sys-surface-container-high);
+        border-color: var(--md-sys-outline-variant);
+    }
+    .list-item:active { background: var(--md-sys-surface-container-highest); }
+    .calendar-card {
+        background:
+            linear-gradient(180deg, rgba(51,53,58,0.62), rgba(30,32,36,0.22)),
+            var(--md-sys-surface-container-low);
+    }
+    .calendar-day { background: var(--md-sys-surface-container-high); }
+    .calendar-day.empty { background: transparent; }
+    .calendar-day.has-record {
+        background: color-mix(in srgb, var(--md-sys-primary-container) 28%, var(--md-sys-surface-container-high));
+    }
+    .calendar-day.selected {
+        background: color-mix(in srgb, var(--md-sys-primary-container) 25%, var(--md-sys-surface-container-high));
+        box-shadow: 0 0 0 2px var(--md-sys-primary);
+    }
+    .calendar-event {
+        background: color-mix(in srgb, var(--event-color) 28%, var(--md-sys-surface-container-highest));
+        color: color-mix(in srgb, var(--event-color) 24%, var(--md-sys-on-surface));
+    }
+
+    .md-btn-tonal {
+        background: var(--md-sys-secondary-container);
+        color: var(--md-sys-on-secondary-container);
+    }
+    .md-card {
+        background: var(--md-sys-surface-container-low);
+        border-color: var(--md-sys-outline-variant);
+    }
+    .workout-controls {
+        background: rgba(30, 32, 36, 0.78);
+        background:
+            linear-gradient(135deg, rgba(51,53,58,0.74), rgba(30,32,36,0.44)),
+            color-mix(in srgb, var(--md-sys-primary-container) 14%, transparent);
+        box-shadow:
+            0 16px 40px rgba(0, 0, 0, 0.42),
+            0 4px 14px rgba(0, 0, 0, 0.28);
+    }
+    .food-result-item { background: var(--md-sys-surface-container-high); }
+    .food-result-item:active { background: var(--md-sys-surface-container-highest); }
+    .diet-log-item { background: var(--md-sys-surface-container-high); }
+    .weightloss-option { border-color: var(--md-sys-outline-variant); }
+    .weightloss-option.active { border-color: var(--md-sys-primary); background: color-mix(in srgb, var(--md-sys-primary-container) 18%, var(--md-sys-surface-container-high)); }
+    .weightloss-tips { background: var(--md-sys-surface-container-high); }
+    .nav-indicator { background: var(--md-sys-secondary-container); }
+    .nav-item.active .material-symbols-rounded { color: var(--md-sys-on-secondary-container); }
+}
+

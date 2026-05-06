@@ -1,7 +1,15 @@
-const CACHE = 'training-assistant-v15';
+const CACHE = 'training-assistant-v16';
 const ASSETS = [
     'index.html',
     'styles.css',
+    'css/vars.css',
+    'css/base.css',
+    'css/layout.css',
+    'css/components.css',
+    'css/feature-workout.css',
+    'css/feature-records.css',
+    'css/feature-health.css',
+    'css/dark-mode.css',
     'theme.js',
     'fooddb.js',
     'ai.js',

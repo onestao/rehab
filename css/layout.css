@@ -1,0 +1,161 @@
+/* --- Top App Bar --- */
+.md-top-app-bar {
+    height: 64px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px;
+    background: var(--md-sys-surface);
+    position: relative;
+    transition: box-shadow var(--md-sys-motion-duration-short) var(--md-sys-motion-emphasized);
+}
+.workout-only-bar { margin-bottom: 8px; }
+.bar-leading {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.app-icon {
+    font-size: 28px;
+    color: var(--md-sys-primary);
+    font-variation-settings: 'FILL' 1, 'wght' 600;
+}
+.app-title {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--md-sys-on-surface);
+    letter-spacing: -0.2px;
+}
+
+/* --- Chip --- */
+.md-chip {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 4px 12px;
+    border-radius: var(--md-sys-shape-full);
+    background: var(--md-sys-surface-container-high);
+    color: var(--md-sys-on-surface-variant);
+    letter-spacing: 0.3px;
+}
+
+/* --- Page --- */
+.page { display: none; padding-bottom: 108px; min-height: calc(100vh - 64px); }
+.page.active { display: block; animation: fadeSlideIn var(--md-sys-motion-duration-medium) var(--md-sys-motion-emphasized-decelerate); }
+#workout { padding-bottom: 184px; }
+
+@keyframes fadeSlideIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* --- Page Header --- */
+.page-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 16px 20px 8px;
+}
+.page-header .material-symbols-rounded {
+    font-size: 24px;
+    color: var(--md-sys-primary);
+    font-variation-settings: 'FILL' 1;
+}
+.page-header h2 {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--md-sys-on-surface);
+}
+
+
+/* --- Bottom Navigation Rail (M3 Expressive) --- */
+.md-nav-rail {
+    position: fixed;
+    bottom: 0;
+    width: 100%;
+    height: calc(76px + env(safe-area-inset-bottom));
+    background: var(--md-sys-surface-container);
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    padding: 6px 8px calc(6px + env(safe-area-inset-bottom));
+    z-index: 100;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-top: 1px solid var(--md-sys-outline-variant);
+}
+.nav-item {
+    flex: 1;
+    border: none;
+    background: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--md-sys-on-surface-variant);
+    font-size: 12px;
+    font-weight: 500;
+    padding: 0;
+    cursor: pointer;
+    position: relative;
+    -webkit-tap-highlight-color: transparent;
+    height: 64px;
+    min-width: 0;
+}
+.nav-content {
+    width: 72px;
+    height: 56px;
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    border-radius: var(--md-sys-shape-full);
+}
+.nav-item .material-symbols-rounded {
+    font-size: 24px;
+    transition:
+        transform var(--md-sys-motion-duration-medium) var(--md-expressive-spring),
+        color var(--md-sys-motion-duration-medium) var(--md-sys-motion-emphasized),
+        font-variation-settings var(--md-sys-motion-duration-medium) var(--md-sys-motion-emphasized);
+}
+.nav-indicator {
+    position: absolute;
+    top: 4px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 56px;
+    border-radius: var(--md-sys-shape-full);
+    background: var(--md-sys-secondary-container);
+    transition:
+        width var(--md-sys-motion-duration-medium) var(--md-expressive-spring),
+        height var(--md-sys-motion-duration-medium) var(--md-expressive-spring),
+        border-radius var(--md-sys-motion-duration-medium) var(--md-sys-motion-emphasized),
+        background var(--md-sys-motion-duration-medium) var(--md-sys-motion-emphasized);
+    z-index: 0;
+}
+.nav-item small {
+    display: block;
+    width: 100%;
+    font-size: 12px;
+    line-height: 1;
+    text-align: center;
+    white-space: nowrap;
+}
+.nav-item.active { color: var(--md-sys-on-surface); }
+.nav-item.active .material-symbols-rounded {
+    color: var(--md-sys-on-secondary-container);
+    font-variation-settings: 'FILL' 1;
+    transform: translateY(-1px) scale(1.08);
+}
+.nav-item.active .nav-indicator {
+    width: 72px;
+    border-radius: 24px;
+}
+.nav-item.active small { font-weight: 700; color: var(--md-sys-on-secondary-container); }
+
+

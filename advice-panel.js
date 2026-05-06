@@ -1,8 +1,11 @@
 const advicePanel = {
     DRAFT_KEY: 'rehab_advice_draft',
+    SETTINGS_KEY: 'rehab_advice_settings',
 
     attach(target) {
         Object.assign(target, {
+            DRAFT_KEY: this.DRAFT_KEY,
+            SETTINGS_KEY: this.SETTINGS_KEY,
             sendAiAdvice: this.sendAiAdvice,
             requestAiAdvice: this.requestAiAdvice,
             deleteAiAdviceMessage: this.deleteAiAdviceMessage,
@@ -11,6 +14,8 @@ const advicePanel = {
             captureAdviceDraft: this.captureAdviceDraft,
             restoreAdviceDraft: this.restoreAdviceDraft,
             clearAdviceDraft: this.clearAdviceDraft,
+            loadAdviceSettings: this.loadAdviceSettings,
+            saveAdviceSettings: this.saveAdviceSettings,
             onAdvicePromptInput: this.onAdvicePromptInput,
             onAdvicePromptKeydown: this.onAdvicePromptKeydown,
             setAdviceModel: this.setAdviceModel,
@@ -19,10 +24,61 @@ const advicePanel = {
             useAdvicePrompt: this.useAdvicePrompt,
             scrollAdviceToLatest: this.scrollAdviceToLatest,
             autoResizeAdvicePrompt: this.autoResizeAdvicePrompt,
+            adviceRangeStart: this.adviceRangeStart,
+            filterByAdviceRange: this.filterByAdviceRange,
             renderAdviceMessages: this.renderAdviceMessages,
             renderAdviceMessage: this.renderAdviceMessage,
             renderAdvicePanel: this.renderAdvicePanel
         });
+
+        target.loadAdviceSettings?.();
+    },
+
+    loadAdviceSettings() {
+        try {
+            const raw = localStorage.getItem(this.SETTINGS_KEY);
+            if (!raw) return;
+            const parsed = JSON.parse(raw);
+            if (!parsed || typeof parsed !== 'object') return;
+
+            const allowedRanges = new Set(['today', 'week', 'month', 'all']);
+            if (typeof parsed.range === 'string' && allowedRanges.has(parsed.range)) {
+                this.adviceRange = parsed.range;
+            }
+
+            if (parsed.contexts && typeof parsed.contexts === 'object') {
+                const next = { ...(this.adviceContexts || {}) };
+                ['diet', 'training', 'weight', 'goal'].forEach(k => {
+                    if (typeof parsed.contexts[k] === 'boolean') next[k] = parsed.contexts[k];
+                });
+                this.adviceContexts = next;
+            }
+
+            if (typeof parsed.model === 'string' && parsed.model.trim()) {
+                this.adviceModel = parsed.model;
+            }
+        } catch {
+            // ignore
+        }
+    },
+
+    saveAdviceSettings() {
+        try {
+            const contexts = { diet: true, training: true, weight: true, goal: true, ...(this.adviceContexts || {}) };
+            const payload = {
+                range: this.adviceRange || 'today',
+                contexts: {
+                    diet: !!contexts.diet,
+                    training: !!contexts.training,
+                    weight: !!contexts.weight,
+                    goal: !!contexts.goal
+                },
+                model: this.adviceModel || '__current__'
+            };
+            localStorage.setItem(this.SETTINGS_KEY, JSON.stringify(payload));
+        } catch {
+            // ignore
+        }
     },
 
     captureAdviceDraft() {
@@ -66,11 +122,13 @@ const advicePanel = {
 
     setAdviceModel(model) {
         this.adviceModel = model || '__current__';
+        this.saveAdviceSettings();
         this.captureAdviceDraft();
     },
 
     setAdviceRange(range) {
         this.adviceRange = range || 'today';
+        this.saveAdviceSettings();
         this.captureAdviceDraft();
         this.renderRoutines();
         requestAnimationFrame(() => this.autoResizeAdvicePrompt());
@@ -79,6 +137,7 @@ const advicePanel = {
     toggleAdviceContext(key) {
         this.adviceContexts = { diet: true, training: true, weight: true, goal: true, ...(this.adviceContexts || {}) };
         this.adviceContexts[key] = !this.adviceContexts[key];
+        this.saveAdviceSettings();
         this.captureAdviceDraft();
         this.renderRoutines();
         requestAnimationFrame(() => this.autoResizeAdvicePrompt());
