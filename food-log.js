@@ -18,6 +18,7 @@ const foodLog = {
             foodSourceTag: this.foodSourceTag,
             aiParseFood: this.aiParseFood,
             updateAiFoodDraft: this.updateAiFoodDraft,
+            renderAiFoodEditor: this.renderAiFoodEditor,
             renderAiFoodResults: this.renderAiFoodResults,
             addSingleAiFood: this.addSingleAiFood,
             addAllAiFoods: this.addAllAiFoods,

@@ -27,6 +27,8 @@ const advicePanel = {
             adviceRangeStart: this.adviceRangeStart,
             filterByAdviceRange: this.filterByAdviceRange,
             visibleAdviceMessages: this.visibleAdviceMessages,
+            adviceConversationContext: this.adviceConversationContext,
+            preserveAdviceScroll: this.preserveAdviceScroll,
             renderAdviceMessages: this.renderAdviceMessages,
             renderAdviceMessage: this.renderAdviceMessage,
             renderAdvicePanel: this.renderAdvicePanel
@@ -177,6 +179,36 @@ const advicePanel = {
         return withIndex.filter(msg => this.parseHistoryDate(msg.at) >= start);
     },
 
+    adviceConversationContext(limit = 12) {
+        const messages = this.db.health.aiAdviceChat || [];
+        const today = this.dateKey(new Date());
+        const todayMessages = messages.filter(msg => this.dateKey(this.parseHistoryDate(msg.at)) === today);
+        const recentMessages = messages.slice(-limit);
+        const merged = [];
+        [...todayMessages, ...recentMessages].forEach(msg => {
+            if (!msg?.content || msg.pending || msg.error) return;
+            if (merged.includes(msg)) return;
+            merged.push(msg);
+        });
+        return merged.slice(-Math.max(limit, todayMessages.length)).map(msg => ({
+            role: msg.role === 'assistant' ? 'assistant' : 'user',
+            content: msg.content
+        }));
+    },
+
+    preserveAdviceScroll(fn) {
+        const list = document.querySelector('.advice-chat-list');
+        const beforeTop = list?.scrollTop || 0;
+        const beforeHeight = list?.scrollHeight || 0;
+        fn();
+        requestAnimationFrame(() => {
+            const nextList = document.querySelector('.advice-chat-list');
+            if (!nextList) return;
+            const heightDelta = nextList.scrollHeight - beforeHeight;
+            nextList.scrollTop = Math.max(0, beforeTop + heightDelta);
+        });
+    },
+
     async requestAiAdvice(prompt, model) {
         const contexts = { diet: true, training: true, weight: true, goal: true, ...(this.adviceContexts || {}) };
         const history = contexts.training
@@ -196,10 +228,11 @@ const advicePanel = {
         const rangeLabel = { today: '今日', week: '最近7天', month: '最近30天', all: '全部记录' }[this.adviceRange || 'today'];
         const sys = '你是训练与营养健康顾问。基于用户记录给出简洁、可执行的建议。优先用短段落和清单表达，不要输出 markdown 表格。';
         const user = `分析范围：${rangeLabel}\n用户提问：${prompt}\n\n训练记录：${JSON.stringify(history)}\n饮食记录：${JSON.stringify(foods)}\n今日宏量营养：${JSON.stringify(macros)}\n当前饮食目标：${JSON.stringify(dietGoal)}\n体重记录：${JSON.stringify(weights)}\n手动运动：${JSON.stringify(exerciseLogs)}`;
+        const conversation = this.adviceConversationContext();
         const oldModel = ai.cfg.model;
         ai.cfg.model = model;
         try {
-            return await ai.call([{ role: 'system', content: sys }, { role: 'user', content: user }], 1800);
+            return await ai.call([{ role: 'system', content: sys }, ...conversation, { role: 'user', content: user }], 1800);
         } finally {
             ai.cfg.model = oldModel;
         }
@@ -245,9 +278,11 @@ const advicePanel = {
     deleteAiAdviceMessage(idx) {
         const messages = this.db.health.aiAdviceChat || [];
         if (idx < 0 || idx >= messages.length) return;
-        messages.splice(idx, 1);
-        this.db.health.aiAdviceChat = messages;
-        this.saveAndBackup();
+        this.preserveAdviceScroll(() => {
+            messages.splice(idx, 1);
+            this.db.health.aiAdviceChat = messages;
+            this.saveAndBackup();
+        });
     },
 
     copyAdviceMessage(idx) {
