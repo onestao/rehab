@@ -244,9 +244,21 @@ const workout = {
 
     syncVideoPipPlayback(playing, video) {
         if (this._pipVideoControlSync || this.pipMode !== 'video' || !this.isPlaying) return;
-        this._pipVideoControlSync = true;
         this.setTrainingPaused(!playing);
-        if (playing && video.paused) video.play().catch(() => {});
+        this.syncPipVideoElement(playing, video);
+    },
+
+    syncPipVideoElement(playing, video = document.getElementById('pipVideo')) {
+        if (!video || this.pipMode !== 'video') return;
+        this._pipVideoControlSync = true;
+        if (playing) {
+            if (video.paused) {
+                video.play().catch(() => {}).finally(() => { this._pipVideoControlSync = false; });
+                return;
+            }
+        } else if (!video.paused) {
+            video.pause();
+        }
         this._pipVideoControlSync = false;
     },
 
@@ -486,13 +498,9 @@ const workout = {
         }
         document.getElementById('playIcon').innerText = nextPaused ? 'play_arrow' : 'pause';
         if ('mediaSession' in navigator) navigator.mediaSession.playbackState = nextPaused ? 'paused' : 'playing';
+        this.syncPipVideoElement(!nextPaused);
         if (!nextPaused) {
             this.reinforceKeepAlive();
-            const video = document.getElementById('pipVideo');
-            if (this.pipMode === 'video' && video?.paused && !this._pipVideoControlSync) {
-                this._pipVideoControlSync = true;
-                video.play().catch(() => {}).finally(() => { this._pipVideoControlSync = false; });
-            }
         }
         this.updateStateClasses();
     },
