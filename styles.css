@@ -1382,7 +1382,7 @@ body {
     display: grid;
     grid-template-columns: 1fr auto;
     gap: 0;
-    align-items: end;
+    align-items: center;
     padding: 6px 6px 6px 16px;
     border-radius: 28px;
     background: var(--md-sys-surface-container-highest);
@@ -1404,7 +1404,7 @@ body {
 }
 .advice-composer-input {
     width: 100%;
-    min-height: 44px;
+    min-height: 24px;
     max-height: 160px;
     resize: none;
     overflow-y: auto;
@@ -1413,8 +1413,9 @@ body {
     background: transparent;
     color: var(--md-sys-on-surface);
     font: inherit;
-    line-height: 1.45;
-    padding: 10px 0;
+    line-height: 1.35;
+    padding: 10px 0 9px;
+    display: block;
 }
 .advice-composer-input::placeholder {
     color: var(--md-sys-on-surface-variant);
@@ -1440,6 +1441,16 @@ body {
     box-shadow:
         0 1px 3px 1px rgba(0,0,0,0.1),
         0 1px 2px rgba(0,0,0,0.1);
+}
+.advice-send-btn .material-symbols-rounded {
+    font-size: 20px;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    font-variation-settings: 'FILL' 1;
 }
 .advice-send-btn::after {
     content: '';
