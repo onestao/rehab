@@ -1,6 +1,7 @@
 const data = {
     DB_KEY: 'rehab_pro_universal_db',
     CFG_KEY: 'rehab_pro_universal_cfg',
+    SCHEMA_VERSION: 2,
     db: { actions: [], routines: [], history: [], rate: 1.1, cardio: { weight: 70, target: 30, type: 'walk' }, health: { weights: [], foodLogs: [], exerciseLogs: [], weightPlan: null, dietGoal: null, aiAdviceChat: [] }, aiProfiles: [], aiActiveId: '', aiModels: [] },
     cfg: { mode: 'none', s3: {}, dav: {} },
     historyMonthOffset: 0,
@@ -25,6 +26,7 @@ const data = {
     },
 
     normalizeDb() {
+        this.db.schemaVersion = Math.max(Number(this.db.schemaVersion) || 0, this.SCHEMA_VERSION);
         this.db.cardio = { weight: 70, target: 30, type: 'walk', ...(this.db.cardio || {}) };
         this.db.health = { weights: [], foodLogs: [], exerciseLogs: [], weightPlan: null, dietGoal: null, aiAdviceChat: [], ...(this.db.health || {}) };
         this.db.health.weights = this.db.health.weights || [];
@@ -196,63 +198,6 @@ const data = {
         this.saveAndBackup();
     },
 
-    // --- Food Logging ---
-    addFoodLog() {
-        const name = document.getElementById('foodName')?.value?.trim();
-        const grams = parseFloat(document.getElementById('foodGrams')?.value);
-        const cal = parseFloat(document.getElementById('foodCal')?.value);
-        const pro = parseFloat(document.getElementById('foodPro')?.value) || 0;
-        const carb = parseFloat(document.getElementById('foodCarb')?.value) || 0;
-        const fat = parseFloat(document.getElementById('foodFat')?.value) || 0;
-        const meal = document.getElementById('foodMeal')?.value || 'lunch';
-        if (!name) return alert('请输入食物名称');
-        if (!grams || grams <= 0) return alert('请输入食物重量');
-        if (!cal || cal <= 0) return alert('请先选择食物或填写每100g热量');
-        const log = {
-            id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-            date: this.dateKey(new Date()),
-            meal,
-            name,
-            grams,
-            cal: Math.round(cal * grams / 100),
-            calPer100g: cal,
-            pro: Number((pro * grams / 100).toFixed(1)),
-            carb: Number((carb * grams / 100).toFixed(1)),
-            fat: Number((fat * grams / 100).toFixed(1)),
-            proPer100g: pro,
-            carbPer100g: carb,
-            fatPer100g: fat,
-            createdAt: new Date().toISOString()
-        };
-        this.db.health.foodLogs.push(log);
-        if (document.getElementById('foodName')) document.getElementById('foodName').value = '';
-        if (document.getElementById('foodGrams')) document.getElementById('foodGrams').value = '';
-        if (document.getElementById('foodCal')) document.getElementById('foodCal').value = '';
-        if (document.getElementById('foodPro')) document.getElementById('foodPro').value = '';
-        if (document.getElementById('foodCarb')) document.getElementById('foodCarb').value = '';
-        if (document.getElementById('foodFat')) document.getElementById('foodFat').value = '';
-        this.setFoodSource('');
-        this._aiFoodResults = [];
-        this._aiFoodAdded = null;
-        const searchEl = document.getElementById('foodSearchResults');
-        if (searchEl) searchEl.innerHTML = '';
-        this.saveAndBackup();
-    },
-
-    deleteFoodLog(id) {
-        this.db.health.foodLogs = (this.db.health.foodLogs || []).filter(f => f.id !== id);
-        this.saveAndBackup();
-    },
-
-    todayFoodLogs() {
-        const today = this.dateKey(new Date());
-        return (this.db.health.foodLogs || []).filter(f => f.date === today);
-    },
-
-    todayCalories() {
-        return this.todayFoodLogs().reduce((sum, f) => sum + (f.cal || 0), 0);
-    },
-
     todayTrainingCalories() {
         const today = this.dateKey(new Date());
         const autoCal = this.db.history
@@ -262,15 +207,6 @@ const data = {
             .filter(e => e.date === today)
             .reduce((sum, e) => sum + (e.calories || 0), 0);
         return autoCal + manualCal;
-    },
-
-    todayMacros() {
-        return this.todayFoodLogs().reduce((acc, f) => {
-            acc.pro += Number(f.pro || 0);
-            acc.carb += Number(f.carb || 0);
-            acc.fat += Number(f.fat || 0);
-            return acc;
-        }, { pro: 0, carb: 0, fat: 0 });
     },
 
     defaultDietGoals() {
@@ -319,257 +255,6 @@ const data = {
     todayExerciseLogs() {
         const today = this.dateKey(new Date());
         return (this.db.health.exerciseLogs || []).filter(e => e.date === today);
-    },
-
-    async sendAiAdvice() {
-        if (!ai.cfg.enabled) return alert('请先在设置中配置 AI');
-        const input = document.getElementById('advicePrompt');
-        const prompt = input?.value?.trim();
-        if (!prompt) return;
-        const history = this.db.history.slice(0, 20);
-        const foods = this.todayFoodLogs();
-        const weights = this.sortedWeights().slice(-12);
-        const exerciseLogs = this.todayExerciseLogs();
-        const macros = this.todayMacros();
-        const dietGoal = this.db.health.dietGoal || {};
-        const model = document.getElementById('adviceModel')?.value || ai.cfg.model;
-        const sys = '你是训练与营养健康顾问。基于用户记录给出简洁、可执行的建议。不要输出markdown表格。';
-        const user = `用户提问：${prompt}\n\n最近训练记录：${JSON.stringify(history)}\n今日饮食记录：${JSON.stringify(foods)}\n今日宏量营养：${JSON.stringify(macros)}\n当前饮食目标：${JSON.stringify(dietGoal)}\n最近体重记录：${JSON.stringify(weights)}\n今日手动运动：${JSON.stringify(exerciseLogs)}`;
-        const oldModel = ai.cfg.model;
-        ai.cfg.model = model;
-        const statusEl = document.getElementById('adviceStatus');
-        if (statusEl) statusEl.textContent = 'AI 分析中...';
-        try {
-            const reply = await ai.call([{ role: 'system', content: sys }, { role: 'user', content: user }], 1800);
-            this.db.health.aiAdviceChat.push({ role: 'user', content: prompt, at: new Date().toISOString() });
-            this.db.health.aiAdviceChat.push({ role: 'assistant', content: reply, at: new Date().toISOString(), model });
-            input.value = '';
-            this.save();
-            if (statusEl) statusEl.textContent = '分析完成';
-            this.render();
-        } catch (e) {
-            if (statusEl) statusEl.textContent = '分析失败: ' + e.message;
-        } finally {
-            ai.cfg.model = oldModel;
-        }
-    },
-
-    deleteAiAdviceMessage(idx) {
-        const messages = this.db.health.aiAdviceChat || [];
-        if (idx < 0 || idx >= messages.length) return;
-        messages.splice(idx, 1);
-        this.db.health.aiAdviceChat = messages;
-        this.saveAndBackup();
-    },
-
-    renderAdviceMessages(messages) {
-        if (!messages.length) return '<div class="empty-state" style="padding:12px"><p>还没有 AI 建议</p></div>';
-        const groups = messages.reduce((acc, msg, idx) => {
-            const date = this.dateKey(this.parseHistoryDate(msg.at));
-            if (!acc[date]) acc[date] = [];
-            acc[date].push({ ...msg, idx });
-            return acc;
-        }, {});
-        return Object.keys(groups).sort((a, b) => b.localeCompare(a)).map(date => {
-            const collapsed = this.isCollapsed(`advice_${date}`, date !== this.dateKey(new Date()));
-            const list = groups[date];
-            return `<section class="advice-date-group ${collapsed ? 'collapsed' : ''}">
-                <button class="advice-date-head" onclick="data.toggleCollapse('advice_${date}')" type="button">
-                    <span class="material-symbols-rounded">event_note</span>
-                    <strong>${date}</strong>
-                    <small>${list.length} 条</small>
-                    <span class="material-symbols-rounded">${collapsed ? 'expand_more' : 'expand_less'}</span>
-                </button>
-                <div class="advice-date-content">
-                    ${list.map(msg => this.renderAdviceMessage(msg)).join('')}
-                </div>
-            </section>`;
-        }).join('');
-    },
-
-    renderAdviceMessage(msg) {
-        const label = msg.role === 'user' ? '我' : 'AI';
-        const time = this.parseHistoryDate(msg.at).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
-        const model = msg.model ? ` · ${this.escapeHtml(msg.model)}` : '';
-        const content = this.escapeHtml(msg.content).replace(/\n/g, '<br>');
-        return `<div class="advice-bubble ${msg.role}">
-            <div class="advice-bubble-head">
-                <b>${label}<small>${time}${model}</small></b>
-                <button class="advice-delete-btn" onclick="data.deleteAiAdviceMessage(${msg.idx})" aria-label="删除这条建议"><span class="material-symbols-rounded">delete</span></button>
-            </div>
-            <p>${content}</p>
-        </div>`;
-    },
-
-    applyFoodItem(id) {
-        const item = fooddb.getAll().find(f => f.id === id);
-        if (!item) return;
-        if (document.getElementById('foodName')) document.getElementById('foodName').value = item.name;
-        if (document.getElementById('foodCal')) document.getElementById('foodCal').value = item.cal;
-        if (document.getElementById('foodPro')) document.getElementById('foodPro').value = item.pro || 0;
-        if (document.getElementById('foodCarb')) document.getElementById('foodCarb').value = item.carb || 0;
-        if (document.getElementById('foodFat')) document.getElementById('foodFat').value = item.fat || 0;
-        if (document.getElementById('foodGrams')) document.getElementById('foodGrams').value = '';
-        document.getElementById('foodSearchResults').innerHTML = '';
-        this._aiFoodResults = [];
-        this._aiFoodAdded = null;
-        this.setFoodSource(item.cat === '自定义' ? '自定义食物库' : '本地食物库');
-        this.updateFoodComputedPreview();
-    },
-
-    onFoodSearchInput() {
-        const kw = document.getElementById('foodName')?.value?.trim() || '';
-        const results = fooddb.searchAll(kw);
-        const el = document.getElementById('foodSearchResults');
-        if (!el) return;
-        if (!kw || results.length === 0) { el.innerHTML = ''; return; }
-        el.innerHTML = results.map(item =>
-            `<button class="food-result-item" onclick="data.applyFoodItem('${item.id}')"><span>${item.name}</span><small>${item.cal} kcal/100g</small></button>`
-        ).join('');
-    },
-
-    autoFillFoodByName() {
-        const kw = document.getElementById('foodName')?.value?.trim() || '';
-        if (!kw) return;
-        const exact = fooddb.getAll().find(i => i.name === kw);
-        if (exact) this.applyFoodItem(exact.id);
-    },
-
-    updateFoodComputedPreview() {
-        const grams = parseFloat(document.getElementById('foodGrams')?.value) || 0;
-        const cal = parseFloat(document.getElementById('foodCal')?.value) || 0;
-        const pro = parseFloat(document.getElementById('foodPro')?.value) || 0;
-        const carb = parseFloat(document.getElementById('foodCarb')?.value) || 0;
-        const fat = parseFloat(document.getElementById('foodFat')?.value) || 0;
-        const el = document.getElementById('foodComputed');
-        if (!el) return;
-        if (!grams || !cal) { el.textContent = '输入食物和重量后自动计算'; return; }
-        const kcal = Math.round(cal * grams / 100);
-        const p = (pro * grams / 100).toFixed(1);
-        const c = (carb * grams / 100).toFixed(1);
-        const f = (fat * grams / 100).toFixed(1);
-        el.textContent = `本次记录：${kcal} kcal · 蛋白 ${p}g · 碳水 ${c}g · 脂肪 ${f}g`;
-    },
-
-    foodSourceTag() {
-        if (!this._foodSource) return '';
-        return `<span class="food-source-tag">${this._foodSource}</span>`;
-    },
-
-    async aiParseFood() {
-        const input = document.getElementById('foodName');
-        const text = input?.value?.trim();
-        if (!text) {
-            if (input) { input.focus(); input.placeholder = '例如：一碗米饭加一个鸡蛋'; }
-            const statusEl = document.getElementById('foodAiStatus');
-            if (statusEl) statusEl.textContent = '请先输入食物描述';
-            setTimeout(() => { if (input) input.placeholder = ' '; }, 3000);
-            return;
-        }
-        if (!ai.cfg.enabled) return alert('请先在设置中配置 AI 接口');
-        const statusEl = document.getElementById('foodAiStatus');
-        if (statusEl) statusEl.textContent = 'AI 分析中...';
-        try {
-            const items = await ai.parseFood(text);
-            if (!items.length) throw new Error('未识别到食物');
-            this._aiFoodResults = items;
-            this._aiFoodAdded = new Set();
-            this.renderAiFoodResults();
-            if (statusEl) statusEl.textContent = `AI 已识别 ${items.length} 项，点击逐个添加或批量添加`;
-        } catch (e) {
-            if (statusEl) statusEl.textContent = 'AI 识别失败: ' + e.message;
-        }
-    },
-
-    renderAiFoodResults() {
-        const items = this._aiFoodResults || [];
-        const el = document.getElementById('foodSearchResults');
-        if (!el) return;
-        if (items.length === 0) { el.innerHTML = ''; return; }
-        el.innerHTML = `
-            <button class="food-result-item food-add-all" onclick="data.addAllAiFoods()"><span class="material-symbols-rounded">done_all</span><span>全部添加</span><small>${items.filter((_, idx) => !(this._aiFoodAdded && this._aiFoodAdded.has(idx))).length}/${items.length} 项 · ${items.reduce((s, i) => s + (i.cal || 0), 0)} kcal</small></button>
-            ${items.map((item, idx) => {
-                const added = this._aiFoodAdded && this._aiFoodAdded.has(idx);
-                return `<div class="food-result-item food-ai-result ${added ? 'food-added' : ''}">
-                    <span>${this.escapeHtml(item.name)} ${item.grams ? item.grams + 'g' : ''}</span>
-                    <small>${item.cal} kcal${item.pro ? ' · 蛋白' + item.pro + 'g' : ''}</small>
-                    ${added
-                        ? '<span class="food-added-badge">已添加</span>'
-                        : `<button class="food-add-btn" onclick="data.addSingleAiFood(${idx})"><span class="material-symbols-rounded">add</span></button>`}
-                </div>`;
-            }).join('')}`;
-    },
-
-    addSingleAiFood(idx) {
-        const items = this._aiFoodResults || [];
-        const item = items[idx];
-        if (!item) return;
-        if (!this._aiFoodAdded) this._aiFoodAdded = new Set();
-        if (this._aiFoodAdded.has(idx)) return;
-        const meal = document.getElementById('foodMeal')?.value || 'lunch';
-        this.db.health.foodLogs.push(this.aiFoodLog(item, meal, idx));
-        this._aiFoodAdded.add(idx);
-        this.renderAiFoodResults();
-        this.save();
-    },
-
-    addAllAiFoods() {
-        const items = this._aiFoodResults || [];
-        if (items.length === 0) return;
-        if (!this._aiFoodAdded) this._aiFoodAdded = new Set();
-        const meal = document.getElementById('foodMeal')?.value || 'lunch';
-        const addedNow = [];
-        items.forEach((item, idx) => {
-            if (this._aiFoodAdded.has(idx)) return;
-            addedNow.push(idx);
-            this.db.health.foodLogs.push(this.aiFoodLog(item, meal, idx));
-        });
-        addedNow.forEach(idx => {
-            this._aiFoodAdded.add(idx);
-        });
-        this.renderAiFoodResults();
-        const statusEl = document.getElementById('foodAiStatus');
-        if (statusEl) statusEl.textContent = addedNow.length ? `已添加 ${addedNow.length} 项 AI 食物` : '这些 AI 食物已全部添加';
-        this.saveAndBackup();
-    },
-
-    aiFoodLog(item, meal, idx = 0) {
-        const grams = Number(item.grams || 0);
-        const cal = Number(item.cal || 0);
-        return {
-            id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${idx}`,
-            date: this.dateKey(new Date()),
-            meal,
-            name: item.name || 'AI 识别食物',
-            grams,
-            cal: Math.round(cal),
-            calPer100g: grams ? Math.round(cal * 100 / grams) : 0,
-            pro: Number(item.pro || 0),
-            carb: Number(item.carb || 0),
-            fat: Number(item.fat || 0),
-            createdAt: new Date().toISOString()
-        };
-    },
-
-    clearAiResults() {
-        this._aiFoodResults = [];
-        this._aiFoodAdded = null;
-        const el = document.getElementById('foodSearchResults');
-        if (el) el.innerHTML = '';
-        const statusEl = document.getElementById('foodAiStatus');
-        if (statusEl) statusEl.textContent = '';
-    },
-
-    applyAiFood(item) {
-        if (document.getElementById('foodName')) document.getElementById('foodName').value = item.name;
-        if (document.getElementById('foodGrams')) document.getElementById('foodGrams').value = item.grams || '';
-        if (document.getElementById('foodCal')) document.getElementById('foodCal').value = item.cal || '';
-        if (document.getElementById('foodPro')) document.getElementById('foodPro').value = item.pro || 0;
-        if (document.getElementById('foodCarb')) document.getElementById('foodCarb').value = item.carb || 0;
-        if (document.getElementById('foodFat')) document.getElementById('foodFat').value = item.fat || 0;
-        document.getElementById('foodSearchResults').innerHTML = '';
-        this.setFoodSource('AI 识别结果');
-        this.updateFoodComputedPreview();
     },
 
     // --- Weight Loss Plan ---
@@ -758,12 +443,13 @@ const data = {
         const weight = (this.db.health.weights || []).find(w => w.date === today) || this.sortedWeights().slice(-1)[0];
         const intake = this.todayCalories();
         const exerciseCal = this.todayTrainingCalories();
+        const goalCal = this.db.health.dietGoal?.dailyCal || 0;
         return `<div class="md-card hero-card daily-hero">
             <div class="hero-kicker">今日行动</div>
             <div class="hero-title-row">
                 <div>
                     <h3>${weight ? `${weight.weight.toFixed(1)} kg` : '记录今天'}</h3>
-                    <p>${intake} kcal 摄入 · ${exerciseCal} kcal 运动消耗 · 净热量 ${intake - exerciseCal}</p>
+                    <p>${intake} kcal 摄入 · ${exerciseCal} kcal 运动消耗 · 净热量 ${intake - exerciseCal}${goalCal ? ` · 目标 ${goalCal} kcal` : ''}</p>
                 </div>
                 <span class="hero-icon material-symbols-rounded">monitoring</span>
             </div>
@@ -820,15 +506,12 @@ const data = {
         const names = this.uniqueActionNames(entries);
         const intake = this.todayCalories();
         const macros = this.todayMacros();
-        const dietGoal = this.db.health.dietGoal;
-        const goalCal = dietGoal?.dailyCal || 0;
         const net = intake - calories;
         return `<div class="md-card daily-summary-card">
             <div class="daily-stat"><span class="material-symbols-rounded">timer</span><b>${minutes}</b><small>训练分钟</small></div>
             <div class="daily-stat"><span class="material-symbols-rounded">local_fire_department</span><b>${calories}</b><small>运动消耗</small></div>
             <div class="daily-stat"><span class="material-symbols-rounded">restaurant</span><b>${intake}</b><small>摄入 kcal</small></div>
             <div class="daily-stat"><span class="material-symbols-rounded">balance</span><b>${net > 0 ? '+' : ''}${net}</b><small>净热量</small></div>
-            ${goalCal ? `<div class="daily-stat goal-stat"><span class="material-symbols-rounded">flag</span><b>${goalCal}</b><small>目标 kcal</small></div>` : ''}
             <div class="daily-stat"><span class="material-symbols-rounded">fitness_center</span><b>${names.length}</b><small>项目数</small></div>
             <div class="daily-stat"><span class="material-symbols-rounded">egg_alt</span><b>${macros.pro.toFixed(0)}</b><small>蛋白 g</small></div>
         </div>`;
@@ -892,14 +575,47 @@ const data = {
                 const subTotal = items.reduce((s, f) => s + f.cal, 0);
                 return `<div class="diet-meal-group">
                     <div class="diet-meal-title">${mealNames[key]} <small>${subTotal} kcal</small></div>
-                    ${items.map(f => `<div class="diet-log-item">
-                        <span>${f.name}${f.grams ? ' ' + f.grams + 'g' : ''}</span>
-                        <small>P ${Number(f.pro || 0).toFixed(1)} / C ${Number(f.carb || 0).toFixed(1)} / F ${Number(f.fat || 0).toFixed(1)}</small>
-                        <b>${f.cal} kcal</b>
-                        <button class="delete-btn" onclick="data.deleteFoodLog('${f.id}')"><span class="material-symbols-rounded">delete</span></button>
-                    </div>`).join('')}
+                    ${items.map(f => this._editingFoodLogId === f.id ? this.renderDietLogEditor(f) : this.renderDietLogItem(f)).join('')}
                 </div>`;
             }).join('')}
+            </div>
+        </div>`;
+    },
+
+    renderDietLogItem(f) {
+        return `<div class="diet-log-item">
+            <span>${f.name}${f.grams ? ' ' + f.grams + 'g' : ''}</span>
+            <small>P ${Number(f.pro || 0).toFixed(1)} / C ${Number(f.carb || 0).toFixed(1)} / F ${Number(f.fat || 0).toFixed(1)}</small>
+            <b>${f.cal} kcal</b>
+            <button class="food-log-action-btn" onclick="data.startEditFoodLog('${f.id}')" aria-label="编辑这条饮食记录"><span class="material-symbols-rounded">edit</span></button>
+            <button class="delete-btn" onclick="data.deleteFoodLog('${f.id}')"><span class="material-symbols-rounded">delete</span></button>
+        </div>`;
+    },
+
+    renderDietLogEditor(f) {
+        const draft = this._editingFoodDraft || {
+            id: f.id,
+            meal: f.meal || 'lunch',
+            name: f.name || '',
+            grams: f.grams || '',
+            calPer100g: f.calPer100g || '',
+            proPer100g: f.proPer100g || '',
+            carbPer100g: f.carbPer100g || '',
+            fatPer100g: f.fatPer100g || ''
+        };
+        return `<div class="diet-log-editor">
+            <div class="food-inline-edit-grid">
+                <div class="md-field"><select onchange="data._editingFoodDraft.meal=this.value"><option value="breakfast" ${draft.meal === 'breakfast' ? 'selected' : ''}>早餐</option><option value="lunch" ${draft.meal === 'lunch' ? 'selected' : ''}>午餐</option><option value="dinner" ${draft.meal === 'dinner' ? 'selected' : ''}>晚餐</option><option value="snack" ${draft.meal === 'snack' ? 'selected' : ''}>加餐</option></select><label>餐次</label></div>
+                <div class="md-field"><input type="text" value="${this.escapeHtml(draft.name)}" oninput="data._editingFoodDraft.name=this.value" placeholder=" "><label>食物</label></div>
+                <div class="md-field"><input type="number" value="${draft.grams}" oninput="data._editingFoodDraft.grams=this.value" placeholder=" "><label>克数</label></div>
+                <div class="md-field"><input type="number" value="${draft.calPer100g}" oninput="data._editingFoodDraft.calPer100g=this.value" placeholder=" "><label>kcal/100g</label></div>
+                <div class="md-field"><input type="number" value="${draft.proPer100g}" oninput="data._editingFoodDraft.proPer100g=this.value" placeholder=" "><label>蛋白/100g</label></div>
+                <div class="md-field"><input type="number" value="${draft.carbPer100g}" oninput="data._editingFoodDraft.carbPer100g=this.value" placeholder=" "><label>碳水/100g</label></div>
+                <div class="md-field"><input type="number" value="${draft.fatPer100g}" oninput="data._editingFoodDraft.fatPer100g=this.value" placeholder=" "><label>脂肪/100g</label></div>
+            </div>
+            <div class="food-inline-actions">
+                <button class="md-btn md-btn-tonal" onclick="data.cancelEditFoodLog()">取消</button>
+                <button class="md-btn md-btn-filled" onclick="data.saveEditFoodLog('${f.id}')"><span class="material-symbols-rounded">save</span> 保存</button>
             </div>
         </div>`;
     },
@@ -926,26 +642,6 @@ const data = {
                 </div>
                 <button class="md-btn md-btn-filled" onclick="data.addManualExercise()"><span class="material-symbols-rounded">add</span> 添加运动记录</button>
                 ${items.length ? `<div class="manual-ex-list">${items.map(e => `<div class="day-detail-item"><span class="record-icon material-symbols-rounded">${this.sportIcon(e.type)}</span><span>${this.exerciseLabel(e.type)} ${e.minutes} 分钟</span><small>${e.calories || 0} kcal</small><button class="delete-btn" onclick="data.deleteManualExercise('${e.id}')"><span class="material-symbols-rounded">delete</span></button></div>`).join('')}</div>` : ''}
-            </div>
-        </div>`;
-    },
-
-    renderAdvicePanel() {
-        const messages = this.db.health.aiAdviceChat || [];
-        const modelOptions = (ai.models && ai.models.length ? ai.models : [{ id: ai.cfg.model || '当前配置模型' }]);
-        return `<div class="md-card advice-main-card">
-            <div class="panel-head">
-                <div>
-                    <span class="cardio-kicker">AI 分析建议</span>
-                    <h3>基于训练 / 饮食 / 体重数据</h3>
-                    <small>${messages.length ? `已生成 ${Math.floor(messages.length / 2)} 轮建议` : '可选择模型并提问'}</small>
-                </div>
-            </div>
-            <div class="advice-panel">
-                <div class="md-field"><select id="adviceModel">${modelOptions.map(m => `<option value="${m.id}" ${m.id === ai.cfg.model ? 'selected' : ''}>${m.id}</option>`).join('')}</select><label>分析模型</label></div>
-                <div class="advice-chat-list">${this.renderAdviceMessages(messages)}</div>
-                <div class="md-field span-full"><input type="text" id="advicePrompt" placeholder=" "><label>向 AI 提问，例如：我最近减重停滞的原因是什么？</label></div>
-                <div class="advice-actions"><button class="md-btn md-btn-filled" onclick="data.sendAiAdvice()"><span class="material-symbols-rounded">send</span> 获取建议</button><div id="adviceStatus" class="food-ai-status"></div></div>
             </div>
         </div>`;
     },

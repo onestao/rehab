@@ -1,4 +1,4 @@
-const CACHE = 'training-assistant-v13';
+const CACHE = 'training-assistant-v14';
 const ASSETS = ['index.html', 'styles.css', 'theme.js', 'fooddb.js', 'ai.js', 'data.js', 'sync.js', 'workout.js', 'manifest.json'];
 
 self.addEventListener('install', e => {
@@ -13,6 +13,10 @@ self.addEventListener('activate', e => {
         ))
     );
     self.clients.claim();
+});
+
+self.addEventListener('message', e => {
+    if (e.data?.type === 'SKIP_WAITING') self.skipWaiting();
 });
 
 self.addEventListener('fetch', e => {

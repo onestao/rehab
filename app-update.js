@@ -1,0 +1,45 @@
+const appUpdate = {
+    registration: null,
+    waitingWorker: null,
+
+    async registerServiceWorker() {
+        if (!('serviceWorker' in navigator)) return;
+        try {
+            this.registration = await navigator.serviceWorker.register('sw.js');
+            this.bindRegistration(this.registration);
+            navigator.serviceWorker.addEventListener('controllerchange', () => {
+                window.location.reload();
+            }, { once: true });
+        } catch {}
+    },
+
+    bindRegistration(registration) {
+        if (!registration) return;
+        if (registration.waiting) this.show(registration.waiting);
+        registration.addEventListener('updatefound', () => {
+            const worker = registration.installing;
+            if (!worker) return;
+            worker.addEventListener('statechange', () => {
+                if (worker.state === 'installed' && navigator.serviceWorker.controller) {
+                    this.show(worker);
+                }
+            });
+        });
+    },
+
+    show(worker) {
+        this.waitingWorker = worker;
+        document.getElementById('appUpdateBanner')?.classList.remove('hidden');
+    },
+
+    apply() {
+        if (!this.waitingWorker) return;
+        this.waitingWorker.postMessage({ type: 'SKIP_WAITING' });
+    },
+
+    dismiss() {
+        document.getElementById('appUpdateBanner')?.classList.add('hidden');
+    }
+};
+
+if (typeof window !== 'undefined') window.appUpdate = appUpdate;

@@ -93,6 +93,25 @@ body {
     line-height: 1.5;
 }
 
+.app-update-banner {
+    position: sticky;
+    top: 0;
+    z-index: 300;
+    margin: 10px 16px 0;
+    padding: 12px 14px;
+    border-radius: 18px;
+    background: color-mix(in srgb, var(--md-sys-primary-container) 82%, white);
+    color: var(--md-sys-on-primary-container);
+    display: grid;
+    grid-template-columns: auto 1fr auto auto;
+    align-items: center;
+    gap: 10px;
+    box-shadow: var(--md-sys-elevation-2);
+}
+.app-update-banner strong { display: block; font-size: 13px; }
+.app-update-banner small { display: block; font-size: 11px; opacity: 0.85; }
+.app-update-banner .material-symbols-rounded { color: var(--md-sys-primary); }
+
 /* --- Top App Bar --- */
 .md-top-app-bar {
     height: 64px;
@@ -912,7 +931,6 @@ body {
 .bmi-label { font-size: 13px; font-weight: 700; }
 .bmi-range { font-size: 11px; color: var(--md-sys-on-surface-variant); }
 .bmi-empty { color: var(--md-sys-on-surface-variant); }
-.goal-stat { background: color-mix(in srgb, var(--md-sys-primary-container) 30%, var(--md-sys-surface-container-lowest)); }
 .calendar-day { cursor: pointer; }
 .calendar-day.selected {
     border-color: var(--md-sys-primary);
@@ -989,6 +1007,7 @@ body {
 .food-result-item:active { background: var(--md-sys-surface-container); }
 .food-result-item small { color: var(--md-sys-on-surface-variant); white-space: nowrap; }
 .food-ai-result { border-left: 3px solid var(--md-sys-tertiary); }
+.food-ai-result-card { display: grid; gap: 6px; }
 .food-add-all {
     border-left: 3px solid var(--md-sys-primary); background: color-mix(in srgb, var(--md-sys-primary-container) 15%, var(--md-sys-surface-container-lowest));
     font-weight: 700;
@@ -1005,6 +1024,16 @@ body {
     display: inline-flex; align-items: center; justify-content: center; cursor: pointer; flex: none;
 }
 .food-add-btn .material-symbols-rounded { font-size: 18px; }
+.food-inline-edit-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    padding: 8px 10px 10px;
+    border-radius: var(--md-sys-shape-md);
+    background: color-mix(in srgb, var(--md-sys-surface-container) 80%, white);
+}
+.food-inline-edit-grid .md-field { margin-bottom: 0; }
+.food-inline-actions { display: flex; justify-content: flex-end; gap: 8px; }
 .food-ai-status { font-size: 11px; color: var(--md-sys-tertiary); min-height: 16px; font-weight: 600; }
 .food-computed {
     font-size: 12px;
@@ -1049,6 +1078,27 @@ body {
 }
 .diet-log-item span:first-child { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .diet-log-item b { white-space: nowrap; color: var(--md-sys-primary); font-size: 13px; }
+.food-log-action-btn {
+    border: none;
+    width: 30px;
+    height: 30px;
+    border-radius: var(--md-sys-shape-full);
+    background: transparent;
+    color: var(--md-sys-on-surface-variant);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+.food-log-action-btn .material-symbols-rounded { font-size: 17px; }
+.diet-log-editor {
+    display: grid;
+    gap: 8px;
+    margin-bottom: 6px;
+    padding: 10px;
+    border-radius: var(--md-sys-shape-md);
+    background: var(--md-sys-surface-container-lowest);
+}
 .exercise-grid { margin: 0; }
 .manual-ex-list { display: grid; gap: 4px; }
 .advice-panel { gap: 12px; }
@@ -1481,6 +1531,23 @@ body.is-cardio-paused .cardio-card {
 .sync-actions .md-btn { margin-top: 8px; }
 .sync-actions .md-row .md-btn { margin-top: 0; }
 .sync-card .md-field { margin-bottom: 8px; }
+.sync-backup-row { flex-wrap: wrap; }
+.sync-detail-status {
+    margin-top: 12px;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+}
+.sync-meta-item {
+    padding: 10px 12px;
+    border-radius: var(--md-sys-shape-md);
+    background: var(--md-sys-surface-container-lowest);
+    display: grid;
+    gap: 2px;
+}
+.sync-meta-item strong { font-size: 11px; color: var(--md-sys-on-surface-variant); }
+.sync-meta-item span { font-size: 12px; color: var(--md-sys-on-surface); }
+.sync-meta-wide { grid-column: 1 / -1; }
 
 /* --- Bottom Navigation Rail (M3 Expressive) --- */
 .md-nav-rail {

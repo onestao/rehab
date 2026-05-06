@@ -10,6 +10,15 @@
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+    <div id="appUpdateBanner" class="app-update-banner hidden">
+        <span class="material-symbols-rounded">system_update</span>
+        <div>
+            <strong>发现新版本</strong>
+            <small>刷新后即可使用最新功能与修复</small>
+        </div>
+        <button class="md-btn md-btn-tonal" onclick="appUpdate.dismiss()">稍后</button>
+        <button class="md-btn md-btn-filled" onclick="appUpdate.apply()">立即刷新</button>
+    </div>
     <audio id="silentAudio" loop preload="auto"><source src="data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAgD4AAAB9AAACABAAZGF0YQAAAAA=" type="audio/wav"></audio>
     <video id="pipVideo" class="pip-video-source" muted playsinline preload="auto" aria-hidden="true"></video>
 
@@ -207,6 +216,12 @@
                         <button class="md-btn md-btn-tonal" onclick="sync.pull()"><span class="material-symbols-rounded">download</span> 下载恢复</button>
                         <button class="md-btn md-btn-tonal" onclick="sync.push()"><span class="material-symbols-rounded">backup</span> 备份上传</button>
                     </div>
+                    <div class="md-row sync-backup-row">
+                        <button class="md-btn md-btn-tonal" onclick="backup.exportData()"><span class="material-symbols-rounded">download_for_offline</span> 导出备份</button>
+                        <button class="md-btn md-btn-tonal" onclick="backup.promptImport()"><span class="material-symbols-rounded">upload_file</span> 导入备份</button>
+                    </div>
+                    <input id="backupImportInput" class="hidden" type="file" accept="application/json" onchange="backup.importFile(event)">
+                    <div id="syncDetailStatus" class="sync-detail-status"></div>
                 </div>
             </div>
         </section>
@@ -235,8 +250,15 @@
     <script src="fooddb.js"></script>
     <script src="ai.js"></script>
     <script src="data.js"></script>
+    <script src="food-log.js"></script>
+    <script src="advice-panel.js"></script>
+    <script src="backup.js"></script>
     <script src="sync.js"></script>
+    <script src="sync-status.js"></script>
     <script src="workout.js"></script>
+    <script src="workout-engine.js"></script>
+    <script src="workout-state.js"></script>
+    <script src="app-update.js"></script>
     <div id="weightModal" class="md-modal hidden" aria-hidden="true">
         <div class="md-modal-backdrop" onclick="data.closeWeightModal()"></div>
         <div class="md-modal-card">
@@ -270,9 +292,9 @@
             theme.init();
             data.init();
             workout.setMode('strength');
-            if ('serviceWorker' in navigator) {
-                navigator.serviceWorker.register('sw.js').catch(() => {});
-            }
+            if (window.syncStatus) syncStatus.init();
+            if (window.workoutState) workoutState.init();
+            if (window.appUpdate) appUpdate.registerServiceWorker();
             window.addEventListener('scroll', () => {
                 document.querySelector('.md-top-app-bar').classList.toggle('scrolled', window.scrollY > 8);
             }, { passive: true });

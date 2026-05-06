@@ -15,6 +15,10 @@ const workout = {
     pipCtx: null,
     pipStream: null,
     _pipVideoControlSync: false,
+    _phaseLeft: null,
+    _phaseSub: '',
+    _phaseStatus: '',
+    _lastActiveAt: null,
 
     async speak(text) {
         if (!text) return;
@@ -82,6 +86,7 @@ const workout = {
             audio.play().catch(()=>{});
             window.speechSynthesis.resume();
             this.renderPip();
+            if (!document.hidden && window.workoutState) workoutState.compensateElapsed();
         });
     },
 
@@ -550,6 +555,7 @@ const workout = {
         if (!this.isPlaying) {
             if (data.db.actions.length === 0) return;
             this.isPlaying = true; this.isPaused = false; this.totalSec = 0;
+            if (window.workoutEngine) workoutEngine.state = workoutEngine.createInitialState();
             this.updateStateClasses();
             document.getElementById('playIcon').innerText = 'pause';
             document.getElementById('stopBtn').classList.remove('hidden');
@@ -559,99 +565,77 @@ const workout = {
             this.initBackGuard();
             
             this.sessionInt = setInterval(() => { if(!this.isPaused) { this.totalSec++; this.updateUI(); }}, 1000);
+            if (window.workoutState) workoutState.markActive();
             
             await this.speak("训练开始");
-            this.run();
+            if (window.workoutEngine) workoutEngine.start();
         } else {
             this.setTrainingPaused(!this.isPaused);
         }
     },
 
     async run() {
-        for (let i = 0; i < data.db.actions.length; i++) {
-            if (!this.isPlaying) break;
-            const a = data.db.actions[i];
-            await this.speak("下一项：" + a.name);
-            
-            for (let s = 1; s <= a.sets; s++) {
-                if (!this.isPlaying) break;
-                document.getElementById('curSet').innerText = s;
-                document.getElementById('totalSet').innerText = a.sets;
-
-                const sides = a.isAlt ? ['左侧', '右侧'] : [''];
-                for (let side of sides) {
-                    if (!this.isPlaying) break;
-                    if (side) { await this.speak(side + "开始"); }
-                    else if (a.sets > 1) { await this.speak("第" + s + "组"); }
-
-                    for (let r = 1; r <= a.reps; r++) {
-                        if (!this.isPlaying) break;
-                        document.getElementById('curRep').innerText = r;
-                        document.getElementById('totalRep').innerText = a.reps;
-                        await this.speak("第" + r + "次");
-                        await this.count(a.work, a.name, 'HOLD');
-                        if (r < a.reps && this.isPlaying) {
-                            await this.speak("放松");
-                            await this.count(a.repRest, "放松休息", "REST");
-                        }
-                    }
-                    if (a.isAlt && side === '左侧' && this.isPlaying) {
-                        await this.speak("准备换边");
-                        await this.count(a.switchRest, "请切换侧向", "SWITCH");
-                    }
-                }
-                if (s < a.sets && this.isPlaying) {
-                    await this.speak("组间休息");
-                    await this.count(a.actionRest, "稍作休息", "SET REST");
-                }
-            }
-            if (i < data.db.actions.length - 1 && this.isPlaying) {
-                await this.speak("更换动作");
-                await this.count(a.groupRest, "下一项准备", "BREAK");
-            }
-        }
-        if (this.isPlaying) this.finish();
+        if (window.workoutEngine) return workoutEngine.run();
     },
 
     count(sec, sub, status) {
         return new Promise(resolve => {
             let left = sec;
+            this._phaseLeft = sec;
+            this._phaseSub = sub;
+            this._phaseStatus = status;
             this._countResolve = resolve;
             document.getElementById('subText').innerText = sub;
             document.getElementById('statusText').innerText = status;
             document.getElementById('mainTime').innerText = left;
+            if (window.workoutState) workoutState.markActive();
             if (sec > 12 && status !== 'HOLD') this.speak(`${sub}，${sec}秒`);
             this.timer = setInterval(() => {
                 if (!this.isPlaying || this.skipFlag) {
                     clearInterval(this.timer); this.skipFlag = false;
+                    this._phaseLeft = null;
                     this._countResolve = null; resolve(); return;
                 }
                 if (this.isPaused) return;
                 left--;
+                this._phaseLeft = left;
                 document.getElementById('mainTime').innerText = left;
                 this.renderPip();
+                if (window.workoutState) workoutState.markActive();
                 if (left <= 3 && left > 0) this.speak(left.toString());
-                if (left <= 0) { clearInterval(this.timer); this._countResolve = null; resolve(); }
+                if (left <= 0) { clearInterval(this.timer); this._phaseLeft = null; this._countResolve = null; resolve(); }
             }, 1000);
         });
     },
 
     skip() {
         if (!this.isPlaying) return;
+        if (this.mode === 'strength' && window.workoutEngine?.skipCurrentPhase()) {
+            document.getElementById('statusText').innerText = 'SKIP';
+            document.getElementById('subText').innerText = '已跳过当前阶段';
+            if (window.workoutState) workoutState.markActive();
+            return;
+        }
+        this.abortCurrentPhaseWait();
+        document.getElementById('statusText').innerText = 'SKIP';
+        document.getElementById('subText').innerText = '已跳过当前阶段';
+    },
+    abortCurrentPhaseWait() {
         this.skipFlag = true;
         window.speechSynthesis.cancel();
         if (this._speakResolve) { this._speakResolve(); this._speakResolve = null; }
         if (this._countResolve) { this._countResolve(); this._countResolve = null; }
         clearInterval(this.timer);
-        document.getElementById('statusText').innerText = 'SKIP';
-        document.getElementById('subText').innerText = '已跳过当前阶段';
+        this._phaseLeft = null;
         this.skipFlag = false;
     },
     updateUI() {
         const m = Math.floor(this.totalSec/60).toString().padStart(2,'0');
         const s = (this.totalSec%60).toString().padStart(2,'0');
         document.getElementById('sessionTime').innerText = `${m}:${s}`;
+        this._lastActiveAt = Date.now();
         this.renderPip();
+        if (window.workoutState) workoutState.markActive();
     },
     stop() {
         if (this.mode === 'cardio') return cardio.stop();
@@ -672,10 +656,14 @@ const workout = {
         window.speechSynthesis.cancel();
         if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'none';
         this.releaseWakeLock();
+        this._phaseLeft = null;
+        this._lastActiveAt = null;
+        if (window.workoutEngine) workoutEngine.state = null;
         this._countResolve = null;
         this._speakResolve = null;
         document.getElementById('playIcon').innerText = 'play_arrow';
         document.getElementById('stopBtn').classList.add('hidden');
+        if (window.workoutState) workoutState.clear();
         if (duration < 20) {
             this.speak("训练时间过短，无法记录");
             alert("训练时间低于20秒，无法保存记录");
@@ -762,6 +750,7 @@ const cardio = {
             this.speak(`${this.currentPlan().name}开始`);
             clearInterval(this.timer);
             this.timer = setInterval(() => this.tick(), 1000);
+            if (window.workoutState) workoutState.markActive();
             return;
         }
         workout.setTrainingPaused(!this.isPaused);
@@ -784,7 +773,9 @@ const cardio = {
         const s = (this.seconds % 60).toString().padStart(2, '0');
         document.getElementById('mainTime').innerText = `${m}:${s}`;
         document.getElementById('sessionTime').innerText = `${Math.round(this.calories())} kcal`;
+        workout._lastActiveAt = Date.now();
         workout.renderPip();
+        if (window.workoutState) workoutState.markActive();
     },
 
     async stop() {
@@ -835,6 +826,7 @@ const cardio = {
         document.getElementById('playIcon').innerText = 'play_arrow';
         document.getElementById('stopBtn').classList.add('hidden');
         workout.resetMainPanel();
+        if (window.workoutState) workoutState.clear();
     },
 
     speak(text) {

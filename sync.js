@@ -92,13 +92,13 @@ const sync = {
             path: document.getElementById('davPath').value || 'training_assistant_data.json'
         };
         localStorage.setItem(data.CFG_KEY, JSON.stringify(data.cfg));
-        this.setStatus(data.cfg.mode === 'none' ? 'local' : 'cloud');
-        alert("配置已本地保存");
-    },
+            this.setStatus(data.cfg.mode === 'none' ? 'local' : 'cloud', data.cfg.mode === 'none' ? '当前仅保存本地数据' : '同步配置已本地保存');
+            alert("配置已本地保存");
+        },
 
     async pull() {
         try {
-            this.setStatus('syncing');
+            this.setStatus('syncing', '正在从云端拉取数据');
             const res = await this.syncReq('GET');
             if (res.ok) {
                 const remote = await res.json();
@@ -107,24 +107,24 @@ const sync = {
                 data.save();
                 if (typeof ai !== 'undefined') await ai.init({ saveData: true, renderData: false });
                 data.render();
-                this.setStatus('cloud');
+                this.setStatus('cloud', '下载恢复成功');
                 alert("下载恢复成功（含训练记录）");
             } else {
-                this.setStatus('error');
+                this.setStatus('error', `拉取失败：${res.status}`);
                 alert("拉取失败，请检查参数");
             }
-        } catch (e) { this.setStatus('error'); alert("同步失败: " + e.message); }
+        } catch (e) { this.setStatus('error', '同步失败: ' + e.message); alert("同步失败: " + e.message); }
     },
 
     async push() {
         try {
-            this.setStatus('syncing');
+            this.setStatus('syncing', '正在上传备份到云端');
             const payload = JSON.stringify(data.db);
             const res = await this.syncReq('PUT', payload);
-            this.setStatus(res.ok ? 'cloud' : 'error');
+            this.setStatus(res.ok ? 'cloud' : 'error', res.ok ? '备份上传成功' : `备份失败：${res.status}`);
             if (res.ok) alert("备份成功（含训练记录、方案库、动作列表）");
             else alert("备份失败，请检查参数");
-        } catch (e) { this.setStatus('error'); alert("备份失败: " + e.message); }
+        } catch (e) { this.setStatus('error', '备份失败: ' + e.message); alert("备份失败: " + e.message); }
     },
 
     async autoBackup(reason = 'auto') {
@@ -137,18 +137,18 @@ const sync = {
             const { url } = data.cfg.dav || {};
             if (!url) return;
         }
-        this.setStatus('syncing');
+        this.setStatus('syncing', '检测到数据变更，自动备份中');
         try {
             const res = await this.syncReq('PUT', JSON.stringify(data.db));
-            this.setStatus(res.ok ? 'cloud' : 'error');
+            this.setStatus(res.ok ? 'cloud' : 'error', res.ok ? '自动备份成功' : `自动备份失败：${res.status}`);
             if (!res.ok) console.warn('Auto backup failed', reason, res.status);
         } catch (e) {
-            this.setStatus('error');
+            this.setStatus('error', '自动备份失败: ' + e.message);
             console.warn('Auto backup failed', reason, e);
         }
     },
 
-    setStatus(state) {
+    setStatus(state, detail = '') {
         const el = document.getElementById('syncStatus');
         if (!el) return;
         const map = {
@@ -160,6 +160,7 @@ const sync = {
         const [icon, label] = map[state] || map.local;
         el.innerHTML = `<span class="material-symbols-rounded" style="font-size:14px">${icon}</span> ${label}`;
         el.dataset.state = state;
+        el.dataset.detail = detail;
     },
 
     toggleFields(m) {
