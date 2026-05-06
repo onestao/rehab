@@ -1,4 +1,4 @@
-const CACHE = 'training-assistant-v16';
+const CACHE = 'training-assistant-v17';
 const ASSETS = [
     'index.html',
     'styles.css',

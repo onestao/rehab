@@ -431,27 +431,6 @@
 
 /* --- Weight Loss Plan --- */
 .weightloss-card { display: grid; gap: 14px; }
-.weightloss-card,
-.diet-card,
-.weight-card,
-.collapsible-card,
-.calendar-card,
-.day-detail-card {
-    position: relative;
-}
-.weightloss-card::before,
-.diet-card::before,
-.weight-card::before,
-.collapsible-card::before,
-.calendar-card::before,
-.day-detail-card::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    pointer-events: none;
-    box-shadow: inset 0 1px 0 rgba(255,255,255,0.14);
-}
 .weightloss-head {
     display: flex; align-items: center; justify-content: space-between; gap: 12px;
 }
