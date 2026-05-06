@@ -132,11 +132,13 @@ const data = {
     },
 
     setRoutineView(view) {
+        this.captureAdviceDraft?.();
         this.routineView = view;
         this.renderRoutines();
     },
 
     toggleCollapse(id) {
+        this.captureAdviceDraft?.();
         this._collapse = this._collapse || {};
         if (this._collapse[id] === undefined) {
             this._collapse[id] = id === 'dietPanel' ? true : false;
@@ -228,19 +230,24 @@ const data = {
     addManualExercise() {
         const date = this.dateKey(new Date());
         const type = document.getElementById('manualExerciseType')?.value || 'walk';
+        const customName = document.getElementById('manualExerciseCustom')?.value?.trim() || '';
         const minutes = parseInt(document.getElementById('manualExerciseMinutes')?.value) || 0;
         const calories = parseInt(document.getElementById('manualExerciseCalories')?.value) || 0;
         const note = document.getElementById('manualExerciseNote')?.value?.trim() || '';
+        if (type === 'custom' && !customName) return alert('请输入自定义运动名称');
         if (minutes <= 0) return alert('请输入有效运动时长');
         this.db.health.exerciseLogs.push({
             id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
             date,
             type,
+            customName,
             minutes,
             calories,
             note,
             createdAt: new Date().toISOString()
         });
+        const customEl = document.getElementById('manualExerciseCustom');
+        if (customEl) customEl.value = '';
         document.getElementById('manualExerciseMinutes').value = '';
         document.getElementById('manualExerciseCalories').value = '';
         document.getElementById('manualExerciseNote').value = '';
@@ -369,6 +376,7 @@ const data = {
                 <button class="record-tab ${this.routineView === 'advice' ? 'active' : ''}" onclick="data.setRoutineView('advice')"><span class="material-symbols-rounded">psychology</span>AI建议</button>
             </div>
             ${this.routineView === 'library' ? this.renderRoutineLibrary() : this.routineView === 'weightloss' ? this.renderWeightLossPlanCard() : this.renderAdvicePanel()}`;
+        if (this.routineView === 'advice') requestAnimationFrame(() => this.autoResizeAdvicePrompt?.());
     },
 
     renderRoutineOverview() {
@@ -527,15 +535,15 @@ const data = {
         const mealNames = { breakfast: '早餐', lunch: '午餐', dinner: '晚餐', snack: '加餐' };
         const collapsed = this.isCollapsed('dietPanel', false);
         return `<div class="md-card diet-card collapsible-card ${collapsed ? 'collapsed' : ''}">
-            <div class="diet-head">
+            <button class="diet-head collapsible-head-btn" onclick="data.toggleCollapse('dietPanel')" type="button" aria-expanded="${!collapsed}">
                 <div>
                     <span class="cardio-kicker">饮食记录</span>
                     <h3>${totalCal} kcal</h3>
                     <small>今日摄入 · ${todayLogs.length} 条记录</small>
                 </div>
                 ${this.foodSourceTag()}
-                <button class="collapse-btn" onclick="data.toggleCollapse('dietPanel')"><span class="material-symbols-rounded">${collapsed ? 'expand_more' : 'expand_less'}</span></button>
-            </div>
+                <span class="collapse-btn"><span class="material-symbols-rounded">${collapsed ? 'expand_more' : 'expand_less'}</span></span>
+            </button>
             <div class="macro-summary macro-progress-grid">
                 <div class="macro-card protein">
                     <div class="macro-head"><b>${macros.pro.toFixed(1)}g</b><small>蛋白 / 目标 ${goals.pro}g</small></div>
@@ -625,25 +633,31 @@ const data = {
         const items = this.todayExerciseLogs();
         const total = items.reduce((s, e) => s + (e.calories || 0), 0);
         return `<div class="md-card collapsible-card ${collapsed ? 'collapsed' : ''}">
-            <div class="panel-head">
+            <button class="panel-head collapsible-head-btn" onclick="data.toggleCollapse('exercisePanel')" type="button" aria-expanded="${!collapsed}">
                 <div>
                     <span class="cardio-kicker">手动运动</span>
                     <h3>${items.length} 条记录</h3>
                     <small>今日手动运动消耗 ${total} kcal</small>
                 </div>
-                <button class="collapse-btn" onclick="data.toggleCollapse('exercisePanel')"><span class="material-symbols-rounded">${collapsed ? 'expand_more' : 'expand_less'}</span></button>
-            </div>
+                <span class="collapse-btn"><span class="material-symbols-rounded">${collapsed ? 'expand_more' : 'expand_less'}</span></span>
+            </button>
             <div class="collapse-content">
                 <div class="md-grid exercise-grid">
-                    <div class="md-field"><select id="manualExerciseType"><option value="walk">步行</option><option value="run">跑步</option><option value="cycling">骑行</option><option value="battle_rope">战绳</option><option value="spin_bike">动感单车</option><option value="strength">力量训练</option><option value="stretch">拉伸/瑜伽</option></select><label>运动种类</label></div>
+                    <div class="md-field"><select id="manualExerciseType" onchange="data.toggleManualCustomExercise(this.value)"><option value="walk">步行</option><option value="run">跑步</option><option value="cycling">骑行</option><option value="swim">游泳</option><option value="battle_rope">战绳</option><option value="spin_bike">动感单车</option><option value="strength">力量训练</option><option value="stretch">拉伸/瑜伽</option><option value="custom">自定义运动</option></select><label>运动种类</label></div>
+                    <div class="md-field hidden" id="manualExerciseCustomField"><input type="text" id="manualExerciseCustom" placeholder=" "><label>自定义运动名称</label></div>
                     <div class="md-field"><input type="number" id="manualExerciseMinutes" step="1" placeholder=" "><label>时长 分钟</label></div>
                     <div class="md-field"><input type="number" id="manualExerciseCalories" step="1" placeholder=" "><label>热量 kcal</label></div>
                     <div class="md-field span-full"><input type="text" id="manualExerciseNote" placeholder=" "><label>备注</label></div>
                 </div>
                 <button class="md-btn md-btn-filled" onclick="data.addManualExercise()"><span class="material-symbols-rounded">add</span> 添加运动记录</button>
-                ${items.length ? `<div class="manual-ex-list">${items.map(e => `<div class="day-detail-item"><span class="record-icon material-symbols-rounded">${this.sportIcon(e.type)}</span><span>${this.exerciseLabel(e.type)} ${e.minutes} 分钟</span><small>${e.calories || 0} kcal</small><button class="delete-btn" onclick="data.deleteManualExercise('${e.id}')"><span class="material-symbols-rounded">delete</span></button></div>`).join('')}</div>` : ''}
+                ${items.length ? `<div class="manual-ex-list">${items.map(e => `<div class="day-detail-item"><span class="record-icon material-symbols-rounded">${this.sportIcon(this.exerciseLabel(e.type, e))}</span><span>${this.exerciseLabel(e.type, e)} ${e.minutes} 分钟</span><small>${e.calories || 0} kcal</small><button class="delete-btn" onclick="data.deleteManualExercise('${e.id}')"><span class="material-symbols-rounded">delete</span></button></div>`).join('')}</div>` : ''}
             </div>
         </div>`;
+    },
+
+    toggleManualCustomExercise(type) {
+        const field = document.getElementById('manualExerciseCustomField');
+        if (field) field.classList.toggle('hidden', type !== 'custom');
     },
 
     renderWeightLossPanel() {
@@ -812,14 +826,14 @@ const data = {
         const first = new Date(year, month, 1);
         const days = new Date(year, month + 1, 0).getDate();
         const leading = (first.getDay() + 6) % 7;
-        const byDate = this.groupHistoryByDate();
+        const byDate = this.groupCalendarActivitiesByDate();
         const cells = [];
         for (let i = 0; i < leading; i++) cells.push('<div class="calendar-day empty"></div>');
         for (let day = 1; day <= days; day++) {
             const key = this.dateKey(new Date(year, month, day));
             const entries = byDate[key] || [];
-            const names = this.uniqueActionNames(entries).slice(0, 3);
-            const totalMin = Math.round(entries.reduce((sum, h) => sum + (h.duration || 0), 0) / 60);
+            const names = entries.map(e => e.name).filter(Boolean).slice(0, 3);
+            const totalMin = Math.round(entries.reduce((sum, e) => sum + (e.minutes || 0), 0));
             const isSelected = this.selectedCalendarDate === key;
             cells.push(`
                 <div class="calendar-day ${entries.length ? 'has-record' : ''} ${isSelected ? 'selected' : ''}" onclick="data.selectCalendarDate('${key}')">
@@ -850,7 +864,7 @@ const data = {
     },
 
     renderHistoryLegend() {
-        const names = this.uniqueActionNames(this.db.history).slice(0, 6);
+        const names = [...new Set(Object.values(this.groupCalendarActivitiesByDate()).flat().map(e => e.name))].slice(0, 6);
         if (names.length === 0) return '';
         return `
             <div class="calendar-legend">
@@ -865,7 +879,7 @@ const data = {
         const foods = (this.db.health.foodLogs || []).filter(f => f.date === date);
         const manualExercises = (this.db.health.exerciseLogs || []).filter(e => e.date === date);
         const weight = (this.db.health.weights || []).find(w => w.date === date);
-        const totalMin = Math.round(entries.reduce((s, h) => s + (h.duration || 0), 0) / 60);
+        const totalMin = Math.round(entries.reduce((s, h) => s + (h.duration || 0), 0) / 60 + manualExercises.reduce((s, e) => s + (e.minutes || 0), 0));
         const totalCal = Math.round(entries.reduce((s, h) => s + (h.cardio?.calories || 0), 0) + manualExercises.reduce((s, e) => s + (e.calories || 0), 0));
         const foodCal = foods.reduce((s, f) => s + (f.cal || 0), 0);
         const foodPro = foods.reduce((s, f) => s + Number(f.pro || 0), 0);
@@ -896,7 +910,7 @@ const data = {
             ${foods.length ? `<div class="day-detail-section"><b>饮食 · ${foodCal} kcal · P${foodPro.toFixed(0)} C${foodCarb.toFixed(0)} F${foodFat.toFixed(0)}</b>${foods.map(f => {
                 return `<div class="day-detail-item"><span class="food-tag">${mealNames[f.meal] || f.meal}</span><span>${f.name}${f.grams ? ' ' + f.grams + 'g' : ''}</span><small>${f.cal} kcal · P${Number(f.pro || 0).toFixed(0)} C${Number(f.carb || 0).toFixed(0)} F${Number(f.fat || 0).toFixed(0)}</small></div>`;
             }).join('')}</div>` : ''}
-            ${manualExercises.length ? `<div class="day-detail-section"><b>手动运动</b>${manualExercises.map(e => `<div class="day-detail-item"><span class="record-icon material-symbols-rounded">${this.sportIcon(e.type)}</span><span>${this.exerciseLabel(e.type)} ${e.minutes} 分钟</span><small>${e.calories || 0} kcal</small></div>`).join('')}</div>` : ''}
+            ${manualExercises.length ? `<div class="day-detail-section"><b>手动运动</b>${manualExercises.map(e => `<div class="day-detail-item"><span class="record-icon material-symbols-rounded">${this.sportIcon(this.exerciseLabel(e.type, e))}</span><span>${this.exerciseLabel(e.type, e)} ${e.minutes} 分钟${e.note ? ' · ' + this.escapeHtml(e.note) : ''}</span><small>${e.calories || 0} kcal</small></div>`).join('')}</div>` : ''}
             ${weight ? `<div class="day-detail-section"><b>体重</b><div class="day-detail-item"><span class="material-symbols-rounded" style="font-size:18px">monitor_weight</span><span>${weight.weight.toFixed(1)} kg</span>${weight.note ? `<small>${weight.note}</small>` : ''}</div></div>` : ''}
         </div>`;
     },
@@ -908,6 +922,24 @@ const data = {
             map[key].push(h);
             return map;
         }, {});
+    },
+
+    groupCalendarActivitiesByDate() {
+        const map = {};
+        (this.db.history || []).forEach(h => {
+            const key = this.dateKey(this.parseHistoryDate(h.date));
+            if (!map[key]) map[key] = [];
+            this.historyNames(h).forEach((name, idx) => {
+                map[key].push({ name, minutes: idx === 0 ? (h.duration || 0) / 60 : 0, source: 'history' });
+            });
+        });
+        (this.db.health.exerciseLogs || []).forEach(e => {
+            if (!e.date) return;
+            if (!map[e.date]) map[e.date] = [];
+            const name = this.exerciseLabel(e.type, e);
+            map[e.date].push({ name, minutes: Number(e.minutes || 0), source: 'manual' });
+        });
+        return map;
     },
 
     parseHistoryDate(value) {
@@ -958,11 +990,13 @@ const data = {
         return 'fitness_center';
     },
 
-    exerciseLabel(type = '') {
+    exerciseLabel(type = '', entry = null) {
+        if (type === 'custom') return entry?.customName || entry?.note || '自定义运动';
         const map = {
             walk: '步行',
             run: '跑步',
             cycling: '骑行',
+            swim: '游泳',
             battle_rope: '战绳',
             spin_bike: '动感单车',
             strength: '力量训练',

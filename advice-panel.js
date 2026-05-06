@@ -1,44 +1,177 @@
 const advicePanel = {
+    DRAFT_KEY: 'rehab_advice_draft',
+
     attach(target) {
         Object.assign(target, {
             sendAiAdvice: this.sendAiAdvice,
+            requestAiAdvice: this.requestAiAdvice,
             deleteAiAdviceMessage: this.deleteAiAdviceMessage,
+            copyAdviceMessage: this.copyAdviceMessage,
+            retryAdviceFrom: this.retryAdviceFrom,
+            captureAdviceDraft: this.captureAdviceDraft,
+            restoreAdviceDraft: this.restoreAdviceDraft,
+            clearAdviceDraft: this.clearAdviceDraft,
+            onAdvicePromptInput: this.onAdvicePromptInput,
+            onAdvicePromptKeydown: this.onAdvicePromptKeydown,
+            setAdviceModel: this.setAdviceModel,
+            setAdviceRange: this.setAdviceRange,
+            toggleAdviceContext: this.toggleAdviceContext,
+            useAdvicePrompt: this.useAdvicePrompt,
+            scrollAdviceToLatest: this.scrollAdviceToLatest,
+            autoResizeAdvicePrompt: this.autoResizeAdvicePrompt,
             renderAdviceMessages: this.renderAdviceMessages,
             renderAdviceMessage: this.renderAdviceMessage,
             renderAdvicePanel: this.renderAdvicePanel
         });
     },
 
-    async sendAiAdvice() {
-        if (!ai.cfg.enabled) return alert('请先在设置中配置 AI');
+    captureAdviceDraft() {
         const input = document.getElementById('advicePrompt');
-        const prompt = input?.value?.trim();
-        if (!prompt) return;
-        const history = this.db.history.slice(0, 20);
-        const foods = this.todayFoodLogs();
-        const weights = this.sortedWeights().slice(-12);
-        const exerciseLogs = this.todayExerciseLogs();
-        const macros = this.todayMacros();
-        const dietGoal = this.db.health.dietGoal || {};
-        const model = document.getElementById('adviceModel')?.value || ai.cfg.model;
-        const sys = '你是训练与营养健康顾问。基于用户记录给出简洁、可执行的建议。不要输出markdown表格。';
-        const user = `用户提问：${prompt}\n\n最近训练记录：${JSON.stringify(history)}\n今日饮食记录：${JSON.stringify(foods)}\n今日宏量营养：${JSON.stringify(macros)}\n当前饮食目标：${JSON.stringify(dietGoal)}\n最近体重记录：${JSON.stringify(weights)}\n今日手动运动：${JSON.stringify(exerciseLogs)}`;
+        if (!input) return;
+        this._adviceDraft = input.value;
+        try { sessionStorage.setItem(this.DRAFT_KEY, input.value); } catch {}
+    },
+
+    restoreAdviceDraft() {
+        if (typeof this._adviceDraft === 'string') return this._adviceDraft;
+        try { return sessionStorage.getItem(this.DRAFT_KEY) || ''; } catch { return ''; }
+    },
+
+    clearAdviceDraft() {
+        this._adviceDraft = '';
+        try { sessionStorage.removeItem(this.DRAFT_KEY); } catch {}
+    },
+
+    onAdvicePromptInput(el) {
+        this._adviceDraft = el.value;
+        try { sessionStorage.setItem(this.DRAFT_KEY, el.value); } catch {}
+        this.autoResizeAdvicePrompt(el);
+        const send = document.getElementById('adviceSendBtn');
+        if (send) send.disabled = !el.value.trim() || !!this._adviceSending;
+    },
+
+    onAdvicePromptKeydown(e) {
+        if (e.isComposing) return;
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            this.sendAiAdvice();
+        }
+    },
+
+    autoResizeAdvicePrompt(el = document.getElementById('advicePrompt')) {
+        if (!el) return;
+        el.style.height = 'auto';
+        el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
+    },
+
+    setAdviceModel(model) {
+        this.adviceModel = model || '__current__';
+        this.captureAdviceDraft();
+    },
+
+    setAdviceRange(range) {
+        this.adviceRange = range || 'today';
+        this.captureAdviceDraft();
+        this.renderRoutines();
+        requestAnimationFrame(() => this.autoResizeAdvicePrompt());
+    },
+
+    toggleAdviceContext(key) {
+        this.adviceContexts = { diet: true, training: true, weight: true, goal: true, ...(this.adviceContexts || {}) };
+        this.adviceContexts[key] = !this.adviceContexts[key];
+        this.captureAdviceDraft();
+        this.renderRoutines();
+        requestAnimationFrame(() => this.autoResizeAdvicePrompt());
+    },
+
+    useAdvicePrompt(text) {
+        const input = document.getElementById('advicePrompt');
+        if (!input) return;
+        input.value = text;
+        this.onAdvicePromptInput(input);
+        input.focus();
+    },
+
+    adviceRangeStart(range = this.adviceRange || 'today') {
+        const start = new Date();
+        start.setHours(0, 0, 0, 0);
+        if (range === 'week') start.setDate(start.getDate() - 6);
+        if (range === 'month') start.setDate(start.getDate() - 29);
+        if (range === 'all') return null;
+        return start;
+    },
+
+    filterByAdviceRange(items, getDate) {
+        const start = this.adviceRangeStart();
+        if (!start) return items;
+        return items.filter(item => {
+            const date = getDate(item);
+            return date && date >= start;
+        });
+    },
+
+    async requestAiAdvice(prompt, model) {
+        const contexts = { diet: true, training: true, weight: true, goal: true, ...(this.adviceContexts || {}) };
+        const history = contexts.training
+            ? this.filterByAdviceRange(this.db.history || [], h => this.parseHistoryDate(h.date)).slice(-30)
+            : [];
+        const foods = contexts.diet
+            ? this.filterByAdviceRange(this.db.health.foodLogs || [], f => new Date(`${f.date}T00:00:00`)).slice(-80)
+            : [];
+        const exerciseLogs = contexts.training
+            ? this.filterByAdviceRange(this.db.health.exerciseLogs || [], e => new Date(`${e.date}T00:00:00`)).slice(-60)
+            : [];
+        const weights = contexts.weight
+            ? this.filterByAdviceRange(this.sortedWeights(), w => new Date(`${w.date}T00:00:00`)).slice(-20)
+            : [];
+        const dietGoal = contexts.goal ? (this.db.health.dietGoal || {}) : {};
+        const macros = contexts.diet ? this.todayMacros() : {};
+        const rangeLabel = { today: '今日', week: '最近7天', month: '最近30天', all: '全部记录' }[this.adviceRange || 'today'];
+        const sys = '你是训练与营养健康顾问。基于用户记录给出简洁、可执行的建议。优先用短段落和清单表达，不要输出 markdown 表格。';
+        const user = `分析范围：${rangeLabel}\n用户提问：${prompt}\n\n训练记录：${JSON.stringify(history)}\n饮食记录：${JSON.stringify(foods)}\n今日宏量营养：${JSON.stringify(macros)}\n当前饮食目标：${JSON.stringify(dietGoal)}\n体重记录：${JSON.stringify(weights)}\n手动运动：${JSON.stringify(exerciseLogs)}`;
         const oldModel = ai.cfg.model;
         ai.cfg.model = model;
-        const statusEl = document.getElementById('adviceStatus');
-        if (statusEl) statusEl.textContent = 'AI 分析中...';
         try {
-            const reply = await ai.call([{ role: 'system', content: sys }, { role: 'user', content: user }], 1800);
-            this.db.health.aiAdviceChat.push({ role: 'user', content: prompt, at: new Date().toISOString() });
-            this.db.health.aiAdviceChat.push({ role: 'assistant', content: reply, at: new Date().toISOString(), model });
-            input.value = '';
-            this.save();
-            if (statusEl) statusEl.textContent = '分析完成';
-            this.render();
-        } catch (e) {
-            if (statusEl) statusEl.textContent = '分析失败: ' + e.message;
+            return await ai.call([{ role: 'system', content: sys }, { role: 'user', content: user }], 1800);
         } finally {
             ai.cfg.model = oldModel;
+        }
+    },
+
+    async sendAiAdvice(promptOverride = '') {
+        if (!ai.cfg.enabled) return alert('请先在设置中配置 AI');
+        if (this._adviceSending) return;
+        const input = document.getElementById('advicePrompt');
+        const prompt = (promptOverride || input?.value || '').trim();
+        if (!prompt) return;
+        const selected = document.getElementById('adviceModel')?.value || this.adviceModel || '__current__';
+        const model = selected === '__current__' ? ai.cfg.model : selected;
+        const now = new Date().toISOString();
+        const pendingId = `pending_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+        this._adviceSending = true;
+        this.db.health.aiAdviceChat.push({ role: 'user', content: prompt, at: now });
+        this.db.health.aiAdviceChat.push({ role: 'assistant', content: '正在结合你的训练、饮食和体重记录分析...', at: now, model, pending: true, id: pendingId });
+        if (input) input.value = '';
+        this.clearAdviceDraft();
+        this.save();
+        requestAnimationFrame(() => this.scrollAdviceToLatest(true));
+        try {
+            const reply = await this.requestAiAdvice(prompt, model);
+            const idx = this.db.health.aiAdviceChat.findIndex(msg => msg.id === pendingId);
+            if (idx >= 0) this.db.health.aiAdviceChat[idx] = { role: 'assistant', content: reply, at: new Date().toISOString(), model };
+            this.save();
+            requestAnimationFrame(() => this.scrollAdviceToLatest(true));
+        } catch (e) {
+            const idx = this.db.health.aiAdviceChat.findIndex(msg => msg.id === pendingId);
+            const failed = { role: 'assistant', content: `分析失败：${e.message}`, at: new Date().toISOString(), model, error: true, retryPrompt: prompt };
+            if (idx >= 0) this.db.health.aiAdviceChat[idx] = failed;
+            else this.db.health.aiAdviceChat.push(failed);
+            this.save();
+            requestAnimationFrame(() => this.scrollAdviceToLatest(true));
+        } finally {
+            this._adviceSending = false;
+            const send = document.getElementById('adviceSendBtn');
+            if (send) send.disabled = true;
         }
     },
 
@@ -50,17 +183,39 @@ const advicePanel = {
         this.saveAndBackup();
     },
 
+    copyAdviceMessage(idx) {
+        const msg = (this.db.health.aiAdviceChat || [])[idx];
+        if (!msg?.content) return;
+        navigator.clipboard?.writeText(msg.content).catch(() => {});
+        workout?.showToast?.('已复制 AI 回答');
+    },
+
+    retryAdviceFrom(idx) {
+        const msg = (this.db.health.aiAdviceChat || [])[idx];
+        const prompt = msg?.retryPrompt || this.db.health.aiAdviceChat?.slice(0, idx).reverse().find(m => m.role === 'user')?.content;
+        if (prompt) this.sendAiAdvice(prompt);
+    },
+
+    scrollAdviceToLatest(force = false) {
+        const list = document.querySelector('.advice-chat-list');
+        const latest = document.querySelector('[data-advice-latest="true"]');
+        if (list) list.scrollTo({ top: list.scrollHeight, behavior: force ? 'smooth' : 'auto' });
+        if (latest) latest.scrollIntoView({ block: 'end', behavior: force ? 'smooth' : 'auto' });
+    },
+
     renderAdviceMessages(messages) {
-        if (!messages.length) return '<div class="empty-state" style="padding:12px"><p>还没有 AI 建议</p></div>';
+        if (!messages.length) return '<div class="empty-state advice-empty"><span class="material-symbols-rounded">forum</span><p>还没有 AI 建议，选择下方快捷问题开始</p></div>';
         const groups = messages.reduce((acc, msg, idx) => {
             const date = this.dateKey(this.parseHistoryDate(msg.at));
             if (!acc[date]) acc[date] = [];
             acc[date].push({ ...msg, idx });
             return acc;
         }, {});
-        return Object.keys(groups).sort((a, b) => b.localeCompare(a)).map(date => {
-            const collapsed = this.isCollapsed(`advice_${date}`, date !== this.dateKey(new Date()));
+        const lastIdx = messages.length - 1;
+        return Object.keys(groups).sort((a, b) => a.localeCompare(b)).map(date => {
             const list = groups[date];
+            const today = date === this.dateKey(new Date());
+            const collapsed = this.isCollapsed(`advice_${date}`, !today && list.every(msg => msg.idx < lastIdx - 4));
             return `<section class="advice-date-group ${collapsed ? 'collapsed' : ''}">
                 <button class="advice-date-head" onclick="data.toggleCollapse('advice_${date}')" type="button">
                     <span class="material-symbols-rounded">event_note</span>
@@ -69,42 +224,65 @@ const advicePanel = {
                     <span class="material-symbols-rounded">${collapsed ? 'expand_more' : 'expand_less'}</span>
                 </button>
                 <div class="advice-date-content">
-                    ${list.map(msg => this.renderAdviceMessage(msg)).join('')}
+                    ${list.map(msg => this.renderAdviceMessage(msg, msg.idx === lastIdx)).join('')}
                 </div>
             </section>`;
         }).join('');
     },
 
-    renderAdviceMessage(msg) {
+    renderAdviceMessage(msg, latest = false) {
         const label = msg.role === 'user' ? '我' : 'AI';
         const time = this.parseHistoryDate(msg.at).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
         const model = msg.model ? ` · ${this.escapeHtml(msg.model)}` : '';
         const content = this.escapeHtml(msg.content).replace(/\n/g, '<br>');
-        return `<div class="advice-bubble ${msg.role}">
+        const state = msg.pending ? ' pending' : msg.error ? ' error' : '';
+        const actions = msg.role === 'assistant'
+            ? `<div class="advice-bubble-actions">
+                <button onclick="data.copyAdviceMessage(${msg.idx})" type="button">复制</button>
+                ${(msg.error || !msg.pending) ? `<button onclick="data.retryAdviceFrom(${msg.idx})" type="button">重试</button>` : ''}
+                <button onclick="data.deleteAiAdviceMessage(${msg.idx})" type="button">删除</button>
+            </div>`
+            : `<div class="advice-bubble-actions"><button onclick="data.deleteAiAdviceMessage(${msg.idx})" type="button">删除</button></div>`;
+        return `<div class="advice-bubble ${msg.role}${state}" ${latest ? 'data-advice-latest="true"' : ''}>
             <div class="advice-bubble-head">
                 <b>${label}<small>${time}${model}</small></b>
-                <button class="advice-delete-btn" onclick="data.deleteAiAdviceMessage(${msg.idx})" aria-label="删除这条建议"><span class="material-symbols-rounded">delete</span></button>
+                ${msg.pending ? '<span class="advice-typing-dot"></span>' : ''}
             </div>
             <p>${content}</p>
+            ${actions}
         </div>`;
     },
 
     renderAdvicePanel() {
         const messages = this.db.health.aiAdviceChat || [];
-        const modelOptions = (ai.models && ai.models.length ? ai.models : [{ id: ai.cfg.model || '当前配置模型' }]);
+        const draft = this.escapeHtml(this.restoreAdviceDraft());
+        const activeModel = this.adviceModel || '__current__';
+        const modelOptions = [{ id: '__current__', name: ai.cfg.model ? `当前配置：${ai.cfg.model}` : '当前配置模型' }, ...(ai.models || [])];
+        const contexts = { diet: true, training: true, weight: true, goal: true, ...(this.adviceContexts || {}) };
+        const range = this.adviceRange || 'today';
+        const quicks = ['分析我最近减重停滞的原因', '根据今天饮食给我晚餐建议', '帮我调整本周训练强度', '我今天蛋白质够不够？'];
         return `<div class="md-card advice-main-card">
-            <div class="panel-head">
-                <div>
-                    <span class="cardio-kicker">AI 分析建议</span>
-                    <h3>基于训练 / 饮食 / 体重数据</h3>
-                    <small>${messages.length ? `已生成 ${Math.floor(messages.length / 2)} 轮建议` : '可选择模型并提问'}</small>
+            <div class="advice-chat-shell">
+                <div class="advice-chat-header">
+                    <div>
+                        <span class="cardio-kicker">AI 分析建议</span>
+                        <h3>训练 / 饮食 / 体重分析</h3>
+                        <small>${messages.length ? `已生成 ${Math.floor(messages.length / 2)} 轮建议` : '像聊天一样提问，AI 会结合你的记录分析'}</small>
+                    </div>
+                    <span class="material-symbols-rounded advice-chat-icon">psychology</span>
                 </div>
-            </div>
-            <div class="advice-panel">
-                <div class="md-field"><select id="adviceModel">${modelOptions.map(m => `<option value="${m.id}" ${m.id === ai.cfg.model ? 'selected' : ''}>${m.id}</option>`).join('')}</select><label>分析模型</label></div>
+                <div class="advice-context-bar">
+                    <div class="md-field advice-model-field"><select id="adviceModel" onchange="data.setAdviceModel(this.value)">${modelOptions.map(m => `<option value="${m.id}" ${m.id === activeModel ? 'selected' : ''}>${this.escapeHtml(m.name || m.id)}</option>`).join('')}</select><label>分析模型</label></div>
+                    <div class="advice-range-tabs">${[['today','今日'],['week','7天'],['month','30天'],['all','全部']].map(([key, label]) => `<button class="advice-pill ${range === key ? 'active' : ''}" onclick="data.setAdviceRange('${key}')" type="button">${label}</button>`).join('')}</div>
+                    <div class="advice-context-toggles">${[['diet','饮食'],['training','训练'],['weight','体重'],['goal','目标']].map(([key, label]) => `<button class="advice-pill ${contexts[key] ? 'active' : ''}" onclick="data.toggleAdviceContext('${key}')" type="button">${label}</button>`).join('')}</div>
+                </div>
                 <div class="advice-chat-list">${this.renderAdviceMessages(messages)}</div>
-                <div class="md-field span-full"><input type="text" id="advicePrompt" placeholder=" "><label>向 AI 提问，例如：我最近减重停滞的原因是什么？</label></div>
-                <div class="advice-actions"><button class="md-btn md-btn-filled" onclick="data.sendAiAdvice()"><span class="material-symbols-rounded">send</span> 获取建议</button><div id="adviceStatus" class="food-ai-status"></div></div>
+                <div class="advice-quick-prompts">${quicks.map(q => `<button onclick="data.useAdvicePrompt('${this.escapeHtml(q)}')" type="button">${this.escapeHtml(q)}</button>`).join('')}</div>
+                <div class="advice-composer">
+                    <textarea id="advicePrompt" class="advice-composer-input" rows="1" placeholder="向 AI 提问，例如：我最近减重停滞的原因是什么？" oninput="data.onAdvicePromptInput(this)" onkeydown="data.onAdvicePromptKeydown(event)">${draft}</textarea>
+                    <button id="adviceSendBtn" class="advice-send-btn" onclick="data.sendAiAdvice()" type="button" ${draft.trim() ? '' : 'disabled'} aria-label="发送问题"><span class="material-symbols-rounded">send</span></button>
+                </div>
+                <div id="adviceStatus" class="food-ai-status advice-status-line">Enter 发送，Shift + Enter 换行</div>
             </div>
         </div>`;
     }

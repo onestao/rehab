@@ -144,7 +144,7 @@
                         <button class="theme-swatch theme-green" data-theme="green" onclick="theme.setPreset('green')" aria-label="绿色主题"></button>
                         <button class="theme-swatch theme-orange" data-theme="orange" onclick="theme.setPreset('orange')" aria-label="橙色主题"></button>
                         <button class="theme-swatch theme-rose" data-theme="rose" onclick="theme.setPreset('rose')" aria-label="玫红主题"></button>
-                        <button class="md-btn md-btn-tonal theme-monet" data-theme="monet" onclick="theme.useMonet()"><span class="material-symbols-rounded">auto_awesome</span> 莫奈</button>
+                        <button class="md-btn md-btn-tonal theme-monet" data-theme="monet" onclick="theme.useMonet()" aria-label="莫奈取色"><span class="material-symbols-rounded">auto_awesome</span></button>
                         <label class="color-picker"><input type="color" id="themeColor" value="#0061a4" oninput="theme.setCustom(this.value)"><span class="material-symbols-rounded">format_color_fill</span></label>
                     </div>
                 </div>
@@ -281,6 +281,7 @@
     <script>
         const ui = {
             tab: (id, el) => {
+                data.captureAdviceDraft?.();
                 document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
                 document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
                 document.getElementById(id).classList.add('active');
