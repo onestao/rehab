@@ -14,6 +14,7 @@ const workout = {
     pipCanvas: null,
     pipCtx: null,
     pipStream: null,
+    _pipVideoControlSync: false,
 
     async speak(text) {
         if (!text) return;
@@ -57,9 +58,9 @@ const workout = {
     setupMediaSession() {
         if (!('mediaSession' in navigator)) return;
         navigator.mediaSession.metadata = new MediaMetadata({ title: '训练中', artist: '训练助手' });
-        navigator.mediaSession.playbackState = 'playing';
-        navigator.mediaSession.setActionHandler('play', () => { if (this.isPaused) this.toggle(); });
-        navigator.mediaSession.setActionHandler('pause', () => { if (!this.isPaused && this.isPlaying) this.toggle(); });
+        navigator.mediaSession.playbackState = this.isPaused ? 'paused' : 'playing';
+        navigator.mediaSession.setActionHandler('play', () => { if (this.isPaused) this.setTrainingPaused(false); });
+        navigator.mediaSession.setActionHandler('pause', () => { if (!this.isPaused && this.isPlaying) this.setTrainingPaused(true); });
         navigator.mediaSession.setActionHandler('stop', () => this.stop());
         navigator.mediaSession.setActionHandler('nexttrack', () => this.skip());
     },
@@ -198,7 +199,7 @@ const workout = {
     },
 
     async openDocumentPip() {
-        const pip = await window.documentPictureInPicture.requestWindow({ width: 320, height: 420 });
+        const pip = await window.documentPictureInPicture.requestWindow({ width: 360, height: 480 });
         this.pipWindow = pip;
         this.pipMode = 'document';
         this.writePipDocument(pip.document);
@@ -229,16 +230,32 @@ const workout = {
             if (this.pipMode === 'video') {
                 this.stopPipSync();
                 this.pipMode = null;
+                this.clearVideoPipHandlers(video);
                 this.updatePipButton();
             }
         };
-        video.onpause = () => {
-            if (this.pipMode === 'video' && this.isPlaying && !this.isPaused) video.play().catch(()=>{});
-        };
+        video.onpause = () => this.syncVideoPipPlayback(false, video);
+        video.onplay = () => this.syncVideoPipPlayback(true, video);
         this.startPipSync();
         this.renderPip();
-        this.showToast('已打开视频画中画：小窗显示训练状态，控制请用通知栏或返回页面');
+        this.showToast('已打开视频画中画：可用小窗播放/暂停控制训练');
         this.updatePipButton();
+    },
+
+    syncVideoPipPlayback(playing, video) {
+        if (this._pipVideoControlSync || this.pipMode !== 'video' || !this.isPlaying) return;
+        this._pipVideoControlSync = true;
+        this.setTrainingPaused(!playing);
+        if (playing && video.paused) video.play().catch(() => {});
+        this._pipVideoControlSync = false;
+    },
+
+    clearVideoPipHandlers(video = document.getElementById('pipVideo')) {
+        if (!video) return;
+        video.onleavepictureinpicture = null;
+        video.onpause = null;
+        video.onplay = null;
+        this._pipVideoControlSync = false;
     },
 
     startPipSync() {
@@ -260,6 +277,7 @@ const workout = {
         this.pipWindow = null;
         if (pip && !pip.closed) pip.close();
         const video = document.getElementById('pipVideo');
+        this.clearVideoPipHandlers(video);
         if (document.pictureInPictureElement === video && typeof document.exitPictureInPicture === 'function') {
             document.exitPictureInPicture().catch(() => {});
         }
@@ -273,8 +291,36 @@ const workout = {
         doc.close();
     },
 
-    pipStyles() {
+    legacyPipStyles() {
         return `:root{color-scheme:dark;--primary:#a0cafd;--primary-container:#00497d;--surface:#111418;--surface-high:#1e2024;--surface-higher:#282a2f;--on:#e3e2e6;--muted:#c3c7cf;--danger:#ffb4ab;--danger-bg:#93000a}*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;background:radial-gradient(circle at top right,rgba(160,202,253,.22),transparent 46%),linear-gradient(145deg,#001d36,#00497d 52%,#0061a4);font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans SC',sans-serif;color:var(--on);overflow:hidden}.pip-card{width:100%;min-height:100vh;padding:16px;display:grid;grid-template-rows:auto auto auto auto auto 1fr auto;gap:10px}.pip-head{display:flex;align-items:center;justify-content:space-between}.pip-kicker{font-size:12px;font-weight:900;letter-spacing:.18em;color:var(--primary);text-transform:uppercase}.pip-icon-btn{width:34px;height:34px;border:0;border-radius:999px;background:rgba(255,255,255,.12);color:var(--on);font-size:24px;line-height:1;cursor:pointer}.pip-status{justify-self:start;padding:4px 10px;border-radius:999px;background:rgba(209,228,255,.14);color:var(--primary);font-size:12px;font-weight:900;letter-spacing:.16em}.pip-time{font-size:clamp(58px,27vw,96px);font-weight:950;line-height:.95;color:#d1e4ff;text-shadow:0 8px 32px rgba(160,202,253,.28);font-variant-numeric:tabular-nums;letter-spacing:-2px}.pip-sub{min-height:42px;color:rgba(255,255,255,.72);font-size:16px;font-weight:700;line-height:1.35;word-break:break-word}.pip-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.pip-stats div{padding:10px 8px;border-radius:18px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.1)}.pip-stats small{display:block;color:rgba(255,255,255,.58);font-size:11px;font-weight:700}.pip-stats b{display:block;margin-top:3px;color:#fff;font-size:15px;font-variant-numeric:tabular-nums}.pip-actions{align-self:end;display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:8px}.pip-btn{height:46px;border:0;border-radius:999px;background:rgba(255,255,255,.14);color:var(--on);font-size:14px;font-weight:900;cursor:pointer}.pip-btn:disabled{opacity:.42;cursor:not-allowed}.pip-primary{background:var(--primary);color:#003258}.pip-danger{background:var(--danger-bg);color:var(--danger)}.pip-hint{margin:0;text-align:center;color:rgba(255,255,255,.48);font-size:11px}.paused .pip-status{background:rgba(242,218,255,.18);color:#f2daff}.paused .pip-primary{background:#f2daff;color:#3b2948}`;
+    },
+
+    pipStyles() {
+        return `
+            :root{color-scheme:dark;--primary:#a0cafd;--surface:#111418;--on:#e3e2e6;--danger:#ffb4ab}
+            *{box-sizing:border-box}
+            body{margin:0;min-height:100vh;display:grid;place-items:center;background:radial-gradient(circle at 80% 8%,rgba(160,202,253,.28),transparent 44%),radial-gradient(circle at 12% 84%,rgba(209,228,255,.16),transparent 38%),linear-gradient(145deg,#001d36,#00497d 52%,#0061a4);font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans SC',sans-serif;color:var(--on);overflow:hidden;text-align:center}
+            .pip-card{width:100%;min-height:100vh;padding:18px;display:grid;grid-template-rows:auto auto minmax(90px,1fr) auto auto auto auto;gap:14px;background:rgba(17,20,24,.08)}
+            .pip-head{display:flex;align-items:center;justify-content:space-between;text-align:left}
+            .pip-kicker{font-size:13px;font-weight:950;letter-spacing:.18em;color:var(--primary);text-transform:uppercase}
+            .pip-icon-btn{width:38px;height:38px;border:0;border-radius:999px;background:rgba(255,255,255,.14);color:var(--on);font-size:26px;line-height:1;cursor:pointer}
+            .pip-status{justify-self:center;display:inline-flex;align-items:center;justify-content:center;padding:6px 14px;border-radius:999px;background:rgba(209,228,255,.15);color:var(--primary);font-size:13px;font-weight:950;letter-spacing:.16em;min-width:96px}
+            .pip-time{align-self:end;font-size:clamp(72px,28vw,118px);font-weight:950;line-height:.9;color:#d1e4ff;text-shadow:0 10px 34px rgba(160,202,253,.32);font-variant-numeric:tabular-nums;letter-spacing:-3px}
+            .pip-sub{align-self:start;min-height:52px;color:rgba(255,255,255,.78);font-size:18px;font-weight:800;line-height:1.35;word-break:break-word;display:flex;align-items:flex-start;justify-content:center;padding:0 8px}
+            .pip-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+            .pip-stats div{padding:12px 8px;border-radius:20px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.12);box-shadow:0 10px 26px rgba(0,0,0,.14)}
+            .pip-stats small{display:block;color:rgba(255,255,255,.64);font-size:12px;font-weight:800;line-height:1.2}
+            .pip-stats b{display:block;margin-top:4px;color:#fff;font-size:17px;font-weight:950;font-variant-numeric:tabular-nums;line-height:1.18}
+            .pip-actions{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:10px}
+            .pip-btn{height:46px;border:0;border-radius:18px;background:rgba(255,255,255,.15);color:var(--on);font-size:15px;font-weight:950;cursor:pointer;box-shadow:0 10px 24px rgba(0,0,0,.14)}
+            .pip-btn:disabled{opacity:.42}
+            .pip-primary{background:#d1e4ff;color:#003258}
+            .pip-danger{background:rgba(255,180,171,.2);color:var(--danger)}
+            .pip-hint{margin:0;color:rgba(255,255,255,.58);font-size:12px;font-weight:700;line-height:1.35}
+            .paused .pip-card{background:rgba(0,0,0,.2)}
+            .paused .pip-status{background:rgba(242,218,255,.18);color:#f2daff}
+            @media (max-width:330px),(max-height:390px){.pip-card{padding:14px;gap:10px}.pip-time{font-size:clamp(58px,27vw,92px)}.pip-sub{font-size:16px;min-height:42px}.pip-stats{gap:7px}.pip-stats div{padding:9px 5px;border-radius:16px}.pip-stats b{font-size:14px}.pip-btn{height:40px;font-size:13px}.pip-hint{font-size:11px}}
+        `;
     },
 
     bindPipControls(pip) {
@@ -357,35 +403,41 @@ const workout = {
         ctx.fillStyle = 'rgba(255,255,255,0.10)';
         ctx.roundRect(28, 24, w - 56, h - 48, 28);
         ctx.fill();
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'alphabetic';
         ctx.fillStyle = '#a0cafd';
-        ctx.font = '800 20px system-ui, sans-serif';
-        ctx.fillText('训练助手', 52, 58);
-        ctx.fillStyle = this.isPaused ? '#f2daff' : '#d1e4ff';
         ctx.font = '900 22px system-ui, sans-serif';
-        ctx.fillText(status, 52, 96);
+        ctx.fillText('训练助手', w / 2, 60);
+        ctx.fillStyle = this.isPaused ? '#f2daff' : '#d1e4ff';
+        ctx.font = '900 24px system-ui, sans-serif';
+        ctx.fillText(status, w / 2, 98);
         ctx.fillStyle = '#d1e4ff';
-        ctx.font = '900 110px system-ui, sans-serif';
+        ctx.font = '900 116px system-ui, sans-serif';
         ctx.textBaseline = 'middle';
-        ctx.fillText(time, 52, 174);
+        ctx.fillText(time, w / 2, 172);
         ctx.textBaseline = 'alphabetic';
         ctx.fillStyle = 'rgba(255,255,255,0.78)';
-        ctx.font = '700 28px system-ui, sans-serif';
-        this.wrapCanvasText(ctx, sub, 52, 254, w - 104, 34, 2);
-        this.drawVideoPipStat(ctx, 52, 306, labelA, valueA);
-        this.drawVideoPipStat(ctx, 238, 306, labelB, valueB);
-        this.drawVideoPipStat(ctx, 424, 306, labelC, valueC);
+        ctx.font = '800 30px system-ui, sans-serif';
+        this.wrapCanvasText(ctx, sub, w / 2, 250, w - 112, 34, 2);
+        ctx.textAlign = 'left';
+        this.drawVideoPipStat(ctx, 55, 294, labelA, valueA);
+        this.drawVideoPipStat(ctx, 238, 294, labelB, valueB);
+        this.drawVideoPipStat(ctx, 421, 294, labelC, valueC);
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'alphabetic';
     },
 
     drawVideoPipStat(ctx, x, y, label, value) {
         ctx.fillStyle = 'rgba(255,255,255,0.15)';
-        ctx.roundRect(x, y, 164, 36, 16);
+        ctx.roundRect(x, y, 164, 42, 18);
         ctx.fill();
+        ctx.textAlign = 'center';
         ctx.fillStyle = 'rgba(255,255,255,0.62)';
-        ctx.font = '700 13px system-ui, sans-serif';
-        ctx.fillText(label, x + 14, y + 15);
+        ctx.font = '800 14px system-ui, sans-serif';
+        ctx.fillText(label, x + 82, y + 17);
         ctx.fillStyle = '#ffffff';
-        ctx.font = '900 16px system-ui, sans-serif';
-        ctx.fillText(value || '-', x + 14, y + 31);
+        ctx.font = '900 18px system-ui, sans-serif';
+        ctx.fillText(value || '-', x + 82, y + 35);
     },
 
     wrapCanvasText(ctx, text, x, y, maxWidth, lineHeight, maxLines) {
@@ -418,6 +470,31 @@ const workout = {
         document.body.classList.toggle('is-cardio-mode', this.mode === 'cardio');
         this.updatePipButton();
         this.renderPip();
+    },
+
+    setTrainingPaused(paused) {
+        if (!this.isPlaying) return;
+        const nextPaused = !!paused;
+        if (this.mode === 'cardio') {
+            cardio.isPaused = nextPaused;
+            this.isPaused = nextPaused;
+            document.body.classList.toggle('is-cardio-paused', nextPaused);
+        } else {
+            this.isPaused = nextPaused;
+            if (nextPaused) window.speechSynthesis.pause();
+            else window.speechSynthesis.resume();
+        }
+        document.getElementById('playIcon').innerText = nextPaused ? 'play_arrow' : 'pause';
+        if ('mediaSession' in navigator) navigator.mediaSession.playbackState = nextPaused ? 'paused' : 'playing';
+        if (!nextPaused) {
+            this.reinforceKeepAlive();
+            const video = document.getElementById('pipVideo');
+            if (this.pipMode === 'video' && video?.paused && !this._pipVideoControlSync) {
+                this._pipVideoControlSync = true;
+                video.play().catch(() => {}).finally(() => { this._pipVideoControlSync = false; });
+            }
+        }
+        this.updateStateClasses();
     },
 
     setMode(mode) {
@@ -478,12 +555,7 @@ const workout = {
             await this.speak("训练开始");
             this.run();
         } else {
-            this.isPaused = !this.isPaused;
-            this.updateStateClasses();
-            document.getElementById('playIcon').innerText = this.isPaused ? 'play_arrow' : 'pause';
-            if ('mediaSession' in navigator) navigator.mediaSession.playbackState = this.isPaused ? 'paused' : 'playing';
-            if(this.isPaused) window.speechSynthesis.pause(); else window.speechSynthesis.resume();
-            this.renderPip();
+            this.setTrainingPaused(!this.isPaused);
         }
     },
 
@@ -684,12 +756,7 @@ const cardio = {
             this.timer = setInterval(() => this.tick(), 1000);
             return;
         }
-        this.isPaused = !this.isPaused;
-        workout.isPaused = this.isPaused;
-        workout.updateStateClasses();
-        document.body.classList.toggle('is-cardio-paused', this.isPaused);
-        document.getElementById('playIcon').innerText = this.isPaused ? 'play_arrow' : 'pause';
-        workout.renderPip();
+        workout.setTrainingPaused(!this.isPaused);
     },
 
     tick() {
