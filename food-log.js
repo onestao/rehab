@@ -1,6 +1,8 @@
 const foodLog = {
     attach(target) {
         Object.assign(target, {
+            foodEntry: this.foodEntry,
+            formatAiDraft: this.formatAiDraft,
             addFoodLog: this.addFoodLog,
             deleteFoodLog: this.deleteFoodLog,
             startEditFoodLog: this.startEditFoodLog,

@@ -26,6 +26,7 @@ const advicePanel = {
             autoResizeAdvicePrompt: this.autoResizeAdvicePrompt,
             adviceRangeStart: this.adviceRangeStart,
             filterByAdviceRange: this.filterByAdviceRange,
+            visibleAdviceMessages: this.visibleAdviceMessages,
             renderAdviceMessages: this.renderAdviceMessages,
             renderAdviceMessage: this.renderAdviceMessage,
             renderAdvicePanel: this.renderAdvicePanel
@@ -169,6 +170,13 @@ const advicePanel = {
         });
     },
 
+    visibleAdviceMessages(messages = []) {
+        const withIndex = messages.map((msg, idx) => ({ ...msg, idx }));
+        const start = this.adviceRangeStart();
+        if (!start) return withIndex;
+        return withIndex.filter(msg => this.parseHistoryDate(msg.at) >= start);
+    },
+
     async requestAiAdvice(prompt, model) {
         const contexts = { diet: true, training: true, weight: true, goal: true, ...(this.adviceContexts || {}) };
         const history = contexts.training
@@ -267,14 +275,14 @@ const advicePanel = {
         const groups = messages.reduce((acc, msg, idx) => {
             const date = this.dateKey(this.parseHistoryDate(msg.at));
             if (!acc[date]) acc[date] = [];
-            acc[date].push({ ...msg, idx });
+            acc[date].push({ ...msg, idx: Number.isInteger(msg.idx) ? msg.idx : idx });
             return acc;
         }, {});
-        const lastIdx = messages.length - 1;
+        const lastVisibleIdx = messages[messages.length - 1]?.idx ?? messages.length - 1;
         return Object.keys(groups).sort((a, b) => a.localeCompare(b)).map(date => {
             const list = groups[date];
             const today = date === this.dateKey(new Date());
-            const collapsed = this.isCollapsed(`advice_${date}`, !today && list.every(msg => msg.idx < lastIdx - 4));
+            const collapsed = this.isCollapsed(`advice_${date}`, !today && list.every(msg => msg.idx < lastVisibleIdx - 4));
             return `<section class="advice-date-group ${collapsed ? 'collapsed' : ''}">
                 <button class="advice-date-head" onclick="data.toggleCollapse('advice_${date}')" type="button">
                     <span class="material-symbols-rounded">event_note</span>
@@ -283,7 +291,7 @@ const advicePanel = {
                     <span class="material-symbols-rounded">${collapsed ? 'expand_more' : 'expand_less'}</span>
                 </button>
                 <div class="advice-date-content">
-                    ${list.map(msg => this.renderAdviceMessage(msg, msg.idx === lastIdx)).join('')}
+                    ${list.map(msg => this.renderAdviceMessage(msg, msg.idx === lastVisibleIdx)).join('')}
                 </div>
             </section>`;
         }).join('');
@@ -314,19 +322,24 @@ const advicePanel = {
 
     renderAdvicePanel() {
         const messages = this.db.health.aiAdviceChat || [];
+        const visibleMessages = this.visibleAdviceMessages(messages);
         const draft = this.escapeHtml(this.restoreAdviceDraft());
         const activeModel = this.adviceModel || '__current__';
         const modelOptions = [{ id: '__current__', name: ai.cfg.model ? `当前配置：${ai.cfg.model}` : '当前配置模型' }, ...(ai.models || [])];
         const contexts = { diet: true, training: true, weight: true, goal: true, ...(this.adviceContexts || {}) };
         const range = this.adviceRange || 'today';
         const quicks = ['分析我最近减重停滞的原因', '根据今天饮食给我晚餐建议', '帮我调整本周训练强度', '我今天蛋白质够不够？'];
+        const rangeLabel = { today: '今日', week: '最近7天', month: '最近30天', all: '全部' }[range] || '今日';
+        const messageSummary = messages.length
+            ? `${rangeLabel}显示 ${Math.floor(visibleMessages.length / 2)} / 共 ${Math.floor(messages.length / 2)} 轮建议`
+            : '像聊天一样提问，AI 会结合你的记录分析';
         return `<div class="md-card advice-main-card">
             <div class="advice-chat-shell">
                 <div class="advice-chat-header">
                     <div>
                         <span class="cardio-kicker">AI 分析建议</span>
                         <h3>训练 / 饮食 / 体重分析</h3>
-                        <small>${messages.length ? `已生成 ${Math.floor(messages.length / 2)} 轮建议` : '像聊天一样提问，AI 会结合你的记录分析'}</small>
+                        <small>${messageSummary}</small>
                     </div>
                     <span class="material-symbols-rounded advice-chat-icon">psychology</span>
                 </div>
@@ -335,7 +348,7 @@ const advicePanel = {
                     <div class="advice-range-tabs">${[['today','今日'],['week','7天'],['month','30天'],['all','全部']].map(([key, label]) => `<button class="advice-pill ${range === key ? 'active' : ''}" onclick="data.setAdviceRange('${key}')" type="button">${label}</button>`).join('')}</div>
                     <div class="advice-context-toggles">${[['diet','饮食'],['training','训练'],['weight','体重'],['goal','目标']].map(([key, label]) => `<button class="advice-pill ${contexts[key] ? 'active' : ''}" onclick="data.toggleAdviceContext('${key}')" type="button">${label}</button>`).join('')}</div>
                 </div>
-                <div class="advice-chat-list">${this.renderAdviceMessages(messages)}</div>
+                <div class="advice-chat-list">${this.renderAdviceMessages(visibleMessages)}</div>
                 <div class="advice-quick-prompts">${quicks.map(q => `<button onclick="data.useAdvicePrompt('${this.escapeHtml(q)}')" type="button">${this.escapeHtml(q)}</button>`).join('')}</div>
                 <div class="advice-composer">
                     <textarea id="advicePrompt" class="advice-composer-input" rows="1" placeholder="向 AI 提问，例如：我最近减重停滞的原因是什么？" oninput="data.onAdvicePromptInput(this)" onkeydown="data.onAdvicePromptKeydown(event)">${draft}</textarea>
