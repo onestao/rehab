@@ -452,15 +452,35 @@ const data = {
         const intake = this.todayCalories();
         const exerciseCal = this.todayTrainingCalories();
         const goalCal = this.db.health.dietGoal?.dailyCal || 0;
-        return `<div class="md-card hero-card daily-hero">
-            <div class="hero-kicker">今日行动</div>
-            <div class="hero-title-row">
-                <div>
-                    <h3>${weight ? `${weight.weight.toFixed(1)} kg` : '记录今天'}</h3>
-                    <p>${intake} kcal 摄入 · ${exerciseCal} kcal 运动消耗 · 净热量 ${intake - exerciseCal}${goalCal ? ` · 目标 ${goalCal} kcal` : ''}</p>
+        const net = intake - exerciseCal;
+        const progress = goalCal ? Math.min(100, Math.round((intake / goalCal) * 100)) : 0;
+        const remaining = goalCal ? goalCal - intake : 0;
+        const monthNum = Number(today.slice(5, 7));
+        const dayNum = Number(today.slice(8, 10));
+        const weekdays = ['周日','周一','周二','周三','周四','周五','周六'];
+        const weekday = weekdays[new Date(today).getDay()];
+        let status = '';
+        let hint = '';
+        if (goalCal) {
+            if (remaining >= 500) { status = '空间充足'; hint = `还可摄入约 ${remaining} kcal，优先补蛋白和蔬菜`; }
+            else if (remaining >= 150) { status = '节奏良好'; hint = `还可摄入约 ${remaining} kcal，晚餐建议清淡均衡`; }
+            else if (remaining >= 0) { status = '接近目标'; hint = '已接近目标，控制油脂和零食'; }
+            else { status = '已超出目标'; hint = `已超出 ${Math.abs(remaining)} kcal，可增加散步或低强度活动`; }
+        }
+        return `<div class="md-card hero-card today-focus-card">
+            <div class="today-focus-row">
+                <div class="today-focus-text">
+                    <span class="hero-kicker">今日行动</span>
+                    <h3>${monthNum}月${dayNum}日 ${weekday}</h3>
+                    <p>${weight ? `当前体重 ${weight.weight.toFixed(1)} kg` : '记录饮食、训练和体重，形成今日闭环'}</p>
                 </div>
-                <span class="hero-icon material-symbols-rounded">monitoring</span>
+                ${goalCal ? `<div class="today-focus-ring" style="--progress:${progress}"><div><b>${progress}%</b><small>摄入进度</small></div></div>` : `<span class="hero-icon material-symbols-rounded">monitoring</span>`}
             </div>
+            <div class="today-focus-energy">
+                <strong>${intake}${goalCal ? ` / ${goalCal}` : ''} kcal</strong>
+                <span>${goalCal ? (remaining >= 0 ? `还可摄入 ${remaining} kcal` : `已超出 ${Math.abs(remaining)} kcal`) : '设置目标后显示进度'}</span>
+            </div>
+            ${goalCal ? `<div class="today-focus-hint"><b>${status}</b><p>${hint}</p></div>` : ''}
         </div>`;
     },
 
