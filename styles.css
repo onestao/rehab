@@ -1,5 +1,6 @@
 /* ============================================
    Material 3 Expressive — 训练助手
+   CSS snapshot for rollback / current-branch parity
    ============================================ */
 
 /* --- Design Tokens --- */
@@ -1152,8 +1153,10 @@ body {
     align-items: center;
     justify-content: space-between;
     gap: 12px;
+    width: 100%;
 }
 .diet-head h3 { font-size: 28px; line-height: 1.05; color: var(--md-sys-primary); }
+.diet-head .collapse-btn { position: relative; z-index: 1; }
 .diet-head small { color: var(--md-sys-on-surface-variant); }
 .food-source-tag {
     padding: 4px 10px;
@@ -1245,7 +1248,48 @@ body {
     letter-spacing: 0.2px;
     box-shadow: var(--md-sys-elevation-1);
 }
-.diet-meal-group { margin-top: 8px; }
+.diet-meal-group { display: grid; gap: 6px; margin-top: 8px; }
+.diet-meal-head {
+    width: 100%;
+    border: none;
+    padding: 8px 12px;
+    border-radius: var(--md-sys-shape-md);
+    background: var(--md-sys-surface-container);
+    color: var(--md-sys-on-surface);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+    text-align: left;
+    transition:
+        transform var(--md-sys-motion-duration-medium) var(--md-expressive-spring),
+        background var(--md-sys-motion-duration-short) var(--md-sys-motion-emphasized),
+        box-shadow var(--md-sys-motion-duration-short) var(--md-sys-motion-emphasized);
+}
+.diet-meal-head::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: currentColor;
+    opacity: 0;
+    transition: opacity var(--md-sys-motion-duration-short);
+}
+.diet-meal-head:hover { box-shadow: var(--md-sys-elevation-1); }
+.diet-meal-head:hover::after { opacity: var(--md-state-hover); }
+.diet-meal-head:active { transform: scale(0.985); background: var(--md-sys-surface-container-high); }
+.diet-meal-head:active::after { opacity: var(--md-state-press); }
+.diet-meal-head > * { position: relative; z-index: 1; }
+.diet-meal-head strong {
+    flex: 1; font-size: 13px; font-weight: 800; color: var(--md-sys-on-surface);
+}
+.diet-meal-head small {
+    font-size: 12px; font-weight: 700; color: var(--md-sys-primary);
+}
+.diet-meal-head .material-symbols-rounded { font-size: 18px; color: var(--md-sys-on-surface-variant); }
+.diet-meal-content { display: grid; gap: 4px; }
+.diet-meal-group.collapsed .diet-meal-content { display: none; }
 .diet-meal-title {
     font-size: 13px; font-weight: 800; color: var(--md-sys-on-surface); margin-bottom: 4px;
     display: flex; align-items: center; gap: 6px;

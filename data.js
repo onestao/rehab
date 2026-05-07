@@ -625,11 +625,21 @@ const data = {
             ${Object.entries(mealGroups).map(([key, items]) => {
                 if (items.length === 0) return '';
                 const subTotal = items.reduce((s, f) => s + f.cal, 0);
-                return `<div class="diet-meal-group">
-                    <div class="diet-meal-title">${mealNames[key]} <small>${subTotal} kcal</small></div>
-                    ${items.map(f => this._editingFoodLogId === f.id ? this.renderDietLogEditor(f) : this.renderDietLogItem(f)).join('')}
+                const mealCollapsed = this.isCollapsed(`diet_meal_${key}`, items.length > 3);
+                return `<div class="diet-meal-group ${mealCollapsed ? 'collapsed' : ''}">
+                    <button class="diet-meal-head" onclick="data.toggleCollapse('diet_meal_${key}')" type="button">
+                        <span class="material-symbols-rounded">restaurant</span>
+                        <strong>${mealNames[key]}</strong>
+                        <small>${items.length} 条 · ${subTotal} kcal</small>
+                        <span class="material-symbols-rounded">${mealCollapsed ? 'expand_more' : 'expand_less'}</span>
+                    </button>
+                    <div class="diet-meal-content">
+                        ${items.map(f => this._editingFoodLogId === f.id ? this.renderDietLogEditor(f) : this.renderDietLogItem(f)).join('')}
+                    </div>
                 </div>`;
             }).join('')}
+
+
             </div>
         </div>`;
     },
