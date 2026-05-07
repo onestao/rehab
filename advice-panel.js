@@ -226,13 +226,63 @@ const advicePanel = {
         const dietGoal = contexts.goal ? (this.db.health.dietGoal || {}) : {};
         const macros = contexts.diet ? this.todayMacros() : {};
         const rangeLabel = { today: '今日', week: '最近7天', month: '最近30天', all: '全部记录' }[this.adviceRange || 'today'];
-        const sys = '你是训练与营养健康顾问。基于用户记录给出简洁、可执行的建议。优先用短段落和清单表达，不要输出 markdown 表格。';
-        const user = `分析范围：${rangeLabel}\n用户提问：${prompt}\n\n训练记录：${JSON.stringify(history)}\n饮食记录：${JSON.stringify(foods)}\n今日宏量营养：${JSON.stringify(macros)}\n当前饮食目标：${JSON.stringify(dietGoal)}\n体重记录：${JSON.stringify(weights)}\n手动运动：${JSON.stringify(exerciseLogs)}`;
+
+        const formatTraining = (history) => history.map(h => {
+            const mins = Math.floor(h.duration / 60);
+            const secs = h.duration % 60;
+            const names = this.historyNames(h).join('、');
+            const meta = h.type === 'cardio'
+                ? `${Math.round(h.cardio.calories || 0)} kcal`
+                : `${h.actions.length}个动作`;
+            return `- ${h.date} ${mins}分${secs}秒 ${names} ${meta}`;
+        }).join('\n');
+
+        const formatFoods = (foods) => foods.map(f =>
+            `- ${f.date} ${f.meal === 'breakfast' ? '早餐' : f.meal === 'lunch' ? '午餐' : f.meal === 'dinner' ? '晚餐' : '加餐'} ${f.name}${f.grams ? ' ' + f.grams + 'g' : ''} ${f.cal} kcal P${Number(f.pro || 0).toFixed(0)} C${Number(f.carb || 0).toFixed(0)} F${Number(f.fat || 0).toFixed(0)}`
+        ).join('\n');
+
+        const formatExerciseLogs = (logs) => logs.map(e => {
+            const label = this.exerciseLabel(e.type, e);
+            return `- ${e.date} ${label} ${e.minutes}分钟 ${e.calories || 0} kcal${e.distance ? ' ' + e.distance + 'km' : ''}`;
+        }).join('\n');
+
+        const formatWeights = (weights) => weights.map(w =>
+            `- ${w.date} ${w.weight.toFixed(1)} kg`
+        ).join('\n');
+
+        const sys = `你是训练与营养健康顾问。基于用户的实际记录回答问题。规则：
+1. 必须引用至少 2 条具体的训练/饮食/体重记录作为证据
+2. 引用时请写出具体日期和内容，例如"5月6日午餐鸡胸肉饭 520 kcal"
+3. 如果数据不足无法判断，请明确说明不足，不要猜测
+4. 优先用短段落和清单表达，不要输出 markdown 表格
+5. 回答后可给出 1-2 条具体可执行的建议`;
+
+        const user = `分析范围：${rangeLabel}
+用户提问：${prompt}
+
+【训练记录】
+${formatTraining(history) || '暂无训练记录'}
+
+【饮食记录】
+${formatFoods(foods) || '暂无饮食记录'}
+
+【今日宏量营养】
+蛋白 ${macros.pro?.toFixed(1) || 0}g / 碳水 ${macros.carb?.toFixed(1) || 0}g / 脂肪 ${macros.fat?.toFixed(1) || 0}g
+
+【饮食目标】
+${dietGoal.dailyCal ? `每日 ${dietGoal.dailyCal} kcal` : '未设置'}
+
+【体重记录】
+${formatWeights(weights) || '暂无体重记录'}
+
+【手动运动】
+${formatExerciseLogs(exerciseLogs) || '暂无手动运动记录'}`;
+
         const conversation = this.adviceConversationContext();
         const oldModel = ai.cfg.model;
         ai.cfg.model = model;
         try {
-            return await ai.call([{ role: 'system', content: sys }, ...conversation, { role: 'user', content: user }], 1800);
+            return await ai.call([{ role: 'system', content: sys }, ...conversation, { role: 'user', content: user }], 2400);
         } finally {
             ai.cfg.model = oldModel;
         }
