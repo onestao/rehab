@@ -233,6 +233,7 @@ const data = {
         const customName = document.getElementById('manualExerciseCustom')?.value?.trim() || '';
         const minutes = parseInt(document.getElementById('manualExerciseMinutes')?.value) || 0;
         const calories = parseInt(document.getElementById('manualExerciseCalories')?.value) || 0;
+        const distance = parseFloat(document.getElementById('manualExerciseDistance')?.value) || 0;
         const note = document.getElementById('manualExerciseNote')?.value?.trim() || '';
         if (type === 'custom' && !customName) return alert('请输入自定义运动名称');
         if (minutes <= 0) return alert('请输入有效运动时长');
@@ -243,6 +244,7 @@ const data = {
             customName,
             minutes,
             calories,
+            distance,
             note,
             createdAt: new Date().toISOString()
         });
@@ -250,6 +252,7 @@ const data = {
         if (customEl) customEl.value = '';
         document.getElementById('manualExerciseMinutes').value = '';
         document.getElementById('manualExerciseCalories').value = '';
+        document.getElementById('manualExerciseDistance').value = '';
         document.getElementById('manualExerciseNote').value = '';
         this.saveAndBackup();
     },
@@ -527,24 +530,47 @@ const data = {
                     <span class="material-symbols-rounded">${collapsed ? 'expand_more' : 'expand_less'}</span>
                 </button>
                 <div class="history-month-content">
-                    ${items.map(({ h, i }) => {
-                        const mins = Math.floor(h.duration / 60);
-                        const secs = h.duration % 60;
-                        const names = this.historyNames(h).join('、');
-                        const meta = h.type === 'cardio'
-                            ? `${Math.round(h.cardio.calories || 0)} kcal &middot; ${h.cardio.weight || 0}kg`
-                            : `${h.actions.length}个动作`;
-                        const icon = this.historyIcon(h);
-                        return `<div class="list-item">
-                            <span class="record-icon material-symbols-rounded">${icon}</span>
-                            <div style="flex:1;min-width:0">
-                                <strong>${h.date}</strong>
-                                <small>${mins}分${secs}秒 &middot; ${meta}</small>
-                                <div class="item-chip">${names.length > 20 ? names.slice(0, 20) + '...' : names}</div>
-                            </div>
-                            <button class="delete-btn" onclick="data.deleteHistory(${i})"><span class="material-symbols-rounded">delete</span></button>
-                        </div>`;
-                    }).join('')}
+                    ${(() => {
+                        const sorted = [...items].sort((a, b) => {
+                            const da = this.parseHistoryDate(a.h.date);
+                            const db = this.parseHistoryDate(b.h.date);
+                            return db - da || b.i - a.i;
+                        });
+                        const recentItems = sorted.slice(0, 3);
+                        const olderItems = sorted.slice(3);
+                        const olderCollapsed = this.isCollapsed(`history_month_older_${key}`, true);
+                        const renderOne = ({ h, i }) => {
+                            const mins = Math.floor(h.duration / 60);
+                            const secs = h.duration % 60;
+                            const names = this.historyNames(h).join('、');
+                            const meta = h.type === 'cardio'
+                                ? `${Math.round(h.cardio.calories || 0)} kcal &middot; ${h.cardio.weight || 0}kg`
+                                : `${h.actions.length}个动作`;
+                            const icon = this.historyIcon(h);
+                            return `<div class="list-item">
+                                <span class="record-icon material-symbols-rounded">${icon}</span>
+                                <div style="flex:1;min-width:0">
+                                    <strong>${h.date}</strong>
+                                    <small>${mins}分${secs}秒 &middot; ${meta}</small>
+                                    <div class="item-chip">${names.length > 20 ? names.slice(0, 20) + '...' : names}</div>
+                                </div>
+                                <button class="delete-btn" onclick="data.deleteHistory(${i})"><span class="material-symbols-rounded">delete</span></button>
+                            </div>`;
+                        };
+                        let html = recentItems.map(renderOne).join('');
+                        if (olderItems.length > 0) {
+                            html += `<div class="history-older-group ${olderCollapsed ? 'collapsed' : ''}">
+                                <button class="history-older-head" onclick="data.toggleCollapse('history_month_older_${key}')" type="button">
+                                    <span class="material-symbols-rounded">expand_more</span>
+                                    <small>还有 ${olderItems.length} 条更早记录</small>
+                                </button>
+                                <div class="history-older-content">
+                                    ${olderItems.map(renderOne).join('')}
+                                </div>
+                            </div>`;
+                        }
+                        return html;
+                    })()}
                 </div>
             </section>`;
         }).join('');
@@ -701,10 +727,11 @@ const data = {
                     <div class="md-field hidden" id="manualExerciseCustomField"><input type="text" id="manualExerciseCustom" placeholder=" "><label>自定义运动名称</label></div>
                     <div class="md-field"><input type="number" id="manualExerciseMinutes" step="1" placeholder=" "><label>时长 分钟</label></div>
                     <div class="md-field"><input type="number" id="manualExerciseCalories" step="1" placeholder=" "><label>热量 kcal</label></div>
+                    <div class="md-field"><input type="number" id="manualExerciseDistance" step="0.1" placeholder=" "><label>距离 km</label></div>
                     <div class="md-field span-full"><input type="text" id="manualExerciseNote" placeholder=" "><label>备注</label></div>
                 </div>
                 <button class="md-btn md-btn-filled" onclick="data.addManualExercise()"><span class="material-symbols-rounded">add</span> 添加运动记录</button>
-                ${items.length ? `<div class="manual-ex-list">${items.map(e => `<div class="day-detail-item"><span class="record-icon material-symbols-rounded">${this.sportIcon(this.exerciseLabel(e.type, e))}</span><span>${this.exerciseLabel(e.type, e)} ${e.minutes} 分钟</span><small>${e.calories || 0} kcal</small><button class="delete-btn" onclick="data.deleteManualExercise('${e.id}')"><span class="material-symbols-rounded">delete</span></button></div>`).join('')}</div>` : ''}
+                ${items.length ? `<div class="manual-ex-list">${items.map(e => this._editingExerciseId === e.id ? this.renderManualExerciseEditor(e) : `<div class="day-detail-item"><span class="record-icon material-symbols-rounded">${this.sportIcon(this.exerciseLabel(e.type, e))}</span><span>${this.exerciseLabel(e.type, e)} ${e.minutes} 分钟${e.calories ? ` · ${e.calories} kcal` : ''}${e.distance ? ` · ${e.distance}km` : ''}</span><button class="food-log-action-btn" onclick="data.startEditManualExercise('${e.id}')" aria-label="编辑这条运动记录"><span class="material-symbols-rounded">edit</span></button><button class="delete-btn" onclick="data.deleteManualExercise('${e.id}')"><span class="material-symbols-rounded">delete</span></button></div>`).join('')}</div>` : ''}
             </div>
         </div>`;
     },
@@ -712,6 +739,75 @@ const data = {
     toggleManualCustomExercise(type) {
         const field = document.getElementById('manualExerciseCustomField');
         if (field) field.classList.toggle('hidden', type !== 'custom');
+    },
+
+    startEditManualExercise(id) {
+        const log = (this.db.health.exerciseLogs || []).find(e => e.id === id);
+        if (!log) return;
+        this._editingExerciseId = id;
+        this._editingExerciseDraft = {
+            id,
+            type: log.type || 'walk',
+            customName: log.customName || '',
+            minutes: log.minutes || '',
+            calories: log.calories || '',
+            distance: log.distance || '',
+            note: log.note || ''
+        };
+        this.render();
+    },
+
+    cancelEditManualExercise() {
+        this._editingExerciseId = null;
+        this._editingExerciseDraft = null;
+        this.render();
+    },
+
+    saveEditManualExercise(id) {
+        const draft = this._editingExerciseDraft;
+        if (!draft || draft.id !== id) return;
+        const idx = (this.db.health.exerciseLogs || []).findIndex(e => e.id === id);
+        if (idx < 0) return;
+        const minutes = parseInt(draft.minutes) || 0;
+        const calories = parseInt(draft.calories) || 0;
+        const distance = parseFloat(draft.distance) || 0;
+        if (minutes <= 0) return alert('请输入有效运动时长');
+        this.db.health.exerciseLogs[idx] = {
+            ...this.db.health.exerciseLogs[idx],
+            type: draft.type,
+            customName: draft.customName,
+            minutes,
+            calories,
+            distance,
+            note: draft.note
+        };
+        this._editingExerciseId = null;
+        this._editingExerciseDraft = null;
+        this.saveAndBackup();
+    },
+
+    renderManualExerciseEditor(e) {
+        const draft = this._editingExerciseDraft || {
+            type: e.type || 'walk',
+            customName: e.customName || '',
+            minutes: e.minutes || '',
+            calories: e.calories || '',
+            distance: e.distance || '',
+            note: e.note || ''
+        };
+        return `<div class="diet-log-editor">
+            <div class="food-inline-edit-grid">
+                <div class="md-field"><select onchange="data._editingExerciseDraft.type=this.value"><option value="walk" ${draft.type === 'walk' ? 'selected' : ''}>步行</option><option value="run" ${draft.type === 'run' ? 'selected' : ''}>跑步</option><option value="cycling" ${draft.type === 'cycling' ? 'selected' : ''}>骑行</option><option value="swim" ${draft.type === 'swim' ? 'selected' : ''}>游泳</option><option value="battle_rope" ${draft.type === 'battle_rope' ? 'selected' : ''}>战绳</option><option value="spin_bike" ${draft.type === 'spin_bike' ? 'selected' : ''}>动感单车</option><option value="strength" ${draft.type === 'strength' ? 'selected' : ''}>力量训练</option><option value="stretch" ${draft.type === 'stretch' ? 'selected' : ''}>拉伸/瑜伽</option><option value="custom" ${draft.type === 'custom' ? 'selected' : ''}>自定义</option></select><label>运动种类</label></div>
+                <div class="md-field"><input type="number" value="${draft.minutes}" oninput="data._editingExerciseDraft.minutes=this.value" placeholder=" "><label>时长 分钟</label></div>
+                <div class="md-field"><input type="number" value="${draft.calories}" oninput="data._editingExerciseDraft.calories=this.value" placeholder=" "><label>热量 kcal</label></div>
+                <div class="md-field"><input type="number" value="${draft.distance}" oninput="data._editingExerciseDraft.distance=this.value" step="0.1" placeholder=" "><label>距离 km</label></div>
+                <div class="md-field span-full"><input type="text" value="${this.escapeHtml(draft.note || '')}" oninput="data._editingExerciseDraft.note=this.value" placeholder=" "><label>备注</label></div>
+            </div>
+            <div class="food-inline-actions">
+                <button class="md-btn md-btn-tonal" onclick="data.cancelEditManualExercise()">取消</button>
+                <button class="md-btn md-btn-filled" onclick="data.saveEditManualExercise('${e.id}')"><span class="material-symbols-rounded">save</span> 保存</button>
+            </div>
+        </div>`;
     },
 
     renderWeightLossPanel() {
