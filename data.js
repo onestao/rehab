@@ -579,8 +579,9 @@ const data = {
     renderTodaySummary() {
         const today = this.dateKey(new Date());
         const entries = this.db.history.filter(h => this.dateKey(this.parseHistoryDate(h.date)) === today);
-        const minutes = Math.round(entries.reduce((sum, h) => sum + (h.duration || 0), 0) / 60);
-        const calories = Math.round(entries.reduce((sum, h) => sum + (h.cardio?.calories || 0), 0));
+        const manualExercises = this.todayExerciseLogs();
+        const minutes = Math.round(entries.reduce((sum, h) => sum + (h.duration || 0), 0) / 60) + manualExercises.reduce((sum, e) => sum + (e.minutes || 0), 0);
+        const calories = Math.round(entries.reduce((sum, h) => sum + (h.cardio?.calories || 0), 0)) + manualExercises.reduce((sum, e) => sum + (e.calories || 0), 0);
         const names = this.uniqueActionNames(entries);
         const intake = this.todayCalories();
         const macros = this.todayMacros();
@@ -641,7 +642,7 @@ const data = {
                     <button class="diet-meal-pill${(this._dietMeal || 'lunch') === 'snack' ? ' active' : ''}" onclick="data.setDietMeal('snack')" type="button">加餐</button>
                 </div>
                 <div class="diet-ai-entry">
-                    <textarea id="foodAiText" class="diet-ai-input" rows="1" placeholder="说说你这顿吃了什么，例如：鸡胸肉饭加一杯豆浆" oninput="data.autoResizeDietInput(this)"></textarea>
+                    <textarea id="foodAiText" class="diet-ai-input" rows="1" placeholder="描述这顿吃了什么…" oninput="data.autoResizeDietInput(this)"></textarea>
                     <button class="md-btn md-btn-filled diet-ai-run" onclick="data.aiParseFood()"><span class="material-symbols-rounded">psychology</span>AI识别</button>
                 </div>
                 <div id="foodSearchResults" class="food-search-results"></div>
