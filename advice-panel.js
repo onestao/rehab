@@ -212,19 +212,26 @@ const advicePanel = {
     async requestAiAdvice(prompt, model) {
         const contexts = { diet: true, training: true, weight: true, goal: true, ...(this.adviceContexts || {}) };
         const history = contexts.training
-            ? (this.db.history || []).slice(-30)
+            ? (this.db.history || []).slice(-60)
             : [];
         const foods = contexts.diet
-            ? (this.db.health.foodLogs || []).slice(-80)
+            ? (this.db.health.foodLogs || []).slice(-160)
             : [];
         const exerciseLogs = contexts.training
-            ? (this.db.health.exerciseLogs || []).slice(-60)
+            ? (this.db.health.exerciseLogs || []).slice(-120)
             : [];
         const weights = contexts.weight
-            ? this.sortedWeights().slice(-20)
+            ? this.sortedWeights().slice(-40)
             : [];
         const dietGoal = contexts.goal ? (this.db.health.dietGoal || {}) : {};
-        const macros = contexts.diet ? this.todayMacros() : {};
+        const macros = contexts.diet
+            ? foods.reduce((acc, f) => {
+                acc.pro += Number(f.pro || 0);
+                acc.carb += Number(f.carb || 0);
+                acc.fat += Number(f.fat || 0);
+                return acc;
+            }, { pro: 0, carb: 0, fat: 0 })
+            : {};
         const rangeLabel = { today: '今日', week: '最近7天', month: '最近30天', all: '全部记录' }[this.adviceRange || 'today'];
 
         const formatTraining = (history) => history.map(h => {
@@ -232,28 +239,29 @@ const advicePanel = {
             const secs = h.duration % 60;
             const names = this.historyNames(h).join('、');
             const meta = h.type === 'cardio'
-                ? `${Math.round(h.cardio.calories || 0)} kcal`
+                ? `${Math.round(h.cardio.calories || 0)} kcal · ${h.cardio?.type || h.cardio?.name || '有氧'}`
                 : `${h.actions.length}个动作`;
-            return `- ${h.date} ${mins}分${secs}秒 ${names} ${meta}`;
+            return `- ${h.date}｜训练时长 ${mins}分${secs}秒｜项目 ${names || '未命名'}｜${meta}`;
         }).join('\n');
 
         const formatFoods = (foods) => foods.map(f =>
-            `- ${f.date} ${f.meal === 'breakfast' ? '早餐' : f.meal === 'lunch' ? '午餐' : f.meal === 'dinner' ? '晚餐' : '加餐'} ${f.name}${f.grams ? ' ' + f.grams + 'g' : ''} ${f.cal} kcal P${Number(f.pro || 0).toFixed(0)} C${Number(f.carb || 0).toFixed(0)} F${Number(f.fat || 0).toFixed(0)}`
+            `- ${f.date}｜${f.meal === 'breakfast' ? '早餐' : f.meal === 'lunch' ? '午餐' : f.meal === 'dinner' ? '晚餐' : '加餐'}｜${f.name}${f.grams ? ' ' + f.grams + 'g' : ''}｜${f.cal} kcal｜P${Number(f.pro || 0).toFixed(0)} C${Number(f.carb || 0).toFixed(0)} F${Number(f.fat || 0).toFixed(0)}`
         ).join('\n');
 
         const formatExerciseLogs = (logs) => logs.map(e => {
             const label = this.exerciseLabel(e.type, e);
-            return `- ${e.date} ${label} ${e.minutes}分钟 ${e.calories || 0} kcal${e.distance ? ' ' + e.distance + 'km' : ''}`;
+            return `- ${e.date}｜${label}｜${e.minutes}分钟｜${e.calories || 0} kcal${e.distance ? `｜${e.distance}km` : ''}`;
         }).join('\n');
 
         const formatWeights = (weights) => weights.map(w =>
-            `- ${w.date} ${w.weight.toFixed(1)} kg`
+            `- ${w.date}｜${w.weight.toFixed(1)} kg`
         ).join('\n');
 
         const sys = `你是训练与营养健康顾问。基于用户的实际记录回答问题。规则：
-1. 必须引用至少 2 条具体的训练/饮食/体重记录作为证据
+1. 如果下方提供了训练/饮食/体重记录，你必须优先基于这些记录分析，不能忽略它们，也不能说“暂无记录”
+2. 必须引用至少 2 条具体的训练/饮食/体重记录作为证据
 2. 引用时请写出具体日期和内容，例如"5月6日午餐鸡胸肉饭 520 kcal"
-3. 如果数据不足无法判断，请明确说明不足，不要猜测
+3. 如果某一类数据确实为空，再说明该类数据不足，不要笼统说全部记录不足
 4. 优先用短段落和清单表达，不要输出 markdown 表格
 5. 回答后可给出 1-2 条具体可执行的建议`;
 
