@@ -29,13 +29,33 @@
     border-radius: var(--md-sys-shape-full);
     box-shadow: inset 0 0 0 1px rgba(0,0,0,0.12);
     cursor: pointer;
-    transition: transform var(--md-sys-motion-duration-short), border-color var(--md-sys-motion-duration-short);
+    position: relative;
+    overflow: hidden;
+    transition:
+        transform var(--md-sys-motion-duration-medium) var(--md-expressive-spring),
+        border-color var(--md-sys-motion-duration-short) var(--md-sys-motion-emphasized),
+        box-shadow var(--md-sys-motion-duration-short) var(--md-sys-motion-emphasized);
 }
+.theme-swatch::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: rgba(255,255,255,0.22);
+    opacity: 0;
+    transition: opacity var(--md-sys-motion-duration-short);
+}
+.theme-swatch:hover {
+    box-shadow:
+        0 3px 10px rgba(0,0,0,0.14),
+        inset 0 0 0 1px rgba(0,0,0,0.12);
+}
+.theme-swatch:hover::after { opacity: 0.5; }
 .theme-swatch.active,
 .theme-swatch:active {
     border-color: var(--md-sys-on-surface);
     transform: scale(1.08);
 }
+.theme-swatch:active::after { opacity: 0.7; }
 .theme-blue { background: #0061a4; }
 .theme-purple { background: #6750a4; }
 .theme-green { background: #1a5e1f; }

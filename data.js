@@ -533,8 +533,8 @@ const data = {
                     ${(() => {
                         const sorted = [...items].sort((a, b) => {
                             const da = this.parseHistoryDate(a.h.date);
-                            const db = this.parseHistoryDate(b.h.date);
-                            return db - da || b.i - a.i;
+                            const db2 = this.parseHistoryDate(b.h.date);
+                            return db2 - da || b.i - a.i;
                         });
                         const recentItems = sorted.slice(0, 3);
                         const olderItems = sorted.slice(3);

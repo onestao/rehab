@@ -30,17 +30,6 @@
     -webkit-tap-highlight-color: transparent;
     height: 64px;
     min-width: 0;
-    overflow: hidden;
-    transition: transform var(--md-sys-motion-duration-medium) var(--md-expressive-spring);
-}
-.nav-item::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: currentColor;
-    opacity: 0;
-    transition: opacity var(--md-sys-motion-duration-short);
-    border-radius: 28px;
 }
 .nav-content {
     width: 72px;
@@ -96,7 +85,4 @@
     border-radius: 24px;
 }
 .nav-item.active small { font-weight: 700; color: var(--md-sys-on-secondary-container); }
-.nav-item:hover::after { opacity: 0.04; }
-.nav-item:active { transform: scale(0.96); }
-.nav-item:active::after { opacity: 0.08; }
 

@@ -80,8 +80,7 @@
     --md-state-press: 0.14;
     --md-expressive-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 }
-
-/* --- Reset & Base --- */
+/* --- Reset & Base --- */
 *, *::before, *::after { box-sizing: border-box; margin: 0; }
 
 body {
@@ -93,8 +92,7 @@ body {
     -webkit-tap-highlight-color: transparent;
     line-height: 1.5;
 }
-
-.app-update-banner {
+.app-update-banner {
     position: sticky;
     top: 0;
     z-index: 300;
@@ -112,8 +110,7 @@ body {
 .app-update-banner strong { display: block; font-size: 13px; }
 .app-update-banner small { display: block; font-size: 11px; opacity: 0.85; }
 .app-update-banner .material-symbols-rounded { color: var(--md-sys-primary); }
-
-/* --- Top App Bar --- */
+/* --- Top App Bar --- */
 .md-top-app-bar {
     height: 64px;
     display: flex;
@@ -141,8 +138,7 @@ body {
     color: var(--md-sys-on-surface);
     letter-spacing: -0.2px;
 }
-
-/* --- Chip --- */
+/* --- Chip --- */
 .md-chip {
     display: flex;
     align-items: center;
@@ -155,8 +151,7 @@ body {
     color: var(--md-sys-on-surface-variant);
     letter-spacing: 0.3px;
 }
-
-/* --- Page --- */
+/* --- Page --- */
 .page { display: none; padding-bottom: 108px; min-height: calc(100vh - 64px); }
 .page.active { display: block; animation: fadeSlideIn var(--md-sys-motion-duration-medium) var(--md-sys-motion-emphasized-decelerate); }
 #workout { padding-bottom: 184px; }
@@ -165,8 +160,7 @@ body {
     from { opacity: 0; transform: translateY(8px); }
     to { opacity: 1; transform: translateY(0); }
 }
-
-/* --- Page Header --- */
+/* --- Page Header --- */
 .page-header {
     display: flex;
     align-items: center;
@@ -183,8 +177,7 @@ body {
     font-weight: 700;
     color: var(--md-sys-on-surface);
 }
-
-/* --- Cards --- */
+/* --- Cards --- */
 .md-card {
     background: var(--md-sys-surface-container-low);
     margin: 8px 16px;
@@ -199,8 +192,7 @@ body {
 .md-card:active {
     transform: scale(0.996);
 }
-
-/* --- Timer Panel (Expressive) --- */
+/* --- Timer Panel (Expressive) --- */
 .timer-panel {
     background: linear-gradient(145deg, var(--timer-gradient-start), var(--timer-gradient-mid) 42%, var(--timer-gradient-end) 100%);
     color: white;
@@ -286,8 +278,7 @@ body {
     color: var(--md-sys-amber) !important;
     text-shadow: 0 0 12px rgba(245,158,11,0.35);
 }
-
-/* --- Floating Label Input Fields --- */
+/* --- Floating Label Input Fields --- */
 .md-field {
     position: relative;
     margin-bottom: 4px;
@@ -340,8 +331,7 @@ body {
 }
 .md-field input::placeholder { color: transparent; }
 .md-field select { cursor: pointer; padding-right: 32px; }
-
-/* --- Grid --- */
+/* --- Grid --- */
 .md-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
@@ -349,16 +339,14 @@ body {
     margin: 8px 0;
 }
 .span-full { grid-column: 1 / -1; }
-
-/* --- Divider --- */
+/* --- Divider --- */
 .md-divider {
     height: 1px;
     background: var(--md-sys-outline-variant);
     margin: 12px 0;
     opacity: 0.6;
 }
-
-/* --- Switch (M3 Expressive) --- */
+/* --- Switch (M3 Expressive) --- */
 .md-switch {
     display: flex;
     align-items: center;
@@ -408,8 +396,7 @@ body {
     transform: translateY(-50%);
     background: var(--md-sys-on-primary);
 }
-
-/* --- Buttons --- */
+/* --- Buttons --- */
 .md-btn {
     border: none;
     border-radius: var(--md-sys-shape-full);
@@ -471,8 +458,7 @@ body {
 .md-btn-tonal:hover { box-shadow: var(--md-sys-elevation-1); }
 
 .md-row { display: flex; gap: 8px; margin-top: 8px; }
-
-/* --- List Items (Expressive) --- */
+/* --- List Items (Expressive) --- */
 .list-item {
     background: var(--md-sys-surface-container-lowest);
     padding: 14px 16px;
@@ -666,8 +652,7 @@ body {
 .weight-history-head small { position: relative; z-index: 1; color: var(--md-sys-on-surface-variant); font-size: 11px; font-weight: 700; white-space: nowrap; }
 .weight-history-content { display: grid; gap: 6px; }
 .weight-history-card.collapsed .weight-history-content { display: none; }
-
-/* --- Record Calendar --- */
+/* --- Record Calendar --- */
 .record-section-title {
     margin: 14px 20px 6px;
     font-size: 14px;
@@ -963,8 +948,7 @@ body {
     border-radius: var(--md-sys-shape-full);
     flex: none;
 }
-
-/* --- Record Tabs & Health --- */
+/* --- Record Tabs & Health --- */
 .record-tabs,
 .weight-range-tabs {
     display: flex;
@@ -1183,8 +1167,7 @@ body {
     border-radius: var(--md-sys-shape-full); background: var(--md-sys-secondary-container);
     color: var(--md-sys-on-secondary-container); white-space: nowrap; overflow: visible; text-overflow: unset;
 }
-
-/* --- Diet Card --- */
+/* --- Diet Card --- */
 .diet-card { display: grid; gap: 14px; }
 .diet-head {
     display: flex;
@@ -1749,8 +1732,7 @@ body {
 .advice-empty { align-self: stretch; }
 .advice-bubble.assistant p { color: var(--md-sys-on-surface); }
 .advice-bubble.assistant.error p { color: var(--md-sys-on-error-container); }
-
-/* --- Weight Loss Plan --- */
+/* --- Weight Loss Plan --- */
 .weightloss-card { display: grid; gap: 14px; }
 .weightloss-card,
 .diet-card,
@@ -1820,8 +1802,7 @@ body {
     display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--md-sys-on-surface-variant);
 }
 .weightloss-tips .material-symbols-rounded { font-size: 16px; color: var(--md-sys-primary); font-variation-settings: 'FILL' 1; }
-
-/* --- AI Config --- */
+/* --- AI Config --- */
 .ai-card-header {
     display: flex; align-items: center; gap: 8px; margin-bottom: 12px;
 }
@@ -1910,8 +1891,7 @@ body {
 .weight-empty-chart .material-symbols-rounded { font-size: 34px; }
 .weight-list { display: grid; gap: 6px; }
 .weight-list-item { padding: 8px 10px; border-radius: var(--md-sys-shape-md); background: var(--md-sys-surface-container-lowest); }
-
-/* --- Rate Row --- */
+/* --- Rate Row --- */
 .rate-row {
     display: flex;
     align-items: center;
@@ -1927,8 +1907,7 @@ body {
     border: none;
     height: 4px;
 }
-
-/* --- Mode Tabs --- */
+/* --- Mode Tabs --- */
 .mode-tabs {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1990,8 +1969,7 @@ body {
 }
 .mode-tab:active { transform: scale(0.96); }
 .mode-tab:active::after { opacity: var(--md-state-press); }
-
-/* --- Routine Tool --- */
+/* --- Routine Tool --- */
 .routine-tool {
     display: flex;
     gap: 10px;
@@ -1999,8 +1977,7 @@ body {
 }
 .routine-tool input { flex: 1; }
 .routine-tool .md-btn { flex: none; white-space: nowrap; margin-top: 0; width: auto; }
-
-/* --- Routine Card --- */
+/* --- Routine Card --- */
 .routine-card {
     background: var(--md-sys-surface-container-lowest);
     border: 1px solid var(--md-sys-outline-variant);
@@ -2064,8 +2041,7 @@ body {
     padding-top: 10px;
     border-top: 1px solid var(--md-sys-outline-variant);
 }
-
-/* --- Cardio Timer --- */
+/* --- Cardio Timer --- */
 .cardio-card {
     display: grid;
     gap: 14px;
@@ -2113,8 +2089,7 @@ body.is-cardio .cardio-header > .material-symbols-rounded {
 body.is-cardio-paused .cardio-card {
     border-color: color-mix(in srgb, var(--md-sys-tertiary) 32%, var(--md-sys-outline-variant));
 }
-
-/* --- Sync Card --- */
+/* --- Sync Card --- */
 .sync-card { padding: 20px; }
 .theme-card { padding: 16px; }
 .sync-card h3 {
@@ -2144,8 +2119,7 @@ body.is-cardio-paused .cardio-card {
 .sync-meta-item strong { font-size: 11px; color: var(--md-sys-on-surface-variant); }
 .sync-meta-item span { font-size: 12px; color: var(--md-sys-on-surface); }
 .sync-meta-wide { grid-column: 1 / -1; }
-
-/* --- Bottom Navigation Rail (M3 Expressive) --- */
+/* --- Bottom Navigation Rail (M3 Expressive) --- */
 .md-nav-rail {
     position: fixed;
     bottom: 0;
@@ -2232,8 +2206,7 @@ body.is-cardio-paused .cardio-card {
     border-radius: 24px;
 }
 .nav-item.active small { font-weight: 700; color: var(--md-sys-on-secondary-container); }
-
-/* --- FAB (Expressive) --- */
+/* --- FAB (Expressive) --- */
 .workout-controls {
     position: fixed;
     left: 50%;
@@ -2368,8 +2341,7 @@ body.is-training .fab-pip {
 body.is-training .fab-pip.active {
     border-radius: 28px;
 }
-
-/* --- Skip Button --- */
+/* --- Skip Button --- */
 .skip-btn {
     position: absolute;
     right: 12px;
@@ -2382,8 +2354,7 @@ body.is-training .fab-pip.active {
     transition: opacity var(--md-sys-motion-duration-short);
 }
 .skip-btn:active { opacity: 1; }
-
-/* --- Toast --- */
+/* --- Toast --- */
 .md-toast {
     position: fixed;
     left: 50%;
@@ -2409,8 +2380,7 @@ body.is-training .fab-pip.active {
     opacity: 1;
     transform: translate(-50%, 0);
 }
-
-/* --- Empty State --- */
+/* --- Empty State --- */
 .empty-state {
     text-align: center;
     padding: 40px 20px;
@@ -2427,8 +2397,7 @@ body.is-training .fab-pip.active {
     font-size: 14px;
     font-weight: 500;
 }
-
-/* --- Hidden --- */
+/* --- Hidden --- */
 .hidden { display: none !important; }
 .pip-video-source {
     position: fixed;
@@ -2439,12 +2408,10 @@ body.is-training .fab-pip.active {
     opacity: 0.01;
     pointer-events: none;
 }
-
-/* --- Input Card --- */
+/* --- Input Card --- */
 .input-card .md-grid { margin: 8px 0 4px; }
 .input-card { padding: 14px; }
-
-/* --- Theme Controls (Material You / Monet) --- */
+/* --- Theme Controls (Material You / Monet) --- */
 .theme-panel {
     display: grid;
     gap: 10px;
@@ -2538,8 +2505,7 @@ body.is-training .fab-pip.active {
 }
 .color-picker .material-symbols-rounded { font-size: 18px; }
 .compact-divider { margin: 8px 0; }
-
-/* --- Modal --- */
+/* --- Modal --- */
 .md-modal {
     position: fixed;
     inset: 0;
@@ -2580,8 +2546,7 @@ body.is-training .fab-pip.active {
     height: 46px;
     margin-top: 0;
 }
-
-/* ============================================
+/* ============================================
    Responsive
    ============================================ */
 @media (max-width: 360px) {
@@ -2608,8 +2573,7 @@ body.is-training .fab-pip.active {
         transition-duration: 1ms !important;
     }
 }
-
-/* ============================================
+/* ============================================
    Dark Mode (M3 Expressive)
    ============================================ */
 @media (prefers-color-scheme: dark) {
@@ -2729,3 +2693,92 @@ body.is-training .fab-pip.active {
     .nav-indicator { background: var(--md-sys-secondary-container); }
     .nav-item.active .material-symbols-rounded { color: var(--md-sys-on-secondary-container); }
 }
+/* Migration branch custom overrides live here.
+   Keep this file for branch-only additions that are not yet merged into styles.css snapshot. */
+
+/* Foldable history months */
+.history-month-group { display: grid; gap: 4px; margin-bottom: 6px; }
+.history-month-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 8px 12px;
+    border: none;
+    border-radius: var(--md-sys-shape-md);
+    background: var(--md-sys-surface-container);
+    color: var(--md-sys-on-surface);
+    cursor: pointer;
+    text-align: left;
+    position: relative;
+    overflow: hidden;
+    transition:
+        transform var(--md-sys-motion-duration-medium) var(--md-expressive-spring),
+        background var(--md-sys-motion-duration-short) var(--md-sys-motion-emphasized),
+        box-shadow var(--md-sys-motion-duration-short) var(--md-sys-motion-emphasized);
+}
+.history-month-head::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: currentColor;
+    opacity: 0;
+    transition: opacity var(--md-sys-motion-duration-short);
+}
+.history-month-head:hover { box-shadow: var(--md-sys-elevation-1); }
+.history-month-head:hover::after { opacity: var(--md-state-hover); }
+.history-month-head:active {
+    transform: scale(0.985);
+    background: var(--md-sys-surface-container-high);
+}
+.history-month-head:active::after { opacity: var(--md-state-press); }
+.history-month-head .material-symbols-rounded { font-size: 18px; color: var(--md-sys-primary); position: relative; z-index: 1; }
+.history-month-head strong { flex: 1; font-size: 13px; position: relative; z-index: 1; }
+.history-month-head small { color: var(--md-sys-on-surface-variant); font-size: 11px; font-weight: 700; white-space: nowrap; position: relative; z-index: 1; }
+.history-month-content { display: grid; gap: 4px; }
+.history-month-group.collapsed .history-month-content { display: none; }
+
+/* Foldable weight history */
+.weight-history-card {
+    display: grid;
+    gap: 8px;
+}
+.weight-history-head {
+    width: 100%;
+    border: none;
+    border-radius: var(--md-sys-shape-md);
+    background: var(--md-sys-surface-container);
+    color: var(--md-sys-on-surface);
+    padding: 8px 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    text-align: left;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+    transition:
+        transform var(--md-sys-motion-duration-medium) var(--md-expressive-spring),
+        background var(--md-sys-motion-duration-short) var(--md-sys-motion-emphasized),
+        box-shadow var(--md-sys-motion-duration-short) var(--md-sys-motion-emphasized);
+}
+.weight-history-head::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: currentColor;
+    opacity: 0;
+    transition: opacity var(--md-sys-motion-duration-short);
+}
+.weight-history-head:hover { box-shadow: var(--md-sys-elevation-1); }
+.weight-history-head:hover::after { opacity: var(--md-state-hover); }
+.weight-history-head:active {
+    transform: scale(0.985);
+    background: var(--md-sys-surface-container-high);
+}
+.weight-history-head:active::after { opacity: var(--md-state-press); }
+.weight-history-head .material-symbols-rounded { position: relative; z-index: 1; font-size: 18px; color: var(--md-sys-primary); }
+.weight-history-head strong { flex: 1; position: relative; z-index: 1; font-size: 13px; }
+.weight-history-head small { position: relative; z-index: 1; color: var(--md-sys-on-surface-variant); font-size: 11px; font-weight: 700; white-space: nowrap; }
+.weight-history-content { display: grid; gap: 6px; }
+.weight-history-card.collapsed .weight-history-content { display: none; }
