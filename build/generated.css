@@ -1328,6 +1328,107 @@ body {
 .diet-meal-head .material-symbols-rounded { font-size: 18px; color: var(--md-sys-on-surface-variant); }
 .diet-meal-content { display: grid; gap: 4px; }
 .diet-meal-group.collapsed .diet-meal-content { display: none; }
+
+/* Diet Mode Tabs */
+.diet-mode-tabs {
+    display: flex;
+    gap: 8px;
+    padding: 4px;
+    border-radius: var(--md-sys-shape-full);
+    background: var(--md-sys-surface-container);
+}
+.diet-mode-tab {
+    flex: 1;
+    border: none;
+    border-radius: var(--md-sys-shape-full);
+    min-height: 38px;
+    background: transparent;
+    color: var(--md-sys-on-surface-variant);
+    font-weight: 700;
+    font-size: 13px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    cursor: pointer;
+    transition: all var(--md-sys-motion-duration-medium) var(--md-sys-motion-emphasized);
+}
+.diet-mode-tab.active {
+    background: var(--md-sys-primary-container);
+    color: var(--md-sys-on-primary-container);
+    box-shadow: var(--md-sys-elevation-1);
+}
+.diet-mode-tab .material-symbols-rounded { font-size: 18px; }
+.diet-meal-selector {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+.diet-meal-pill {
+    border: none;
+    border-radius: var(--md-sys-shape-full);
+    min-height: 32px;
+    padding: 0 14px;
+    background: var(--md-sys-surface-container);
+    color: var(--md-sys-on-surface-variant);
+    font-size: 12px;
+    font-weight: 800;
+    cursor: pointer;
+    transition: all var(--md-sys-motion-duration-medium) var(--md-sys-motion-emphasized);
+}
+.diet-meal-pill.active {
+    background: var(--md-sys-tertiary-container);
+    color: var(--md-sys-on-tertiary-container);
+    box-shadow: var(--md-sys-elevation-1);
+}
+.diet-ai-entry {
+    display: grid;
+    gap: 8px;
+}
+.diet-ai-input {
+    width: 100%;
+    min-height: 24px;
+    max-height: 120px;
+    resize: none;
+    overflow-y: auto;
+    border: none;
+    border-radius: var(--md-sys-shape-lg);
+    background: var(--md-sys-surface-container-highest);
+    color: var(--md-sys-on-surface);
+    font: inherit;
+    line-height: 1.35;
+    padding: 12px 12px;
+    outline: none;
+    transition: box-shadow var(--md-sys-motion-duration-short) var(--md-sys-motion-emphasized);
+}
+.diet-ai-input:focus {
+    box-shadow:
+        0 2px 6px 2px rgba(0,0,0,0.08),
+        0 0 0 2px color-mix(in srgb, var(--md-sys-primary) 18%, transparent);
+}
+.diet-ai-run {
+    justify-self: start;
+    margin-top: 0;
+}
+.diet-suggest-row {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+.diet-suggest-chip {
+    border: none;
+    border-radius: var(--md-sys-shape-full);
+    min-height: 30px;
+    padding: 0 12px;
+    background: var(--md-sys-surface-container-lowest);
+    color: var(--md-sys-on-surface-variant);
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all var(--md-sys-motion-duration-short) var(--md-sys-motion-emphasized);
+}
+.diet-suggest-chip:active { transform: scale(0.98); }
+.diet-manual-area { display: grid; gap: 8px; }
 .diet-meal-title {
     font-size: 13px; font-weight: 800; color: var(--md-sys-on-surface); margin-bottom: 4px;
     display: flex; align-items: center; gap: 6px;

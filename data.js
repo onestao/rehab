@@ -630,23 +630,43 @@ const data = {
             </div>
             <div class="collapse-content">
             <div class="diet-input-area">
-                <div class="md-grid diet-input-grid">
-                    <div class="md-field"><select id="foodMeal"><option value="breakfast">早餐</option><option value="lunch" selected>午餐</option><option value="dinner">晚餐</option><option value="snack">加餐</option></select><label>餐次</label></div>
-                    <div class="md-field"><input type="number" id="foodGrams" step="1" placeholder=" " oninput="data.updateFoodComputedPreview()"><label>克数</label></div>
-                    <div class="md-field span-full"><input type="text" id="foodName" placeholder=" " oninput="data.onFoodSearchInput()" onblur="data.autoFillFoodByName()"><label>食物名称</label></div>
-                    <div id="foodSourceHint" class="food-source-hint span-full">输入食物后可从食物库或 AI 自动填充营养</div>
-                    <div class="md-field"><input type="number" id="foodCal" step="1" placeholder=" " oninput="data.updateFoodComputedPreview()"><label>kcal/100g</label></div>
-                    <div class="md-field"><input type="number" id="foodPro" step="0.1" placeholder=" " oninput="data.updateFoodComputedPreview()"><label>蛋白/100g</label></div>
-                    <div class="md-field"><input type="number" id="foodCarb" step="0.1" placeholder=" " oninput="data.updateFoodComputedPreview()"><label>碳水/100g</label></div>
-                    <div class="md-field"><input type="number" id="foodFat" step="0.1" placeholder=" " oninput="data.updateFoodComputedPreview()"><label>脂肪/100g</label></div>
-                    <div id="foodComputed" class="food-computed span-full">输入食物和重量后自动计算</div>
-                    <div class="diet-btn-row">
-                        <button class="md-btn md-btn-filled" onclick="data.addFoodLog()"><span class="material-symbols-rounded">add</span> 添加</button>
-                        <button class="md-btn md-btn-tonal" onclick="data.aiParseFood()" title="AI 智能识别"><span class="material-symbols-rounded">psychology</span></button>
-                    </div>
+                <div class="diet-mode-tabs" role="tablist" aria-label="饮食录入模式">
+                    <button class="diet-mode-tab active" data-mode="ai" onclick="data.setDietInputMode('ai')" type="button" role="tab" aria-selected="true"><span class="material-symbols-rounded">psychology</span>AI录入</button>
+                    <button class="diet-mode-tab" data-mode="manual" onclick="data.setDietInputMode('manual')" type="button" role="tab" aria-selected="false"><span class="material-symbols-rounded">edit</span>手动录入</button>
+                </div>
+                <div class="diet-meal-selector">
+                    <button class="diet-meal-pill${(this._dietMeal || 'lunch') === 'breakfast' ? ' active' : ''}" onclick="data.setDietMeal('breakfast')" type="button">早餐</button>
+                    <button class="diet-meal-pill${(this._dietMeal || 'lunch') === 'lunch' ? ' active' : ''}" onclick="data.setDietMeal('lunch')" type="button">午餐</button>
+                    <button class="diet-meal-pill${(this._dietMeal || 'lunch') === 'dinner' ? ' active' : ''}" onclick="data.setDietMeal('dinner')" type="button">晚餐</button>
+                    <button class="diet-meal-pill${(this._dietMeal || 'lunch') === 'snack' ? ' active' : ''}" onclick="data.setDietMeal('snack')" type="button">加餐</button>
+                </div>
+                <div class="diet-ai-entry">
+                    <textarea id="foodAiText" class="diet-ai-input" rows="1" placeholder="说说你这顿吃了什么，例如：鸡胸肉饭加一杯豆浆" oninput="data.autoResizeDietInput(this)"></textarea>
+                    <button class="md-btn md-btn-filled diet-ai-run" onclick="data.aiParseFood()"><span class="material-symbols-rounded">psychology</span>AI识别</button>
+                </div>
+                <div class="diet-suggest-row">
+                    <button class="diet-suggest-chip" onclick="data.useFoodAiText('鸡蛋三明治 + 美式咖啡')" type="button">鸡蛋三明治 + 美式咖啡</button>
+                    <button class="diet-suggest-chip" onclick="data.useFoodAiText('鸡胸肉饭 + 无糖酸奶')" type="button">鸡胸肉饭 + 无糖酸奶</button>
+                    <button class="diet-suggest-chip" onclick="data.useFoodAiText('一杯蛋白粉 + 香蕉')" type="button">蛋白粉 + 香蕉</button>
                 </div>
                 <div id="foodSearchResults" class="food-search-results"></div>
                 <div id="foodAiStatus" class="food-ai-status"></div>
+                <div id="foodManualArea" class="diet-manual-area ${(this._dietInputMode || 'ai') === 'ai' ? 'hidden' : ''}">
+                    <div class="md-grid diet-input-grid">
+                        <div class="md-field span-full"><input type="text" id="foodName" placeholder=" " oninput="data.onFoodSearchInput()" onblur="data.autoFillFoodByName()"><label>食物名称</label></div>
+                        <div class="md-field"><input type="number" id="foodGrams" step="1" placeholder=" " oninput="data.updateFoodComputedPreview()"><label>克数</label></div>
+                        <div class="md-field"><input type="number" id="foodCal" step="1" placeholder=" " oninput="data.updateFoodComputedPreview()"><label>kcal/100g</label></div>
+                        <div class="md-field"><input type="number" id="foodPro" step="0.1" placeholder=" " oninput="data.updateFoodComputedPreview()"><label>蛋白/100g</label></div>
+                        <div class="md-field"><input type="number" id="foodCarb" step="0.1" placeholder=" " oninput="data.updateFoodComputedPreview()"><label>碳水/100g</label></div>
+                        <div class="md-field"><input type="number" id="foodFat" step="0.1" placeholder=" " oninput="data.updateFoodComputedPreview()"><label>脂肪/100g</label></div>
+                        <div id="foodComputed" class="food-computed span-full">输入食物和重量后自动计算</div>
+                        <div id="foodSourceHint" class="food-source-hint span-full">输入食物后可从食物库或 AI 自动填充营养</div>
+                        <div class="diet-btn-row">
+                            <button class="md-btn md-btn-filled" onclick="data.addFoodLog()"><span class="material-symbols-rounded">add</span> 添加</button>
+                            <button class="md-btn md-btn-tonal" onclick="data.aiParseFood()" title="AI 智能识别"><span class="material-symbols-rounded">psychology</span></button>
+                        </div>
+                    </div>
+                </div>
             </div>
             ${Object.entries(mealGroups).map(([key, items]) => {
                 if (items.length === 0) return '';
@@ -739,6 +759,38 @@ const data = {
     toggleManualCustomExercise(type) {
         const field = document.getElementById('manualExerciseCustomField');
         if (field) field.classList.toggle('hidden', type !== 'custom');
+    },
+
+    setDietInputMode(mode) {
+        this._dietInputMode = mode || 'ai';
+        const manualArea = document.getElementById('foodManualArea');
+        if (manualArea) manualArea.classList.toggle('hidden', mode !== 'manual');
+        document.querySelectorAll('.diet-mode-tab').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.mode === mode);
+        });
+    },
+
+    setDietMeal(meal) {
+        this._dietMeal = meal || 'lunch';
+        const select = document.getElementById('foodMeal');
+        if (select) select.value = meal;
+        document.querySelectorAll('.diet-meal-pill').forEach(btn => {
+            btn.classList.toggle('active', btn.textContent === { breakfast: '早餐', lunch: '午餐', dinner: '晚餐', snack: '加餐' }[meal]);
+        });
+    },
+
+    autoResizeDietInput(el) {
+        if (!el) return;
+        el.style.height = 'auto';
+        el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
+    },
+
+    useFoodAiText(text) {
+        const input = document.getElementById('foodAiText');
+        if (!input) return;
+        input.value = text;
+        this.autoResizeDietInput(input);
+        input.focus();
     },
 
     startEditManualExercise(id) {

@@ -231,13 +231,14 @@ const foodLog = {
     },
 
     async aiParseFood() {
-        const input = document.getElementById('foodName');
-        const text = input?.value?.trim();
+        const textarea = document.getElementById('foodAiText');
+        const manualInput = document.getElementById('foodName');
+        const text = (textarea?.value?.trim() || manualInput?.value?.trim() || '');
         if (!text) {
-            if (input) { input.focus(); input.placeholder = '例如：一碗米饭加一个鸡蛋'; }
+            if (textarea) { textarea.focus(); textarea.placeholder = '请先输入食物描述'; }
             const statusEl = document.getElementById('foodAiStatus');
             if (statusEl) statusEl.textContent = '请先输入食物描述';
-            setTimeout(() => { if (input) input.placeholder = ' '; }, 3000);
+            setTimeout(() => { if (textarea) textarea.placeholder = '说说你这顿吃了什么，例如：鸡胸肉饭加一杯豆浆'; }, 3000);
             return;
         }
         if (!ai.cfg.enabled) return alert('请先在设置中配置 AI 接口');
