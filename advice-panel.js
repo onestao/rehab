@@ -212,16 +212,16 @@ const advicePanel = {
     async requestAiAdvice(prompt, model) {
         const contexts = { diet: true, training: true, weight: true, goal: true, ...(this.adviceContexts || {}) };
         const history = contexts.training
-            ? this.filterByAdviceRange(this.db.history || [], h => this.parseHistoryDate(h.date)).slice(-30)
+            ? (this.db.history || []).slice(-30)
             : [];
         const foods = contexts.diet
-            ? this.filterByAdviceRange(this.db.health.foodLogs || [], f => new Date(`${f.date}T00:00:00`)).slice(-80)
+            ? (this.db.health.foodLogs || []).slice(-80)
             : [];
         const exerciseLogs = contexts.training
-            ? this.filterByAdviceRange(this.db.health.exerciseLogs || [], e => new Date(`${e.date}T00:00:00`)).slice(-60)
+            ? (this.db.health.exerciseLogs || []).slice(-60)
             : [];
         const weights = contexts.weight
-            ? this.filterByAdviceRange(this.sortedWeights(), w => new Date(`${w.date}T00:00:00`)).slice(-20)
+            ? this.sortedWeights().slice(-20)
             : [];
         const dietGoal = contexts.goal ? (this.db.health.dietGoal || {}) : {};
         const macros = contexts.diet ? this.todayMacros() : {};
