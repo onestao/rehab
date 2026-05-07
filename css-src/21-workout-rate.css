@@ -1,0 +1,90 @@
+/* --- AI Config --- */
+.ai-card-header {
+    display: flex; align-items: center; gap: 8px; margin-bottom: 12px;
+}
+.ai-card-header .material-symbols-rounded { font-size: 22px; color: var(--md-sys-tertiary); font-variation-settings: 'FILL' 1; }
+.ai-card-header strong { flex: 1; }
+.ai-status {
+    font-size: 11px; font-weight: 700; padding: 2px 10px;
+    border-radius: var(--md-sys-shape-full);
+}
+.ai-ready { background: var(--md-sys-primary-container); color: var(--md-sys-on-primary-container); }
+.ai-off { background: var(--md-sys-surface-container-high); color: var(--md-sys-on-surface-variant); }
+.ai-model-list {
+    display: grid; gap: 4px; max-height: 200px; overflow-y: auto;
+    padding: 6px; border-radius: var(--md-sys-shape-lg);
+    background: var(--md-sys-surface-container); margin: 6px 0;
+}
+.ai-model-item {
+    border: none; background: var(--md-sys-surface-container-lowest); color: var(--md-sys-on-surface);
+    padding: 8px 10px; border-radius: var(--md-sys-shape-md); cursor: pointer;
+    display: flex; justify-content: space-between; align-items: center; gap: 8px;
+    text-align: left; font-size: 13px; transition: background 0.15s;
+}
+.ai-model-item:active { background: var(--md-sys-surface-container); }
+.ai-model-item.has-vision { border-left: 3px solid var(--md-sys-primary); }
+.ai-model-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ai-vision-badge {
+    display: inline-flex; align-items: center; gap: 3px; font-size: 10px; font-weight: 700;
+    padding: 2px 8px; border-radius: var(--md-sys-shape-full);
+    background: var(--md-sys-primary-container); color: var(--md-sys-on-primary-container); white-space: nowrap;
+}
+.ai-vision-badge .material-symbols-rounded { font-size: 12px; }
+.ai-model-empty { text-align: center; padding: 12px; color: var(--md-sys-on-surface-variant); font-size: 13px; }
+.ai-profile-actions {
+    align-items: flex-end;
+    gap: 8px;
+}
+.ai-profile-actions .md-btn {
+    flex: none;
+    margin-top: 0;
+    white-space: nowrap;
+    padding: 0 14px;
+}
+.ai-encrypt-section {
+    display: grid; gap: 8px; padding-top: 10px; margin-top: 10px;
+    border-top: 1px solid var(--md-sys-outline-variant);
+}
+.ai-encrypt-title {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 13px; font-weight: 700; color: var(--md-sys-on-surface);
+}
+.ai-encrypt-title .material-symbols-rounded { font-size: 18px; color: var(--md-sys-tertiary); }
+.ai-encrypt-section small { color: var(--md-sys-on-surface-variant); font-size: 11px; line-height: 1.4; }
+.weight-chart-wrap {
+    background: var(--md-sys-surface-container-lowest);
+    border: 1px solid var(--md-sys-outline-variant);
+    border-radius: var(--md-sys-shape-lg);
+    padding: 10px;
+}
+.weight-chart { width: 100%; height: 150px; overflow: visible; }
+.weight-grid-line { stroke: var(--md-sys-outline-variant); stroke-width: 1; fill: none; opacity: 0.7; }
+.weight-line { stroke: var(--md-sys-primary); stroke-width: 4; stroke-linecap: round; stroke-linejoin: round; fill: none; }
+.weight-dot { fill: var(--md-sys-primary-container); stroke: var(--md-sys-primary); stroke-width: 2; }
+.weight-chart-labels,
+.weight-analysis,
+.weight-list-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+}
+.weight-chart-labels { color: var(--md-sys-on-surface-variant); font-size: 11px; padding: 0 4px; }
+.weight-analysis { background: var(--md-sys-surface-container); border-radius: var(--md-sys-shape-lg); padding: 12px; }
+.weight-analysis div { display: grid; gap: 2px; }
+.weight-analysis b { color: var(--md-sys-primary); }
+.weight-analysis small,
+.weight-list-item span { color: var(--md-sys-on-surface-variant); font-size: 12px; }
+.weight-empty-chart {
+    display: grid;
+    place-items: center;
+    gap: 6px;
+    min-height: 120px;
+    color: var(--md-sys-on-surface-variant);
+    background: var(--md-sys-surface-container);
+    border-radius: var(--md-sys-shape-lg);
+}
+.weight-empty-chart .material-symbols-rounded { font-size: 34px; }
+.weight-list { display: grid; gap: 6px; }
+.weight-list-item { padding: 8px 10px; border-radius: var(--md-sys-shape-md); background: var(--md-sys-surface-container-lowest); }
+

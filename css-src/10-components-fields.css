@@ -1,0 +1,54 @@
+/* --- Floating Label Input Fields --- */
+.md-field {
+    position: relative;
+    margin-bottom: 4px;
+}
+.md-field input,
+.md-field select {
+    width: 100%;
+    padding: 17px 12px 5px;
+    border: 1.5px solid var(--md-sys-outline-variant);
+    border-radius: var(--md-sys-shape-sm);
+    background: var(--md-sys-surface-container-lowest);
+    font-size: 16px;
+    color: var(--md-sys-on-surface);
+    outline: none;
+    transition:
+        border-color var(--md-sys-motion-duration-short) var(--md-sys-motion-emphasized),
+        box-shadow var(--md-sys-motion-duration-short) var(--md-sys-motion-emphasized),
+        background var(--md-sys-motion-duration-short) var(--md-sys-motion-emphasized);
+    -webkit-appearance: none;
+    appearance: none;
+}
+.md-field label {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 13px;
+    color: var(--md-sys-on-surface-variant);
+    pointer-events: none;
+    transition: all var(--md-sys-motion-duration-short) var(--md-sys-motion-emphasized);
+    background: transparent;
+    padding: 0 2px;
+}
+.md-field input:focus + label,
+.md-field input:not(:placeholder-shown) + label,
+.md-field select:focus + label,
+.md-field select:valid + label {
+    top: 5px;
+    transform: translateY(0);
+    font-size: 10px;
+    color: var(--md-sys-primary);
+    font-weight: 600;
+}
+.md-field input:focus,
+.md-field select:focus {
+    border-color: var(--md-sys-primary);
+    border-width: 2px;
+    padding: 16px 11px 4px;
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--md-sys-primary) 14%, transparent);
+}
+.md-field input::placeholder { color: transparent; }
+.md-field select { cursor: pointer; padding-right: 32px; }
+

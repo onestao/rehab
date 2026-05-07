@@ -1,0 +1,71 @@
+/* --- Weight Loss Plan --- */
+.weightloss-card { display: grid; gap: 14px; }
+.weightloss-card,
+.diet-card,
+.weight-card,
+.collapsible-card,
+.calendar-card,
+.day-detail-card {
+    position: relative;
+}
+.weightloss-card::before,
+.diet-card::before,
+.weight-card::before,
+.collapsible-card::before,
+.calendar-card::before,
+.day-detail-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.14);
+}
+.weightloss-head {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+}
+.weightloss-head h3 { font-size: 20px; line-height: 1.2; color: var(--md-sys-on-surface); }
+.weightloss-head small { color: var(--md-sys-on-surface-variant); }
+.weightloss-icon {
+    width: 48px; height: 48px; border-radius: 16px;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: var(--md-sys-tertiary-container); color: var(--md-sys-on-tertiary-container);
+    font-size: 26px; font-variation-settings: 'FILL' 1;
+}
+.weightloss-form { display: grid; gap: 10px; }
+.weightloss-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.weightloss-options { display: grid; gap: 8px; }
+.weightloss-option {
+    padding: 12px; border-radius: var(--md-sys-shape-lg);
+    border: 2px solid var(--md-sys-outline-variant); cursor: pointer;
+    transition: all var(--md-sys-motion-duration-short) var(--md-sys-motion-emphasized);
+    background: var(--md-sys-surface-container-lowest);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.15);
+}
+.weightloss-option:active { transform: scale(0.98); }
+.weightloss-option.active {
+    border-color: var(--md-sys-primary);
+    background: color-mix(in srgb, var(--md-sys-primary-container) 18%, var(--md-sys-surface-container-lowest));
+    box-shadow:
+        0 8px 20px rgba(0, 97, 164, 0.12),
+        inset 0 1px 0 rgba(255,255,255,0.22);
+}
+.weightloss-option-head {
+    display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;
+}
+.weightloss-option-head b { font-size: 15px; }
+.weightloss-option-stats {
+    display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--md-sys-on-surface-variant);
+    margin-bottom: 4px;
+}
+.weightloss-option-stats b { color: var(--md-sys-primary); font-size: 16px; margin-left: auto; }
+.weightloss-option small { color: var(--md-sys-on-surface-variant); font-size: 12px; }
+.weightloss-tips {
+    display: grid; gap: 4px; margin-top: 8px;
+    padding: 10px; border-radius: var(--md-sys-shape-lg); background: var(--md-sys-surface-container);
+}
+.weightloss-tips span {
+    display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--md-sys-on-surface-variant);
+}
+.weightloss-tips .material-symbols-rounded { font-size: 16px; color: var(--md-sys-primary); font-variation-settings: 'FILL' 1; }
+

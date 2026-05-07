@@ -1,0 +1,87 @@
+/* --- Timer Panel (Expressive) --- */
+.timer-panel {
+    background: linear-gradient(145deg, var(--timer-gradient-start), var(--timer-gradient-mid) 42%, var(--timer-gradient-end) 100%);
+    color: white;
+    text-align: center;
+    position: relative;
+    padding: 32px 16px 18px;
+    border: none;
+    overflow: hidden;
+}
+.timer-panel::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(115deg, transparent 0%, rgba(255,255,255,0.12) 46%, transparent 78%);
+    opacity: 0.62;
+    pointer-events: none;
+    z-index: 0;
+}
+.timer-panel::before {
+    content: '';
+    position: absolute;
+    top: -40%;
+    right: -20%;
+    width: 200px;
+    height: 200px;
+    background: radial-gradient(circle, var(--timer-orb) 0%, transparent 70%);
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 0;
+}
+.timer-panel > * {
+    position: relative;
+    z-index: 1;
+}
+#statusText {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    color: var(--md-sys-primary-container);
+    opacity: 0.9;
+    text-transform: uppercase;
+}
+#mainTime {
+    font-size: clamp(78px, 28vw, 128px);
+    font-weight: 900;
+    color: var(--timer-time-color);
+    line-height: 1;
+    margin: 8px 0;
+    font-variant-numeric: tabular-nums;
+    text-shadow: 0 2px 20px rgba(209, 228, 255, 0.32);
+    letter-spacing: -2px;
+}
+#subText {
+    font-size: 14px;
+    color: rgba(255,255,255,0.6);
+    min-height: 20px;
+    font-weight: 500;
+}
+.timer-stats {
+    display: flex;
+    justify-content: space-around;
+    margin-top: 18px;
+    padding-top: 14px;
+    border-top: 1px solid rgba(164,245,154,0.15);
+}
+.stat-item { text-align: center; }
+.stat-label {
+    display: block;
+    font-size: 11px;
+    color: rgba(255,255,255,0.45);
+    font-weight: 500;
+    letter-spacing: 0.5px;
+    margin-bottom: 2px;
+}
+.timer-stats b {
+    display: block;
+    font-size: 16px;
+    font-weight: 700;
+    color: rgba(255,255,255,0.9);
+}
+/* Session time — warm amber accent */
+.session-time {
+    color: var(--md-sys-amber) !important;
+    text-shadow: 0 0 12px rgba(245,158,11,0.35);
+}
+

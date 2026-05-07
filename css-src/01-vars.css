@@ -1,0 +1,82 @@
+/* ============================================
+   Material 3 Expressive — 训练助手
+   ============================================ */
+
+/* --- Design Tokens --- */
+:root {
+    /* Primary — Default Blue */
+    --md-sys-primary: #0061a4;
+    --md-sys-on-primary: #ffffff;
+    --md-sys-primary-container: #d1e4ff;
+    --md-sys-on-primary-container: #001d36;
+
+    /* Secondary */
+    --md-sys-secondary: #535f70;
+    --md-sys-on-secondary: #ffffff;
+    --md-sys-secondary-container: #d7e3f8;
+    --md-sys-on-secondary-container: #101c2b;
+
+    /* Tertiary — Warm Accent */
+    --md-sys-tertiary: #6b5778;
+    --md-sys-on-tertiary: #ffffff;
+    --md-sys-tertiary-container: #f2daff;
+    --md-sys-on-tertiary-container: #251431;
+
+    /* Session Timer Accent — Amber */
+    --md-sys-amber: #f59e0b;
+    --md-sys-amber-container: #fef3c7;
+    --md-sys-on-amber-container: #78350f;
+
+    /* Surface */
+    --md-sys-surface: #fdfcff;
+    --md-sys-surface-dim: #d9d9e0;
+    --md-sys-surface-container-lowest: #ffffff;
+    --md-sys-surface-container-low: #f4f3fa;
+    --md-sys-surface-container: #eeedf4;
+    --md-sys-surface-container-high: #e8e7ef;
+    --md-sys-surface-container-highest: #e2e2e9;
+    --md-sys-on-surface: #1a1c1e;
+    --md-sys-on-surface-variant: #43474e;
+    --md-sys-inverse-surface: #30322e;
+    --md-sys-inverse-on-surface: #f1f1ea;
+
+    /* Outline */
+    --md-sys-outline: #73777f;
+    --md-sys-outline-variant: #c3c7cf;
+    --timer-gradient-start: #001d36;
+    --timer-gradient-mid: #0061a4;
+    --timer-gradient-end: #2f7cbd;
+    --timer-time-color: #d1e4ff;
+    --timer-orb: rgba(209, 228, 255, 0.15);
+    --theme-seed: #0061a4;
+
+    /* Error */
+    --md-sys-error: #ba1a1a;
+    --md-sys-error-container: #ffdad6;
+    --md-sys-on-error-container: #410002;
+
+    /* Elevation */
+    --md-sys-elevation-1: 0 1px 2px rgba(0,0,0,0.1), 0 1px 3px 1px rgba(0,0,0,0.06);
+    --md-sys-elevation-2: 0 1px 2px rgba(0,0,0,0.1), 0 2px 6px 2px rgba(0,0,0,0.08);
+    --md-sys-elevation-3: 0 4px 8px 3px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.1);
+
+    /* Shape */
+    --md-sys-shape-xs: 4px;
+    --md-sys-shape-sm: 8px;
+    --md-sys-shape-md: 12px;
+    --md-sys-shape-lg: 16px;
+    --md-sys-shape-xl: 28px;
+    --md-sys-shape-full: 9999px;
+
+    /* Motion */
+    --md-sys-motion-emphasized: cubic-bezier(0.2, 0, 0, 1);
+    --md-sys-motion-emphasized-decelerate: cubic-bezier(0.05, 0.7, 0.1, 1);
+    --md-sys-motion-emphasized-accelerate: cubic-bezier(0.3, 0, 0.8, 0.15);
+    --md-sys-motion-duration-short: 200ms;
+    --md-sys-motion-duration-medium: 400ms;
+    --md-sys-motion-duration-long: 500ms;
+    --md-state-hover: 0.08;
+    --md-state-press: 0.14;
+    --md-expressive-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+

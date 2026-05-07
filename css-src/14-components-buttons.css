@@ -1,0 +1,63 @@
+/* --- Buttons --- */
+.md-btn {
+    border: none;
+    border-radius: var(--md-sys-shape-full);
+    height: 44px;
+    min-width: 48px;
+    padding: 0 24px;
+    font-weight: 600;
+    font-size: 14px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: all var(--md-sys-motion-duration-short) var(--md-sys-motion-emphasized);
+    -webkit-tap-highlight-color: transparent;
+    letter-spacing: 0.2px;
+    position: relative;
+    overflow: hidden;
+}
+.md-btn::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: currentColor;
+    opacity: 0;
+    transition: opacity var(--md-sys-motion-duration-short);
+}
+.md-btn:active::after { opacity: 0.12; }
+.md-btn:hover::after { opacity: var(--md-state-hover); }
+.md-btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.48;
+    box-shadow: none;
+}
+.md-btn-filled {
+    background: var(--md-sys-primary);
+    color: var(--md-sys-on-primary);
+    width: 100%;
+    margin-top: 12px;
+    box-shadow: var(--md-sys-elevation-1);
+    font-size: 15px;
+    height: 48px;
+}
+.md-btn-filled:hover { box-shadow: var(--md-sys-elevation-2); }
+.md-btn:focus-visible,
+.md-fab:focus-visible,
+.nav-item:focus-visible,
+.theme-swatch:focus-visible,
+.color-picker:focus-within {
+    outline: 3px solid color-mix(in srgb, var(--md-sys-primary) 45%, transparent);
+    outline-offset: 3px;
+}
+.md-btn-tonal {
+    background: var(--md-sys-secondary-container);
+    color: var(--md-sys-on-secondary-container);
+    flex: 1;
+    height: 44px;
+}
+.md-btn-tonal:hover { box-shadow: var(--md-sys-elevation-1); }
+
+.md-row { display: flex; gap: 8px; margin-top: 8px; }
+

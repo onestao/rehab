@@ -506,23 +506,47 @@ const data = {
         if (this.db.history.length === 0) {
             return `<div class="empty-state"><span class="material-symbols-rounded">event_note</span><p>暂无训练记录，完成一次训练后自动记录</p></div>`;
         }
-        return this.db.history.map((h, i) => {
-            const mins = Math.floor(h.duration / 60);
-            const secs = h.duration % 60;
-            const names = this.historyNames(h).join('、');
-            const meta = h.type === 'cardio'
-                ? `${Math.round(h.cardio.calories || 0)} kcal &middot; ${h.cardio.weight || 0}kg`
-                : `${h.actions.length}个动作`;
-            const icon = this.historyIcon(h);
-            return `<div class="list-item">
-                <span class="record-icon material-symbols-rounded">${icon}</span>
-                <div style="flex:1;min-width:0">
-                    <strong>${h.date}</strong>
-                    <small>${mins}分${secs}秒 &middot; ${meta}</small>
-                    <div class="item-chip">${names.length > 20 ? names.slice(0, 20) + '...' : names}</div>
+        const groups = {};
+        this.db.history.forEach((h, i) => {
+            const d = this.parseHistoryDate(h.date);
+            const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+            if (!groups[key]) groups[key] = [];
+            groups[key].push({ h, i });
+        });
+        const currentMonth = this.dateKey(new Date()).slice(0, 7);
+        return Object.keys(groups).sort((a, b) => b.localeCompare(a)).map(key => {
+            const [y, m] = key.split('-');
+            const items = groups[key];
+            const totalMin = Math.round(items.reduce((s, { h }) => s + (h.duration || 0), 0) / 60);
+            const collapsed = this.isCollapsed(`history_month_${key}`, key !== currentMonth);
+            return `<section class="history-month-group ${collapsed ? 'collapsed' : ''}">
+                <button class="history-month-head" onclick="data.toggleCollapse('history_month_${key}')" type="button">
+                    <span class="material-symbols-rounded">calendar_month</span>
+                    <strong>${y}年${Number(m)}月</strong>
+                    <small>${items.length} 次 · ${totalMin} 分钟</small>
+                    <span class="material-symbols-rounded">${collapsed ? 'expand_more' : 'expand_less'}</span>
+                </button>
+                <div class="history-month-content">
+                    ${items.map(({ h, i }) => {
+                        const mins = Math.floor(h.duration / 60);
+                        const secs = h.duration % 60;
+                        const names = this.historyNames(h).join('、');
+                        const meta = h.type === 'cardio'
+                            ? `${Math.round(h.cardio.calories || 0)} kcal &middot; ${h.cardio.weight || 0}kg`
+                            : `${h.actions.length}个动作`;
+                        const icon = this.historyIcon(h);
+                        return `<div class="list-item">
+                            <span class="record-icon material-symbols-rounded">${icon}</span>
+                            <div style="flex:1;min-width:0">
+                                <strong>${h.date}</strong>
+                                <small>${mins}分${secs}秒 &middot; ${meta}</small>
+                                <div class="item-chip">${names.length > 20 ? names.slice(0, 20) + '...' : names}</div>
+                            </div>
+                            <button class="delete-btn" onclick="data.deleteHistory(${i})"><span class="material-symbols-rounded">delete</span></button>
+                        </div>`;
+                    }).join('')}
                 </div>
-                <button class="delete-btn" onclick="data.deleteHistory(${i})"><span class="material-symbols-rounded">delete</span></button>
-            </div>`;
+            </section>`;
         }).join('');
     },
 
@@ -741,6 +765,8 @@ const data = {
         const h = this.db.health.height || 0;
         const bmi = (latest && h > 0) ? (latest.weight / ((h / 100) ** 2)) : 0;
         const bmiInfo = bmi > 0 ? this.bmiCategory(bmi) : null;
+        const recentWeights = weights.slice(-8).reverse();
+        const historyCollapsed = this.isCollapsed('weightHistory', recentWeights.length > 4);
         return `<div class="md-card weight-card">
             <div class="weight-head">
                 <div>
@@ -766,7 +792,17 @@ const data = {
                 <div><b>${analysis.avgText}</b><small>日均变化</small></div>
                 <div><b>${analysis.trend}</b><small>阶段判断</small></div>
             </div>
-            ${this.renderWeightList(weights.slice(-5).reverse())}
+            ${recentWeights.length ? `<div class="weight-history-card ${historyCollapsed ? 'collapsed' : ''}">
+                <button class="weight-history-head" onclick="data.toggleCollapse('weightHistory')" type="button">
+                    <span class="material-symbols-rounded">history</span>
+                    <strong>近期记录</strong>
+                    <small>${recentWeights.length} 条</small>
+                    <span class="material-symbols-rounded">${historyCollapsed ? 'expand_more' : 'expand_less'}</span>
+                </button>
+                <div class="weight-history-content">
+                    ${this.renderWeightList(recentWeights)}
+                </div>
+            </div>` : ''}
         </div>`;
     },
 

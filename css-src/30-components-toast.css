@@ -1,0 +1,14 @@
+/* --- Skip Button --- */
+.skip-btn {
+    position: absolute;
+    right: 12px;
+    top: 12px;
+    opacity: 0.4;
+    color: white;
+    cursor: pointer;
+    padding: 6px;
+    border-radius: var(--md-sys-shape-sm);
+    transition: opacity var(--md-sys-motion-duration-short);
+}
+.skip-btn:active { opacity: 1; }
+

@@ -1,0 +1,9 @@
+/* --- Grid --- */
+.md-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+    margin: 8px 0;
+}
+.span-full { grid-column: 1 / -1; }
+

@@ -1,0 +1,17 @@
+/* --- Rate Row --- */
+.rate-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+    color: var(--md-sys-on-surface-variant);
+    font-weight: 500;
+}
+.rate-row input[type="range"] {
+    flex: 1;
+    accent-color: var(--md-sys-primary);
+    padding: 0;
+    border: none;
+    height: 4px;
+}
+

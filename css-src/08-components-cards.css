@@ -1,0 +1,16 @@
+/* --- Cards --- */
+.md-card {
+    background: var(--md-sys-surface-container-low);
+    margin: 8px 16px;
+    padding: 16px;
+    border-radius: var(--md-sys-shape-lg);
+    border: 1px solid var(--md-sys-outline-variant);
+    transition:
+        box-shadow var(--md-sys-motion-duration-short) var(--md-sys-motion-emphasized),
+        transform var(--md-sys-motion-duration-short) var(--md-sys-motion-emphasized),
+        background var(--md-sys-motion-duration-short) var(--md-sys-motion-emphasized);
+}
+.md-card:active {
+    transform: scale(0.996);
+}
+

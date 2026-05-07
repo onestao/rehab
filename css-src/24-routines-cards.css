@@ -1,0 +1,9 @@
+/* --- Routine Tool --- */
+.routine-tool {
+    display: flex;
+    gap: 10px;
+    align-items: flex-end;
+}
+.routine-tool input { flex: 1; }
+.routine-tool .md-btn { flex: none; white-space: nowrap; margin-top: 0; width: auto; }
+

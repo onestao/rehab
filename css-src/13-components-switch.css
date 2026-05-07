@@ -1,0 +1,51 @@
+/* --- Switch (M3 Expressive) --- */
+.md-switch {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 0 4px;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--md-sys-on-surface);
+}
+.switch-track {
+    position: relative;
+    display: inline-block;
+    width: 52px;
+    height: 32px;
+    cursor: pointer;
+}
+.switch-track input { opacity: 0; width: 0; height: 0; position: absolute; }
+.switch-thumb {
+    position: absolute;
+    inset: 0;
+    background: var(--md-sys-surface-container-highest);
+    border: 2px solid var(--md-sys-outline);
+    border-radius: var(--md-sys-shape-full);
+    transition: all var(--md-sys-motion-duration-medium) var(--md-sys-motion-emphasized);
+}
+.switch-thumb::before {
+    content: '';
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    left: 6px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: var(--md-sys-outline);
+    border-radius: 50%;
+    transition: all var(--md-sys-motion-duration-medium) var(--md-sys-motion-emphasized);
+}
+.switch-track input:checked + .switch-thumb {
+    background: var(--md-sys-primary);
+    border-color: var(--md-sys-primary);
+}
+.switch-track input:checked + .switch-thumb::before {
+    left: 28px;
+    width: 24px;
+    height: 24px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: var(--md-sys-on-primary);
+}
+

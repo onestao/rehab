@@ -1,0 +1,18 @@
+/* --- Page Header --- */
+.page-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 16px 20px 8px;
+}
+.page-header .material-symbols-rounded {
+    font-size: 24px;
+    color: var(--md-sys-primary);
+    font-variation-settings: 'FILL' 1;
+}
+.page-header h2 {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--md-sys-on-surface);
+}
+

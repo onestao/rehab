@@ -1,0 +1,31 @@
+/* --- Sync Card --- */
+.sync-card { padding: 20px; }
+.theme-card { padding: 16px; }
+.sync-card h3 {
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 12px;
+    color: var(--md-sys-on-surface);
+}
+.sync-actions { margin-top: 16px; }
+.sync-actions .md-btn { margin-top: 8px; }
+.sync-actions .md-row .md-btn { margin-top: 0; }
+.sync-card .md-field { margin-bottom: 8px; }
+.sync-backup-row { flex-wrap: wrap; }
+.sync-detail-status {
+    margin-top: 12px;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+}
+.sync-meta-item {
+    padding: 10px 12px;
+    border-radius: var(--md-sys-shape-md);
+    background: var(--md-sys-surface-container-lowest);
+    display: grid;
+    gap: 2px;
+}
+.sync-meta-item strong { font-size: 11px; color: var(--md-sys-on-surface-variant); }
+.sync-meta-item span { font-size: 12px; color: var(--md-sys-on-surface); }
+.sync-meta-wide { grid-column: 1 / -1; }
+

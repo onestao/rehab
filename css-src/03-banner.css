@@ -1,0 +1,19 @@
+.app-update-banner {
+    position: sticky;
+    top: 0;
+    z-index: 300;
+    margin: 10px 16px 0;
+    padding: 12px 14px;
+    border-radius: 18px;
+    background: color-mix(in srgb, var(--md-sys-primary-container) 82%, white);
+    color: var(--md-sys-on-primary-container);
+    display: grid;
+    grid-template-columns: auto 1fr auto auto;
+    align-items: center;
+    gap: 10px;
+    box-shadow: var(--md-sys-elevation-2);
+}
+.app-update-banner strong { display: block; font-size: 13px; }
+.app-update-banner small { display: block; font-size: 11px; opacity: 0.85; }
+.app-update-banner .material-symbols-rounded { color: var(--md-sys-primary); }
+

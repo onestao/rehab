@@ -1,0 +1,42 @@
+/* --- Modal --- */
+.md-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 220;
+    display: grid;
+    place-items: center;
+}
+.md-modal-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(12, 18, 28, 0.45);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+}
+.md-modal-card {
+    position: relative;
+    z-index: 1;
+    width: min(92vw, 420px);
+    padding: 16px;
+    border-radius: var(--md-sys-shape-xl);
+    background: var(--md-sys-surface-container-lowest);
+    box-shadow: var(--md-sys-elevation-3);
+    display: grid;
+    gap: 12px;
+}
+.md-modal-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+.md-modal-head strong { font-size: 18px; }
+.modal-grid { margin: 0; }
+.modal-actions { margin-top: 0; }
+.modal-actions .md-btn {
+    flex: 1;
+    width: auto;
+    height: 46px;
+    margin-top: 0;
+}
+

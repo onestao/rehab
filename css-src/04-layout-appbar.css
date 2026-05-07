@@ -1,0 +1,29 @@
+/* --- Top App Bar --- */
+.md-top-app-bar {
+    height: 64px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px;
+    background: var(--md-sys-surface);
+    position: relative;
+    transition: box-shadow var(--md-sys-motion-duration-short) var(--md-sys-motion-emphasized);
+}
+.workout-only-bar { margin-bottom: 8px; }
+.bar-leading {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.app-icon {
+    font-size: 28px;
+    color: var(--md-sys-primary);
+    font-variation-settings: 'FILL' 1, 'wght' 600;
+}
+.app-title {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--md-sys-on-surface);
+    letter-spacing: -0.2px;
+}
+
