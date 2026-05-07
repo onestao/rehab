@@ -1669,7 +1669,7 @@ body {
 }
 .advice-composer-input {
     width: 100%;
-    min-height: 24px;
+    min-height: 20px;
     max-height: 160px;
     resize: none;
     overflow-y: auto;
@@ -1678,12 +1678,14 @@ body {
     background: transparent;
     color: var(--md-sys-on-surface);
     font: inherit;
+    font-size: 14px;
     line-height: 1.35;
     padding: 10px 0 9px;
     display: block;
 }
 .advice-composer-input::placeholder {
     color: var(--md-sys-on-surface-variant);
+    opacity: 0.7;
 }
 .advice-send-btn {
     width: 44px;

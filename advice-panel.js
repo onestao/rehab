@@ -386,7 +386,7 @@ const advicePanel = {
                 <div class="advice-chat-list">${this.renderAdviceMessages(visibleMessages)}</div>
                 <div class="advice-quick-prompts">${quicks.map(q => `<button onclick="data.useAdvicePrompt('${this.escapeHtml(q)}')" type="button">${this.escapeHtml(q)}</button>`).join('')}</div>
                 <div class="advice-composer">
-                    <textarea id="advicePrompt" class="advice-composer-input" rows="1" placeholder="向 AI 提问，例如：我最近减重停滞的原因是什么？" oninput="data.onAdvicePromptInput(this)" onkeydown="data.onAdvicePromptKeydown(event)">${draft}</textarea>
+                    <textarea id="advicePrompt" class="advice-composer-input" rows="1" placeholder="向 AI 提问…" oninput="data.onAdvicePromptInput(this)" onkeydown="data.onAdvicePromptKeydown(event)">${draft}</textarea>
                     <button id="adviceSendBtn" class="advice-send-btn" onclick="data.sendAiAdvice()" type="button" ${draft.trim() ? '' : 'disabled'} aria-label="发送问题"><span class="material-symbols-rounded">send</span></button>
                 </div>
                 <div id="adviceStatus" class="food-ai-status advice-status-line">Enter 发送，Shift + Enter 换行</div>
