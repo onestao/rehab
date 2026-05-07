@@ -1,18 +1,12 @@
-/* --- Empty State --- */
-.empty-state {
-    text-align: center;
-    padding: 40px 20px;
-    color: var(--md-sys-on-surface-variant);
-}
-.empty-state .material-symbols-rounded {
-    font-size: 48px;
-    color: var(--md-sys-outline);
-    margin-bottom: 12px;
-    display: block;
-    font-variation-settings: 'FILL' 0, 'wght' 300;
-}
-.empty-state p {
-    font-size: 14px;
-    font-weight: 500;
+/* --- Hidden --- */
+.hidden { display: none !important; }
+.pip-video-source {
+    position: fixed;
+    width: 1px;
+    height: 1px;
+    right: 0;
+    bottom: 0;
+    opacity: 0.01;
+    pointer-events: none;
 }
 

@@ -1,49 +1,31 @@
-/* --- Cardio Timer --- */
-.cardio-card {
-    display: grid;
-    gap: 14px;
-}
-.cardio-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-}
-.cardio-header h3 {
+/* --- Sync Card --- */
+.sync-card { padding: 20px; }
+.theme-card { padding: 16px; }
+.sync-card h3 {
     font-size: 18px;
-    line-height: 1.2;
+    font-weight: 700;
+    margin-bottom: 12px;
     color: var(--md-sys-on-surface);
 }
-.cardio-kicker {
-    display: block;
-    margin-bottom: 2px;
-    color: var(--md-sys-primary);
-    font-size: 11px;
-    font-weight: 900;
+.sync-actions { margin-top: 16px; }
+.sync-actions .md-btn { margin-top: 8px; }
+.sync-actions .md-row .md-btn { margin-top: 0; }
+.sync-card .md-field { margin-bottom: 8px; }
+.sync-backup-row { flex-wrap: wrap; }
+.sync-detail-status {
+    margin-top: 12px;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
 }
-.cardio-header > .material-symbols-rounded {
-    width: 42px;
-    height: 42px;
-    border-radius: 16px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    background: var(--md-sys-primary-container);
-    color: var(--md-sys-on-primary-container);
-    font-variation-settings: 'FILL' 1;
+.sync-meta-item {
+    padding: 10px 12px;
+    border-radius: var(--md-sys-shape-md);
+    background: var(--md-sys-surface-container-lowest);
+    display: grid;
+    gap: 2px;
 }
-.cardio-grid { margin: 0; }
-body.is-cardio .cardio-card {
-    box-shadow:
-        0 10px 28px rgba(0, 29, 54, 0.12),
-        0 2px 8px rgba(0, 0, 0, 0.08);
-    border-color: color-mix(in srgb, var(--md-sys-primary) 28%, var(--md-sys-outline-variant));
-}
-body.is-cardio .cardio-header > .material-symbols-rounded {
-    background: var(--md-sys-primary);
-    color: var(--md-sys-on-primary);
-}
-body.is-cardio-paused .cardio-card {
-    border-color: color-mix(in srgb, var(--md-sys-tertiary) 32%, var(--md-sys-outline-variant));
-}
+.sync-meta-item strong { font-size: 11px; color: var(--md-sys-on-surface-variant); }
+.sync-meta-item span { font-size: 12px; color: var(--md-sys-on-surface); }
+.sync-meta-wide { grid-column: 1 / -1; }
 

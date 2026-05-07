@@ -1,37 +1,9 @@
-/* --- Mode Tabs --- */
-.mode-tabs {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
-    margin: 8px 16px;
-    padding: 4px;
-    border-radius: 22px;
-    background: var(--md-sys-surface-container-low);
-    border: 1px solid var(--md-sys-outline-variant);
+/* --- Routine Tool --- */
+.routine-tool {
+    display: flex;
+    gap: 10px;
+    align-items: flex-end;
 }
-.mode-tab {
-    height: 44px;
-    border: none;
-    border-radius: 18px;
-    background: transparent;
-    color: var(--md-sys-on-surface-variant);
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    font-size: 14px;
-    font-weight: 800;
-    cursor: pointer;
-    transition:
-        transform var(--md-sys-motion-duration-medium) var(--md-expressive-spring),
-        background var(--md-sys-motion-duration-medium) var(--md-sys-motion-emphasized),
-        color var(--md-sys-motion-duration-medium) var(--md-sys-motion-emphasized);
-}
-.mode-tab .material-symbols-rounded { font-size: 20px; }
-.mode-tab.active {
-    background: var(--md-sys-primary-container);
-    color: var(--md-sys-on-primary-container);
-    box-shadow: var(--md-sys-elevation-1);
-}
-.mode-tab:active { transform: scale(0.96); }
+.routine-tool input { flex: 1; }
+.routine-tool .md-btn { flex: none; white-space: nowrap; margin-top: 0; width: auto; }
 

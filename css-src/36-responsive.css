@@ -1,42 +1,28 @@
-/* --- Modal --- */
-.md-modal {
-    position: fixed;
-    inset: 0;
-    z-index: 220;
-    display: grid;
-    place-items: center;
+/* ============================================
+   Responsive
+   ============================================ */
+@media (max-width: 360px) {
+    .md-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .md-card { margin: 6px 10px; padding: 14px; }
+    .input-card { padding: 12px; }
+    .timer-stats b { font-size: 14px; }
+    .list-item { margin: 4px 10px; padding: 10px 12px; }
 }
-.md-modal-backdrop {
-    position: absolute;
-    inset: 0;
-    background: rgba(12, 18, 28, 0.45);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
+
+@media (min-width: 600px) {
+    .md-grid { grid-template-columns: repeat(3, 1fr); }
+    #app { max-width: 520px; margin: 0 auto; }
+    .md-nav-rail { max-width: 520px; left: 50%; transform: translateX(-50%); border-radius: var(--md-sys-shape-lg) var(--md-sys-shape-lg) 0 0; }
 }
-.md-modal-card {
-    position: relative;
-    z-index: 1;
-    width: min(92vw, 420px);
-    padding: 16px;
-    border-radius: var(--md-sys-shape-xl);
-    background: var(--md-sys-surface-container-lowest);
-    box-shadow: var(--md-sys-elevation-3);
-    display: grid;
-    gap: 12px;
-}
-.md-modal-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-}
-.md-modal-head strong { font-size: 18px; }
-.modal-grid { margin: 0; }
-.modal-actions { margin-top: 0; }
-.modal-actions .md-btn {
-    flex: 1;
-    width: auto;
-    height: 46px;
-    margin-top: 0;
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 1ms !important;
+        animation-iteration-count: 1 !important;
+        scroll-behavior: auto !important;
+        transition-duration: 1ms !important;
+    }
 }
 

@@ -1,136 +1,14 @@
-/* --- FAB (Expressive) --- */
-.workout-controls {
-    position: fixed;
-    left: 50%;
-    bottom: calc(92px + env(safe-area-inset-bottom));
-    transform: translateX(-50%);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 14px;
-    min-height: 0;
-    margin: 0;
-    padding: 10px 12px;
-    border: none;
-    border-radius: 34px;
-    background: rgba(244, 243, 250, 0.76);
-    background:
-        linear-gradient(135deg, rgba(255,255,255,0.72), rgba(244,243,250,0.42)),
-        color-mix(in srgb, var(--md-sys-primary-container) 18%, transparent);
-    box-shadow:
-        0 14px 36px rgba(0, 29, 54, 0.18),
-        0 4px 12px rgba(0, 0, 0, 0.12);
-    backdrop-filter: blur(22px) saturate(1.35);
-    -webkit-backdrop-filter: blur(22px) saturate(1.35);
-    z-index: 95;
-    transition:
-        transform var(--md-sys-motion-duration-medium) var(--md-expressive-spring),
-        box-shadow var(--md-sys-motion-duration-medium) var(--md-sys-motion-emphasized),
-        background var(--md-sys-motion-duration-medium) var(--md-sys-motion-emphasized);
-}
-body.is-training .workout-controls {
-    transform: translateX(-50%) translateY(-4px);
-    box-shadow:
-        0 18px 44px rgba(0, 29, 54, 0.22),
-        0 6px 16px rgba(0, 0, 0, 0.14);
-}
-.md-fab {
-    width: 64px;
-    height: 64px;
-    border-radius: 22px;
-    border: none;
-    box-shadow:
-        0 6px 18px rgba(0, 29, 54, 0.18),
-        0 2px 6px rgba(0, 0, 0, 0.12);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    transition:
-        transform var(--md-sys-motion-duration-medium) var(--md-expressive-spring),
-        border-radius var(--md-sys-motion-duration-medium) var(--md-expressive-spring),
-        width var(--md-sys-motion-duration-medium) var(--md-expressive-spring),
-        height var(--md-sys-motion-duration-medium) var(--md-expressive-spring),
-        box-shadow var(--md-sys-motion-duration-medium) var(--md-sys-motion-emphasized),
-        background var(--md-sys-motion-duration-medium) var(--md-sys-motion-emphasized);
-    -webkit-tap-highlight-color: transparent;
-    position: relative;
-    overflow: hidden;
-}
-.md-fab:hover {
-    box-shadow:
-        0 10px 24px rgba(0, 29, 54, 0.22),
-        0 3px 8px rgba(0, 0, 0, 0.14);
-}
-.md-fab::after {
-    content: '';
+/* --- Skip Button --- */
+.skip-btn {
     position: absolute;
-    inset: 0;
-    background: currentColor;
-    opacity: 0;
+    right: 12px;
+    top: 12px;
+    opacity: 0.4;
+    color: white;
+    cursor: pointer;
+    padding: 6px;
+    border-radius: var(--md-sys-shape-sm);
     transition: opacity var(--md-sys-motion-duration-short);
 }
-.md-fab:active { transform: scale(0.92); }
-.md-fab:hover::after { opacity: var(--md-state-hover); }
-.md-fab:active::after { opacity: var(--md-state-press); }
-.md-fab .material-symbols-rounded { font-size: 24px; position: relative; z-index: 1; }
-.fab-play {
-    width: 68px;
-    height: 68px;
-    border-radius: 24px;
-}
-body.is-training .fab-play {
-    width: 76px;
-    border-radius: 28px;
-}
-body.is-paused .fab-play {
-    border-radius: 34px;
-}
-.fab-play .material-symbols-rounded { font-size: 32px; }
-.fab-play {
-    background: var(--md-sys-primary-container);
-    color: var(--md-sys-on-primary-container);
-}
-body.is-training .fab-play {
-    background: var(--md-sys-primary);
-    color: var(--md-sys-on-primary);
-}
-body.is-paused .fab-play {
-    background: var(--md-sys-tertiary-container);
-    color: var(--md-sys-on-tertiary-container);
-}
-.fab-stop {
-    background: var(--md-sys-error-container);
-    color: var(--md-sys-on-error-container);
-    width: 52px;
-    height: 52px;
-    border-radius: 18px;
-}
-body.is-training .fab-stop {
-    border-radius: 26px 18px 26px 18px;
-}
-.fab-pip {
-    background: var(--md-sys-secondary-container);
-    color: var(--md-sys-on-secondary-container);
-    width: 52px;
-    height: 52px;
-    border-radius: 18px;
-}
-.fab-pip.active {
-    background: var(--md-sys-tertiary-container);
-    color: var(--md-sys-on-tertiary-container);
-    border-radius: 26px;
-    box-shadow:
-        0 8px 22px color-mix(in srgb, var(--md-sys-tertiary) 26%, transparent),
-        0 2px 8px rgba(0, 0, 0, 0.14);
-}
-.fab-pip.unsupported {
-    opacity: 0.72;
-}
-body.is-training .fab-pip {
-    border-radius: 18px 26px 18px 26px;
-}
-body.is-training .fab-pip.active {
-    border-radius: 28px;
-}
+.skip-btn:active { opacity: 1; }
 

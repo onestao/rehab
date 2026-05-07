@@ -1,12 +1,4 @@
-/* --- Hidden --- */
-.hidden { display: none !important; }
-.pip-video-source {
-    position: fixed;
-    width: 1px;
-    height: 1px;
-    right: 0;
-    bottom: 0;
-    opacity: 0.01;
-    pointer-events: none;
-}
+/* --- Input Card --- */
+.input-card .md-grid { margin: 8px 0 4px; }
+.input-card { padding: 14px; }
 
