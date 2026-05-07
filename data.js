@@ -603,7 +603,7 @@ const data = {
         const mealGroups = { breakfast: [], lunch: [], dinner: [], snack: [] };
         todayLogs.forEach(f => { (mealGroups[f.meal] || mealGroups.snack).push(f); });
         const mealNames = { breakfast: '早餐', lunch: '午餐', dinner: '晚餐', snack: '加餐' };
-        const collapsed = this.isCollapsed('dietPanel', false);
+        const collapsed = this.isCollapsed('dietPanel', true);
         return `<div class="md-card diet-card collapsible-card ${collapsed ? 'collapsed' : ''}">
             <button class="diet-head collapsible-head-btn" onclick="data.toggleCollapse('dietPanel')" type="button" aria-expanded="${!collapsed}">
                 <div>
@@ -643,11 +643,6 @@ const data = {
                 <div class="diet-ai-entry">
                     <textarea id="foodAiText" class="diet-ai-input" rows="1" placeholder="说说你这顿吃了什么，例如：鸡胸肉饭加一杯豆浆" oninput="data.autoResizeDietInput(this)"></textarea>
                     <button class="md-btn md-btn-filled diet-ai-run" onclick="data.aiParseFood()"><span class="material-symbols-rounded">psychology</span>AI识别</button>
-                </div>
-                <div class="diet-suggest-row">
-                    <button class="diet-suggest-chip" onclick="data.useFoodAiText('鸡蛋三明治 + 美式咖啡')" type="button">鸡蛋三明治 + 美式咖啡</button>
-                    <button class="diet-suggest-chip" onclick="data.useFoodAiText('鸡胸肉饭 + 无糖酸奶')" type="button">鸡胸肉饭 + 无糖酸奶</button>
-                    <button class="diet-suggest-chip" onclick="data.useFoodAiText('一杯蛋白粉 + 香蕉')" type="button">蛋白粉 + 香蕉</button>
                 </div>
                 <div id="foodSearchResults" class="food-search-results"></div>
                 <div id="foodAiStatus" class="food-ai-status"></div>
@@ -924,7 +919,7 @@ const data = {
         const bmi = (latest && h > 0) ? (latest.weight / ((h / 100) ** 2)) : 0;
         const bmiInfo = bmi > 0 ? this.bmiCategory(bmi) : null;
         const recentWeights = weights.slice(-8).reverse();
-        const historyCollapsed = this.isCollapsed('weightHistory', recentWeights.length > 4);
+        const historyCollapsed = this.isCollapsed('weightHistory', true);
         return `<div class="md-card weight-card">
             <div class="weight-head">
                 <div>
