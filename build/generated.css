@@ -1423,10 +1423,26 @@ body {
 }
 .diet-meal-title small { font-weight: 600; color: var(--md-sys-primary); }
 .diet-log-item {
-    display: flex; align-items: center; gap: 8px; padding: 6px 8px;
+    display: grid; gap: 2px; padding: 8px 10px;
     background: var(--md-sys-surface-container-lowest); border-radius: var(--md-sys-shape-sm); margin-bottom: 3px;
     font-size: 13px;
 }
+.diet-log-main {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+}
+.diet-log-name {
+    flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    font-weight: 600; color: var(--md-sys-on-surface);
+}
+.diet-log-cal { white-space: nowrap; color: var(--md-sys-primary); font-size: 13px; }
+.diet-log-sub {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+}
+.diet-log-sub small {
+    min-width: 0; color: var(--md-sys-on-surface-variant); font-size: 11px; font-weight: 600;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.diet-log-actions { display: flex; gap: 2px; flex: none; }
 .diet-log-item span:first-child { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .diet-log-item b { white-space: nowrap; color: var(--md-sys-primary); font-size: 13px; }
 .food-log-action-btn {
@@ -2547,6 +2563,291 @@ body.is-training .fab-pip.active {
     margin-top: 0;
 }
 /* ============================================
+   Record Page — Refactored Layout
+   ============================================ */
+
+/* Record Overview Card (compact) */
+.record-overview-card { display: grid; gap: 14px; }
+.record-overview-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 14px;
+}
+.record-overview-date h3 {
+    font-size: 26px;
+    line-height: 1.08;
+    color: var(--md-sys-on-surface);
+    letter-spacing: -0.4px;
+    margin-top: 2px;
+}
+.record-overview-date p {
+    margin-top: 4px;
+    color: var(--md-sys-on-surface-variant);
+    font-size: 13px;
+}
+.record-overview-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+}
+.record-overview-stat {
+    padding: 10px 8px;
+    border-radius: var(--md-sys-shape-md);
+    background: color-mix(in srgb, var(--md-sys-surface-container-lowest) 86%, transparent);
+    display: grid;
+    gap: 2px;
+    text-align: center;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.2);
+    border: 1px solid color-mix(in srgb, var(--md-sys-outline-variant) 70%, transparent);
+}
+.record-overview-stat b { font-size: 18px; color: var(--md-sys-primary); font-variant-numeric: tabular-nums; }
+.record-overview-stat small { color: var(--md-sys-on-surface-variant); font-size: 11px; }
+
+/* Quick Actions */
+.record-quick-actions {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    margin: 0 16px 4px;
+}
+.record-quick-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    padding: 12px 4px;
+    border: none;
+    border-radius: var(--md-sys-shape-lg);
+    background: var(--md-sys-surface-container-low);
+    color: var(--md-sys-on-surface);
+    font-size: 11px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all var(--md-sys-motion-duration-short) var(--md-sys-motion-emphasized);
+    -webkit-tap-highlight-color: transparent;
+    box-shadow: var(--md-sys-elevation-1);
+    border: 1px solid var(--md-sys-outline-variant);
+}
+.record-quick-btn .material-symbols-rounded {
+    font-size: 22px;
+    color: var(--md-sys-primary);
+    font-variation-settings: 'FILL' 1;
+}
+.record-quick-btn:active {
+    transform: scale(0.95);
+    background: var(--md-sys-surface-container);
+}
+.record-quick-btn-ai {
+    background: color-mix(in srgb, var(--md-sys-primary-container) 40%, var(--md-sys-surface-container-low));
+    border-color: color-mix(in srgb, var(--md-sys-primary) 25%, var(--md-sys-outline-variant));
+}
+.record-quick-btn-ai .material-symbols-rounded {
+    color: var(--md-sys-primary);
+}
+
+/* Scrollable Record Tabs (5 tabs) */
+.record-tabs-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    gap: 4px;
+    padding: 4px 12px;
+    margin: 8px 4px;
+}
+.record-tabs-scroll::-webkit-scrollbar { display: none; }
+.record-tabs-scroll .record-tab {
+    flex: none;
+    min-width: 0;
+    padding: 0 12px;
+    white-space: nowrap;
+    font-size: 12px;
+}
+
+/* Today Timeline */
+.today-timeline-card { display: grid; gap: 0; padding: 14px; }
+.today-timeline-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+.today-timeline-header .material-symbols-rounded {
+    font-size: 20px;
+    color: var(--md-sys-primary);
+    font-variation-settings: 'FILL' 1;
+}
+.today-timeline-header strong { flex: 1; font-size: 14px; }
+.today-timeline-header small { color: var(--md-sys-on-surface-variant); font-size: 12px; }
+.today-timeline-list {
+    display: grid;
+    gap: 0;
+    position: relative;
+}
+.today-timeline-list::before {
+    content: '';
+    position: absolute;
+    left: 17px;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    background: var(--md-sys-outline-variant);
+    border-radius: 1px;
+}
+.today-timeline-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 8px 0;
+    position: relative;
+}
+.today-timeline-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: var(--md-sys-shape-full);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    font-variation-settings: 'FILL' 1;
+    flex: none;
+    position: relative;
+    z-index: 1;
+}
+.today-timeline-diet .today-timeline-icon {
+    background: color-mix(in srgb, #059669 20%, var(--md-sys-surface-container-lowest));
+    color: #059669;
+}
+.today-timeline-training .today-timeline-icon {
+    background: var(--md-sys-primary-container);
+    color: var(--md-sys-on-primary-container);
+}
+.today-timeline-exercise .today-timeline-icon {
+    background: color-mix(in srgb, #8b5cf6 20%, var(--md-sys-surface-container-lowest));
+    color: #8b5cf6;
+}
+.today-timeline-weight .today-timeline-icon {
+    background: var(--md-sys-tertiary-container);
+    color: var(--md-sys-on-tertiary-container);
+}
+.today-timeline-body {
+    flex: 1;
+    min-width: 0;
+    display: grid;
+    gap: 2px;
+    padding-top: 2px;
+}
+.today-timeline-main {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+}
+.today-timeline-main strong {
+    font-size: 13px;
+    color: var(--md-sys-on-surface);
+}
+.today-timeline-main span {
+    font-size: 13px;
+    color: var(--md-sys-on-surface-variant);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.today-timeline-body small {
+    font-size: 11px;
+    color: var(--md-sys-outline);
+    font-weight: 600;
+}
+.today-timeline-empty {
+    text-align: center;
+}
+
+/* Context AI Card */
+.context-ai-card {
+    display: grid;
+    gap: 12px;
+    background: color-mix(in srgb, var(--md-sys-primary-container) 12%, var(--md-sys-surface-container-low));
+    border-color: color-mix(in srgb, var(--md-sys-primary) 20%, var(--md-sys-outline-variant));
+}
+.context-ai-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+}
+.context-ai-head h3 {
+    font-size: 16px;
+    color: var(--md-sys-on-surface);
+}
+.context-ai-head > .material-symbols-rounded {
+    font-size: 28px;
+    color: var(--md-sys-primary);
+    font-variation-settings: 'FILL' 1;
+    opacity: 0.7;
+}
+.context-ai-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+.context-ai-btn {
+    flex: 1;
+    min-width: 0;
+    height: 38px;
+    font-size: 12px;
+    padding: 0 12px;
+    white-space: nowrap;
+}
+
+/* Recent History List */
+.recent-history-list {
+    display: grid;
+    gap: 4px;
+}
+
+/* Sheet-style Modal (bottom slide-up) */
+.md-modal-sheet {
+    align-items: flex-end;
+}
+.md-modal-sheet-card {
+    width: 100%;
+    max-width: 100%;
+    max-height: 85vh;
+    border-radius: var(--md-sys-shape-xl) var(--md-sys-shape-xl) 0 0;
+    overflow-y: auto;
+    animation: sheetSlideUp 300ms var(--md-sys-motion-emphasized-decelerate);
+}
+@keyframes sheetSlideUp {
+    from { transform: translateY(100%); opacity: 0.5; }
+    to { transform: translateY(0); opacity: 1; }
+}
+.diet-modal-body,
+.exercise-modal-body {
+    display: grid;
+    gap: 12px;
+    padding: 0 0 16px;
+}
+.diet-modal-body .diet-meal-selector,
+.diet-modal-body .diet-mode-tabs {
+    margin: 0;
+}
+.diet-modal-body .diet-ai-entry {
+    margin: 0;
+}
+.diet-modal-body .food-search-results {
+    max-height: 200px;
+}
+
+.today-timeline-sub {
+    font-size: 11px;
+    color: var(--md-sys-outline);
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+/* ============================================
    Responsive
    ============================================ */
 @media (max-width: 360px) {
@@ -2555,6 +2856,11 @@ body.is-training .fab-pip.active {
     .input-card { padding: 12px; }
     .timer-stats b { font-size: 14px; }
     .list-item { margin: 4px 10px; padding: 10px 12px; }
+    .record-quick-actions { gap: 6px; margin: 0 10px 4px; }
+    .record-quick-btn { padding: 10px 2px; font-size: 10px; }
+    .record-quick-btn .material-symbols-rounded { font-size: 20px; }
+    .record-overview-stat b { font-size: 16px; }
+    .record-tabs-scroll .record-tab { padding: 0 10px; font-size: 11px; }
 }
 
 @media (min-width: 600px) {

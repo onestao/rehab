@@ -259,11 +259,11 @@
     <script src="workout-engine.js"></script>
     <script src="workout-state.js"></script>
     <script src="app-update.js"></script>
-    <div id="weightModal" class="md-modal hidden" aria-hidden="true">
+    <div id="weightModal" class="md-modal md-modal-sheet hidden" aria-hidden="true">
         <div class="md-modal-backdrop" onclick="data.closeWeightModal()"></div>
-        <div class="md-modal-card">
+        <div class="md-modal-card md-modal-sheet-card">
             <div class="md-modal-head">
-                <strong>添加体重记录</strong>
+                <strong>记录体重</strong>
                 <button class="icon-btn" onclick="data.closeWeightModal()" aria-label="关闭"><span class="material-symbols-rounded">close</span></button>
             </div>
             <div class="md-grid modal-grid">
@@ -278,7 +278,26 @@
             </div>
         </div>
     </div>
-    <script>
+    <div id="dietModal" class="md-modal md-modal-sheet hidden" aria-hidden="true">
+        <div class="md-modal-backdrop" onclick="data.closeDietModal()"></div>
+        <div class="md-modal-card md-modal-sheet-card">
+            <div class="md-modal-head">
+                <strong>记录饮食</strong>
+                <button class="icon-btn" onclick="data.closeDietModal()" aria-label="关闭"><span class="material-symbols-rounded">close</span></button>
+            </div>
+            <div id="dietModalContent"></div>
+        </div>
+    </div>
+    <div id="exerciseModal" class="md-modal md-modal-sheet hidden" aria-hidden="true">
+        <div class="md-modal-backdrop" onclick="data.closeExerciseModal()"></div>
+        <div class="md-modal-card md-modal-sheet-card">
+            <div class="md-modal-head">
+                <strong>记录运动</strong>
+                <button class="icon-btn" onclick="data.closeExerciseModal()" aria-label="关闭"><span class="material-symbols-rounded">close</span></button>
+            </div>
+            <div id="exerciseModalContent"></div>
+        </div>
+    </div>    <script>
         const ui = {
             tab: (id, el) => {
                 data.captureAdviceDraft?.();

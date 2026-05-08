@@ -254,10 +254,26 @@
 }
 .diet-meal-title small { font-weight: 600; color: var(--md-sys-primary); }
 .diet-log-item {
-    display: flex; align-items: center; gap: 8px; padding: 6px 8px;
+    display: grid; gap: 2px; padding: 8px 10px;
     background: var(--md-sys-surface-container-lowest); border-radius: var(--md-sys-shape-sm); margin-bottom: 3px;
     font-size: 13px;
 }
+.diet-log-main {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+}
+.diet-log-name {
+    flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    font-weight: 600; color: var(--md-sys-on-surface);
+}
+.diet-log-cal { white-space: nowrap; color: var(--md-sys-primary); font-size: 13px; }
+.diet-log-sub {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+}
+.diet-log-sub small {
+    min-width: 0; color: var(--md-sys-on-surface-variant); font-size: 11px; font-weight: 600;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.diet-log-actions { display: flex; gap: 2px; flex: none; }
 .diet-log-item span:first-child { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .diet-log-item b { white-space: nowrap; color: var(--md-sys-primary); font-size: 13px; }
 .food-log-action-btn {

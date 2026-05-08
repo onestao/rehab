@@ -34,6 +34,7 @@ export const cssSections = [
   { file: '33-workout-input-card.css', marker: { type: 'exact', value: '/* --- Input Card --- */' } },
   { file: '34-settings-theme.css', marker: { type: 'exact', value: '/* --- Theme Controls (Material You / Monet) --- */' } },
   { file: '35-components-modal.css', marker: { type: 'exact', value: '/* --- Modal --- */' } },
+  { file: '38-record-page.css', marker: { type: 'exact', value: '/* ============================================\n   Record Page' } },
   { file: '36-responsive.css', marker: { type: 'pair', line: '/* ============================================', nextIncludes: 'Responsive' } },
   { file: '37-dark-mode.css', marker: { type: 'pair', line: '/* ============================================', nextIncludes: 'Dark Mode' } },
 ];

@@ -6,7 +6,7 @@ const data = {
     cfg: { mode: 'none', s3: {}, dav: {} },
     historyMonthOffset: 0,
     routineView: 'library',
-    recordView: 'daily',
+    recordView: 'today',
     weightRange: 'month',
     selectedCalendarDate: null,
     adviceModel: '__current__',
@@ -127,7 +127,8 @@ const data = {
     },
 
     setRecordView(view) {
-        this.recordView = view;
+        this.recordView = view || 'today';
+        this.captureAdviceDraft?.();
         this.renderHistory();
     },
 
@@ -193,6 +194,65 @@ const data = {
 
     closeWeightModal() {
         document.getElementById('weightModal').classList.add('hidden');
+    },
+
+    // --- Diet Modal ---
+    openDietModal() {
+        const el = document.getElementById('dietModalContent');
+        if (el) el.innerHTML = this.renderDietModalContent();
+        document.getElementById('dietModal').classList.remove('hidden');
+        this._dietInputMode = 'ai';
+    },
+    closeDietModal() {
+        document.getElementById('dietModal').classList.add('hidden');
+        this.clearAiResults?.();
+        this.renderHistory();
+    },
+    renderDietModalContent() {
+        const meal = this._dietMeal || 'lunch';
+        const meals = [['breakfast','早餐'],['lunch','午餐'],['dinner','晚餐'],['snack','加餐']];
+        return '<div class="diet-modal-body">' +
+            '<div class="diet-meal-selector">' + meals.map(([k,v]) => '<button class="diet-meal-pill' + (meal===k ? ' active' : '') + '" onclick="data.setDietMeal(\''+k+'\')" type="button">' + v + '</button>').join('') + '</div>' +
+            '<div class="diet-mode-tabs" role="tablist"><button class="diet-mode-tab active" data-mode="ai" onclick="data.setDietInputMode(\'ai\')" type="button"><span class="material-symbols-rounded">psychology</span>AI录入</button><button class="diet-mode-tab" data-mode="manual" onclick="data.setDietInputMode(\'manual\')" type="button"><span class="material-symbols-rounded">edit</span>手动录入</button></div>' +
+            '<div class="diet-ai-entry"><textarea id="foodAiText" class="diet-ai-input" rows="2" placeholder="描述这顿吃了什么..." oninput="data.autoResizeDietInput(this)"></textarea><button class="md-btn md-btn-filled diet-ai-run" onclick="data.aiParseFood()"><span class="material-symbols-rounded">psychology</span>AI识别</button></div>' +
+            '<div id="foodSearchResults" class="food-search-results"></div><div id="foodAiStatus" class="food-ai-status"></div>' +
+            '<div id="foodManualArea" class="diet-manual-area hidden"><div class="md-grid diet-input-grid">' +
+            '<div class="md-field span-full"><input type="text" id="foodName" placeholder=" " oninput="data.onFoodSearchInput()" onblur="data.autoFillFoodByName()"><label>食物名称</label></div>' +
+            '<div class="md-field"><input type="number" id="foodGrams" step="1" placeholder=" " oninput="data.updateFoodComputedPreview()"><label>克数</label></div>' +
+            '<div class="md-field"><input type="number" id="foodCal" step="1" placeholder=" " oninput="data.updateFoodComputedPreview()"><label>kcal/100g</label></div>' +
+            '<div class="md-field"><input type="number" id="foodPro" step="0.1" placeholder=" " oninput="data.updateFoodComputedPreview()"><label>蛋白/100g</label></div>' +
+            '<div class="md-field"><input type="number" id="foodCarb" step="0.1" placeholder=" " oninput="data.updateFoodComputedPreview()"><label>碳水/100g</label></div>' +
+            '<div class="md-field"><input type="number" id="foodFat" step="0.1" placeholder=" " oninput="data.updateFoodComputedPreview()"><label>脂肪/100g</label></div>' +
+            '<div id="foodComputed" class="food-computed span-full">输入食物和重量后自动计算</div>' +
+            '<div id="foodSourceHint" class="food-source-hint span-full">输入食物后可从食物库或 AI 自动填充营养</div>' +
+            '<div class="diet-btn-row"><button class="md-btn md-btn-filled" onclick="data.addFoodLog()"><span class="material-symbols-rounded">add</span> 添加</button><button class="md-btn md-btn-tonal" onclick="data.aiParseFood()"><span class="material-symbols-rounded">psychology</span></button></div>' +
+            '</div></div></div>';
+    },
+    openExerciseModal() {
+        const el = document.getElementById('exerciseModalContent');
+        if (el) el.innerHTML = this.renderExerciseModalContent();
+        document.getElementById('exerciseModal').classList.remove('hidden');
+    },
+    closeExerciseModal() {
+        document.getElementById('exerciseModal').classList.add('hidden');
+        this.renderHistory();
+    },
+    renderExerciseModalContent() {
+        return '<div class="exercise-modal-body"><div class="md-grid exercise-grid">' +
+            '<div class="md-field"><select id="manualExerciseType" onchange="data.toggleManualCustomExercise(this.value)"><option value="walk">步行</option><option value="run">跑步</option><option value="cycling">骑行</option><option value="swim">游泳</option><option value="battle_rope">战绳</option><option value="spin_bike">动感单车</option><option value="strength">力量训练</option><option value="stretch">拉伸/瑜伽</option><option value="custom">自定义运动</option></select><label>运动种类</label></div>' +
+            '<div class="md-field hidden" id="manualExerciseCustomField"><input type="text" id="manualExerciseCustom" placeholder=" "><label>自定义运动名称</label></div>' +
+            '<div class="md-field"><input type="number" id="manualExerciseMinutes" step="1" placeholder=" "><label>时长 分钟</label></div>' +
+            '<div class="md-field"><input type="number" id="manualExerciseCalories" step="1" placeholder=" "><label>热量 kcal</label></div>' +
+            '<div class="md-field"><input type="number" id="manualExerciseDistance" step="0.1" placeholder=" "><label>距离 km</label></div>' +
+            '<div class="md-field span-full"><input type="text" id="manualExerciseNote" placeholder=" "><label>备注</label></div>' +
+            '</div><button class="md-btn md-btn-filled" onclick="data.addExerciseFromModal()"><span class="material-symbols-rounded">add</span> 添加运动记录</button></div>';
+    },
+    addExerciseFromModal() {
+        this.addManualExercise();
+        ['manualExerciseCustom','manualExerciseMinutes','manualExerciseCalories','manualExerciseDistance','manualExerciseNote'].forEach(function(id) { var el = document.getElementById(id); if (el) el.value = ''; });
+        var t = document.getElementById('manualExerciseType'); if (t) t.value = 'walk';
+        var cf = document.getElementById('manualExerciseCustomField'); if (cf) cf.classList.add('hidden');
+        if (typeof workout !== 'undefined' && workout.showToast) workout.showToast('运动记录已添加');
     },
 
     deleteWeight(id) {
@@ -440,13 +500,145 @@ const data = {
         const top = document.getElementById('todayActionTop');
         const list = document.getElementById('historyList');
         if (!list || !top) return;
-        top.innerHTML = this.renderTodayActionHero();
+        top.innerHTML = this.renderRecordOverview() + this.renderRecordQuickActions();
         list.innerHTML = `
-            <div class="record-tabs" role="tablist" aria-label="记录视图">
-                <button class="record-tab ${this.recordView === 'daily' ? 'active' : ''}" onclick="data.setRecordView('daily')"><span class="material-symbols-rounded">today</span>每日行动</button>
-                <button class="record-tab ${this.recordView === 'calendar' ? 'active' : ''}" onclick="data.setRecordView('calendar')"><span class="material-symbols-rounded">calendar_month</span>健身日历</button>
+            ${this.renderRecordTabs()}
+            ${this.renderRecordView()}`;
+        if (this.recordView === 'diet') requestAnimationFrame(() => this.autoResizeDietInput?.());
+    },
+    renderRecordOverview() {
+        const today = this.dateKey(new Date());
+        const weight = (this.db.health.weights || []).find(w => w.date === today) || this.sortedWeights().slice(-1)[0];
+        const intake = this.todayCalories();
+        const exerciseCal = this.todayTrainingCalories();
+        const macros = this.todayMacros();
+        const goalCal = this.db.health.dietGoal?.dailyCal || 0;
+        const goals = this.defaultDietGoals();
+        const progress = goalCal ? Math.min(100, Math.round((intake / goalCal) * 100)) : 0;
+        const remaining = goalCal ? goalCal - intake : 0;
+        const monthNum = Number(today.slice(5, 7));
+        const dayNum = Number(today.slice(8, 10));
+        const weekdays = ['周日','周一','周二','周三','周四','周五','周六'];
+        const weekday = weekdays[new Date(today).getDay()];
+        let status = '', hint = '';
+        if (goalCal) {
+            if (remaining >= 500) { status = '空间充足'; hint = '还可摄入约 ' + remaining + ' kcal，优先补蛋白和蔬菜'; }
+            else if (remaining >= 150) { status = '节奏良好'; hint = '还可摄入约 ' + remaining + ' kcal，晚餐建议清淡均衡'; }
+            else if (remaining >= 0) { status = '接近目标'; hint = '已接近目标，控制油脂和零食'; }
+            else { status = '已超出目标'; hint = '已超出 ' + Math.abs(remaining) + ' kcal，可增加散步或低强度活动'; }
+        }
+        return `<div class="md-card hero-card record-overview-card">
+            <div class="record-overview-top">
+                <div class="record-overview-date">
+                    <span class="hero-kicker">今日总览</span>
+                    <h3>${monthNum}月${dayNum}日 ${weekday}</h3>
+                    ${weight ? `<p>体重 ${weight.weight.toFixed(1)} kg</p>` : ''}
+                </div>
+                ${goalCal ? `<div class="today-focus-ring" style="--progress:${progress}"><div><b>${progress}%</b><small>摄入</small></div></div>` : ''}
             </div>
-            ${this.recordView === 'daily' ? this.renderDailyActions() : this.renderFitnessCalendar()}`;
+            <div class="record-overview-stats">
+                <div class="record-overview-stat"><b>${intake}${goalCal ? `/${goalCal}` : ''}</b><small>摄入 kcal</small></div>
+                <div class="record-overview-stat"><b>${exerciseCal}</b><small>消耗 kcal</small></div>
+                <div class="record-overview-stat"><b>${macros.pro.toFixed(0)}/${goals.pro}</b><small>蛋白 g</small></div>
+            </div>
+            ${goalCal ? `<div class="today-focus-hint"><b>${status}</b><p>${hint}</p></div>` : ''}
+        </div>`;
+    },
+    renderRecordQuickActions() {
+        return `<div class="record-quick-actions">
+            <button class="record-quick-btn" onclick="data.openDietModal()"><span class="material-symbols-rounded">restaurant</span><span>记饮食</span></button>
+            <button class="record-quick-btn" onclick="data.openExerciseModal()"><span class="material-symbols-rounded">fitness_center</span><span>记运动</span></button>
+            <button class="record-quick-btn" onclick="data.openWeightModal()"><span class="material-symbols-rounded">monitor_weight</span><span>记体重</span></button>
+            <button class="record-quick-btn record-quick-btn-ai" onclick="data.askContextAi('today','请分析我今天的饮食、训练和体重记录，并给出今晚或明天的调整建议')"><span class="material-symbols-rounded">psychology</span><span>问 AI</span></button>
+        </div>`;
+    },
+    renderRecordTabs() {
+        const tabs = [['today','today','今日'],['diet','restaurant','饮食'],['exercise','fitness_center','运动'],['weight','monitor_weight','体重'],['calendar','calendar_month','日历']];
+        return `<div class="record-tabs record-tabs-scroll" role="tablist" aria-label="记录视图">${tabs.map(([key, icon, label]) => `<button class="record-tab ${this.recordView === key ? 'active' : ''}" onclick="data.setRecordView('${key}')"><span class="material-symbols-rounded">${icon}</span>${label}</button>`).join('')}</div>`;
+    },
+    renderRecordView() {
+        switch (this.recordView) {
+            case 'diet': return this.renderDietView();
+            case 'exercise': return this.renderExerciseView();
+            case 'weight': return this.renderWeightView();
+            case 'calendar': return this.renderCalendarView();
+            case 'today': default: return this.renderTodayView();
+        }
+    },
+    renderTodayView() { return `${this.renderTodayTimeline()}${this.renderContextAiCard('today')}`; },
+    renderTodayTimeline() {
+        const today = this.dateKey(new Date());
+        const entries = this.db.history.filter(h => this.dateKey(this.parseHistoryDate(h.date)) === today);
+        const foods = (this.db.health.foodLogs || []).filter(f => f.date === today);
+        const exercises = (this.db.health.exerciseLogs || []).filter(e => e.date === today);
+        const weight = (this.db.health.weights || []).find(w => w.date === today);
+        const items = [];
+        const mealGroups = { breakfast: [], lunch: [], dinner: [], snack: [] };
+        foods.forEach(f => (mealGroups[f.meal] || mealGroups.snack).push(f));
+        const mealOrder = { breakfast: 1, lunch: 2, dinner: 3, snack: 4 };
+        const mealNames = { breakfast: '早餐', lunch: '午餐', dinner: '晚餐', snack: '加餐' };
+        Object.entries(mealGroups).forEach(([meal, list]) => {
+            if (!list.length) return;
+            const totalCal = list.reduce((s, f) => s + Number(f.cal || 0), 0);
+            const totalPro = list.reduce((s, f) => s + Number(f.pro || 0), 0);
+            const totalCarb = list.reduce((s, f) => s + Number(f.carb || 0), 0);
+            const totalFat = list.reduce((s, f) => s + Number(f.fat || 0), 0);
+            const names = list.map(f => f.name).slice(0, 3).join('、') + (list.length > 3 ? '等' + list.length + '项' : '');
+            items.push({ order: mealOrder[meal] || 5, sk: list[0]?.createdAt || '', icon: 'restaurant', label: mealNames[meal] || '加餐', detail: totalCal + ' kcal', meta: 'P' + totalPro.toFixed(0) + ' C' + totalCarb.toFixed(0) + ' F' + totalFat.toFixed(0) + ' · ' + list.length + '项', sub: names, type: 'diet' });
+        });
+        entries.forEach(h => {
+            const mins = Math.floor(h.duration / 60), secs = h.duration % 60;
+            const names = this.historyNames(h).join('、');
+            const cal = Math.round(h.cardio?.calories || 0);
+            items.push({ order: 5, sk: h.date || '', icon: this.historyIcon(h), label: names || '训练', detail: mins+'分'+secs+'秒', meta: cal ? cal+' kcal' : (h.actions?.length||0)+' 个动作', type: 'training' });
+        });
+        exercises.forEach(e => {
+            items.push({ order: 6, sk: e.createdAt || '', icon: this.sportIcon(this.exerciseLabel(e.type, e)), label: this.exerciseLabel(e.type, e), detail: e.minutes+' 分钟', meta: e.calories ? e.calories+' kcal' : '', type: 'exercise' });
+        });
+        if (weight) items.push({ order: 0, sk: '0', icon: 'monitor_weight', label: '体重记录', detail: weight.weight.toFixed(1)+' kg', meta: weight.note || '', type: 'weight' });
+        if (!items.length) return '<div class="md-card today-timeline-empty"><div class="empty-state" style="padding:24px 16px"><span class="material-symbols-rounded">timeline</span><p>今天还没有记录，使用上方快捷按钮开始记录</p></div></div>';
+        items.sort((a, b) => a.order - b.order || String(a.sk).localeCompare(String(b.sk)));
+        return '<div class="md-card today-timeline-card"><div class="today-timeline-header"><span class="material-symbols-rounded">timeline</span><strong>今日时间线</strong><small>' + items.length + ' 条</small></div><div class="today-timeline-list">' + items.map(it => '<div class="today-timeline-item today-timeline-' + it.type + '"><span class="today-timeline-icon material-symbols-rounded">' + it.icon + '</span><div class="today-timeline-body"><div class="today-timeline-main"><strong>' + it.label + '</strong><span>' + it.detail + '</span></div>' + (it.meta ? '<small>' + it.meta + '</small>' : '') + (it.sub ? '<span class="today-timeline-sub">' + it.sub + '</span>' : '') + '</div></div>').join('') + '</div></div>';
+    },
+    renderDietView() { return this.renderDietPanel() + this.renderContextAiCard('diet'); },
+    renderExerciseView() { return this.renderManualExercisePanel() + '<div class="record-section-title">最近训练记录</div>' + this.renderRecentHistoryList(5) + this.renderContextAiCard('exercise'); },
+    renderRecentHistoryList(limit = 5) {
+        if (!this.db.history.length) return '<div class="empty-state"><span class="material-symbols-rounded">event_note</span><p>暂无训练记录</p></div>';
+        const sorted = [...this.db.history].sort((a, b) => this.parseHistoryDate(b.date) - this.parseHistoryDate(a.date)).slice(0, limit);
+        return '<div class="recent-history-list">' + sorted.map(h => {
+            const mins = Math.floor(h.duration / 60), secs = h.duration % 60;
+            const names = this.historyNames(h).join('、');
+            const meta = h.type === 'cardio' ? Math.round(h.cardio.calories||0)+' kcal' : h.actions.length+'个动作';
+            const ri = this.db.history.indexOf(h);
+            return '<div class="list-item"><span class="record-icon material-symbols-rounded">' + this.historyIcon(h) + '</span><div style="flex:1;min-width:0"><strong>' + h.date + '</strong><small>' + mins + '分' + secs + '秒 · ' + meta + '</small><div class="item-chip">' + (names.length > 20 ? names.slice(0, 20) + '...' : names) + '</div></div><button class="delete-btn" onclick="data.deleteHistory(' + ri + ')"><span class="material-symbols-rounded">delete</span></button></div>';
+        }).join('') + (this.db.history.length > limit ? '<button class="md-btn md-btn-tonal" style="margin:8px auto;display:flex" onclick="data.setRecordView(\'calendar\')"><span class="material-symbols-rounded">calendar_month</span> 查看全部记录</button>' : '') + '</div>';
+    },
+    renderWeightView() { return this.renderWeightPanel() + this.renderContextAiCard('weight'); },
+    renderCalendarView() { return this.renderHistoryCalendar() + this.renderCalendarDayDetail() + '<div class="record-section-title">记录明细</div>' + this.renderHistoryList(); },
+    renderContextAiCard(context) {
+        if (!ai.cfg.enabled) return '';
+        const prompts = this.contextAiPrompts(context);
+        return '<div class="md-card context-ai-card"><div class="context-ai-head"><div><span class="cardio-kicker">AI 建议</span><h3>' + this.contextAiTitle(context) + '</h3></div><span class="material-symbols-rounded">psychology</span></div><div class="context-ai-actions">' + prompts.map(p => '<button class="md-btn md-btn-tonal context-ai-btn" onclick="data.askContextAi(\'' + context + '\',\'' + this.escapeHtml(p.prompt) + '\')">' + p.label + '</button>').join('') + '</div></div>';
+    },
+    contextAiTitle(context) { return { today: '综合分析', diet: '饮食分析', exercise: '训练分析', weight: '体重分析', calendar: '日历分析' }[context] || 'AI 分析'; },
+    contextAiPrompts(context) {
+        return {
+            today: [{ label: '分析今天', prompt: '请分析我今天的饮食、训练和体重记录，并给出今晚或明天的调整建议' }, { label: '晚餐建议', prompt: '根据今天已经摄入的饮食和目标，给我晚餐建议' }, { label: '明日调整', prompt: '根据今天记录，帮我安排明天的饮食和训练重点' }],
+            diet: [{ label: '饮食分析', prompt: '请分析我今天和最近的饮食结构，重点看热量和蛋白质是否达标' }, { label: '补蛋白建议', prompt: '我今天蛋白质够不够？如果不够，建议怎么补' }, { label: '热量控制', prompt: '请根据我的饮食记录判断热量控制是否合理' }],
+            exercise: [{ label: '训练强度', prompt: '请分析我最近训练频率和强度是否合理' }, { label: '恢复建议', prompt: '根据最近训练记录，帮我安排一次恢复训练' }, { label: '训练调整', prompt: '我应该增加还是减少训练量？请结合记录判断' }],
+            weight: [{ label: '趋势分析', prompt: '请分析我最近体重趋势，并判断减重是否正常' }, { label: '停滞原因', prompt: '如果我最近减重停滞，请结合饮食和训练记录分析原因' }, { label: '目标调整', prompt: '请根据我的体重趋势调整热量和运动建议' }],
+            calendar: [{ label: '分析选中日', prompt: '请分析我选中日期当天的饮食、训练和体重记录' }, { label: '本月总结', prompt: '请总结我这个月的训练、饮食和体重变化' }]
+        }[context] || [{ label: '分析今天', prompt: '请分析我今天的记录' }];
+    },
+    askContextAi(context, prompt) {
+        if (!ai.cfg.enabled) return alert('请先在设置中配置 AI');
+        this.routineView = 'advice';
+        const nav = document.querySelectorAll('.nav-item')[1];
+        ui.tab('routines', nav);
+        requestAnimationFrame(() => {
+            const input = document.getElementById('advicePrompt');
+            if (input) { input.value = prompt; this.onAdvicePromptInput?.(input); this.sendAiAdvice(prompt); }
+        });
     },
 
     renderTodayActionHero() {
@@ -487,23 +679,8 @@ const data = {
         </div>`;
     },
 
-    renderDailyActions() {
-        return `
-            ${this.renderTodaySummary()}
-            ${this.renderWeightPanel()}
-            ${this.renderDietPanel()}
-            ${this.renderManualExercisePanel()}
-            <div class="record-section-title">训练明细</div>
-            ${this.renderHistoryList()}`;
-    },
-
-    renderFitnessCalendar() {
-        return `
-            ${this.renderHistoryCalendar()}
-            ${this.renderCalendarDayDetail()}
-            <div class="record-section-title">记录明细</div>
-            ${this.renderHistoryList()}`;
-    },
+    renderDailyActions() { return this.renderRecordView(); },
+    renderFitnessCalendar() { return this.renderCalendarView(); },
 
     renderHistoryList() {
         if (this.db.history.length === 0) {
@@ -630,40 +807,7 @@ const data = {
                 </div>
             </div>
             <div class="collapse-content">
-            <div class="diet-input-area">
-                <div class="diet-mode-tabs" role="tablist" aria-label="饮食录入模式">
-                    <button class="diet-mode-tab active" data-mode="ai" onclick="data.setDietInputMode('ai')" type="button" role="tab" aria-selected="true"><span class="material-symbols-rounded">psychology</span>AI录入</button>
-                    <button class="diet-mode-tab" data-mode="manual" onclick="data.setDietInputMode('manual')" type="button" role="tab" aria-selected="false"><span class="material-symbols-rounded">edit</span>手动录入</button>
-                </div>
-                <div class="diet-meal-selector">
-                    <button class="diet-meal-pill${(this._dietMeal || 'lunch') === 'breakfast' ? ' active' : ''}" onclick="data.setDietMeal('breakfast')" type="button">早餐</button>
-                    <button class="diet-meal-pill${(this._dietMeal || 'lunch') === 'lunch' ? ' active' : ''}" onclick="data.setDietMeal('lunch')" type="button">午餐</button>
-                    <button class="diet-meal-pill${(this._dietMeal || 'lunch') === 'dinner' ? ' active' : ''}" onclick="data.setDietMeal('dinner')" type="button">晚餐</button>
-                    <button class="diet-meal-pill${(this._dietMeal || 'lunch') === 'snack' ? ' active' : ''}" onclick="data.setDietMeal('snack')" type="button">加餐</button>
-                </div>
-                <div class="diet-ai-entry">
-                    <textarea id="foodAiText" class="diet-ai-input" rows="1" placeholder="描述这顿吃了什么…" oninput="data.autoResizeDietInput(this)"></textarea>
-                    <button class="md-btn md-btn-filled diet-ai-run" onclick="data.aiParseFood()"><span class="material-symbols-rounded">psychology</span>AI识别</button>
-                </div>
-                <div id="foodSearchResults" class="food-search-results"></div>
-                <div id="foodAiStatus" class="food-ai-status"></div>
-                <div id="foodManualArea" class="diet-manual-area ${(this._dietInputMode || 'ai') === 'ai' ? 'hidden' : ''}">
-                    <div class="md-grid diet-input-grid">
-                        <div class="md-field span-full"><input type="text" id="foodName" placeholder=" " oninput="data.onFoodSearchInput()" onblur="data.autoFillFoodByName()"><label>食物名称</label></div>
-                        <div class="md-field"><input type="number" id="foodGrams" step="1" placeholder=" " oninput="data.updateFoodComputedPreview()"><label>克数</label></div>
-                        <div class="md-field"><input type="number" id="foodCal" step="1" placeholder=" " oninput="data.updateFoodComputedPreview()"><label>kcal/100g</label></div>
-                        <div class="md-field"><input type="number" id="foodPro" step="0.1" placeholder=" " oninput="data.updateFoodComputedPreview()"><label>蛋白/100g</label></div>
-                        <div class="md-field"><input type="number" id="foodCarb" step="0.1" placeholder=" " oninput="data.updateFoodComputedPreview()"><label>碳水/100g</label></div>
-                        <div class="md-field"><input type="number" id="foodFat" step="0.1" placeholder=" " oninput="data.updateFoodComputedPreview()"><label>脂肪/100g</label></div>
-                        <div id="foodComputed" class="food-computed span-full">输入食物和重量后自动计算</div>
-                        <div id="foodSourceHint" class="food-source-hint span-full">输入食物后可从食物库或 AI 自动填充营养</div>
-                        <div class="diet-btn-row">
-                            <button class="md-btn md-btn-filled" onclick="data.addFoodLog()"><span class="material-symbols-rounded">add</span> 添加</button>
-                            <button class="md-btn md-btn-tonal" onclick="data.aiParseFood()" title="AI 智能识别"><span class="material-symbols-rounded">psychology</span></button>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            <button class="md-btn md-btn-filled" onclick="data.openDietModal()" type="button" style="margin:4px 0 8px"><span class="material-symbols-rounded">add</span> 添加饮食</button>
             ${Object.entries(mealGroups).map(([key, items]) => {
                 if (items.length === 0) return '';
                 const subTotal = items.reduce((s, f) => s + f.cal, 0);
@@ -688,11 +832,17 @@ const data = {
 
     renderDietLogItem(f) {
         return `<div class="diet-log-item">
-            <span>${f.name}${f.grams ? ' ' + f.grams + 'g' : ''}</span>
-            <small>P ${Number(f.pro || 0).toFixed(1)} / C ${Number(f.carb || 0).toFixed(1)} / F ${Number(f.fat || 0).toFixed(1)}</small>
-            <b>${f.cal} kcal</b>
-            <button class="food-log-action-btn" onclick="data.startEditFoodLog('${f.id}')" aria-label="编辑这条饮食记录"><span class="material-symbols-rounded">edit</span></button>
-            <button class="delete-btn" onclick="data.deleteFoodLog('${f.id}')"><span class="material-symbols-rounded">delete</span></button>
+            <div class="diet-log-main">
+                <span class="diet-log-name">${f.name}${f.grams ? ' ' + f.grams + 'g' : ''}</span>
+                <b class="diet-log-cal">${f.cal} kcal</b>
+            </div>
+            <div class="diet-log-sub">
+                <small>P${Number(f.pro || 0).toFixed(0)} · C${Number(f.carb || 0).toFixed(0)} · F${Number(f.fat || 0).toFixed(0)}</small>
+                <div class="diet-log-actions">
+                    <button class="food-log-action-btn" onclick="data.startEditFoodLog('${f.id}')" aria-label="编辑"><span class="material-symbols-rounded">edit</span></button>
+                    <button class="delete-btn" onclick="data.deleteFoodLog('${f.id}')"><span class="material-symbols-rounded">delete</span></button>
+                </div>
+            </div>
         </div>`;
     },
 
@@ -738,15 +888,7 @@ const data = {
                 <span class="collapse-btn"><span class="material-symbols-rounded">${collapsed ? 'expand_more' : 'expand_less'}</span></span>
             </button>
             <div class="collapse-content">
-                <div class="md-grid exercise-grid">
-                    <div class="md-field"><select id="manualExerciseType" onchange="data.toggleManualCustomExercise(this.value)"><option value="walk">步行</option><option value="run">跑步</option><option value="cycling">骑行</option><option value="swim">游泳</option><option value="battle_rope">战绳</option><option value="spin_bike">动感单车</option><option value="strength">力量训练</option><option value="stretch">拉伸/瑜伽</option><option value="custom">自定义运动</option></select><label>运动种类</label></div>
-                    <div class="md-field hidden" id="manualExerciseCustomField"><input type="text" id="manualExerciseCustom" placeholder=" "><label>自定义运动名称</label></div>
-                    <div class="md-field"><input type="number" id="manualExerciseMinutes" step="1" placeholder=" "><label>时长 分钟</label></div>
-                    <div class="md-field"><input type="number" id="manualExerciseCalories" step="1" placeholder=" "><label>热量 kcal</label></div>
-                    <div class="md-field"><input type="number" id="manualExerciseDistance" step="0.1" placeholder=" "><label>距离 km</label></div>
-                    <div class="md-field span-full"><input type="text" id="manualExerciseNote" placeholder=" "><label>备注</label></div>
-                </div>
-                <button class="md-btn md-btn-filled" onclick="data.addManualExercise()"><span class="material-symbols-rounded">add</span> 添加运动记录</button>
+                <button class="md-btn md-btn-filled" onclick="data.openExerciseModal()" type="button" style="margin:4px 0 8px"><span class="material-symbols-rounded">add</span> 添加运动</button>
                 ${items.length ? `<div class="manual-ex-list">${items.map(e => this._editingExerciseId === e.id ? this.renderManualExerciseEditor(e) : `<div class="day-detail-item"><span class="record-icon material-symbols-rounded">${this.sportIcon(this.exerciseLabel(e.type, e))}</span><span>${this.exerciseLabel(e.type, e)} ${e.minutes} 分钟${e.calories ? ` · ${e.calories} kcal` : ''}${e.distance ? ` · ${e.distance}km` : ''}</span><button class="food-log-action-btn" onclick="data.startEditManualExercise('${e.id}')" aria-label="编辑这条运动记录"><span class="material-symbols-rounded">edit</span></button><button class="delete-btn" onclick="data.deleteManualExercise('${e.id}')"><span class="material-symbols-rounded">delete</span></button></div>`).join('')}</div>` : ''}
             </div>
         </div>`;
