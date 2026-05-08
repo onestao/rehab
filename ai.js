@@ -478,8 +478,25 @@ const ai = {
             const txt = await res.text().catch(() => '');
             throw new Error(`AI 请求失败: ${res.status} ${txt.slice(0, 120)}`);
         }
-        const d = await res.json();
-        return d.choices?.[0]?.message?.content || '';
+        const raw = await res.text();
+        try {
+            const d = JSON.parse(raw);
+            return d.choices?.[0]?.message?.content || '';
+        } catch {
+            let content = '';
+            const parts = raw.split(/\r?\n/);
+            for (const line of parts) {
+                if (!line.startsWith('data:')) continue;
+                const payload = line.slice(5).trim();
+                if (!payload || payload === '[DONE]') continue;
+                try {
+                    const json = JSON.parse(payload);
+                    content += json.choices?.[0]?.delta?.content ?? json.choices?.[0]?.message?.content ?? '';
+                } catch {}
+            }
+            if (content) return content;
+            throw new Error('AI 返回格式异常');
+        }
     },
 
     async callStream(messages, maxTokens = 2000, onChunk = () => {}) {
