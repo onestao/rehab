@@ -55,15 +55,16 @@ const foodLog = {
         const log = (this.db.health.foodLogs || []).find(item => item.id === id);
         if (!log) return;
         this._editingFoodLogId = id;
+        const grams = log.grams || 0;
         this._editingFoodDraft = {
             id,
             meal: log.meal || 'lunch',
             name: log.name || '',
-            grams: log.grams || '',
-            calPer100g: log.calPer100g || '',
-            proPer100g: log.proPer100g || '',
-            carbPer100g: log.carbPer100g || '',
-            fatPer100g: log.fatPer100g || ''
+            grams: grams,
+            calPer100g: log.calPer100g || (grams ? Math.round((log.cal || 0) * 100 / grams) : ''),
+            proPer100g: log.proPer100g || (grams ? Number(((log.pro || 0) * 100 / grams).toFixed(1)) : ''),
+            carbPer100g: log.carbPer100g || (grams ? Number(((log.carb || 0) * 100 / grams).toFixed(1)) : ''),
+            fatPer100g: log.fatPer100g || (grams ? Number(((log.fat || 0) * 100 / grams).toFixed(1)) : '')
         };
         this.render();
     },
@@ -115,7 +116,7 @@ const foodLog = {
         const pro = parseFloat(document.getElementById('foodPro')?.value) || 0;
         const carb = parseFloat(document.getElementById('foodCarb')?.value) || 0;
         const fat = parseFloat(document.getElementById('foodFat')?.value) || 0;
-        const meal = document.getElementById('foodMeal')?.value || 'lunch';
+        const meal = this._dietMeal || 'lunch';
         if (!name) return alert('请输入食物名称');
         if (!grams || grams <= 0) return alert('请输入食物重量');
         if (!cal || cal <= 0) return alert('请先选择食物或填写每100g热量');
@@ -303,7 +304,7 @@ const foodLog = {
         if (!item.name) return alert('请输入食物名称');
         if (!this._aiFoodAdded) this._aiFoodAdded = new Set();
         if (this._aiFoodAdded.has(idx)) return;
-        const meal = document.getElementById('foodMeal')?.value || 'lunch';
+        const meal = this._dietMeal || 'lunch';
         this.db.health.foodLogs.push(this.aiFoodLog(item, meal, idx));
         this._aiFoodAdded.add(idx);
         this.renderAiFoodResults();
@@ -314,7 +315,7 @@ const foodLog = {
         const items = this._aiFoodDrafts || this._aiFoodResults || [];
         if (items.length === 0) return;
         if (!this._aiFoodAdded) this._aiFoodAdded = new Set();
-        const meal = document.getElementById('foodMeal')?.value || 'lunch';
+        const meal = this._dietMeal || 'lunch';
         const addedNow = [];
         items.forEach((item, idx) => {
             if (this._aiFoodAdded.has(idx)) return;
@@ -335,6 +336,9 @@ const foodLog = {
     aiFoodLog(item, meal, idx = 0) {
         const grams = Number(item.grams || 0);
         const cal = Number(item.cal || 0);
+        const pro = Number(item.pro || 0);
+        const carb = Number(item.carb || 0);
+        const fat = Number(item.fat || 0);
         return {
             id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${idx}`,
             date: this.dateKey(new Date()),
@@ -343,9 +347,12 @@ const foodLog = {
             grams,
             cal: Math.round(cal),
             calPer100g: grams ? Math.round(cal * 100 / grams) : 0,
-            pro: Number(item.pro || 0),
-            carb: Number(item.carb || 0),
-            fat: Number(item.fat || 0),
+            pro,
+            carb,
+            fat,
+            proPer100g: grams ? Number((pro * 100 / grams).toFixed(1)) : 0,
+            carbPer100g: grams ? Number((carb * 100 / grams).toFixed(1)) : 0,
+            fatPer100g: grams ? Number((fat * 100 / grams).toFixed(1)) : 0,
             createdAt: new Date().toISOString()
         };
     },

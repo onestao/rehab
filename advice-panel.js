@@ -30,6 +30,7 @@ const advicePanel = {
             adviceConversationContext: this.adviceConversationContext,
             parsePromptTargetDate: this.parsePromptTargetDate,
             preserveAdviceScroll: this.preserveAdviceScroll,
+            renderAdviceMarkdown: this.renderAdviceMarkdown,
             renderAdviceMessages: this.renderAdviceMessages,
             renderAdviceMessage: this.renderAdviceMessage,
             renderAdvicePanel: this.renderAdvicePanel
@@ -210,6 +211,58 @@ const advicePanel = {
         });
     },
 
+    renderAdviceMarkdown(text = '') {
+        const escaped = this.escapeHtml(String(text || ''));
+        const normalized = escaped.replace(/\r\n?/g, '\n');
+
+        const renderInline = (line) => line
+            .replace(/`([^`]+)`/g, '<code>$1</code>')
+            .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+            .replace(/\*([^*]+)\*/g, '<em>$1</em>');
+
+        const lines = normalized.split('\n');
+        const out = [];
+        let inList = false;
+        let inCode = false;
+
+        for (const raw of lines) {
+            const line = raw.trimEnd();
+            if (line.startsWith('```')) {
+                if (inList) { out.push('</ul>'); inList = false; }
+                out.push(inCode ? '</code></pre>' : '<pre><code>');
+                inCode = !inCode;
+                continue;
+            }
+            if (inCode) {
+                out.push(`${line}\n`);
+                continue;
+            }
+            if (!line.trim()) {
+                if (inList) { out.push('</ul>'); inList = false; }
+                continue;
+            }
+            const heading = line.match(/^(#{1,3})\s+(.+)$/);
+            if (heading) {
+                if (inList) { out.push('</ul>'); inList = false; }
+                const level = heading[1].length;
+                out.push(`<h${level}>${renderInline(heading[2])}</h${level}>`);
+                continue;
+            }
+            const bullet = line.match(/^[-*]\s+(.+)$/);
+            if (bullet) {
+                if (!inList) { out.push('<ul>'); inList = true; }
+                out.push(`<li>${renderInline(bullet[1])}</li>`);
+                continue;
+            }
+            if (inList) { out.push('</ul>'); inList = false; }
+            out.push(`<p>${renderInline(line)}</p>`);
+        }
+
+        if (inList) out.push('</ul>');
+        if (inCode) out.push('</code></pre>');
+        return out.join('');
+    },
+
     parsePromptTargetDate(prompt) {
         const text = String(prompt || '');
         const explicit = text.match(/(\d{4})[\/\-.年](\d{1,2})[\/\-.月](\d{1,2})/);
@@ -367,9 +420,9 @@ ${formatExerciseLogs(exerciseLogs) || '暂无手动运动记录'}`;
         this.save();
         requestAnimationFrame(() => this.scrollAdviceToLatest(true));
         try {
-            const reply = await this.requestAiAdvice(prompt, model);
+            const messages = await this.requestAiAdvice(prompt, model, true);
             const idx = this.db.health.aiAdviceChat.findIndex(msg => msg.id === pendingId);
-            if (idx >= 0) this.db.health.aiAdviceChat[idx] = { role: 'assistant', content: reply, at: new Date().toISOString(), model };
+            if (idx >= 0) this.db.health.aiAdviceChat[idx] = { role: 'assistant', content: messages, at: new Date().toISOString(), model };
             this.save();
             requestAnimationFrame(() => this.scrollAdviceToLatest(true));
         } catch (e) {
@@ -447,7 +500,9 @@ ${formatExerciseLogs(exerciseLogs) || '暂无手动运动记录'}`;
         const label = msg.role === 'user' ? '我' : 'AI';
         const time = this.parseHistoryDate(msg.at).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
         const model = msg.model ? ` · ${this.escapeHtml(msg.model)}` : '';
-        const content = this.escapeHtml(msg.content).replace(/\n/g, '<br>');
+        const content = msg.role === 'assistant'
+            ? this.renderAdviceMarkdown(msg.content)
+            : this.escapeHtml(msg.content).replace(/\n/g, '<br>');
         const state = msg.pending ? ' pending' : msg.error ? ' error' : '';
         const actions = msg.role === 'assistant'
             ? `<div class="advice-bubble-actions">
@@ -461,7 +516,7 @@ ${formatExerciseLogs(exerciseLogs) || '暂无手动运动记录'}`;
                 <b>${label}<small>${time}${model}</small></b>
                 ${msg.pending ? '<span class="advice-typing-dot"></span>' : ''}
             </div>
-            <p>${content}</p>
+            <div class="advice-bubble-content">${content}</div>
             ${actions}
         </div>`;
     },

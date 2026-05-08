@@ -482,6 +482,62 @@ const ai = {
         return d.choices?.[0]?.message?.content || '';
     },
 
+    async callStream(messages, maxTokens = 2000, onChunk = () => {}) {
+        if (!this.cfg.enabled) throw new Error('请先在设置中配置 AI 接口');
+        const key = this.apiKeyFor(this.cfg.activeProfileId);
+        if (!key) throw new Error('请先在当前 AI 配置中填写 API Key');
+        const url = `${this.cfg.baseUrl}/chat/completions`;
+        const body = { model: this.cfg.model, messages, temperature: 0.3, max_tokens: maxTokens, stream: true };
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
+            body: JSON.stringify(body)
+        });
+        if (!res.ok) {
+            const txt = await res.text().catch(() => '');
+            throw new Error(`AI 请求失败: ${res.status} ${txt.slice(0, 120)}`);
+        }
+        if (!res.body) {
+            const content = await this.call(messages, maxTokens);
+            if (content) onChunk(content);
+            return content;
+        }
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder('utf-8');
+        let buffer = '';
+        let full = '';
+
+        const flush = (chunk) => {
+            const parts = chunk.split(/\r?\n/).filter(Boolean);
+            for (const part of parts) {
+                if (!part.startsWith('data:')) continue;
+                const payload = part.slice(5).trim();
+                if (!payload || payload === '[DONE]') continue;
+                try {
+                    const json = JSON.parse(payload);
+                    const delta = json.choices?.[0]?.delta?.content ?? json.choices?.[0]?.message?.content ?? '';
+                    if (!delta) continue;
+                    full += delta;
+                    onChunk(delta, full);
+                } catch {
+                    // Ignore malformed partial chunks from non-SSE responses.
+                }
+            }
+        };
+
+        while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const events = buffer.split(/\r?\n\r?\n/);
+            buffer = events.pop() || '';
+            for (const event of events) flush(event);
+        }
+        if (buffer) flush(buffer);
+        return full;
+    },
+
     async parseFood(text) {
         const prompt = `你是营养师助手。用户描述了食物，请严格只返回 JSON 数组，不要其他文字。\n每个元素格式：{"name":"食物名","grams":克数,"cal":热量kcal,"pro":蛋白质g,"carb":碳水g,"fat":脂肪g}\n如果用户没给克数，用常见份量估算。\n用户描述：${text}`;
         const raw = await this.call([
