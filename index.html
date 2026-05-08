@@ -297,7 +297,42 @@
             </div>
             <div id="exerciseModalContent"></div>
         </div>
-    </div>    <script>
+    </div>    <div id="cardioEditModal" class="md-modal md-modal-sheet hidden" aria-hidden="true">
+        <div class="md-modal-backdrop" onclick="cardio.closeEditModal()"></div>
+        <div class="md-modal-card md-modal-sheet-card">
+            <div class="md-modal-head">
+                <strong>校准有氧记录</strong>
+                <button class="icon-btn" onclick="cardio.closeEditModal()" aria-label="关闭"><span class="material-symbols-rounded">close</span></button>
+            </div>
+            <div class="md-grid modal-grid">
+                <div class="md-field span-full">
+                    <select id="cardioEditType" onchange="cardio.updateEditCalories()">
+                        <option value="walk">步行 3.5 MET</option>
+                        <option value="brisk_walk">快走 4.3 MET</option>
+                        <option value="jog">慢跑 7.0 MET</option>
+                        <option value="run">跑步 9.8 MET</option>
+                        <option value="cycling">骑行 6.8 MET</option>
+                        <option value="swim">游泳 7.0 MET</option>
+                        <option value="elliptical">椭圆机 5.0 MET</option>
+                        <option value="rowing">划船机 7.0 MET</option>
+                        <option value="battle_rope">战绳 8.0 MET</option>
+                        <option value="spin_bike">动感单车 7.5 MET</option>
+                    </select>
+                    <label>有氧项目</label>
+                </div>
+                <div class="md-field"><input type="number" id="cardioEditMin" min="0" placeholder=" " oninput="cardio.updateEditCalories()"><label>分钟</label></div>
+                <div class="md-field"><input type="number" id="cardioEditSec" min="0" max="59" placeholder=" " oninput="cardio.updateEditCalories()"><label>秒</label></div>
+                <div class="md-field"><input type="number" id="cardioEditWeight" step="0.1" placeholder=" " oninput="cardio.updateEditCalories()"><label>体重 kg</label></div>
+                <div class="md-field"><input type="number" id="cardioEditTarget" placeholder=" " oninput="cardio.updateEditCalories()"><label>目标分钟</label></div>
+                <div class="md-field span-full"><input type="number" id="cardioEditCal" placeholder=" "><label>热量 kcal（可手动修正）</label></div>
+            </div>
+            <div class="md-row modal-actions">
+                <button class="md-btn md-btn-tonal" onclick="cardio.closeEditModal()">放弃</button>
+                <button class="md-btn md-btn-filled" onclick="cardio.saveCardioEdit()"><span class="material-symbols-rounded">save</span> 保存记录</button>
+            </div>
+        </div>
+    </div>
+    <script>
         const ui = {
             tab: (id, el) => {
                 data.captureAdviceDraft?.();

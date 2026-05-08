@@ -780,7 +780,7 @@ const cardio = {
 
     async stop() {
         if (!this.isRunning) return;
-        if (!confirm('结束并保存有氧记录？')) return;
+        if (!confirm('结束有氧训练？')) return;
         if (this.seconds < 20) {
             this.reset();
             alert('有氧时间低于20秒，无法保存记录');
@@ -788,23 +788,76 @@ const cardio = {
         }
         const plan = this.currentPlan();
         const duration = this.seconds;
+        const calories = this.calories(duration);
+        this.reset();
+        this.showEditModal(plan, duration, calories);
+    },
+
+    showEditModal(plan, duration, calories) {
+        const modal = document.getElementById('cardioEditModal');
+        const min = Math.floor(duration / 60);
+        const sec = duration % 60;
+        document.getElementById('cardioEditType').value = plan.type;
+        document.getElementById('cardioEditMin').value = min;
+        document.getElementById('cardioEditSec').value = sec;
+        document.getElementById('cardioEditWeight').value = plan.weight;
+        document.getElementById('cardioEditTarget').value = plan.target;
+        document.getElementById('cardioEditCal').value = Math.round(calories);
+        modal.classList.remove('hidden');
+        modal.setAttribute('aria-hidden', 'false');
+        this._editOriginalDuration = duration;
+        this._editOriginalCalories = calories;
+        this.updateEditCalories();
+    },
+
+    closeEditModal() {
+        const modal = document.getElementById('cardioEditModal');
+        modal.classList.add('hidden');
+        modal.setAttribute('aria-hidden', 'true');
+    },
+
+    updateEditCalories() {
+        const type = document.getElementById('cardioEditType').value;
+        const weight = parseFloat(document.getElementById('cardioEditWeight').value) || 70;
+        const min = parseInt(document.getElementById('cardioEditMin').value) || 0;
+        const sec = parseInt(document.getElementById('cardioEditSec').value) || 0;
+        const totalSec = min * 60 + sec;
+        const info = this.types[type] || this.types.walk;
+        const cal = info.met * weight * (totalSec / 3600);
+        document.getElementById('cardioEditCal').value = Math.round(cal);
+    },
+
+    async saveCardioEdit() {
+        const type = document.getElementById('cardioEditType').value;
+        const min = parseInt(document.getElementById('cardioEditMin').value) || 0;
+        const sec = parseInt(document.getElementById('cardioEditSec').value) || 0;
+        const weight = parseFloat(document.getElementById('cardioEditWeight').value) || 70;
+        const target = parseInt(document.getElementById('cardioEditTarget').value) || 0;
+        const calories = parseInt(document.getElementById('cardioEditCal').value) || 0;
+        const duration = min * 60 + sec;
+        if (duration < 20) {
+            alert('有氧时间低于20秒，无法保存');
+            return;
+        }
+        const info = this.types[type] || this.types.walk;
         data.db.history.unshift({
             type: 'cardio',
             date: new Date().toLocaleString(),
             duration,
             actions: [],
             cardio: {
-                name: plan.name,
-                type: plan.type,
-                met: plan.met,
-                weight: plan.weight,
-                target: plan.target,
-                calories: this.calories(duration)
+                name: info.name,
+                type,
+                met: info.met,
+                weight,
+                target,
+                calories
             }
         });
+        this.closeEditModal();
         this.speak('有氧训练完成');
-        this.reset();
         await data.saveAndBackup();
+        data.render();
     },
 
     reset() {

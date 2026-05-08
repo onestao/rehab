@@ -1,17 +1,47 @@
 /* ============================================
    Responsive
    ============================================ */
+@media (max-width: 480px) {
+    .md-card { margin: 4px 8px; padding: 12px; }
+    .input-card { padding: 10px; }
+    .record-quick-actions { gap: 4px; margin: 0 8px 2px; }
+    .record-quick-btn { padding: 8px 2px; font-size: 10px; }
+    .record-quick-btn .material-symbols-rounded { font-size: 20px; }
+    .record-tabs-scroll { margin: 4px 2px; padding: 3px 8px; }
+    .record-tabs-scroll .record-tab { padding: 0 10px; font-size: 11px; }
+    .record-section-title { margin: 8px 12px 4px; }
+    .record-overview-card { gap: 10px; }
+    .record-overview-stats { gap: 6px; }
+    .record-overview-stat { padding: 8px 4px; }
+    .record-overview-stat b { font-size: 16px; }
+    .today-timeline-card { padding: 10px; }
+    .today-timeline-header { margin-bottom: 8px; }
+    .today-timeline-item { padding: 6px 0; gap: 10px; }
+    .calendar-card { padding: 10px; }
+    .calendar-toolbar { margin-bottom: 6px; }
+    .calendar-day { min-height: 48px; padding: 3px 2px; }
+    .calendar-legend { padding-top: 8px; margin-top: 8px; gap: 6px; }
+    .hero-stat-row { margin-top: 10px; gap: 6px; }
+    .hero-stat { padding: 8px 6px; }
+    .collapsible-card .collapse-content { gap: 6px; margin-top: 6px; }
+    .diet-card { gap: 10px; }
+    .weight-card { gap: 10px; }
+    .context-ai-card { gap: 8px; }
+    .today-focus-card { gap: 10px; }
+    .today-focus-hint { padding: 8px 10px; }
+    .daily-summary-card { gap: 6px; }
+    .daily-stat { padding: 8px 2px; }
+    .macro-summary { gap: 6px; }
+    .timer-stats b { font-size: 14px; }
+    .list-item { margin: 4px 8px; padding: 8px 10px; }
+}
 @media (max-width: 360px) {
     .md-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .md-card { margin: 6px 10px; padding: 14px; }
-    .input-card { padding: 12px; }
-    .timer-stats b { font-size: 14px; }
-    .list-item { margin: 4px 10px; padding: 10px 12px; }
-    .record-quick-actions { gap: 6px; margin: 0 10px 4px; }
-    .record-quick-btn { padding: 10px 2px; font-size: 10px; }
-    .record-quick-btn .material-symbols-rounded { font-size: 20px; }
-    .record-overview-stat b { font-size: 16px; }
-    .record-tabs-scroll .record-tab { padding: 0 10px; font-size: 11px; }
+    .md-card { margin: 3px 6px; padding: 10px; }
+    .record-quick-actions { gap: 3px; margin: 0 6px 2px; }
+    .record-quick-btn { padding: 6px 1px; font-size: 9px; }
+    .record-quick-btn .material-symbols-rounded { font-size: 18px; }
+    .calendar-day { min-height: 40px; font-size: 10px; }
 }
 
 @media (min-width: 600px) {
