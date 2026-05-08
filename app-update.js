@@ -5,8 +5,9 @@ const appUpdate = {
     async registerServiceWorker() {
         if (!('serviceWorker' in navigator)) return;
         try {
-            this.registration = await navigator.serviceWorker.register('sw.js');
+            this.registration = await navigator.serviceWorker.register('sw.js?v=21');
             this.bindRegistration(this.registration);
+            this.registration.update?.();
             navigator.serviceWorker.addEventListener('controllerchange', () => {
                 window.location.reload();
             }, { once: true });

@@ -1,20 +1,20 @@
-const CACHE = 'training-assistant-v20';
+const CACHE = 'training-assistant-v21';
 const ASSETS = [
     'index.html',
-    'build/generated.css',
-    'theme.js',
-    'fooddb.js',
-    'ai.js',
-    'data.js',
-    'food-log.js',
-    'advice-panel.js',
-    'backup.js',
-    'sync.js',
-    'sync-status.js',
-    'workout.js',
-    'workout-engine.js',
-    'workout-state.js',
-    'app-update.js',
+    'build/generated.css?v=21',
+    'theme.js?v=21',
+    'fooddb.js?v=21',
+    'ai.js?v=21',
+    'data.js?v=21',
+    'food-log.js?v=21',
+    'advice-panel.js?v=21',
+    'backup.js?v=21',
+    'sync.js?v=21',
+    'sync-status.js?v=21',
+    'workout.js?v=21',
+    'workout-engine.js?v=21',
+    'workout-state.js?v=21',
+    'app-update.js?v=21',
     'manifest.json'
 ];
 
