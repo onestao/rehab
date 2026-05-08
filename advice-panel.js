@@ -209,6 +209,26 @@ const advicePanel = {
         });
     },
 
+    parsePromptTargetDate(prompt) {
+        const text = String(prompt || '');
+        const explicit = text.match(/(\d{4})[\/\-.年](\d{1,2})[\/\-.月](\d{1,2})/);
+        if (explicit) {
+            return this.dateKey(new Date(Number(explicit[1]), Number(explicit[2]) - 1, Number(explicit[3])));
+        }
+        const md = text.match(/(\d{1,2})月(\d{1,2})日/);
+        if (md) {
+            const now = new Date();
+            return this.dateKey(new Date(now.getFullYear(), Number(md[1]) - 1, Number(md[2])));
+        }
+        if (/今天/.test(text)) return this.dateKey(new Date());
+        if (/昨天/.test(text)) {
+            const d = new Date();
+            d.setDate(d.getDate() - 1);
+            return this.dateKey(d);
+        }
+        return '';
+    },
+
     async requestAiAdvice(prompt, model) {
         const contexts = { diet: true, training: true, weight: true, goal: true, ...(this.adviceContexts || {}) };
         const history = contexts.training
@@ -224,6 +244,7 @@ const advicePanel = {
             ? this.sortedWeights().slice(-40)
             : [];
         const dietGoal = contexts.goal ? (this.db.health.dietGoal || {}) : {};
+        const targetDate = this.parsePromptTargetDate(prompt);
         const macros = contexts.diet
             ? foods.reduce((acc, f) => {
                 acc.pro += Number(f.pro || 0);
@@ -232,6 +253,18 @@ const advicePanel = {
                 return acc;
             }, { pro: 0, carb: 0, fat: 0 })
             : {};
+        const targetHistory = targetDate ? history.filter(h => this.dateKey(this.parseHistoryDate(h.date)) === targetDate) : [];
+        const targetFoods = targetDate ? foods.filter(f => f.date === targetDate) : [];
+        const targetExerciseLogs = targetDate ? exerciseLogs.filter(e => e.date === targetDate) : [];
+        const targetWeights = targetDate ? weights.filter(w => w.date === targetDate) : [];
+        const targetMacros = contexts.diet
+            ? targetFoods.reduce((acc, f) => {
+                acc.pro += Number(f.pro || 0);
+                acc.carb += Number(f.carb || 0);
+                acc.fat += Number(f.fat || 0);
+                return acc;
+            }, { pro: 0, carb: 0, fat: 0 })
+            : { pro: 0, carb: 0, fat: 0 };
         const rangeLabel = { today: '今日', week: '最近7天', month: '最近30天', all: '全部记录' }[this.adviceRange || 'today'];
 
         const formatTraining = (history) => history.map(h => {
@@ -260,13 +293,32 @@ const advicePanel = {
         const sys = `你是训练与营养健康顾问。基于用户的实际记录回答问题。规则：
 1. 如果下方提供了训练/饮食/体重记录，你必须优先基于这些记录分析，不能忽略它们，也不能说“暂无记录”
 2. 必须引用至少 2 条具体的训练/饮食/体重记录作为证据
-2. 引用时请写出具体日期和内容，例如"5月6日午餐鸡胸肉饭 520 kcal"
+3. 引用时请写出具体日期和内容，例如"5月6日午餐鸡胸肉饭 520 kcal"
 3. 如果某一类数据确实为空，再说明该类数据不足，不要笼统说全部记录不足
 4. 优先用短段落和清单表达，不要输出 markdown 表格
-5. 回答后可给出 1-2 条具体可执行的建议`;
+5. 如果用户问题提到了某个具体日期，你必须优先分析该日期的数据，再结合近期整体趋势补充
+6. 回答后可给出 1-2 条具体可执行的建议`;
 
         const user = `分析范围：${rangeLabel}
 用户提问：${prompt}
+
+【优先分析日期】
+${targetDate || '未指定具体日期'}
+
+【该日期训练记录】
+${formatTraining(targetHistory) || '该日期无训练记录'}
+
+【该日期饮食记录】
+${formatFoods(targetFoods) || '该日期无饮食记录'}
+
+【该日期宏量营养】
+蛋白 ${targetMacros.pro?.toFixed(1) || 0}g / 碳水 ${targetMacros.carb?.toFixed(1) || 0}g / 脂肪 ${targetMacros.fat?.toFixed(1) || 0}g
+
+【该日期体重记录】
+${formatWeights(targetWeights) || '该日期无体重记录'}
+
+【该日期手动运动】
+${formatExerciseLogs(targetExerciseLogs) || '该日期无手动运动记录'}
 
 【训练记录】
 ${formatTraining(history) || '暂无训练记录'}
