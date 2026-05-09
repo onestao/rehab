@@ -567,16 +567,41 @@ const ai = {
     },
 
     async weightLossPlan(params) {
-        const { currentWeight, targetWeight, activityLevel, dailyTrainMin, height, weeklyFreq, intensity, sportType } = params;
-        const diff = currentWeight - targetWeight;
-        const intensityMap = { light: '低强度(散步/瑜伽)', moderate: '中等强度(慢跑/游泳)', vigorous: '高强度(HIIT/快速跑)' };
+        return this.bodyGoalPlan({ ...params, goalType: 'loss' });
+    },
+
+    async bodyGoalPlan(params) {
+        const { goalType = 'loss', currentWeight, targetWeight, activityLevel, dailyTrainMin, height, weeklyFreq, intensity, sportType, experience } = params;
+        const isGain = goalType === 'gain';
+        const diff = isGain ? (targetWeight - currentWeight) : (currentWeight - targetWeight);
+        const activityMap = {
+            sedentary: '久坐：办公/学习为主，少于5000步/日',
+            light: '轻度活动：少量走动，5000-8000步/日',
+            moderate: '中等活动：经常走动或站立，8000-12000步/日',
+            active: '高强度活动：体力劳动或超过12000步/日'
+        };
+        const intensityMap = {
+            light: '低强度：轻松，可完整说话',
+            moderate: '中等强度：明显出汗，可短句交流',
+            vigorous: '高强度：很喘，难以连续说话'
+        };
         const sportMap = { strength: '力量训练', cardio: '有氧运动', mixed: '力量+有氧混合', flexibility: '拉伸/瑜伽' };
-        const prompt = `你是运动营养师。请为用户制定减重计划。\n用户信息：\n- 当前体重：${currentWeight} kg\n- 目标体重：${targetWeight} kg（需减 ${diff.toFixed(1)} kg）\n- 身高：${height || '未知'} cm\n- 日常活动水平：${activityLevel}\n- 每次运动时间：${dailyTrainMin} 分钟\n- 每周运动次数：${weeklyFreq} 次\n- 运动强度：${intensityMap[intensity] || intensity}\n- 主要运动项目：${sportMap[sportType] || sportType}\n\n请严格只返回如下 JSON，不要其他文字：\n{\n  "fast": { "days": 天数, "weeklyLoss": 每周减重kg, "dailyCal": 建议每日摄入kcal, "deficit": 每日热量缺口kcal, "desc": "一句话说明" },\n  "moderate": { "days": 天数, "weeklyLoss": 每周减重kg, "dailyCal": 建议每日摄入kcal, "deficit": 每日热量缺口kcal, "desc": "一句话说明" },\n  "slow": { "days": 天数, "weeklyLoss": 每周减重kg, "dailyCal": 建议每日摄入kcal, "deficit": 每日热量缺口kcal, "desc": "一句话说明" },\n  "tips": ["建议1", "建议2", "建议3"]\n}`;
+        const experienceMap = {
+            beginner: '新手：系统力量训练少于6个月',
+            intermediate: '中级：规律训练6个月-2年',
+            advanced: '高级：规律训练超过2年，有周期化经验'
+        };
+        let prompt;
+        if (isGain) {
+            prompt = `你是运动营养师。请为用户制定增肌计划。\n用户信息：\n- 当前体重：${currentWeight} kg\n- 目标体重：${targetWeight} kg（需增 ${diff.toFixed(1)} kg）\n- 身高：${height || '未知'} cm\n- 日常活动水平：${activityMap[activityLevel] || activityLevel}\n- 每次运动时间：${dailyTrainMin} 分钟\n- 每周运动次数：${weeklyFreq} 次\n- 运动强度：${intensityMap[intensity] || intensity}\n- 主要运动项目：${sportMap[sportType] || sportType}\n- 训练经验：${experienceMap[experience] || experience || '未知'}\n\n请严格只返回如下 JSON，不要其他文字：\n{\n  "conservative": { "days": 天数, "weeklyChange": 每周增重kg, "dailyCal": 建议每日摄入kcal, "calorieDelta": 每日热量盈余kcal, "proteinGoal": 蛋白质目标g, "carbGoal": 碳水目标g, "fatGoal": 脂肪目标g, "desc": "一句话说明" },\n  "moderate": { "days": 天数, "weeklyChange": 每周增重kg, "dailyCal": 建议每日摄入kcal, "calorieDelta": 每日热量盈余kcal, "proteinGoal": 蛋白质目标g, "carbGoal": 碳水目标g, "fatGoal": 脂肪目标g, "desc": "一句话说明" },\n  "aggressive": { "days": 天数, "weeklyChange": 每周增重kg, "dailyCal": 建议每日摄入kcal, "calorieDelta": 每日热量盈余kcal, "proteinGoal": 蛋白质目标g, "carbGoal": 碳水目标g, "fatGoal": 脂肪目标g, "desc": "一句话说明" },\n  "tips": ["建议1", "建议2", "建议3"]\n}`;
+        } else {
+            prompt = `你是运动营养师。请为用户制定减重计划。\n用户信息：\n- 当前体重：${currentWeight} kg\n- 目标体重：${targetWeight} kg（需减 ${diff.toFixed(1)} kg）\n- 身高：${height || '未知'} cm\n- 日常活动水平：${activityMap[activityLevel] || activityLevel}\n- 每次运动时间：${dailyTrainMin} 分钟\n- 每周运动次数：${weeklyFreq} 次\n- 运动强度：${intensityMap[intensity] || intensity}\n- 主要运动项目：${sportMap[sportType] || sportType}\n\n请严格只返回如下 JSON，不要其他文字：\n{\n  "fast": { "days": 天数, "weeklyLoss": 每周减重kg, "dailyCal": 建议每日摄入kcal, "deficit": 每日热量缺口kcal, "proteinGoal": 蛋白质目标g, "carbGoal": 碳水目标g, "fatGoal": 脂肪目标g, "desc": "一句话说明" },\n  "moderate": { "days": 天数, "weeklyLoss": 每周减重kg, "dailyCal": 建议每日摄入kcal, "deficit": 每日热量缺口kcal, "proteinGoal": 蛋白质目标g, "carbGoal": 碳水目标g, "fatGoal": 脂肪目标g, "desc": "一句话说明" },\n  "slow": { "days": 天数, "weeklyLoss": 每周减重kg, "dailyCal": 建议每日摄入kcal, "deficit": 每日热量缺口kcal, "proteinGoal": 蛋白质目标g, "carbGoal": 碳水目标g, "fatGoal": 脂肪目标g, "desc": "一句话说明" },\n  "tips": ["建议1", "建议2", "建议3"]\n}`;
+        }
         const raw = await this.call([
             { role: 'system', content: '你是运动营养师，只返回纯 JSON，不要 markdown，不要解释。' },
             { role: 'user', content: prompt }
         ]);
-        const match = raw.match(/\{[\s\S]*"fast"[\s\S]*\}/);
+        const match = raw.match(/\{[\s\S]*"tips"[\s\S]*\}/);
         if (!match) throw new Error('AI 返回格式异常');
         return JSON.parse(match[0]);
     }

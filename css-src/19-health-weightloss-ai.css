@@ -68,4 +68,133 @@
     display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--md-sys-on-surface-variant);
 }
 .weightloss-tips .material-symbols-rounded { font-size: 16px; color: var(--md-sys-primary); font-variation-settings: 'FILL' 1; }
+
+/* --- Goal Mode Tabs --- */
+.goal-mode-tabs {
+    display: flex;
+    gap: 8px;
+    padding: 4px;
+    border-radius: var(--md-sys-shape-full);
+    background: var(--md-sys-surface-container);
+}
+.goal-mode-tab {
+    flex: 1;
+    border: none;
+    border-radius: var(--md-sys-shape-full);
+    min-height: 38px;
+    background: transparent;
+    color: var(--md-sys-on-surface-variant);
+    font-weight: 700;
+    font-size: 13px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    cursor: pointer;
+    transition: all var(--md-sys-motion-duration-medium) var(--md-sys-motion-emphasized);
+}
+.goal-mode-tab.active {
+    background: var(--md-sys-primary-container);
+    color: var(--md-sys-on-primary-container);
+    box-shadow: var(--md-sys-elevation-1);
+}
+.goal-mode-tab .material-symbols-rounded { font-size: 18px; }
+
+/* --- Gain mode color variants --- */
+.goal-gain .weightloss-icon {
+    background: var(--md-sys-tertiary-container);
+    color: var(--md-sys-on-tertiary-container);
+}
+.goal-gain .weightloss-option.active {
+    border-color: var(--md-sys-tertiary);
+    background: color-mix(in srgb, var(--md-sys-tertiary-container) 18%, var(--md-sys-surface-container-lowest));
+    box-shadow:
+        0 8px 20px rgba(130, 71, 229, 0.12),
+        inset 0 1px 0 rgba(255,255,255,0.22);
+}
+.goal-gain .weightloss-option-stats b { color: var(--md-sys-tertiary); }
+.goal-gain .weightloss-tips .material-symbols-rounded { color: var(--md-sys-tertiary); }
+
+/* --- Loss mode color variants --- */
+.goal-loss .weightloss-icon {
+    background: var(--md-sys-primary-container);
+    color: var(--md-sys-on-primary-container);
+}
+.goal-loss .weightloss-option.active {
+    border-color: var(--md-sys-primary);
+    background: color-mix(in srgb, var(--md-sys-primary-container) 18%, var(--md-sys-surface-container-lowest));
+    box-shadow:
+        0 8px 20px rgba(0, 97, 164, 0.12),
+        inset 0 1px 0 rgba(255,255,255,0.22);
+}
+
+/* --- Goal Guide (collapsible help) --- */
+.goal-guide {
+    border-radius: var(--md-sys-shape-lg);
+    background: var(--md-sys-surface-container);
+    overflow: hidden;
+}
+.goal-guide summary {
+    min-height: 40px;
+    padding: 0 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    color: var(--md-sys-on-surface);
+    font-size: 13px;
+    font-weight: 800;
+    list-style: none;
+}
+.goal-guide summary::-webkit-details-marker { display: none; }
+.goal-guide summary .material-symbols-rounded { font-size: 18px; color: var(--md-sys-primary); }
+.goal-guide-content {
+    display: grid;
+    gap: 8px;
+    padding: 0 12px 12px;
+}
+.goal-guide-content div {
+    padding: 8px 10px;
+    border-radius: var(--md-sys-shape-md);
+    background: var(--md-sys-surface-container-lowest);
+}
+.goal-guide-content b {
+    display: block;
+    margin-bottom: 4px;
+    font-size: 12px;
+    color: var(--md-sys-on-surface);
+}
+.goal-guide-content p,
+.goal-guide-content ul {
+    margin: 0;
+    padding: 0;
+    color: var(--md-sys-on-surface-variant);
+    font-size: 11px;
+    line-height: 1.45;
+}
+.goal-guide-content ul { padding-left: 16px; }
+.goal-guide-content li { margin: 2px 0; }
+
+/* --- Mobile responsive (goal card) --- */
+@media (max-width: 480px) {
+    .weightloss-card { gap: 10px; }
+    .weightloss-head { gap: 8px; }
+    .weightloss-head > div { min-width: 0; }
+    .weightloss-head small { display: block; overflow-wrap: anywhere; line-height: 1.35; }
+    .weightloss-icon { width: 40px; height: 40px; border-radius: 14px; font-size: 22px; }
+    .weightloss-grid { grid-template-columns: 1fr; gap: 8px; }
+    .goal-mode-tabs { gap: 4px; }
+    .goal-mode-tab { min-height: 34px; font-size: 12px; }
+    .weightloss-option { padding: 10px; }
+    .weightloss-option-stats { gap: 6px; font-size: 12px; flex-wrap: wrap; }
+    .weightloss-option-stats b { margin-left: 0; font-size: 15px; }
+    .goal-guide summary { min-height: 36px; padding: 0 10px; font-size: 12px; }
+    .goal-guide-content { padding: 0 10px 10px; }
+}
+@media (max-width: 360px) {
+    .weightloss-card { gap: 8px; }
+    .weightloss-head h3 { font-size: 17px; }
+    .weightloss-option-head b { font-size: 14px; }
+    .weightloss-option-stats { font-size: 11px; }
+}
 

@@ -2,7 +2,7 @@ const data = {
     DB_KEY: 'rehab_pro_universal_db',
     CFG_KEY: 'rehab_pro_universal_cfg',
     SCHEMA_VERSION: 2,
-    db: { actions: [], routines: [], history: [], rate: 1.1, cardio: { weight: 70, target: 30, type: 'walk' }, health: { weights: [], foodLogs: [], exerciseLogs: [], weightPlan: null, dietGoal: null, aiAdviceChat: [] }, aiProfiles: [], aiActiveId: '', aiModels: [] },
+    db: { actions: [], routines: [], history: [], rate: 1.1, cardio: { weight: 70, target: 30, type: 'walk' }, health: { weights: [], foodLogs: [], exerciseLogs: [], goalType: 'loss', bodyPlan: null, weightPlan: null, dietGoal: null, aiAdviceChat: [] }, aiProfiles: [], aiActiveId: '', aiModels: [] },
     cfg: { mode: 'none', s3: {}, dav: {} },
     historyMonthOffset: 0,
     routineView: 'library',
@@ -29,7 +29,7 @@ const data = {
     normalizeDb() {
         this.db.schemaVersion = Math.max(Number(this.db.schemaVersion) || 0, this.SCHEMA_VERSION);
         this.db.cardio = { weight: 70, target: 30, type: 'walk', ...(this.db.cardio || {}) };
-        this.db.health = { weights: [], foodLogs: [], exerciseLogs: [], weightPlan: null, dietGoal: null, aiAdviceChat: [], ...(this.db.health || {}) };
+        this.db.health = { weights: [], foodLogs: [], exerciseLogs: [], goalType: 'loss', bodyPlan: null, weightPlan: null, dietGoal: null, aiAdviceChat: [], ...(this.db.health || {}) };
         this.db.health.weights = this.db.health.weights || [];
         this.db.health.foodLogs = this.db.health.foodLogs || [];
         this.db.health.exerciseLogs = this.db.health.exerciseLogs || [];
@@ -286,12 +286,29 @@ const data = {
     defaultDietGoals() {
         const goal = this.db.health.dietGoal || {};
         const cal = Number(goal.dailyCal || 0);
+        const goalType = goal.goalType || this.db.health.goalType || 'loss';
+        if (goalType === 'gain' && cal) {
+            const latest = this.sortedWeights().slice(-1)[0];
+            const bodyWeight = latest?.weight || 70;
+            const pro = Number(goal.proteinGoal || Math.round(bodyWeight * 1.8));
+            const fat = Number(goal.fatGoal || Math.round(cal * 0.25 / 9));
+            const carb = Number(goal.carbGoal || Math.max(0, Math.round((cal - pro * 4 - fat * 9) / 4)));
+            return { cal, pro, carb, fat };
+        }
         return {
             cal,
             pro: Number(goal.proteinGoal || (cal ? Math.round(cal * 0.3 / 4) : 90)),
             carb: Number(goal.carbGoal || (cal ? Math.round(cal * 0.4 / 4) : 180)),
             fat: Number(goal.fatGoal || (cal ? Math.round(cal * 0.3 / 9) : 55))
         };
+    },
+
+    currentGoalType() {
+        return this.db.health.dietGoal?.goalType || this.db.health.goalType || 'loss';
+    },
+
+    isGainMode() {
+        return this.currentGoalType() === 'gain';
     },
 
     ratio(value, total) {
@@ -341,6 +358,8 @@ const data = {
 
     // --- Weight Loss Plan ---
     async requestWeightLossPlan() {
+        const goalType = this.db.health.goalType || 'loss';
+        const isGain = goalType === 'gain';
         const latest = this.sortedWeights().slice(-1)[0];
         const currentWeight = parseFloat(document.getElementById('planCurrentWeight')?.value) || latest?.weight;
         const targetWeight = parseFloat(document.getElementById('planTargetWeight')?.value);
@@ -349,61 +368,98 @@ const data = {
         const dailyTrainMin = parseInt(document.getElementById('planTrainMin')?.value) || 30;
         const weeklyFreq = parseInt(document.getElementById('planWeeklyFreq')?.value) || 3;
         const intensity = document.getElementById('planIntensity')?.value || 'moderate';
-        const sportType = document.getElementById('planSportType')?.value || 'mixed';
+        const sportType = document.getElementById('planSportType')?.value || (isGain ? 'strength' : 'mixed');
+        const experience = document.getElementById('planExperience')?.value || 'beginner';
         if (!currentWeight || currentWeight <= 0) return alert('请先填写当前体重');
         if (!targetWeight || targetWeight <= 0) return alert('请输入目标体重');
-        if (targetWeight >= currentWeight) return alert('目标体重需低于当前体重');
+        if (!isGain && targetWeight >= currentWeight) return alert('减重目标体重需低于当前体重');
+        if (isGain && targetWeight <= currentWeight) return alert('增肌目标体重需高于当前体重');
         const statusEl = document.getElementById('planStatus');
         if (statusEl) statusEl.textContent = 'AI 分析中...';
         try {
-            const plan = await ai.weightLossPlan({ currentWeight, targetWeight, activityLevel, dailyTrainMin, height, weeklyFreq, intensity, sportType });
-            this.db.health.weightPlan = this.normalizeWeightPlan(plan, { currentWeight, targetWeight });
+            const plan = await ai.bodyGoalPlan({ goalType, currentWeight, targetWeight, activityLevel, dailyTrainMin, height, weeklyFreq, intensity, sportType, experience });
+            const normalized = this.normalizeBodyPlan(plan, { currentWeight, targetWeight }, goalType);
+            this.db.health.bodyPlan = normalized;
+            this.db.health.weightPlan = normalized;
             this.save();
             if (statusEl) statusEl.textContent = 'AI 方案已生成，请选择';
             this.renderHistory();
         } catch (e) {
             if (statusEl) statusEl.textContent = '生成失败: ' + e.message;
-            alert('AI 减重方案生成失败: ' + e.message);
+            alert('AI 方案生成失败: ' + e.message);
         }
     },
 
-    normalizeWeightPlan(plan, meta) {
-        const diff = Math.max(0, (meta.currentWeight || 0) - (meta.targetWeight || 0));
-        const fixed = { ...plan, meta };
-        ['fast', 'moderate', 'slow'].forEach(key => {
+    normalizeBodyPlan(plan, meta, goalType) {
+        const isGain = goalType === 'gain';
+        const diff = isGain
+            ? Math.max(0, (meta.targetWeight || 0) - (meta.currentWeight || 0))
+            : Math.max(0, (meta.currentWeight || 0) - (meta.targetWeight || 0));
+        const fixed = { ...plan, goalType, meta };
+        const paceKeys = isGain ? ['conservative', 'moderate', 'aggressive'] : ['fast', 'moderate', 'slow'];
+        paceKeys.forEach(key => {
             const p = fixed[key];
             if (!p) return;
-            const weeklyLoss = Math.max(0.1, Number(p.weeklyLoss) || (key === 'fast' ? 0.8 : key === 'moderate' ? 0.5 : 0.25));
-            const weeks = diff > 0 ? diff / weeklyLoss : 0;
-            const days = Math.max(7, Math.round(weeks * 7));
-            fixed[key] = {
-                ...p,
-                weeklyLoss: Number(weeklyLoss.toFixed(2)),
-                days,
-                dailyCal: Math.round(Number(p.dailyCal) || 0),
-                deficit: Math.round(Number(p.deficit) || 0)
-            };
+            if (isGain) {
+                const weeklyChange = Math.max(0.1, Number(p.weeklyChange) || (key === 'aggressive' ? 0.5 : key === 'moderate' ? 0.3 : 0.15));
+                const weeks = diff > 0 ? diff / weeklyChange : 0;
+                const days = Math.max(7, Math.round(weeks * 7));
+                fixed[key] = {
+                    ...p,
+                    pace: key,
+                    weeklyChange: Number(weeklyChange.toFixed(2)),
+                    days,
+                    dailyCal: Math.round(Number(p.dailyCal) || 0),
+                    calorieDelta: Math.round(Number(p.calorieDelta) || 0),
+                    proteinGoal: Math.round(Number(p.proteinGoal) || 0),
+                    carbGoal: Math.round(Number(p.carbGoal) || 0),
+                    fatGoal: Math.round(Number(p.fatGoal) || 0)
+                };
+            } else {
+                const weeklyLoss = Math.max(0.1, Number(p.weeklyLoss) || (key === 'fast' ? 0.8 : key === 'moderate' ? 0.5 : 0.25));
+                const weeks = diff > 0 ? diff / weeklyLoss : 0;
+                const days = Math.max(7, Math.round(weeks * 7));
+                fixed[key] = {
+                    ...p,
+                    pace: key,
+                    weeklyLoss: Number(weeklyLoss.toFixed(2)),
+                    days,
+                    dailyCal: Math.round(Number(p.dailyCal) || 0),
+                    deficit: Math.round(Number(p.deficit) || 0),
+                    proteinGoal: Math.round(Number(p.proteinGoal) || 0),
+                    carbGoal: Math.round(Number(p.carbGoal) || 0),
+                    fatGoal: Math.round(Number(p.fatGoal) || 0)
+                };
+            }
         });
         return fixed;
     },
 
     applyWeightLossPlan(pace) {
-        const plan = this.db.health.weightPlan;
-        if (!plan || !plan[pace]) return alert('请先生成 AI 减重方案');
+        const goalType = this.db.health.goalType || 'loss';
+        const plan = this.db.health.bodyPlan || this.db.health.weightPlan;
+        if (!plan || !plan[pace]) return alert('请先生成 AI 方案');
         const p = plan[pace];
+        const isGain = goalType === 'gain';
         this.db.health.dietGoal = {
+            goalType,
             pace,
             dailyCal: p.dailyCal,
-            deficit: p.deficit,
-            weeklyLoss: p.weeklyLoss,
+            calorieDelta: isGain ? p.calorieDelta : undefined,
+            deficit: isGain ? undefined : p.deficit,
+            weeklyChange: isGain ? p.weeklyChange : undefined,
+            weeklyLoss: isGain ? undefined : p.weeklyLoss,
             days: p.days,
-            proteinGoal: Math.round(p.dailyCal * 0.3 / 4),
-            carbGoal: Math.round(p.dailyCal * 0.4 / 4),
-            fatGoal: Math.round(p.dailyCal * 0.3 / 9),
+            proteinGoal: p.proteinGoal || (isGain ? Math.round(p.dailyCal * 0.3 / 4) : Math.round(p.dailyCal * 0.3 / 4)),
+            carbGoal: p.carbGoal || (isGain ? Math.round(p.dailyCal * 0.45 / 4) : Math.round(p.dailyCal * 0.4 / 4)),
+            fatGoal: p.fatGoal || (isGain ? Math.round(p.dailyCal * 0.25 / 9) : Math.round(p.dailyCal * 0.3 / 9)),
             appliedAt: new Date().toISOString()
         };
         this.saveAndBackup();
-        alert(`已应用${pace === 'fast' ? '快速' : pace === 'moderate' ? '中等' : '慢速'}方案：每日 ${p.dailyCal} kcal`);
+        const paceLabel = isGain
+            ? (pace === 'conservative' ? '精益' : pace === 'moderate' ? '稳定' : '进取')
+            : (pace === 'fast' ? '快速' : pace === 'moderate' ? '中等' : '慢速');
+        alert(`已应用${paceLabel}${isGain ? '增肌' : '减重'}方案：每日 ${p.dailyCal} kcal`);
         this.renderHistory();
     },
 
@@ -690,7 +746,7 @@ const data = {
                 content.innerHTML = `
                     <div class="record-tabs" role="tablist" aria-label="我的视图">
                         <button class="record-tab ${this.routineView === 'library' ? 'active' : ''}" onclick="data.setRoutineView('library')"><span class="material-symbols-rounded">bookmarks</span>动作组库</button>
-                        <button class="record-tab ${this.routineView === 'weightloss' ? 'active' : ''}" onclick="data.setRoutineView('weightloss')"><span class="material-symbols-rounded">trending_down</span>减重指导</button>
+                        <button class="record-tab ${this.routineView === 'weightloss' ? 'active' : ''}" onclick="data.setRoutineView('weightloss')"><span class="material-symbols-rounded">trending_down</span>目标指导</button>
                         <button class="record-tab ${this.routineView === 'settings' ? 'active' : ''}" onclick="data.setRoutineView('settings')"><span class="material-symbols-rounded">settings</span>设置</button>
                     </div>
                     ${this.routineView === 'library' ? this.renderRoutineLibrary() : this.renderWeightLossPlanCard()}`;
@@ -698,7 +754,7 @@ const data = {
                 content.innerHTML = `
                     <div class="record-tabs" role="tablist" aria-label="我的视图">
                         <button class="record-tab" onclick="data.setRoutineView('library')"><span class="material-symbols-rounded">bookmarks</span>动作组库</button>
-                        <button class="record-tab" onclick="data.setRoutineView('weightloss')"><span class="material-symbols-rounded">trending_down</span>减重指导</button>
+                        <button class="record-tab" onclick="data.setRoutineView('weightloss')"><span class="material-symbols-rounded">trending_down</span>目标指导</button>
                         <button class="record-tab active" onclick="data.setRoutineView('settings')"><span class="material-symbols-rounded">settings</span>设置</button>
                     </div>`;
                 content.classList.remove('hidden');
@@ -719,14 +775,14 @@ const data = {
             <div class="hero-title-row">
                 <div>
                     <h3>${routineCount} 个方案</h3>
-                    <p>${goal ? `当前减重方案：${goal.dailyCal} kcal / 日` : '可在此管理训练动作库与 AI 减重方案'}</p>
+                    <p>${goal ? `当前${goal.goalType === 'gain' ? '增肌' : '减重'}方案：${goal.dailyCal} kcal / 日` : '可在此管理训练动作库与 AI 目标方案'}</p>
                 </div>
                 <span class="hero-icon material-symbols-rounded">inventory_2</span>
             </div>
             <div class="hero-stat-row">
                 <div class="hero-stat"><b>${actionCount}</b><small>当前动作</small></div>
                 <div class="hero-stat"><b>${routineCount}</b><small>已存方案</small></div>
-                <div class="hero-stat"><b>${goal?.weeklyLoss || '--'}</b><small>目标 kg/周</small></div>
+                <div class="hero-stat"><b>${goal?.weeklyChange || goal?.weeklyLoss || '--'}</b><small>目标 kg/周</small></div>
             </div>
         </div>`;
     },
@@ -808,11 +864,14 @@ const data = {
         </div>`;
     },
     renderRecordQuickActions() {
+        const aiPrompt = this.isGainMode()
+            ? '请以增肌目标为前提，分析我今天的饮食、训练和体重记录，并给出今晚或明天的调整建议'
+            : '请分析我今天的饮食、训练和体重记录，并给出今晚或明天的调整建议';
         return `<div class="record-quick-actions">
             <button class="record-quick-btn" onclick="data.openDietModal()"><span class="material-symbols-rounded">restaurant</span><span>记饮食</span></button>
             <button class="record-quick-btn" onclick="data.openExerciseModal()"><span class="material-symbols-rounded">fitness_center</span><span>记运动</span></button>
             <button class="record-quick-btn" onclick="data.openWeightModal()"><span class="material-symbols-rounded">monitor_weight</span><span>记体重</span></button>
-            <button class="record-quick-btn record-quick-btn-ai" onclick="data.askContextAi('today','请分析我今天的饮食、训练和体重记录，并给出今晚或明天的调整建议')"><span class="material-symbols-rounded">psychology</span><span>问 AI</span></button>
+            <button class="record-quick-btn record-quick-btn-ai" onclick="data.askContextAi('today','${aiPrompt}')"><span class="material-symbols-rounded">psychology</span><span>问 AI</span></button>
         </div>`;
     },
     renderRecordTabs() {
@@ -885,11 +944,14 @@ const data = {
     },
     contextAiTitle(context) { return { today: '综合分析', diet: '饮食分析', exercise: '训练分析', weight: '体重分析', calendar: '日历分析' }[context] || 'AI 分析'; },
     contextAiPrompts(context) {
+        const isGain = this.isGainMode();
         return {
             today: [{ label: '分析今天', prompt: '请分析我今天的饮食、训练和体重记录，并给出今晚或明天的调整建议' }, { label: '晚餐建议', prompt: '根据今天已经摄入的饮食和目标，给我晚餐建议' }, { label: '明日调整', prompt: '根据今天记录，帮我安排明天的饮食和训练重点' }],
             diet: [{ label: '饮食分析', prompt: '请分析我今天和最近的饮食结构，重点看热量和蛋白质是否达标' }, { label: '补蛋白建议', prompt: '我今天蛋白质够不够？如果不够，建议怎么补' }, { label: '热量控制', prompt: '请根据我的饮食记录判断热量控制是否合理' }],
             exercise: [{ label: '训练强度', prompt: '请分析我最近训练频率和强度是否合理' }, { label: '恢复建议', prompt: '根据最近训练记录，帮我安排一次恢复训练' }, { label: '训练调整', prompt: '我应该增加还是减少训练量？请结合记录判断' }],
-            weight: [{ label: '趋势分析', prompt: '请分析我最近体重趋势，并判断减重是否正常' }, { label: '停滞原因', prompt: '如果我最近减重停滞，请结合饮食和训练记录分析原因' }, { label: '目标调整', prompt: '请根据我的体重趋势调整热量和运动建议' }],
+            weight: isGain
+                ? [{ label: '增肌趋势', prompt: '请分析我最近体重趋势，判断增肌进展是否正常' }, { label: '停滞原因', prompt: '如果我最近增肌停滞，请结合饮食和训练记录分析原因' }, { label: '目标调整', prompt: '请根据我的体重趋势调整增肌热量和训练建议' }]
+                : [{ label: '趋势分析', prompt: '请分析我最近体重趋势，并判断减重是否正常' }, { label: '停滞原因', prompt: '如果我最近减重停滞，请结合饮食和训练记录分析原因' }, { label: '目标调整', prompt: '请根据我的体重趋势调整热量和运动建议' }],
             calendar: [{ label: '分析选中日', prompt: '请分析我选中日期当天的饮食、训练和体重记录' }, { label: '本月总结', prompt: '请总结我这个月的训练、饮食和体重变化' }]
         }[context] || [{ label: '分析今天', prompt: '请分析我今天的记录' }];
     },
@@ -920,10 +982,17 @@ const data = {
         let status = '';
         let hint = '';
         if (goalCal) {
-            if (remaining >= 500) { status = '空间充足'; hint = `还可摄入约 ${remaining} kcal，优先补蛋白和蔬菜`; }
-            else if (remaining >= 150) { status = '节奏良好'; hint = `还可摄入约 ${remaining} kcal，晚餐建议清淡均衡`; }
-            else if (remaining >= 0) { status = '接近目标'; hint = '已接近目标，控制油脂和零食'; }
-            else { status = '已超出目标'; hint = `已超出 ${Math.abs(remaining)} kcal，可增加散步或低强度活动`; }
+            if (this.isGainMode()) {
+                if (remaining >= 500) { status = '摄入不足'; hint = `距离增肌目标还差约 ${remaining} kcal，建议加一餐主食、牛奶或蛋白质`; }
+                else if (remaining >= 150) { status = '接近目标'; hint = `还差约 ${remaining} kcal，可补一份蛋白和碳水`; }
+                else if (remaining >= -200) { status = '达成良好'; hint = '今日热量接近增肌目标，注意睡眠和训练恢复'; }
+                else { status = '略高于目标'; hint = `今日超过目标约 ${Math.abs(remaining)} kcal，明天恢复正常摄入即可`; }
+            } else {
+                if (remaining >= 500) { status = '空间充足'; hint = `还可摄入约 ${remaining} kcal，优先补蛋白和蔬菜`; }
+                else if (remaining >= 150) { status = '节奏良好'; hint = `还可摄入约 ${remaining} kcal，晚餐建议清淡均衡`; }
+                else if (remaining >= 0) { status = '接近目标'; hint = '已接近目标，控制油脂和零食'; }
+                else { status = '已超出目标'; hint = `已超出 ${Math.abs(remaining)} kcal，可增加散步或低强度活动`; }
+            }
         }
         return `<div class="md-card hero-card today-focus-card">
             <div class="today-focus-row">
@@ -1171,6 +1240,12 @@ const data = {
         });
     },
 
+    setGoalType(type) {
+        this.db.health.goalType = type;
+        this.saveAndBackup();
+        this.renderHistory();
+    },
+
     setDietMeal(meal) {
         this._dietMeal = meal || 'lunch';
         const select = document.getElementById('foodMeal');
@@ -1264,18 +1339,33 @@ const data = {
     },
 
     renderWeightLossPanel() {
-        const plan = this.db.health.weightPlan;
+        const goalType = this.db.health.goalType || 'loss';
+        const isGain = goalType === 'gain';
+        const plan = this.db.health.bodyPlan || this.db.health.weightPlan;
         const goal = this.db.health.dietGoal;
         const latest = this.sortedWeights().slice(-1)[0];
         const currentWeight = latest?.weight || '';
-        return `<div class="md-card weightloss-card">
+        const diffText = plan?.meta ? (isGain
+            ? `+${(plan.meta.targetWeight - plan.meta.currentWeight).toFixed(1)} kg`
+            : `-${(plan.meta.currentWeight - plan.meta.targetWeight).toFixed(1)} kg`) : '';
+        const paceLabel = goal ? (isGain
+            ? (goal.pace === 'conservative' ? '精益' : goal.pace === 'moderate' ? '稳定' : '进取')
+            : (goal.pace === 'fast' ? '快速' : goal.pace === 'moderate' ? '中等' : '慢速')) : '';
+        const weeklyLabel = goal ? (isGain
+            ? `${goal.weeklyChange || (plan?.[goal.pace]?.weeklyChange) || '--'} kg/周`
+            : `${goal.weeklyLoss || (plan?.[goal.pace]?.weeklyLoss) || '--'} kg/周`) : '';
+        return `<div class="md-card weightloss-card ${isGain ? 'goal-gain' : 'goal-loss'}">
             <div class="weightloss-head">
                 <div>
-                    <span class="cardio-kicker">AI 减重指导</span>
-                    <h3>制定减重计划</h3>
-                    <small>${goal ? `当前方案：${goal.pace === 'fast' ? '快速' : goal.pace === 'moderate' ? '中等' : '慢速'} · 每日 ${goal.dailyCal} kcal · 目标减重 ${(plan?.meta?.currentWeight - plan?.meta?.targetWeight).toFixed(1)} kg` : '填写信息后 AI 帮你生成方案'}</small>
+                    <span class="cardio-kicker">${isGain ? 'AI 增肌指导' : 'AI 减重指导'}</span>
+                    <h3>${isGain ? '制定增肌计划' : '制定减重计划'}</h3>
+                    <small>${goal ? `当前方案：${paceLabel} · 每日 ${goal.dailyCal} kcal · 目标${diffText}` : '填写信息后 AI 帮你生成方案'}</small>
                 </div>
-                <span class="material-symbols-rounded weightloss-icon">trending_down</span>
+                <span class="material-symbols-rounded weightloss-icon">${isGain ? 'fitness_center' : 'trending_down'}</span>
+            </div>
+            <div class="goal-mode-tabs">
+                <button class="goal-mode-tab ${!isGain ? 'active' : ''}" onclick="data.setGoalType('loss')" type="button"><span class="material-symbols-rounded">trending_down</span>减重</button>
+                <button class="goal-mode-tab ${isGain ? 'active' : ''}" onclick="data.setGoalType('gain')" type="button"><span class="material-symbols-rounded">fitness_center</span>增肌</button>
             </div>
             <div class="weightloss-form">
                 <div class="md-grid weightloss-grid">
@@ -1284,32 +1374,83 @@ const data = {
                     <div class="md-field"><input type="number" id="planHeight" step="1" placeholder=" "><label>身高 cm</label></div>
                     <div class="md-field"><select id="planActivity"><option value="sedentary">久坐</option><option value="light">轻度活动</option><option value="moderate">中等活动</option><option value="active">高强度活动</option></select><label>日常活动水平</label></div>
                     <div class="md-field"><input type="number" id="planTrainMin" value="30" step="5" placeholder=" "><label>每次运动分钟</label></div>
-                    <div class="md-field"><input type="number" id="planWeeklyFreq" value="3" step="1" min="0" max="7" placeholder=" "><label>每周运动次数</label></div>
-                    <div class="md-field"><select id="planIntensity"><option value="light">低强度</option><option value="moderate" selected>中等强度</option><option value="vigorous">高强度</option></select><label>运动强度</label></div>
-                    <div class="md-field span-full"><select id="planSportType"><option value="strength">力量训练</option><option value="cardio">有氧运动</option><option value="mixed" selected>力量+有氧混合</option><option value="flexibility">拉伸/瑜伽</option></select><label>主要运动项目</label></div>
+                    <div class="md-field"><input type="number" id="planWeeklyFreq" value="${isGain ? 4 : 3}" step="1" min="0" max="7" placeholder=" "><label>每周运动次数</label></div>
+                    <div class="md-field"><select id="planIntensity"><option value="light">低强度</option><option value="moderate" ${!isGain ? 'selected' : ''}>中等强度</option><option value="vigorous" ${isGain ? 'selected' : ''}>高强度</option></select><label>运动强度</label></div>
+                    <div class="md-field"><select id="planSportType"><option value="strength" ${isGain ? 'selected' : ''}>力量训练</option><option value="cardio">有氧运动</option><option value="mixed" ${!isGain ? 'selected' : ''}>力量+有氧混合</option><option value="flexibility">拉伸/瑜伽</option></select><label>主要运动项目</label></div>
+                    ${isGain ? `<div class="md-field span-full"><select id="planExperience"><option value="beginner">新手</option><option value="intermediate">中级</option><option value="advanced">高级</option></select><label>训练经验</label></div>` : ''}
                 </div>
-                <button class="md-btn md-btn-filled" onclick="data.requestWeightLossPlan()"><span class="material-symbols-rounded">psychology</span> AI 生成减重方案</button>
+                <button class="md-btn md-btn-filled" onclick="data.requestWeightLossPlan()"><span class="material-symbols-rounded">psychology</span> AI 生成${isGain ? '增肌' : '减重'}方案</button>
                 <div id="planStatus" class="food-ai-status"></div>
             </div>
+            <details class="goal-guide">
+                <summary><span class="material-symbols-rounded">help</span> 如何选择活动水平、强度和经验</summary>
+                <div class="goal-guide-content">
+                    <div>
+                        <b>日常活动水平</b>
+                        <p>不包含专门训练，只看工作、通勤和日常走动。</p>
+                        <ul>
+                            <li><b>久坐</b> — 办公/学习为主，&lt;5000步/日</li>
+                            <li><b>轻度</b> — 少量走动，5000-8000步/日</li>
+                            <li><b>中等</b> — 经常走动或站立，8000-12000步/日</li>
+                            <li><b>高强度</b> — 体力劳动或&gt;12000步/日</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <b>训练强度</b>
+                        <ul>
+                            <li><b>低强度</b> — 轻松，可完整说话</li>
+                            <li><b>中等强度</b> — 明显出汗，可短句交流</li>
+                            <li><b>高强度</b> — 很喘，难以连续说话</li>
+                        </ul>
+                    </div>
+                    ${isGain ? `<div>
+                        <b>训练经验</b>
+                        <ul>
+                            <li><b>新手</b> — 系统力量训练少于6个月</li>
+                            <li><b>中级</b> — 规律训练6个月-2年</li>
+                            <li><b>高级</b> — 规律训练超过2年，有周期化经验</li>
+                        </ul>
+                    </div>` : ''}
+                </div>
+            </details>
             ${plan ? `<div class="weightloss-options">
-                ${['fast', 'moderate', 'slow'].map(pace => {
-                    const p = plan[pace];
-                    if (!p) return '';
-                    const isActive = goal?.pace === pace;
-                    const label = pace === 'fast' ? '快速' : pace === 'moderate' ? '中等' : '慢速';
-                    return `<div class="weightloss-option ${isActive ? 'active' : ''}" onclick="data.applyWeightLossPlan('${pace}')">
-                        <div class="weightloss-option-head">
-                            <b>${label}</b>
-                            ${isActive ? '<span class="item-chip">当前方案</span>' : ''}
-                        </div>
-                        <div class="weightloss-option-stats">
-                            <span>${p.weeklyLoss} kg/周</span>
-                            <span>${p.days} 天</span>
-                            <b>${p.dailyCal} kcal/日</b>
-                        </div>
-                        <small>${p.desc || ''}</small>
-                    </div>`;
-                }).join('')}
+                ${isGain
+                    ? ['conservative', 'moderate', 'aggressive'].map(pace => {
+                        const p = plan[pace];
+                        if (!p) return '';
+                        const isActive = goal?.pace === pace;
+                        const label = pace === 'conservative' ? '精益增肌' : pace === 'moderate' ? '稳定增肌' : '进取增肌';
+                        return `<div class="weightloss-option ${isActive ? 'active' : ''}" onclick="data.applyWeightLossPlan('${pace}')">
+                            <div class="weightloss-option-head">
+                                <b>${label}</b>
+                                ${isActive ? '<span class="item-chip">当前方案</span>' : ''}
+                            </div>
+                            <div class="weightloss-option-stats">
+                                <span>+${p.weeklyChange || 0} kg/周</span>
+                                <span>${p.days} 天</span>
+                                <b>${p.dailyCal} kcal/日</b>
+                            </div>
+                            <small>${p.desc || ''}</small>
+                        </div>`;
+                    }).join('')
+                    : ['fast', 'moderate', 'slow'].map(pace => {
+                        const p = plan[pace];
+                        if (!p) return '';
+                        const isActive = goal?.pace === pace;
+                        const label = pace === 'fast' ? '快速' : pace === 'moderate' ? '中等' : '慢速';
+                        return `<div class="weightloss-option ${isActive ? 'active' : ''}" onclick="data.applyWeightLossPlan('${pace}')">
+                            <div class="weightloss-option-head">
+                                <b>${label}</b>
+                                ${isActive ? '<span class="item-chip">当前方案</span>' : ''}
+                            </div>
+                            <div class="weightloss-option-stats">
+                                <span>${p.weeklyLoss} kg/周</span>
+                                <span>${p.days} 天</span>
+                                <b>${p.dailyCal} kcal/日</b>
+                            </div>
+                            <small>${p.desc || ''}</small>
+                        </div>`;
+                    }).join('')}
                 ${plan.tips ? `<div class="weightloss-tips">${plan.tips.map(t => `<span><span class="material-symbols-rounded">check_circle</span>${t}</span>`).join('')}</div>` : ''}
             </div>` : ''}
         </div>`;
