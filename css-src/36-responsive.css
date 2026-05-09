@@ -34,6 +34,14 @@
     .macro-summary { gap: 6px; }
     .timer-stats b { font-size: 14px; }
     .list-item { margin: 4px 8px; padding: 8px 10px; }
+    .workout-plan-card { gap: 8px; }
+    .workout-plan-info h3 { font-size: 15px; }
+    .workout-plan-icon { width: 36px; height: 36px; font-size: 18px; border-radius: 12px; }
+    .workout-plan-recent-item { padding: 8px 10px; gap: 8px; }
+    .workout-plan-chip { max-width: 110px; min-height: 26px; padding: 0 8px; font-size: 10px; }
+    .workout-plan-empty { padding: 16px 12px; }
+    .workout-plan-empty-actions { flex-direction: column; align-items: stretch; }
+    .workout-plan-empty-actions .md-btn { width: 100%; }
 }
 @media (max-width: 360px) {
     .md-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }

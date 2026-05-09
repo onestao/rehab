@@ -3,21 +3,32 @@
    ============================================ */
 
 /* Workout Plan Card */
-.workout-plan-card { display: grid; gap: 12px; }
+.workout-plan-card { display: grid; gap: 12px; overflow: hidden; }
 .workout-plan-head {
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
-    gap: 12px;
+    gap: 10px;
+}
+.workout-plan-info {
+    flex: 1;
+    min-width: 0;
 }
 .workout-plan-info h3 {
     font-size: 18px;
     line-height: 1.2;
     color: var(--md-sys-on-surface);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 .workout-plan-info small {
     color: var(--md-sys-on-surface-variant);
     font-size: 12px;
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 .workout-plan-icon {
     width: 44px;
@@ -79,7 +90,11 @@
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
-    gap: 12px;
+    gap: 10px;
+}
+.workout-plan-import-head > div:first-child {
+    flex: 1;
+    min-width: 0;
 }
 .workout-plan-import-head h3 {
     font-size: 16px;
@@ -137,14 +152,17 @@
 .workout-plan-switch {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
     padding-top: 4px;
+    min-width: 0;
+    overflow: hidden;
 }
 .workout-plan-switch small {
-    font-size: 12px;
+    font-size: 11px;
     color: var(--md-sys-on-surface-variant);
     font-weight: 600;
     white-space: nowrap;
+    flex: none;
 }
 .workout-plan-chips {
     display: flex;
@@ -154,26 +172,30 @@
     scrollbar-width: none;
     flex: 1;
     min-width: 0;
+    padding: 2px 0;
 }
 .workout-plan-chips::-webkit-scrollbar { display: none; }
 .workout-plan-chip {
     border: none;
     border-radius: var(--md-sys-shape-full);
-    min-height: 30px;
-    padding: 0 12px;
+    min-height: 28px;
+    padding: 0 10px;
     background: var(--md-sys-secondary-container);
     color: var(--md-sys-on-secondary-container);
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 700;
     display: inline-flex;
     align-items: center;
-    gap: 4px;
+    gap: 3px;
     white-space: nowrap;
     cursor: pointer;
     transition: all var(--md-sys-motion-duration-short) var(--md-sys-motion-emphasized);
     flex: none;
+    max-width: 140px;
+    overflow: hidden;
 }
-.workout-plan-chip .material-symbols-rounded { font-size: 16px; }
+.workout-plan-chip .material-symbols-rounded { font-size: 14px; flex: none; }
+.workout-plan-chip { text-overflow: ellipsis; }
 .workout-plan-chip:active { transform: scale(0.95); }
 
 /* View All Button */
