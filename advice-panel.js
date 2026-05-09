@@ -135,7 +135,7 @@ const advicePanel = {
         this.adviceRange = range || 'today';
         this.saveAdviceSettings();
         this.captureAdviceDraft();
-        this.renderRoutines();
+        this.renderAiCoachPage?.() || this.renderRoutines?.();
         requestAnimationFrame(() => this.autoResizeAdvicePrompt());
     },
 
@@ -144,7 +144,7 @@ const advicePanel = {
         this.adviceContexts[key] = !this.adviceContexts[key];
         this.saveAdviceSettings();
         this.captureAdviceDraft();
-        this.renderRoutines();
+        this.renderAiCoachPage?.() || this.renderRoutines?.();
         requestAnimationFrame(() => this.autoResizeAdvicePrompt());
     },
 

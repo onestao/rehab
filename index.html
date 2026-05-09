@@ -24,10 +24,9 @@
 
     <main id="app">
         <!-- 训练页 -->
-        <section id="workout" class="page active">
+        <section id="workout" class="page">
             <header class="md-top-app-bar workout-only-bar">
                 <div class="bar-leading"><span class="material-symbols-rounded app-icon">fitness_center</span><span class="app-title">训练助手</span></div>
-                <div id="syncStatus" class="md-chip"><span class="material-symbols-rounded" style="font-size:14px">cloud_off</span> 本地</div>
             </header>
             <div class="md-card timer-panel">
                 <span class="skip-btn" onclick="workout.skip()"><span class="material-symbols-rounded">skip_next</span></span>
@@ -115,6 +114,7 @@
                     <div class="md-field"><input type="number" id="cardioTarget" placeholder=" " value="30" oninput="cardio.updatePlan()"><label>目标分钟</label></div>
                 </div>
             </div>
+            <div id="workoutPlanCard"></div>
             <div id="currentActionList"></div>
             <div class="md-card routine-tool">
                 <div class="md-field" style="flex:1"><input type="text" id="newRoutineName" placeholder=" "><label>方案名称</label></div>
@@ -122,127 +122,153 @@
             </div>
         </section>
 
-        <!-- 方案页/记录页/同步页 -->
-        <section id="routines" class="page">
-            <div class="page-header"><span class="material-symbols-rounded">bookmarks</span><h2>我的方案</h2></div>
-            <div id="routineOverview"></div>
-            <div id="routineList"></div>
+        <!-- 今日页 -->
+        <section id="today" class="page active">
+            <header class="md-top-app-bar">
+                <div class="bar-leading"><span class="material-symbols-rounded app-icon">today</span><span class="app-title">今日</span></div>
+                <div id="syncStatus" class="md-chip"><span class="material-symbols-rounded" style="font-size:14px">cloud_off</span> 本地</div>
+            </header>
+            <div id="todayOverview"></div>
+            <div id="todayQuickActions"></div>
+            <div id="todayTimeline"></div>
+            <div id="todayAiCard"></div>
         </section>
-        <section id="history" class="page">
-            <div class="page-header"><span class="material-symbols-rounded">event_note</span><h2>训练记录</h2></div>
-            <div id="todayActionTop"></div>
-            <div id="historyList"></div>
+
+        <!-- 饮食页 -->
+        <section id="diet" class="page">
+            <header class="md-top-app-bar">
+                <div class="bar-leading"><span class="material-symbols-rounded app-icon">restaurant</span><span class="app-title">饮食</span></div>
+            </header>
+            <div id="dietContent"></div>
+            <div id="dietAiCard"></div>
         </section>
-        <section id="sync" class="page">
-            <div class="page-header"><span class="material-symbols-rounded">settings</span><h2>设置</h2></div>
-            <div class="md-card theme-card">
-                <div class="theme-panel">
-                    <div class="theme-panel-title"><span class="material-symbols-rounded">palette</span> 主题颜色</div>
-                    <div class="theme-actions">
-                        <button class="theme-swatch theme-blue active" data-theme="blue" onclick="theme.setPreset('blue')" aria-label="蓝色主题"></button>
-                        <button class="theme-swatch theme-purple" data-theme="purple" onclick="theme.setPreset('purple')" aria-label="紫色主题"></button>
-                        <button class="theme-swatch theme-green" data-theme="green" onclick="theme.setPreset('green')" aria-label="绿色主题"></button>
-                        <button class="theme-swatch theme-orange" data-theme="orange" onclick="theme.setPreset('orange')" aria-label="橙色主题"></button>
-                        <button class="theme-swatch theme-rose" data-theme="rose" onclick="theme.setPreset('rose')" aria-label="玫红主题"></button>
-                        <button class="md-btn md-btn-tonal theme-monet" data-theme="monet" onclick="theme.useMonet()" aria-label="莫奈取色"><span class="material-symbols-rounded">auto_awesome</span></button>
-                        <label class="color-picker"><input type="color" id="themeColor" value="#0061a4" oninput="theme.setCustom(this.value)"><span class="material-symbols-rounded">format_color_fill</span></label>
+
+        <!-- AI教练页 -->
+        <section id="ai-coach" class="page">
+            <div id="aiCoachContent"></div>
+        </section>
+
+        <!-- 我的页 -->
+        <section id="profile" class="page">
+            <header class="md-top-app-bar">
+                <div class="bar-leading"><span class="material-symbols-rounded app-icon">person</span><span class="app-title">我的</span></div>
+            </header>
+            <div id="profileOverview"></div>
+            <div id="profileContent"></div>
+            <div id="profileSettings" class="hidden">
+                <div class="md-card theme-card">
+                    <div class="theme-panel">
+                        <div class="theme-panel-title"><span class="material-symbols-rounded">palette</span> 主题颜色</div>
+                        <div class="theme-actions">
+                            <button class="theme-swatch theme-blue active" data-theme="blue" onclick="theme.setPreset('blue')" aria-label="蓝色主题"></button>
+                            <button class="theme-swatch theme-purple" data-theme="purple" onclick="theme.setPreset('purple')" aria-label="紫色主题"></button>
+                            <button class="theme-swatch theme-green" data-theme="green" onclick="theme.setPreset('green')" aria-label="绿色主题"></button>
+                            <button class="theme-swatch theme-orange" data-theme="orange" onclick="theme.setPreset('orange')" aria-label="橙色主题"></button>
+                            <button class="theme-swatch theme-rose" data-theme="rose" onclick="theme.setPreset('rose')" aria-label="玫红主题"></button>
+                            <button class="md-btn md-btn-tonal theme-monet" data-theme="monet" onclick="theme.useMonet()" aria-label="莫奈取色"><span class="material-symbols-rounded">auto_awesome</span></button>
+                            <label class="color-picker"><input type="color" id="themeColor" value="#0061a4" oninput="theme.setCustom(this.value)"><span class="material-symbols-rounded">format_color_fill</span></label>
+                        </div>
                     </div>
                 </div>
-            </div>
-            <div class="md-card sync-card">
-                <div class="ai-card-header"><span class="material-symbols-rounded">psychology</span><strong>AI 配置</strong><span id="aiStatus" class="ai-status ai-off">未配置</span></div>
-                <div class="md-field">
-                    <select id="aiProfileSelect" onchange="ai.selectProfile(this.value)"></select>
-                    <label>配置档案</label>
-                </div>
-                <div class="md-row ai-profile-actions">
-                    <div class="md-field" style="flex:1"><input type="text" id="aiProfileName" placeholder=" "><label>档案名称</label></div>
-                    <button class="md-btn md-btn-tonal" onclick="ai.saveAsNewProfile()"><span class="material-symbols-rounded">bookmark_add</span> 另存新档案</button>
-                    <button class="md-btn md-btn-tonal" onclick="ai.deleteCurrentProfile()"><span class="material-symbols-rounded">delete</span> 删除</button>
-                </div>
-                <div class="md-field">
-                    <select id="aiProvider">
-                        <option value="openai">OpenAI 兼容</option>
-                        <option value="gemini">Gemini</option>
-                    </select>
-                    <label>AI 服务</label>
-                </div>
-                <div class="md-field"><input type="text" id="aiBaseUrl" placeholder=" "><label>Base URL</label></div>
-                <div class="md-field"><input type="password" id="aiApiKey" placeholder=" "><label>API Key</label></div>
-                <button class="md-btn md-btn-tonal" onclick="ai.fetchModels()"><span class="material-symbols-rounded">refresh</span> 获取可用模型</button>
-                <div id="aiFetchStatus" class="food-ai-status"></div>
-                <div id="aiModelList" class="ai-model-list hidden"></div>
-                <div class="md-field"><input type="text" id="aiModel" placeholder=" " onfocus="ai.showCachedModels()"><label>模型名称</label></div>
-                <button class="md-btn md-btn-filled" onclick="ai.saveCurrentProfile()"><span class="material-symbols-rounded">save</span> 更新当前档案</button>
-                <div class="md-divider"></div>
-                <div class="ai-encrypt-section">
-                    <div class="ai-encrypt-title"><span class="material-symbols-rounded">lock</span> 加密同步 AI 配置</div>
-                    <small>设置密码后会将所有 AI 配置档案一起加密写入同步数据，和训练记录同文件备份</small>
-                    <div class="md-field"><input type="password" id="aiEncryptPass" placeholder=" "><label>加密密码</label></div>
-                    <button class="md-btn md-btn-tonal" onclick="ai.exportToSync()"><span class="material-symbols-rounded">upload</span> 加密并写入同步数据</button>
-                </div>
-                <div id="aiDecryptSection" class="ai-encrypt-section hidden">
-                    <div class="ai-encrypt-title"><span class="material-symbols-rounded">lock_open</span> 恢复 AI 配置</div>
-                    <small>检测到同步中的加密 AI 配置，输入密码恢复所有档案</small>
-                    <div class="md-field"><input type="password" id="aiDecryptPass" placeholder=" "><label>解密密码</label></div>
-                    <button class="md-btn md-btn-tonal" onclick="ai.importFromSync()"><span class="material-symbols-rounded">download</span> 解密恢复</button>
-                </div>
-            </div>
-            <div class="md-card sync-card">
-                <div class="md-field">
-                    <select id="syncMode" onchange="sync.toggleFields(this.value)">
-                        <option value="none">关闭同步</option>
-                        <option value="s3">S3 协议</option>
-                        <option value="webdav">WebDAV</option>
-                    </select>
-                    <label>同步方式</label>
-                </div>
-                <div id="s3Fields" class="hidden">
-                    <div class="md-field"><input type="text" id="s3Endpoint" placeholder=" "><label>Endpoint URL</label></div>
-                    <div class="md-field"><input type="text" id="s3Region" placeholder=" "><label>Region (如 us-east-1)</label></div>
-                    <div class="md-field"><input type="text" id="s3Bucket" placeholder=" "><label>Bucket</label></div>
-                    <div class="md-field"><input type="text" id="s3Key" placeholder=" "><label>Access Key</label></div>
-                    <div class="md-field"><input type="password" id="s3Secret" placeholder=" "><label>Secret Key</label></div>
-                </div>
-                <div id="webdavFields" class="hidden">
-                    <div class="md-field"><input type="text" id="davUrl" placeholder=" "><label>WebDAV 地址</label></div>
-                    <div class="md-field"><input type="text" id="davUser" placeholder=" "><label>用户名</label></div>
-                    <div class="md-field"><input type="password" id="davPass" placeholder=" "><label>密码 / App Password</label></div>
-                    <div class="md-field"><input type="text" id="davPath" placeholder=" "><label>备份文件路径</label></div>
-                </div>
-                <div class="sync-actions">
-                    <button class="md-btn md-btn-filled" onclick="sync.saveConfig()"><span class="material-symbols-rounded">save</span> 保存配置</button>
-                    <div class="md-row">
-                        <button class="md-btn md-btn-tonal" onclick="sync.pull()"><span class="material-symbols-rounded">download</span> 下载恢复</button>
-                        <button class="md-btn md-btn-tonal" onclick="sync.push()"><span class="material-symbols-rounded">backup</span> 备份上传</button>
+                <div class="md-card sync-card">
+                    <div class="ai-card-header"><span class="material-symbols-rounded">psychology</span><strong>AI 配置</strong><span id="aiStatus" class="ai-status ai-off">未配置</span></div>
+                    <div class="md-field">
+                        <select id="aiProfileSelect" onchange="ai.selectProfile(this.value)"></select>
+                        <label>配置档案</label>
                     </div>
-                    <div class="md-row sync-backup-row">
-                        <button class="md-btn md-btn-tonal" onclick="backup.exportData()"><span class="material-symbols-rounded">download_for_offline</span> 导出备份</button>
-                        <button class="md-btn md-btn-tonal" onclick="backup.promptImport()"><span class="material-symbols-rounded">upload_file</span> 导入备份</button>
+                    <div class="md-row ai-profile-actions">
+                        <div class="md-field" style="flex:1"><input type="text" id="aiProfileName" placeholder=" "><label>档案名称</label></div>
+                        <button class="md-btn md-btn-tonal" onclick="ai.saveAsNewProfile()"><span class="material-symbols-rounded">bookmark_add</span> 另存新档案</button>
+                        <button class="md-btn md-btn-tonal" onclick="ai.deleteCurrentProfile()"><span class="material-symbols-rounded">delete</span> 删除</button>
                     </div>
-                    <input id="backupImportInput" class="hidden" type="file" accept="application/json" onchange="backup.importFile(event)">
-                    <div id="syncDetailStatus" class="sync-detail-status"></div>
+                    <div class="md-field">
+                        <select id="aiProvider">
+                            <option value="openai">OpenAI 兼容</option>
+                            <option value="gemini">Gemini</option>
+                        </select>
+                        <label>AI 服务</label>
+                    </div>
+                    <div class="md-field"><input type="text" id="aiBaseUrl" placeholder=" "><label>Base URL</label></div>
+                    <div class="md-field"><input type="password" id="aiApiKey" placeholder=" "><label>API Key</label></div>
+                    <button class="md-btn md-btn-tonal" onclick="ai.fetchModels()"><span class="material-symbols-rounded">refresh</span> 获取可用模型</button>
+                    <div id="aiFetchStatus" class="food-ai-status"></div>
+                    <div id="aiModelList" class="ai-model-list hidden"></div>
+                    <div class="md-field"><input type="text" id="aiModel" placeholder=" " onfocus="ai.showCachedModels()"><label>模型名称</label></div>
+                    <button class="md-btn md-btn-filled" onclick="ai.saveCurrentProfile()"><span class="material-symbols-rounded">save</span> 更新当前档案</button>
+                    <div class="md-divider"></div>
+                    <div class="ai-encrypt-section">
+                        <div class="ai-encrypt-title"><span class="material-symbols-rounded">lock</span> 加密同步 AI 配置</div>
+                        <small>设置密码后会将所有 AI 配置档案一起加密写入同步数据，和训练记录同文件备份</small>
+                        <div class="md-field"><input type="password" id="aiEncryptPass" placeholder=" "><label>加密密码</label></div>
+                        <button class="md-btn md-btn-tonal" onclick="ai.exportToSync()"><span class="material-symbols-rounded">upload</span> 加密并写入同步数据</button>
+                    </div>
+                    <div id="aiDecryptSection" class="ai-encrypt-section hidden">
+                        <div class="ai-encrypt-title"><span class="material-symbols-rounded">lock_open</span> 恢复 AI 配置</div>
+                        <small>检测到同步中的加密 AI 配置，输入密码恢复所有档案</small>
+                        <div class="md-field"><input type="password" id="aiDecryptPass" placeholder=" "><label>解密密码</label></div>
+                        <button class="md-btn md-btn-tonal" onclick="ai.importFromSync()"><span class="material-symbols-rounded">download</span> 解密恢复</button>
+                    </div>
+                </div>
+                <div class="md-card sync-card">
+                    <div class="md-field">
+                        <select id="syncMode" onchange="sync.toggleFields(this.value)">
+                            <option value="none">关闭同步</option>
+                            <option value="s3">S3 协议</option>
+                            <option value="webdav">WebDAV</option>
+                        </select>
+                        <label>同步方式</label>
+                    </div>
+                    <div id="s3Fields" class="hidden">
+                        <div class="md-field"><input type="text" id="s3Endpoint" placeholder=" "><label>Endpoint URL</label></div>
+                        <div class="md-field"><input type="text" id="s3Region" placeholder=" "><label>Region (如 us-east-1)</label></div>
+                        <div class="md-field"><input type="text" id="s3Bucket" placeholder=" "><label>Bucket</label></div>
+                        <div class="md-field"><input type="text" id="s3Key" placeholder=" "><label>Access Key</label></div>
+                        <div class="md-field"><input type="password" id="s3Secret" placeholder=" "><label>Secret Key</label></div>
+                    </div>
+                    <div id="webdavFields" class="hidden">
+                        <div class="md-field"><input type="text" id="davUrl" placeholder=" "><label>WebDAV 地址</label></div>
+                        <div class="md-field"><input type="text" id="davUser" placeholder=" "><label>用户名</label></div>
+                        <div class="md-field"><input type="password" id="davPass" placeholder=" "><label>密码 / App Password</label></div>
+                        <div class="md-field"><input type="text" id="davPath" placeholder=" "><label>备份文件路径</label></div>
+                    </div>
+                    <div class="sync-actions">
+                        <button class="md-btn md-btn-filled" onclick="sync.saveConfig()"><span class="material-symbols-rounded">save</span> 保存配置</button>
+                        <div class="md-row">
+                            <button class="md-btn md-btn-tonal" onclick="sync.pull()"><span class="material-symbols-rounded">download</span> 下载恢复</button>
+                            <button class="md-btn md-btn-tonal" onclick="sync.push()"><span class="material-symbols-rounded">backup</span> 备份上传</button>
+                        </div>
+                        <div class="md-row sync-backup-row">
+                            <button class="md-btn md-btn-tonal" onclick="backup.exportData()"><span class="material-symbols-rounded">download_for_offline</span> 导出备份</button>
+                            <button class="md-btn md-btn-tonal" onclick="backup.promptImport()"><span class="material-symbols-rounded">upload_file</span> 导入备份</button>
+                        </div>
+                        <input id="backupImportInput" class="hidden" type="file" accept="application/json" onchange="backup.importFile(event)">
+                        <div id="syncDetailStatus" class="sync-detail-status"></div>
+                    </div>
                 </div>
             </div>
         </section>
     </main>
 
     <nav class="md-nav-rail">
-        <button class="nav-item active" onclick="ui.tab('workout', this)">
+        <button class="nav-item active" onclick="ui.tab('today', this)">
+            <div class="nav-indicator"></div>
+            <span class="nav-content"><span class="material-symbols-rounded">today</span><small>今日</small></span>
+        </button>
+        <button class="nav-item" onclick="ui.tab('workout', this)">
             <div class="nav-indicator"></div>
             <span class="nav-content"><span class="material-symbols-rounded">exercise</span><small>训练</small></span>
         </button>
-        <button class="nav-item" onclick="ui.tab('routines', this)">
+        <button class="nav-item" onclick="ui.tab('diet', this)">
             <div class="nav-indicator"></div>
-            <span class="nav-content"><span class="material-symbols-rounded">bookmarks</span><small>方案</small></span>
+            <span class="nav-content"><span class="material-symbols-rounded">restaurant</span><small>饮食</small></span>
         </button>
-        <button class="nav-item" onclick="ui.tab('history', this)">
+        <button class="nav-item" onclick="ui.tab('ai-coach', this)">
             <div class="nav-indicator"></div>
-            <span class="nav-content"><span class="material-symbols-rounded">event_note</span><small>记录</small></span>
+            <span class="nav-content"><span class="material-symbols-rounded">psychology</span><small>AI</small></span>
         </button>
-        <button class="nav-item" onclick="ui.tab('sync', this)">
+        <button class="nav-item" onclick="ui.tab('profile', this)">
             <div class="nav-indicator"></div>
-            <span class="nav-content"><span class="material-symbols-rounded">settings</span><small>设置</small></span>
+            <span class="nav-content"><span class="material-symbols-rounded">person</span><small>我的</small></span>
         </button>
     </nav>
 
@@ -332,6 +358,16 @@
             </div>
         </div>
     </div>
+    <div id="workoutLibrarySheet" class="md-modal md-modal-sheet hidden" aria-hidden="true">
+        <div class="md-modal-backdrop" onclick="data.closeWorkoutLibrary()"></div>
+        <div class="md-modal-card md-modal-sheet-card">
+            <div class="md-modal-head">
+                <strong>选择训练方案</strong>
+                <button class="icon-btn" onclick="data.closeWorkoutLibrary()" aria-label="关闭"><span class="material-symbols-rounded">close</span></button>
+            </div>
+            <div id="workoutLibraryContent"></div>
+        </div>
+    </div>
     <script>
         const ui = {
             tab: (id, el) => {
@@ -351,7 +387,7 @@
             if (window.workoutState) workoutState.init();
             if (window.appUpdate) appUpdate.registerServiceWorker();
             window.addEventListener('scroll', () => {
-                document.querySelector('.md-top-app-bar').classList.toggle('scrolled', window.scrollY > 8);
+                document.querySelector('.md-top-app-bar')?.classList.toggle('scrolled', window.scrollY > 8);
             }, { passive: true });
         };
     </script>

@@ -134,6 +134,11 @@ const data = {
 
     setRoutineView(view) {
         this.captureAdviceDraft?.();
+        if (view === 'advice') {
+            const nav = document.querySelectorAll('.nav-item')[3];
+            if (nav) ui.tab('ai-coach', nav);
+            return;
+        }
         this.routineView = view;
         this.renderRoutines();
     },
@@ -397,8 +402,11 @@ const data = {
 
     render() {
         this.renderActions();
-        this.renderRoutines();
-        this.renderHistory();
+        this.renderWorkoutPlanCard();
+        this.renderTodayPage();
+        this.renderDietPage();
+        this.renderAiCoachPage();
+        this.renderProfilePage();
     },
 
     renderActions() {
@@ -427,19 +435,227 @@ const data = {
             </div>`).join('');
     },
 
+    renderWorkoutPlanCard() {
+        const el = document.getElementById('workoutPlanCard');
+        if (!el) return;
+        const actions = this.db.actions;
+        const routines = this.db.routines;
+        const recentRoutines = routines.slice(-3).reverse();
+        const actionCount = actions.length;
+
+        if (actionCount === 0 && routines.length === 0) {
+            el.innerHTML = `
+                <div class="md-card workout-plan-card workout-plan-empty">
+                    <div class="workout-plan-empty-icon">
+                        <span class="material-symbols-rounded">fitness_center</span>
+                    </div>
+                    <div class="workout-plan-empty-text">
+                        <strong>还没有训练计划</strong>
+                        <p>从运动库导入一个方案，或手动添加动作开始训练</p>
+                    </div>
+                    <div class="workout-plan-empty-actions">
+                        <button class="md-btn md-btn-filled" onclick="data.showWorkoutLibrary()">
+                            <span class="material-symbols-rounded">library_books</span> 从运动库导入
+                        </button>
+                        <button class="md-btn md-btn-tonal" onclick="document.getElementById('name').focus()">
+                            <span class="material-symbols-rounded">add</span> 手动添加
+                        </button>
+                    </div>
+                </div>`;
+            return;
+        }
+
+        if (actionCount === 0 && routines.length > 0) {
+            el.innerHTML = `
+                <div class="md-card workout-plan-card workout-plan-import">
+                    <div class="workout-plan-import-head">
+                        <div>
+                            <span class="cardio-kicker">训练计划</span>
+                            <h3>选择方案开始训练</h3>
+                            <small>${routines.length} 个方案可用</small>
+                        </div>
+                        <span class="material-symbols-rounded workout-plan-icon">library_books</span>
+                    </div>
+                    <div class="workout-plan-recent">
+                        ${recentRoutines.map((r, i) => {
+                            const realIdx = routines.length - 1 - i;
+                            const totalSets = r.actions.reduce((s, a) => s + (a.sets || 1), 0);
+                            return `<div class="workout-plan-recent-item" onclick="data.loadRoutine(${realIdx})">
+                                <div class="workout-plan-recent-info">
+                                    <strong>${this.escapeHtml(r.name)}</strong>
+                                    <small>${r.actions.length} 个动作 · ${totalSets} 组 · ${r.created || ''}</small>
+                                </div>
+                                <span class="material-symbols-rounded">upload</span>
+                            </div>`;
+                        }).join('')}
+                    </div>
+                    <button class="md-btn md-btn-tonal workout-plan-lib-btn" onclick="data.showWorkoutLibrary()">
+                        <span class="material-symbols-rounded">library_books</span> 查看全部方案
+                    </button>
+                </div>`;
+            return;
+        }
+
+        const totalSets = actions.reduce((s, a) => s + (a.sets || 1), 0);
+        const totalReps = actions.reduce((s, a) => s + (a.sets || 1) * (a.reps || 1), 0);
+        const estMinutes = Math.round(actions.reduce((s, a) => {
+            const workTime = (a.sets || 1) * (a.reps || 1) * (a.work || 5);
+            const restTime = ((a.sets || 1) - 1) * (a.repRest || 2) + (a.actionRest || 10);
+            return s + workTime + restTime;
+        }, 0) / 60);
+
+        el.innerHTML = `
+            <div class="md-card workout-plan-card">
+                <div class="workout-plan-head">
+                    <div class="workout-plan-info">
+                        <span class="cardio-kicker">当前计划</span>
+                        <h3>${actionCount} 个动作 · ${totalSets} 组</h3>
+                        <small>预计 ${estMinutes} 分钟 · 约 ${totalReps} 次</small>
+                    </div>
+                    <div class="workout-plan-actions-top">
+                        <button class="icon-btn" onclick="data.showWorkoutLibrary()" aria-label="从运动库导入" title="从运动库导入">
+                            <span class="material-symbols-rounded">library_books</span>
+                        </button>
+                    </div>
+                </div>
+                ${recentRoutines.length > 0 ? `
+                <div class="workout-plan-switch">
+                    <small>快速切换：</small>
+                    <div class="workout-plan-chips">
+                        ${recentRoutines.map((r, i) => {
+                            const realIdx = routines.length - 1 - i;
+                            return `<button class="workout-plan-chip" onclick="data.loadRoutine(${realIdx})" title="${this.escapeHtml(r.name)}">
+                                <span class="material-symbols-rounded">swap_horiz</span> ${this.escapeHtml(r.name)}
+                            </button>`;
+                        }).join('')}
+                    </div>
+                </div>` : ''}
+            </div>`;
+    },
+
+    showWorkoutLibrary() {
+        const el = document.getElementById('workoutLibraryContent');
+        const sheet = document.getElementById('workoutLibrarySheet');
+        if (!el || !sheet) return;
+
+        const routines = this.db.routines;
+        if (routines.length === 0) {
+            el.innerHTML = `
+                <div class="empty-state" style="padding:24px 16px">
+                    <span class="material-symbols-rounded">bookmark_border</span>
+                    <p>运动库为空</p>
+                    <small>先在训练页添加动作并存入方案库</small>
+                </div>`;
+        } else {
+            el.innerHTML = `
+                <div class="workout-lib-list">
+                    ${routines.map((r, i) => {
+                        const totalSets = r.actions.reduce((s, a) => s + (a.sets || 1), 0);
+                        const estMinutes = Math.round(r.actions.reduce((s, a) => {
+                            const workTime = (a.sets || 1) * (a.reps || 1) * (a.work || 5);
+                            const restTime = ((a.sets || 1) - 1) * (a.repRest || 2) + (a.actionRest || 10);
+                            return s + workTime + restTime;
+                        }, 0) / 60);
+                        return `<div class="workout-lib-item">
+                            <div class="workout-lib-item-main" onclick="data.loadRoutineFromLib(${i})">
+                                <div class="workout-lib-item-info">
+                                    <strong>${this.escapeHtml(r.name)}</strong>
+                                    <small>${r.actions.length} 个动作 · ${totalSets} 组 · 约 ${estMinutes} 分钟${r.created ? ' · ' + r.created : ''}</small>
+                                </div>
+                                <span class="material-symbols-rounded">upload</span>
+                            </div>
+                            <div class="workout-lib-item-actions">
+                                <button class="delete-btn" onclick="event.stopPropagation();data.deleteRoutineFromLib(${i})" aria-label="删除方案">
+                                    <span class="material-symbols-rounded">delete</span>
+                                </button>
+                            </div>
+                        </div>`;
+                    }).join('')}
+                </div>`;
+        }
+
+        sheet.classList.remove('hidden');
+        sheet.setAttribute('aria-hidden', 'false');
+    },
+
+    closeWorkoutLibrary() {
+        const sheet = document.getElementById('workoutLibrarySheet');
+        if (sheet) {
+            sheet.classList.add('hidden');
+            sheet.setAttribute('aria-hidden', 'true');
+        }
+    },
+
+    loadRoutineFromLib(idx) {
+        this.loadRoutine(idx);
+        this.closeWorkoutLibrary();
+    },
+
+    deleteRoutineFromLib(idx) {
+        if (!confirm('确定删除方案 "' + this.db.routines[idx]?.name + '"？')) return;
+        this.deleteRoutine(idx);
+        this.showWorkoutLibrary();
+        this.renderWorkoutPlanCard();
+    },
+
+    renderTodayPage() {
+        const overview = document.getElementById('todayOverview');
+        const quickActions = document.getElementById('todayQuickActions');
+        const timeline = document.getElementById('todayTimeline');
+        const aiCard = document.getElementById('todayAiCard');
+        if (overview) overview.innerHTML = this.renderRecordOverview();
+        if (quickActions) quickActions.innerHTML = this.renderRecordQuickActions();
+        if (timeline) timeline.innerHTML = this.renderTodayTimeline();
+        if (aiCard) aiCard.innerHTML = this.renderContextAiCard('today');
+    },
+
+    renderDietPage() {
+        const content = document.getElementById('dietContent');
+        const aiCard = document.getElementById('dietAiCard');
+        if (content) content.innerHTML = this.renderDietPanel();
+        if (aiCard) aiCard.innerHTML = this.renderContextAiCard('diet');
+        requestAnimationFrame(() => this.autoResizeDietInput?.());
+    },
+
+    renderAiCoachPage() {
+        const content = document.getElementById('aiCoachContent');
+        if (content) {
+            content.innerHTML = this.renderAdvicePanel();
+            requestAnimationFrame(() => this.autoResizeAdvicePrompt?.());
+        }
+    },
+
+    renderProfilePage() {
+        const overview = document.getElementById('profileOverview');
+        const content = document.getElementById('profileContent');
+        const settings = document.getElementById('profileSettings');
+        if (overview) overview.innerHTML = this.renderRoutineOverview();
+        if (content) {
+            const isSettings = this.routineView === 'settings';
+            if (settings) settings.classList.toggle('hidden', !isSettings);
+            if (!isSettings) {
+                content.classList.remove('hidden');
+                content.innerHTML = `
+                    <div class="record-tabs" role="tablist" aria-label="我的视图">
+                        <button class="record-tab ${this.routineView === 'library' ? 'active' : ''}" onclick="data.setRoutineView('library')"><span class="material-symbols-rounded">bookmarks</span>动作组库</button>
+                        <button class="record-tab ${this.routineView === 'weightloss' ? 'active' : ''}" onclick="data.setRoutineView('weightloss')"><span class="material-symbols-rounded">trending_down</span>减重指导</button>
+                        <button class="record-tab ${this.routineView === 'settings' ? 'active' : ''}" onclick="data.setRoutineView('settings')"><span class="material-symbols-rounded">settings</span>设置</button>
+                    </div>
+                    ${this.routineView === 'library' ? this.renderRoutineLibrary() : this.renderWeightLossPlanCard()}`;
+            } else {
+                content.innerHTML = `
+                    <div class="record-tabs" role="tablist" aria-label="我的视图">
+                        <button class="record-tab" onclick="data.setRoutineView('library')"><span class="material-symbols-rounded">bookmarks</span>动作组库</button>
+                        <button class="record-tab" onclick="data.setRoutineView('weightloss')"><span class="material-symbols-rounded">trending_down</span>减重指导</button>
+                        <button class="record-tab active" onclick="data.setRoutineView('settings')"><span class="material-symbols-rounded">settings</span>设置</button>
+                    </div>`;
+                content.classList.remove('hidden');
+            }
+        }
+    },
+
     renderRoutines() {
-        const overview = document.getElementById('routineOverview');
-        const list = document.getElementById('routineList');
-        if (!list || !overview) return;
-        overview.innerHTML = this.renderRoutineOverview();
-        list.innerHTML = `
-            <div class="record-tabs" role="tablist" aria-label="方案视图">
-                <button class="record-tab ${this.routineView === 'library' ? 'active' : ''}" onclick="data.setRoutineView('library')"><span class="material-symbols-rounded">bookmarks</span>动作组库</button>
-                <button class="record-tab ${this.routineView === 'weightloss' ? 'active' : ''}" onclick="data.setRoutineView('weightloss')"><span class="material-symbols-rounded">trending_down</span>减重指导</button>
-                <button class="record-tab ${this.routineView === 'advice' ? 'active' : ''}" onclick="data.setRoutineView('advice')"><span class="material-symbols-rounded">psychology</span>AI建议</button>
-            </div>
-            ${this.routineView === 'library' ? this.renderRoutineLibrary() : this.routineView === 'weightloss' ? this.renderWeightLossPlanCard() : this.renderAdvicePanel()}`;
-        if (this.routineView === 'advice') requestAnimationFrame(() => this.autoResizeAdvicePrompt?.());
+        this.renderProfilePage();
     },
 
     renderRoutineOverview() {
@@ -497,14 +713,9 @@ const data = {
     },
 
     renderHistory() {
-        const top = document.getElementById('todayActionTop');
-        const list = document.getElementById('historyList');
-        if (!list || !top) return;
-        top.innerHTML = this.renderRecordOverview() + this.renderRecordQuickActions();
-        list.innerHTML = `
-            ${this.renderRecordTabs()}
-            ${this.renderRecordView()}`;
-        if (this.recordView === 'diet') requestAnimationFrame(() => this.autoResizeDietInput?.());
+        this.renderTodayPage();
+        this.renderDietPage();
+        this.renderProfilePage();
     },
     renderRecordOverview() {
         const today = this.dateKey(new Date());
@@ -633,8 +844,8 @@ const data = {
     askContextAi(context, prompt) {
         if (!ai.cfg.enabled) return alert('请先在设置中配置 AI');
         this.routineView = 'advice';
-        const nav = document.querySelectorAll('.nav-item')[1];
-        ui.tab('routines', nav);
+        const nav = document.querySelectorAll('.nav-item')[3];
+        ui.tab('ai-coach', nav);
         requestAnimationFrame(() => {
             const input = document.getElementById('advicePrompt');
             if (input) { input.value = prompt; this.onAdvicePromptInput?.(input); this.sendAiAdvice(prompt); }
