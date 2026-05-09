@@ -7,6 +7,7 @@ const data = {
     historyMonthOffset: 0,
     routineView: 'library',
     recordView: 'today',
+    healthView: 'diet',
     weightRange: 'month',
     selectedCalendarDate: null,
     adviceModel: '__current__',
@@ -130,6 +131,12 @@ const data = {
         this.recordView = view || 'today';
         this.captureAdviceDraft?.();
         this.renderHistory();
+    },
+
+    setHealthView(view) {
+        this.captureAdviceDraft?.();
+        this.healthView = view || 'diet';
+        this.renderRecordsPage();
     },
 
     setRoutineView(view) {
@@ -404,7 +411,7 @@ const data = {
         this.renderActions();
         this.renderWorkoutPlanCard();
         this.renderTodayPage();
-        this.renderDietPage();
+        this.renderRecordsPage();
         this.renderAiCoachPage();
         this.renderProfilePage();
     },
@@ -617,6 +624,51 @@ const data = {
         requestAnimationFrame(() => this.autoResizeDietInput?.());
     },
 
+    renderRecordsPage() {
+        const overview = document.getElementById('recordsOverview');
+        const content = document.getElementById('recordsContent');
+        if (overview) overview.innerHTML = this.renderRecordOverview();
+        if (content) {
+            content.innerHTML = `
+                ${this.renderHealthTabs()}
+                ${this.renderHealthView()}`;
+        }
+        if (this.healthView === 'diet') {
+            requestAnimationFrame(() => this.autoResizeDietInput?.());
+        }
+    },
+
+    renderHealthTabs() {
+        const tabs = [
+            ['diet', 'restaurant', '饮食'],
+            ['weight', 'monitor_weight', '体重'],
+            ['training', 'fitness_center', '训练记录'],
+            ['calendar', 'calendar_month', '记录日历']
+        ];
+        return `<div class="record-tabs record-tabs-scroll" role="tablist" aria-label="健康记录视图">${tabs.map(([key, icon, label]) => `<button class="record-tab ${this.healthView === key ? 'active' : ''}" onclick="data.setHealthView('${key}')"><span class="material-symbols-rounded">${icon}</span>${label}</button>`).join('')}</div>`;
+    },
+
+    renderHealthView() {
+        switch (this.healthView) {
+            case 'weight':
+                return this.renderWeightPanel() + this.renderContextAiCard('weight');
+            case 'training':
+                return this.renderManualExercisePanel() +
+                    '<div class="record-section-title">最近训练记录</div>' +
+                    this.renderRecentHistoryList(5) +
+                    this.renderContextAiCard('exercise');
+            case 'calendar':
+                return '<div class="record-section-title">记录日历</div>' +
+                    this.renderHistoryCalendar() +
+                    this.renderCalendarDayDetail() +
+                    '<div class="record-section-title">历史明细</div>' +
+                    this.renderHistoryList();
+            case 'diet':
+            default:
+                return this.renderDietPanel() + this.renderContextAiCard('diet');
+        }
+    },
+
     renderAiCoachPage() {
         const content = document.getElementById('aiCoachContent');
         if (content) {
@@ -714,7 +766,7 @@ const data = {
 
     renderHistory() {
         this.renderTodayPage();
-        this.renderDietPage();
+        this.renderRecordsPage();
         this.renderProfilePage();
     },
     renderRecordOverview() {
@@ -992,7 +1044,7 @@ const data = {
         const mealGroups = { breakfast: [], lunch: [], dinner: [], snack: [] };
         todayLogs.forEach(f => { (mealGroups[f.meal] || mealGroups.snack).push(f); });
         const mealNames = { breakfast: '早餐', lunch: '午餐', dinner: '晚餐', snack: '加餐' };
-        const collapsed = this.isCollapsed('dietPanel', true);
+        const collapsed = this.isCollapsed('dietPanel', false);
         return `<div class="md-card diet-card collapsible-card ${collapsed ? 'collapsed' : ''}">
             <button class="diet-head collapsible-head-btn" onclick="data.toggleCollapse('dietPanel')" type="button" aria-expanded="${!collapsed}">
                 <div>
