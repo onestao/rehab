@@ -134,9 +134,7 @@ const data = {
     },
 
     setHealthView(view) {
-        this.captureAdviceDraft?.();
-        this.healthView = view || 'diet';
-        this.renderRecordsPage();
+        this.scrollToHealthView(view || 'weight');
     },
 
     setRoutineView(view) {
@@ -687,13 +685,13 @@ const data = {
         if (content) {
             content.innerHTML = `
                 ${this.renderHealthTabs()}
-                <div class="health-swipe-area" ontouchstart="data.onHealthSwipeStart(event)" ontouchmove="data.onHealthSwipeMove(event)" ontouchend="data.onHealthSwipeEnd(event)">
-                    ${this.renderHealthView()}
-                </div>`;
+                ${this.renderHealthSwipeDeck()}`;
         }
-        if (this.healthView === 'diet') {
-            requestAnimationFrame(() => this.autoResizeDietInput?.());
-        }
+        requestAnimationFrame(() => {
+            this.syncHealthDeckPosition(false);
+            this.updateHealthSwipeEffects();
+            if (this.healthView === 'diet') this.autoResizeDietInput?.();
+        });
     },
 
     renderHealthTabs() {
@@ -703,51 +701,82 @@ const data = {
             ['training', 'fitness_center', '训练记录'],
             ['calendar', 'calendar_month', '记录日历']
         ];
-        return `<div class="record-tabs record-tabs-scroll" role="tablist" aria-label="健康记录视图">${tabs.map(([key, icon, label]) => `<button class="record-tab ${this.healthView === key ? 'active' : ''}" onclick="data.setHealthView('${key}')"><span class="material-symbols-rounded">${icon}</span>${label}</button>`).join('')}</div>`;
+        return `<div class="record-tabs record-tabs-scroll" role="tablist" aria-label="健康记录视图">${tabs.map(([key, icon, label]) => `<button class="record-tab ${this.healthView === key ? 'active' : ''}" data-health-view="${key}" onclick="data.scrollToHealthView('${key}')" type="button"><span class="material-symbols-rounded">${icon}</span>${label}</button>`).join('')}</div>`;
     },
 
     healthViewOrder() {
         return ['weight', 'diet', 'training', 'calendar'];
     },
 
-    onHealthSwipeStart(event) {
-        const touch = event.touches?.[0];
-        if (!touch) return;
-        this._healthSwipe = {
-            startX: touch.clientX,
-            startY: touch.clientY,
-            lastX: touch.clientX,
-            lastY: touch.clientY,
-            locked: false
-        };
+    renderHealthSwipeDeck() {
+        return `<div id="healthSwipeDeck" class="health-swipe-deck" onscroll="data.onHealthDeckScroll(this)">
+            ${this.healthViewOrder().map(view => `<section class="health-swipe-page" data-health-page="${view}">${this.renderHealthViewByKey(view)}</section>`).join('')}
+        </div>`;
     },
 
-    onHealthSwipeMove(event) {
-        const state = this._healthSwipe;
-        const touch = event.touches?.[0];
-        if (!state || !touch) return;
-        state.lastX = touch.clientX;
-        state.lastY = touch.clientY;
-        const dx = state.lastX - state.startX;
-        const dy = state.lastY - state.startY;
-        if (!state.locked && Math.abs(dx) > 12 && Math.abs(dx) > Math.abs(dy) * 1.2) {
-            state.locked = true;
-        }
-        if (state.locked) event.preventDefault();
+    renderHealthViewByKey(view) {
+        const previous = this.healthView;
+        this.healthView = view;
+        const html = this.renderHealthView();
+        this.healthView = previous;
+        return html;
     },
 
-    onHealthSwipeEnd() {
-        const state = this._healthSwipe;
-        this._healthSwipe = null;
-        if (!state) return;
-        const dx = state.lastX - state.startX;
-        const dy = state.lastY - state.startY;
-        if (Math.abs(dx) < 56 || Math.abs(dx) < Math.abs(dy) * 1.25) return;
+    scrollToHealthView(view) {
         const order = this.healthViewOrder();
-        const idx = order.indexOf(this.healthView);
-        if (idx < 0) return;
-        const nextIdx = dx < 0 ? Math.min(order.length - 1, idx + 1) : Math.max(0, idx - 1);
-        if (nextIdx !== idx) this.setHealthView(order[nextIdx]);
+        const index = order.indexOf(view);
+        if (index < 0) return;
+        this.captureAdviceDraft?.();
+        this.healthView = view;
+        this.updateHealthTabActive();
+        const deck = document.getElementById('healthSwipeDeck');
+        if (!deck) {
+            this.renderRecordsPage();
+            return;
+        }
+        deck.scrollTo({ left: index * deck.clientWidth, behavior: 'smooth' });
+        if (view === 'diet') requestAnimationFrame(() => this.autoResizeDietInput?.());
+    },
+
+    syncHealthDeckPosition(smooth = false) {
+        const deck = document.getElementById('healthSwipeDeck');
+        if (!deck) return;
+        const order = this.healthViewOrder();
+        const index = Math.max(0, order.indexOf(this.healthView));
+        deck.scrollTo({ left: index * deck.clientWidth, behavior: smooth ? 'smooth' : 'auto' });
+    },
+
+    onHealthDeckScroll(deck) {
+        this.updateHealthSwipeEffects(deck);
+        clearTimeout(this._healthDeckScrollTimer);
+        this._healthDeckScrollTimer = setTimeout(() => {
+            const order = this.healthViewOrder();
+            const index = Math.max(0, Math.min(order.length - 1, Math.round(deck.scrollLeft / deck.clientWidth)));
+            const nextView = order[index];
+            if (!nextView || nextView === this.healthView) return;
+            this.healthView = nextView;
+            this.updateHealthTabActive();
+            if (nextView === 'diet') requestAnimationFrame(() => this.autoResizeDietInput?.());
+        }, 80);
+    },
+
+    updateHealthSwipeEffects(deck = document.getElementById('healthSwipeDeck')) {
+        if (!deck || !deck.clientWidth) return;
+        const progress = deck.scrollLeft / deck.clientWidth;
+        deck.querySelectorAll('.health-swipe-page').forEach((page, index) => {
+            const distance = Math.min(1, Math.abs(progress - index));
+            const scale = 1 - distance * 0.025;
+            const opacity = 1 - distance * 0.16;
+            const translateY = distance * 4;
+            page.style.transform = `scale(${scale}) translateY(${translateY}px)`;
+            page.style.opacity = String(opacity);
+        });
+    },
+
+    updateHealthTabActive() {
+        document.querySelectorAll('[data-health-view]').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.healthView === this.healthView);
+        });
     },
 
     renderHealthView() {

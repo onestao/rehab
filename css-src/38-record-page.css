@@ -100,11 +100,33 @@
     white-space: nowrap;
     font-size: 12px;
 }
-.health-swipe-area {
-    min-width: 0;
-    touch-action: pan-y;
+.health-swipe-deck {
+    display: flex;
+    width: 100%;
+    overflow-x: auto;
+    overflow-y: visible;
+    scroll-snap-type: x mandatory;
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
     overscroll-behavior-x: contain;
+    touch-action: pan-x pan-y;
+    padding: 0;
 }
+.health-swipe-deck::-webkit-scrollbar { display: none; }
+.health-swipe-page {
+    flex: 0 0 100%;
+    min-width: 0;
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
+    transform-origin: center top;
+    transition:
+        transform var(--md-sys-motion-duration-medium) var(--md-sys-motion-emphasized-decelerate),
+        opacity var(--md-sys-motion-duration-short) var(--md-sys-motion-emphasized);
+    will-change: transform, opacity;
+    padding-bottom: 4px;
+}
+.health-swipe-page > .md-card:first-child { margin-top: 4px; }
 
 /* Today Timeline */
 .today-timeline-card { display: grid; gap: 0; padding: 14px; }
