@@ -27,6 +27,7 @@
     .diet-card { gap: 10px; }
     .weight-card { gap: 10px; }
     .context-ai-card { gap: 8px; }
+    .context-ai-actions { grid-template-columns: 1fr; }
     .today-focus-card { gap: 10px; }
     .today-focus-hint { padding: 8px 10px; }
     .daily-summary-card { gap: 6px; }
@@ -50,8 +51,9 @@
     .record-quick-btn { padding: 6px 1px; font-size: 9px; }
     .record-quick-btn .material-symbols-rounded { font-size: 18px; }
     .calendar-day { min-height: 40px; font-size: 10px; }
+    .advice-bubble.assistant { max-width: 100%; }
+    .advice-bubble-content { font-size: 13.5px; line-height: 1.64; }
 }
-
 @media (min-width: 600px) {
     .md-grid { grid-template-columns: repeat(3, 1fr); }
     #app { max-width: 520px; margin: 0 auto; }
@@ -68,4 +70,4 @@
         transition-duration: 1ms !important;
     }
 }
-
+

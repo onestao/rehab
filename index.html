@@ -372,6 +372,7 @@
         const ui = {
             tab: (id, el) => {
                 data.captureAdviceDraft?.();
+                data.captureAdviceScroll?.();
                 document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
                 document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
                 document.getElementById(id).classList.add('active');

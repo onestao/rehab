@@ -1,6 +1,8 @@
 const advicePanel = {
     DRAFT_KEY: 'rehab_advice_draft',
     SETTINGS_KEY: 'rehab_advice_settings',
+    SCROLL_KEY: 'rehab_advice_scroll_top',
+    PAGE_SCROLL_KEY: 'rehab_advice_page_scroll_offset',
     MODEL_ICON_CDN_BASES: [
         'https://registry.npmmirror.com/@lobehub/icons-static-svg/latest/files/icons/',
         'https://unpkg.com/@lobehub/icons-static-svg@latest/icons/'
@@ -50,6 +52,8 @@ const advicePanel = {
         Object.assign(target, {
             DRAFT_KEY: this.DRAFT_KEY,
             SETTINGS_KEY: this.SETTINGS_KEY,
+            SCROLL_KEY: this.SCROLL_KEY,
+            PAGE_SCROLL_KEY: this.PAGE_SCROLL_KEY,
             MODEL_ICONS: this.MODEL_ICONS,
             sendAiAdvice: this.sendAiAdvice,
             requestAiAdvice: this.requestAiAdvice,
@@ -57,6 +61,12 @@ const advicePanel = {
             copyAdviceMessage: this.copyAdviceMessage,
             retryAdviceFrom: this.retryAdviceFrom,
             captureAdviceDraft: this.captureAdviceDraft,
+            adviceSavedScrollTop: this.adviceSavedScrollTop,
+            adviceSavedPageScrollOffset: this.adviceSavedPageScrollOffset,
+            isAdvicePageActive: this.isAdvicePageActive,
+            captureAdviceScroll: this.captureAdviceScroll,
+            restoreAdviceScroll: this.restoreAdviceScroll,
+            bindAdviceScrollListener: this.bindAdviceScrollListener,
             restoreAdviceDraft: this.restoreAdviceDraft,
             clearAdviceDraft: this.clearAdviceDraft,
             loadAdviceSettings: this.loadAdviceSettings,
@@ -183,6 +193,80 @@ const advicePanel = {
     clearAdviceDraft() {
         this._adviceDraft = '';
         try { sessionStorage.removeItem(this.DRAFT_KEY); } catch {}
+    },
+
+    adviceSavedScrollTop() {
+        if (Number.isFinite(this._adviceScrollTop)) return this._adviceScrollTop;
+        try {
+            const raw = sessionStorage.getItem(this.SCROLL_KEY);
+            const parsed = Number(raw);
+            return Number.isFinite(parsed) ? parsed : null;
+        } catch {
+            return null;
+        }
+    },
+
+    adviceSavedPageScrollOffset() {
+        if (Number.isFinite(this._advicePageScrollOffset)) return this._advicePageScrollOffset;
+        try {
+            const raw = sessionStorage.getItem(this.PAGE_SCROLL_KEY);
+            const parsed = Number(raw);
+            return Number.isFinite(parsed) ? parsed : null;
+        } catch {
+            return null;
+        }
+    },
+
+    isAdvicePageActive(el = document.querySelector('.advice-chat-list')) {
+        const page = el?.closest?.('.page');
+        return !page || page.classList.contains('active');
+    },
+
+    captureAdviceScroll() {
+        const list = document.querySelector('.advice-chat-list');
+        if (!list) return;
+        if (!this.isAdvicePageActive(list)) return;
+        const maxTop = Math.max(0, list.scrollHeight - list.clientHeight);
+        const top = Math.max(0, Math.min(list.scrollTop || 0, maxTop));
+        this._adviceScrollTop = top;
+        try { sessionStorage.setItem(this.SCROLL_KEY, String(top)); } catch {}
+
+        const card = list.closest('.advice-main-card');
+        if (!card) return;
+        const pageOffset = Math.max(0, window.scrollY - (card.getBoundingClientRect().top + window.scrollY));
+        this._advicePageScrollOffset = pageOffset;
+        try { sessionStorage.setItem(this.PAGE_SCROLL_KEY, String(pageOffset)); } catch {}
+    },
+
+    restoreAdviceScroll() {
+        const list = document.querySelector('.advice-chat-list');
+        if (!list) return;
+        if (!this.isAdvicePageActive(list)) return;
+        const savedTop = this.adviceSavedScrollTop();
+        if (Number.isFinite(savedTop)) {
+            const maxTop = Math.max(0, list.scrollHeight - list.clientHeight);
+            list.scrollTop = Math.max(0, Math.min(savedTop, maxTop));
+        }
+
+        const savedPageOffset = this.adviceSavedPageScrollOffset();
+        const card = list.closest('.advice-main-card');
+        if (!Number.isFinite(savedPageOffset) || !card) return;
+        const cardTop = card.getBoundingClientRect().top + window.scrollY;
+        const maxWindowTop = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+        window.scrollTo({ top: Math.min(cardTop + savedPageOffset, maxWindowTop), behavior: 'auto' });
+    },
+
+    bindAdviceScrollListener() {
+        const list = document.querySelector('.advice-chat-list');
+        if (!list) return;
+        if (!this.isAdvicePageActive(list)) return;
+        if (this._adviceScrollEl === list) return;
+        if (this._adviceScrollEl && this._adviceOnScroll) {
+            this._adviceScrollEl.removeEventListener('scroll', this._adviceOnScroll);
+        }
+        this._adviceOnScroll = () => this.captureAdviceScroll();
+        list.addEventListener('scroll', this._adviceOnScroll, { passive: true });
+        this._adviceScrollEl = list;
     },
 
     isMobileAdviceInput() {
@@ -325,6 +409,7 @@ const advicePanel = {
         this.adviceSearchOpen = shouldOpen;
         if (!shouldOpen) this.adviceSearchQuery = '';
         this.captureAdviceDraft();
+        this.captureAdviceScroll();
         this.renderAiCoachPage?.() || this.renderRoutines?.();
         requestAnimationFrame(() => {
             this.autoResizeAdvicePrompt();
@@ -343,6 +428,7 @@ const advicePanel = {
         this.adviceSearchQuery = '';
         this.adviceSearchOpen = false;
         this.captureAdviceDraft();
+        this.captureAdviceScroll();
         this.renderAiCoachPage?.() || this.renderRoutines?.();
         requestAnimationFrame(() => this.autoResizeAdvicePrompt());
     },
@@ -361,6 +447,7 @@ const advicePanel = {
         this.adviceRange = range || 'today';
         this.saveAdviceSettings();
         this.captureAdviceDraft();
+        this.captureAdviceScroll();
         this.renderAiCoachPage?.() || this.renderRoutines?.();
         requestAnimationFrame(() => this.autoResizeAdvicePrompt());
     },
@@ -370,6 +457,7 @@ const advicePanel = {
         this.adviceContexts[key] = !this.adviceContexts[key];
         this.saveAdviceSettings();
         this.captureAdviceDraft();
+        this.captureAdviceScroll();
         this.renderAiCoachPage?.() || this.renderRoutines?.();
         requestAnimationFrame(() => this.autoResizeAdvicePrompt());
     },

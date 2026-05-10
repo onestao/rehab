@@ -844,6 +844,10 @@ const data = {
         if (content) {
             content.innerHTML = this.renderAdvicePanel();
             requestAnimationFrame(() => this.autoResizeAdvicePrompt?.());
+            requestAnimationFrame(() => {
+                this.bindAdviceScrollListener?.();
+                this.restoreAdviceScroll?.();
+            });
         }
     },
 
@@ -1060,9 +1064,10 @@ const data = {
     renderContextAiCard(context) {
         if (!ai.cfg.enabled) return '';
         const prompts = this.contextAiPrompts(context);
-        return '<div class="md-card context-ai-card"><div class="context-ai-head"><div><span class="cardio-kicker">AI 建议</span><h3>' + this.contextAiTitle(context) + '</h3></div><span class="material-symbols-rounded">psychology</span></div><div class="context-ai-actions">' + prompts.map(p => '<button class="md-btn md-btn-tonal context-ai-btn" onclick="data.askContextAi(\'' + context + '\',\'' + this.escapeHtml(p.prompt) + '\')">' + p.label + '</button>').join('') + '</div></div>';
+        return '<div class="md-card context-ai-card"><div class="context-ai-head"><div><span class="cardio-kicker">AI 建议</span><h3>' + this.contextAiTitle(context) + '</h3><small>' + this.contextAiDescription(context) + '</small></div><span class="context-ai-icon material-symbols-rounded">psychology</span></div><div class="context-ai-actions">' + prompts.map(p => '<button class="md-btn md-btn-tonal context-ai-btn" onclick="data.askContextAi(\'' + context + '\',\'' + this.escapeHtml(p.prompt) + '\')">' + p.label + '</button>').join('') + '</div></div>';
     },
     contextAiTitle(context) { return { today: '综合分析', diet: '饮食分析', exercise: '训练分析', weight: '体重分析', calendar: '日历分析' }[context] || 'AI 分析'; },
+    contextAiDescription(context) { return { today: '结合今日饮食、训练和体重记录生成建议', diet: '检查热量、蛋白质和饮食结构是否贴合目标', exercise: '根据训练频率、强度和恢复情况给出调整', weight: '结合趋势判断目标推进是否稳定', calendar: '按选中日期或本月记录总结关键变化' }[context] || '结合你的记录生成可执行建议'; },
     contextAiPrompts(context) {
         const isGain = this.isGainMode();
         return {
