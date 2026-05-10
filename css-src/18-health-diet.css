@@ -550,7 +550,7 @@
     bottom: calc(76px + env(safe-area-inset-bottom));
     display: grid;
     grid-template-columns: auto minmax(0, 1fr) auto;
-    gap: 6px;
+    gap: 8px;
     align-items: center;
     padding: 6px 6px 6px 8px;
     border-radius: 28px;
@@ -564,38 +564,96 @@
         box-shadow var(--md-sys-motion-duration-short) var(--md-sys-motion-emphasized),
         background var(--md-sys-motion-duration-short) var(--md-sys-motion-emphasized);
 }
-.advice-model-switch {
-    width: 38px;
-    height: 38px;
+.advice-model-picker {
+    width: 58px;
+    height: 40px;
     border: none;
-    border-radius: var(--md-sys-shape-full);
-    appearance: none;
-    -webkit-appearance: none;
+    border-radius: 20px;
     background: linear-gradient(135deg, var(--md-sys-secondary-container), var(--md-sys-tertiary-container));
-    color: transparent;
-    cursor: pointer;
+    color: var(--md-sys-on-secondary-container);
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 2px;
+    padding: 0 6px 0 8px;
     flex: none;
-    grid-column: 1;
-    grid-row: 1;
     position: relative;
-    text-align: center;
+    overflow: hidden;
+    cursor: pointer;
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.22),
+        0 1px 2px rgba(0,0,0,0.08);
+    transition:
+        transform var(--md-sys-motion-duration-medium) var(--md-expressive-spring),
+        box-shadow var(--md-sys-motion-duration-short) var(--md-sys-motion-emphasized),
+        background var(--md-sys-motion-duration-short) var(--md-sys-motion-emphasized);
 }
-.advice-composer::before {
-    content: 'smart_toy';
-    width: 38px;
-    height: 38px;
-    border-radius: var(--md-sys-shape-full);
+.advice-model-openai { background: linear-gradient(135deg, #d1fae5, #a7f3d0); color: #064e3b; }
+.advice-model-gemini { background: linear-gradient(135deg, #dbeafe, #ede9fe); color: #3730a3; }
+.advice-model-grok { background: linear-gradient(135deg, #111827, #475569); color: #f8fafc; }
+.advice-model-deepseek { background: linear-gradient(135deg, #dbeafe, #bfdbfe); color: #1e3a8a; }
+.advice-model-claude { background: linear-gradient(135deg, #fef3c7, #fde68a); color: #92400e; }
+.advice-model-qwen { background: linear-gradient(135deg, #e0e7ff, #cffafe); color: #312e81; }
+.advice-model-doubao { background: linear-gradient(135deg, #fee2e2, #fed7aa); color: #9a3412; }
+.advice-model-kimi { background: linear-gradient(135deg, #e0f2fe, #f5f3ff); color: #0f172a; }
+.advice-model-minimax { background: linear-gradient(135deg, #ccfbf1, #d9f99d); color: #134e4a; }
+.advice-model-mimo { background: linear-gradient(135deg, #fce7f3, #ede9fe); color: #86198f; }
+.advice-model-glm { background: linear-gradient(135deg, #dbeafe, #c7d2fe); color: #312e81; }
+.advice-model-generic { background: linear-gradient(135deg, var(--md-sys-secondary-container), var(--md-sys-tertiary-container)); color: var(--md-sys-on-secondary-container); }
+.advice-model-picker:active { transform: scale(0.96); }
+.advice-model-picker:hover {
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.26),
+        0 2px 6px rgba(0,0,0,0.12);
+}
+.advice-model-picker:focus-within {
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.26),
+        0 0 0 2px color-mix(in srgb, var(--md-sys-primary) 24%, transparent),
+        0 2px 6px rgba(0,0,0,0.12);
+}
+.advice-model-mark {
+    min-width: 0;
+    width: 28px;
+    height: 28px;
+    border-radius: 14px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    color: var(--md-sys-on-secondary-container);
-    font-family: 'Material Symbols Rounded';
-    font-size: 18px;
-    font-variation-settings: 'FILL' 1;
-    pointer-events: none;
-    grid-column: 1;
-    grid-row: 1;
-    z-index: 1;
+    font-size: 11px;
+    font-weight: 950;
+    letter-spacing: -0.25px;
+    justify-self: center;
+    overflow: hidden;
+}
+.advice-model-icon {
+    width: 24px;
+    height: 24px;
+    display: block;
+    object-fit: contain;
+    border-radius: 8px;
+}
+.advice-model-picker-arrow {
+    font-size: 16px;
+    color: currentColor;
+    opacity: 0.76;
+}
+.advice-model-switch {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border: none;
+    outline: none;
+    background: transparent;
+    color: transparent;
+    appearance: none;
+    -webkit-appearance: none;
+    cursor: pointer;
+}
+.advice-model-switch option {
+    color: var(--md-sys-on-surface);
+    background: var(--md-sys-surface-container-lowest);
 }
 .advice-composer:focus-within {
     box-shadow:
