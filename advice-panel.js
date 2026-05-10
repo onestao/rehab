@@ -21,8 +21,13 @@ const advicePanel = {
             setAdviceModel: this.setAdviceModel,
             setAdviceRange: this.setAdviceRange,
             toggleAdviceContext: this.toggleAdviceContext,
+            toggleAdviceSearch: this.toggleAdviceSearch,
+            onAdviceSearchInput: this.onAdviceSearchInput,
+            clearAdviceSearch: this.clearAdviceSearch,
             useAdvicePrompt: this.useAdvicePrompt,
             scrollAdviceToLatest: this.scrollAdviceToLatest,
+            scheduleAdviceStreamScroll: this.scheduleAdviceStreamScroll,
+            refreshAdviceSearchResults: this.refreshAdviceSearchResults,
             autoResizeAdvicePrompt: this.autoResizeAdvicePrompt,
             adviceRangeStart: this.adviceRangeStart,
             filterByAdviceRange: this.filterByAdviceRange,
@@ -132,6 +137,43 @@ const advicePanel = {
         this.captureAdviceDraft();
     },
 
+    toggleAdviceSearch() {
+        const shouldOpen = !(this.adviceSearchOpen || this.adviceSearchQuery);
+        this.adviceSearchOpen = shouldOpen;
+        if (!shouldOpen) this.adviceSearchQuery = '';
+        this.captureAdviceDraft();
+        this.renderAiCoachPage?.() || this.renderRoutines?.();
+        requestAnimationFrame(() => {
+            this.autoResizeAdvicePrompt();
+            const input = document.getElementById('adviceSearchInput');
+            if (this.adviceSearchOpen && input) input.focus();
+        });
+    },
+
+    onAdviceSearchInput(el) {
+        this.adviceSearchQuery = el?.value || '';
+        this.captureAdviceDraft();
+        this.refreshAdviceSearchResults();
+    },
+
+    clearAdviceSearch() {
+        this.adviceSearchQuery = '';
+        this.adviceSearchOpen = false;
+        this.captureAdviceDraft();
+        this.renderAiCoachPage?.() || this.renderRoutines?.();
+        requestAnimationFrame(() => this.autoResizeAdvicePrompt());
+    },
+
+    refreshAdviceSearchResults() {
+        const list = document.querySelector('.advice-chat-list');
+        const summary = document.getElementById('adviceMessageSummary');
+        if (!list) return;
+        const messages = this.db.health.aiAdviceChat || [];
+        const visibleMessages = this.visibleAdviceMessages(messages);
+        list.innerHTML = this.renderAdviceMessages(visibleMessages);
+        if (summary) summary.textContent = this.adviceMessageSummary(messages, visibleMessages);
+    },
+
     setAdviceRange(range) {
         this.adviceRange = range || 'today';
         this.saveAdviceSettings();
@@ -178,8 +220,27 @@ const advicePanel = {
     visibleAdviceMessages(messages = []) {
         const withIndex = messages.map((msg, idx) => ({ ...msg, idx }));
         const start = this.adviceRangeStart();
-        if (!start) return withIndex;
-        return withIndex.filter(msg => this.parseHistoryDate(msg.at) >= start);
+        const ranged = start ? withIndex.filter(msg => this.parseHistoryDate(msg.at) >= start) : withIndex;
+        const query = String(this.adviceSearchQuery || '').trim().toLowerCase();
+        if (!query) return ranged;
+        const matched = new Set();
+        ranged.forEach((msg, localIdx) => {
+            const date = this.dateKey(this.parseHistoryDate(msg.at));
+            const haystack = `${msg.content || ''} ${msg.model || ''} ${msg.role || ''} ${date}`.toLowerCase();
+            if (!haystack.includes(query)) return;
+            matched.add(localIdx);
+            if (msg.role === 'assistant' && localIdx > 0) matched.add(localIdx - 1);
+            if (msg.role === 'user' && localIdx + 1 < ranged.length) matched.add(localIdx + 1);
+        });
+        return ranged.filter((_, localIdx) => matched.has(localIdx));
+    },
+
+    adviceMessageSummary(messages, visibleMessages) {
+        const rangeLabel = { today: '今日', week: '最近7天', month: '最近30天', all: '全部' }[this.adviceRange || 'today'] || '今日';
+        const query = String(this.adviceSearchQuery || '').trim();
+        if (!messages.length) return '像聊天一样提问，AI 会结合你的记录分析';
+        if (query) return `搜索“${query}”：${visibleMessages.length} 条匹配记录`;
+        return `${rangeLabel}显示 ${Math.floor(visibleMessages.length / 2)} / 共 ${Math.floor(messages.length / 2)} 轮建议`;
     },
 
     adviceConversationContext(limit = 12) {
@@ -438,6 +499,8 @@ ${formatExerciseLogs(rangeExerciseLogs) || `${rangeLabel}暂无手动运动记�
         const input = document.getElementById('advicePrompt');
         const prompt = (promptOverride || input?.value || '').trim();
         if (!prompt) return;
+        const list = document.querySelector('.advice-chat-list');
+        this._adviceFollowStream = !list || (list.scrollHeight - list.clientHeight - list.scrollTop) < 180;
         const selected = document.getElementById('adviceModel')?.value || this.adviceModel || '__current__';
         const model = selected === '__current__' ? ai.cfg.model : selected;
         const now = new Date().toISOString();
@@ -470,7 +533,7 @@ ${formatExerciseLogs(rangeExerciseLogs) || `${rangeLabel}暂无手动运动记�
                             if (dots) dots.remove();
                         }
                     }
-                    this.scrollAdviceToLatest(true);
+                    this.scheduleAdviceStreamScroll();
                 });
             } finally {
                 ai.cfg.model = oldModel;
@@ -488,6 +551,7 @@ ${formatExerciseLogs(rangeExerciseLogs) || `${rangeLabel}暂无手动运动记�
             requestAnimationFrame(() => this.scrollAdviceToLatest(true));
         } finally {
             this._adviceSending = false;
+            this._adviceFollowStream = false;
             const send = document.getElementById('adviceSendBtn');
             if (send) send.disabled = true;
         }
@@ -516,15 +580,32 @@ ${formatExerciseLogs(rangeExerciseLogs) || `${rangeLabel}暂无手动运动记�
         if (prompt) this.sendAiAdvice(prompt);
     },
 
-    scrollAdviceToLatest(force = false) {
+    scheduleAdviceStreamScroll(force = false) {
+        if (!force && !this._adviceFollowStream) return;
+        if (this._adviceScrollRaf) return;
+        this._adviceScrollRaf = requestAnimationFrame(() => {
+            this._adviceScrollRaf = 0;
+            this.scrollAdviceToLatest(force || !!this._adviceFollowStream, 'auto');
+        });
+    },
+
+    scrollAdviceToLatest(force = false, behavior = force ? 'smooth' : 'auto') {
         const list = document.querySelector('.advice-chat-list');
-        const latest = document.querySelector('[data-advice-latest="true"]');
-        if (list) list.scrollTo({ top: list.scrollHeight, behavior: force ? 'smooth' : 'auto' });
-        if (latest) latest.scrollIntoView({ block: 'end', behavior: force ? 'smooth' : 'auto' });
+        if (list) {
+            const distance = list.scrollHeight - list.clientHeight - list.scrollTop;
+            if (force || distance < 180 || this._adviceFollowStream) {
+                list.scrollTo({ top: list.scrollHeight, behavior });
+            }
+        }
     },
 
     renderAdviceMessages(messages) {
-        if (!messages.length) return '<div class="empty-state advice-empty"><span class="material-symbols-rounded">forum</span><p>还没有 AI 建议，选择下方快捷问题开始</p></div>';
+        if (!messages.length) {
+            const searching = String(this.adviceSearchQuery || '').trim();
+            return searching
+                ? '<div class="empty-state advice-empty"><span class="material-symbols-rounded">search_off</span><p>没有匹配的聊天记录</p></div>'
+                : '<div class="empty-state advice-empty"><span class="material-symbols-rounded">forum</span><p>还没有 AI 建议，选择下方快捷问题开始</p></div>';
+        }
         const groups = messages.reduce((acc, msg, idx) => {
             const date = this.dateKey(this.parseHistoryDate(msg.at));
             if (!acc[date]) acc[date] = [];
@@ -583,33 +664,40 @@ ${formatExerciseLogs(rangeExerciseLogs) || `${rangeLabel}暂无手动运动记�
         const modelOptions = [{ id: '__current__', name: ai.cfg.model ? `当前配置：${ai.cfg.model}` : '当前配置模型' }, ...(ai.models || [])];
         const contexts = { diet: true, training: true, weight: true, goal: true, ...(this.adviceContexts || {}) };
         const range = this.adviceRange || 'today';
+        const searchQuery = this.escapeHtml(this.adviceSearchQuery || '');
+        const searchOpen = !!this.adviceSearchOpen || !!this.adviceSearchQuery;
         const goalType = this.db.health.dietGoal?.goalType || this.db.health.goalType || 'loss';
         const isGain = goalType === 'gain';
         const quicks = isGain
             ? ['分析我最近增肌进展是否正常', '根据今天饮食给我加餐建议', '帮我安排本周力量训练重点', '我今天蛋白质和碳水够不够？']
             : ['分析我最近减重停滞的原因', '根据今天饮食给我晚餐建议', '帮我调整本周训练强度', '我今天蛋白质够不够？'];
-        const rangeLabel = { today: '今日', week: '最近7天', month: '最近30天', all: '全部' }[range] || '今日';
-        const messageSummary = messages.length
-            ? `${rangeLabel}显示 ${Math.floor(visibleMessages.length / 2)} / 共 ${Math.floor(messages.length / 2)} 轮建议`
-            : '像聊天一样提问，AI 会结合你的记录分析';
+        const messageSummary = this.adviceMessageSummary(messages, visibleMessages);
         return `<div class="md-card advice-main-card">
             <div class="advice-chat-shell">
                 <div class="advice-chat-header">
                     <div>
                         <span class="cardio-kicker">AI 分析建议</span>
                         <h3>训练 / 饮食 / 体重分析</h3>
-                        <small>${messageSummary}</small>
+                        <small id="adviceMessageSummary">${this.escapeHtml(messageSummary)}</small>
                     </div>
                     <span class="material-symbols-rounded advice-chat-icon">psychology</span>
                 </div>
                 <div class="advice-context-bar">
-                    <div class="md-field advice-model-field"><select id="adviceModel" onchange="data.setAdviceModel(this.value)">${modelOptions.map(m => `<option value="${m.id}" ${m.id === activeModel ? 'selected' : ''}>${this.escapeHtml(m.name || m.id)}</option>`).join('')}</select><label>分析模型</label></div>
-                    <div class="advice-range-tabs">${[['today','今日'],['week','7天'],['month','30天'],['all','全部']].map(([key, label]) => `<button class="advice-pill ${range === key ? 'active' : ''}" onclick="data.setAdviceRange('${key}')" type="button">${label}</button>`).join('')}</div>
+                    <div class="advice-filter-row">
+                        <div class="advice-range-tabs">${[['today','今日'],['week','7天'],['month','30天'],['all','全部']].map(([key, label]) => `<button class="advice-pill ${range === key ? 'active' : ''}" onclick="data.setAdviceRange('${key}')" type="button">${label}</button>`).join('')}</div>
+                        <button class="advice-search-toggle ${searchOpen ? 'active' : ''}" onclick="data.toggleAdviceSearch()" type="button" aria-label="搜索聊天记录"><span class="material-symbols-rounded">search</span></button>
+                    </div>
+                    ${searchOpen ? `<div class="advice-search-row">
+                        <span class="material-symbols-rounded">search</span>
+                        <input id="adviceSearchInput" value="${searchQuery}" oninput="data.onAdviceSearchInput(this)" placeholder="搜索聊天记录、日期或模型" autocomplete="off">
+                        ${searchQuery ? '<button onclick="data.clearAdviceSearch()" type="button" aria-label="清空搜索"><span class="material-symbols-rounded">close</span></button>' : ''}
+                    </div>` : ''}
                     <div class="advice-context-toggles">${[['diet','饮食'],['training','训练'],['weight','体重'],['goal','目标']].map(([key, label]) => `<button class="advice-pill ${contexts[key] ? 'active' : ''}" onclick="data.toggleAdviceContext('${key}')" type="button">${label}</button>`).join('')}</div>
                 </div>
                 <div class="advice-chat-list">${this.renderAdviceMessages(visibleMessages)}</div>
                 <div class="advice-quick-prompts">${quicks.map(q => `<button onclick="data.useAdvicePrompt('${this.escapeHtml(q)}')" type="button">${this.escapeHtml(q)}</button>`).join('')}</div>
                 <div class="advice-composer">
+                    <select id="adviceModel" class="advice-model-switch" onchange="data.setAdviceModel(this.value)" aria-label="切换分析模型" title="切换分析模型">${modelOptions.map(m => `<option value="${this.escapeHtml(m.id)}" ${m.id === activeModel ? 'selected' : ''}>${this.escapeHtml(m.name || m.id)}</option>`).join('')}</select>
                     <textarea id="advicePrompt" class="advice-composer-input" rows="1" placeholder="向 AI 提问…" oninput="data.onAdvicePromptInput(this)" onkeydown="data.onAdvicePromptKeydown(event)">${draft}</textarea>
                     <button id="adviceSendBtn" class="advice-send-btn" onclick="data.sendAiAdvice()" type="button" ${draft.trim() ? '' : 'disabled'} aria-label="发送问题"><span class="material-symbols-rounded">send</span></button>
                 </div>
