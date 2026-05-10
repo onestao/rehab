@@ -117,4 +117,20 @@
     .weightloss-tips { background: var(--md-sys-surface-container-high); }
     .nav-indicator { background: var(--md-sys-secondary-container); }
     .nav-item.active .material-symbols-rounded { color: var(--md-sys-on-secondary-container); }
+
+    .advice-model-openai { --advice-model-bg: linear-gradient(135deg, #022c22, #064e3b); --advice-model-color: #a7f3d0; --advice-model-mark-bg: rgba(167, 243, 208, 0.14); }
+    .advice-model-gemini { --advice-model-bg: linear-gradient(135deg, #121b4b, #1d2563); --advice-model-color: #c7d2fe; --advice-model-mark-bg: rgba(199, 210, 254, 0.14); }
+    .advice-model-grok { --advice-model-bg: linear-gradient(135deg, #0b1120, #1f2937); --advice-model-color: #f8fafc; --advice-model-mark-bg: rgba(248, 250, 252, 0.12); }
+    .advice-model-deepseek { --advice-model-bg: linear-gradient(135deg, #0b172d, #1e3a8a); --advice-model-color: #bfdbfe; --advice-model-mark-bg: rgba(191, 213, 254, 0.14); }
+    .advice-model-claude { --advice-model-bg: linear-gradient(135deg, #2a1800, #3b2200); --advice-model-color: #fde68a; --advice-model-mark-bg: rgba(253, 230, 138, 0.12); }
+    .advice-model-qwen { --advice-model-bg: linear-gradient(135deg, #121146, #161a5b); --advice-model-color: #d6f4fb; --advice-model-mark-bg: rgba(214, 244, 251, 0.14); }
+    .advice-model-doubao { --advice-model-bg: linear-gradient(135deg, #2b0f0f, #3b1a0a); --advice-model-color: #fed7aa; --advice-model-mark-bg: rgba(254, 215, 170, 0.12); }
+    .advice-model-kimi { --advice-model-bg: linear-gradient(135deg, #0b1437, #122266); --advice-model-color: #e0eaff; --advice-model-mark-bg: rgba(224, 234, 255, 0.12); }
+    .advice-model-minimax { --advice-model-bg: linear-gradient(135deg, #052e27, #073f2f); --advice-model-color: #ccfbf1; --advice-model-mark-bg: rgba(204, 251, 241, 0.14); }
+    .advice-model-mimo { --advice-model-bg: linear-gradient(135deg, #230b23, #2c0e2e); --advice-model-color: #f5d0fe; --advice-model-mark-bg: rgba(245, 208, 254, 0.14); }
+    .advice-model-glm { --advice-model-bg: linear-gradient(135deg, #101445, #161b63); --advice-model-color: #c7d2fe; --advice-model-mark-bg: rgba(199, 210, 254, 0.14); }
+    .advice-model-generic { --advice-model-bg: linear-gradient(135deg, var(--md-sys-secondary-container), var(--md-sys-tertiary-container)); --advice-model-color: var(--md-sys-on-secondary-container); --advice-model-mark-bg: var(--md-sys-surface-container-highest); }
+    .advice-model-mark {
+        background: var(--advice-model-mark-bg, color-mix(in srgb, var(--md-sys-surface-container-highest) 60%, transparent));
+    }
 }

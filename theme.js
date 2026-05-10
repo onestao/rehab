@@ -95,6 +95,7 @@ const theme = {
             '--theme-seed': seed
         });
         document.querySelector('meta[name="theme-color"]')?.setAttribute('content', primary);
+        try { data?.applyPickerThemeFromCache?.(); } catch {}
     },
 
     setVars(vars) {

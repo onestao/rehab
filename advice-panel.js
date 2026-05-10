@@ -1,6 +1,36 @@
 const advicePanel = {
     DRAFT_KEY: 'rehab_advice_draft',
     SETTINGS_KEY: 'rehab_advice_settings',
+    MODEL_ICON_CDN_BASES: [
+        'https://registry.npmmirror.com/@lobehub/icons-static-svg/latest/files/icons/',
+        'https://unpkg.com/@lobehub/icons-static-svg@latest/icons/'
+    ],
+    MODEL_ICON_SLUGS: {
+        openai: 'openai',
+        gemini: 'gemini',
+        grok: 'grok',
+        deepseek: 'deepseek',
+        claude: 'claude',
+        qwen: 'qwen',
+        doubao: 'doubao',
+        kimi: 'kimi',
+        minimax: 'minimax',
+        mimo: 'xiaomimimo',
+        glm: 'zhipu',
+        mistral: 'mistral',
+        meta: 'meta',
+        llama: 'meta',
+        ollama: 'ollama',
+        perplexity: 'perplexity',
+        cohere: 'cohere',
+        baichuan: 'baichuan',
+        yi: 'zeroone',
+        stepfun: 'stepfun',
+        siliconflow: 'siliconcloud',
+        openrouter: 'openrouter',
+        azure: 'azure',
+        huggingface: 'huggingface'
+    },
     MODEL_ICONS: {
         openai: 'assets/model-icons/openai.svg',
         gemini: 'assets/model-icons/gemini.svg',
@@ -31,6 +61,7 @@ const advicePanel = {
             clearAdviceDraft: this.clearAdviceDraft,
             loadAdviceSettings: this.loadAdviceSettings,
             saveAdviceSettings: this.saveAdviceSettings,
+            isMobileAdviceInput: this.isMobileAdviceInput,
             onAdvicePromptInput: this.onAdvicePromptInput,
             onAdvicePromptKeydown: this.onAdvicePromptKeydown,
             setAdviceModel: this.setAdviceModel,
@@ -44,11 +75,17 @@ const advicePanel = {
             scheduleAdviceStreamScroll: this.scheduleAdviceStreamScroll,
             refreshAdviceSearchResults: this.refreshAdviceSearchResults,
             refreshAdviceModelPicker: this.refreshAdviceModelPicker,
+            applyPickerThemeFromCache: this.applyPickerThemeFromCache,
             autoResizeAdvicePrompt: this.autoResizeAdvicePrompt,
             adviceRangeStart: this.adviceRangeStart,
             filterByAdviceRange: this.filterByAdviceRange,
             visibleAdviceMessages: this.visibleAdviceMessages,
             adviceMessageSummary: this.adviceMessageSummary,
+            iconFallbackSrcs: this.iconFallbackSrcs,
+            adviceModelIconHtml: this.adviceModelIconHtml,
+            adviceModelThemeStyle: this.adviceModelThemeStyle,
+            providerHashHue: this.providerHashHue,
+            modelThemeFor: this.modelThemeFor,
             detectAdviceModelProvider: this.detectAdviceModelProvider,
             adviceModelVisual: this.adviceModelVisual,
             adviceConversationContext: this.adviceConversationContext,
@@ -62,6 +99,26 @@ const advicePanel = {
         });
 
         target.loadAdviceSettings?.();
+        this.listenThemeChanges();
+    },
+
+    listenThemeChanges() {
+        if (this._themeMediaBound) return;
+        if (window.matchMedia) {
+            const mq = window.matchMedia('(prefers-color-scheme: dark)');
+            this._themeMediaBound = true;
+            mq.addEventListener('change', () => this.applyPickerThemeFromCache());
+        }
+    },
+
+    applyPickerThemeFromCache() {
+        try {
+            if (!this._lastVisual) return;
+            const picker = document.querySelector('.advice-model-picker');
+            if (!picker) return;
+            const style = this.adviceModelThemeStyle(this._lastVisual);
+            if (style) picker.setAttribute('style', style);
+        } catch {}
     },
 
     loadAdviceSettings() {
@@ -128,6 +185,13 @@ const advicePanel = {
         try { sessionStorage.removeItem(this.DRAFT_KEY); } catch {}
     },
 
+    isMobileAdviceInput() {
+        return !!(
+            window.matchMedia?.('(pointer: coarse) and (max-width: 768px)').matches
+            || (navigator.maxTouchPoints > 0 && window.innerWidth <= 768)
+        );
+    },
+
     onAdvicePromptInput(el) {
         this._adviceDraft = el.value;
         try { sessionStorage.setItem(this.DRAFT_KEY, el.value); } catch {}
@@ -138,6 +202,7 @@ const advicePanel = {
 
     onAdvicePromptKeydown(e) {
         if (e.isComposing) return;
+        if (this.isMobileAdviceInput()) return;
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
             this.sendAiAdvice();
@@ -155,6 +220,62 @@ const advicePanel = {
         this.saveAdviceSettings();
         this.captureAdviceDraft();
         this.refreshAdviceModelPicker();
+    },
+
+    iconFallbackSrcs(key = 'generic') {
+        const slug = this.MODEL_ICON_SLUGS?.[key] || key;
+        if (key === 'kimi') {
+            const mono = (this.MODEL_ICON_CDN_BASES || []).map(base => `${base}${slug}.svg`);
+            return Array.from(new Set([...mono, this.MODEL_ICONS?.kimi, this.MODEL_ICONS?.generic].filter(Boolean)));
+        }
+        const cdn = (this.MODEL_ICON_CDN_BASES || []).map(base => [`${base}${slug}-color.svg`, `${base}${slug}.svg`]).flat();
+        const local = [this.MODEL_ICONS?.[key], this.MODEL_ICONS?.generic].filter(Boolean);
+        const unique = new Set([...cdn, ...local]);
+        return Array.from(unique);
+    },
+
+    adviceModelIconHtml(visual = {}) {
+        const srcs = visual.iconSrcs || [];
+        const mark = this.escapeHtml(visual.mark || 'AI');
+        if (!srcs.length) return mark;
+        const src = srcs[0];
+        const fallbacks = srcs.slice(1).map(s => `this.src='${this.escapeHtml(s)}'`).join(';');
+        const onerror = fallbacks ? `this.onerror=function(){this.onerror=null;${fallbacks}};` : 'this.onerror=null;';
+        return `<img class="advice-model-icon" src="${this.escapeHtml(src)}" alt="" onerror="${onerror}">`;
+    },
+
+    adviceModelThemeStyle(visual = {}) {
+        const t = visual.theme || {};
+        return [
+            t.bg ? `--advice-model-bg:${t.bg}` : '',
+            t.color ? `--advice-model-color:${t.color}` : '',
+            t.markBg ? `--advice-model-mark-bg:${t.markBg}` : ''
+        ].filter(Boolean).join(';');
+    },
+
+    providerHashHue(key = 'generic') {
+        const s = String(key || 'generic');
+        let h = 0;
+        for (let i = 0; i < s.length; i++) {
+            h = ((h << 5) - h + s.charCodeAt(i)) | 0;
+        }
+        return Math.abs(h) % 360;
+    },
+
+    modelThemeFor(key = 'generic') {
+        const hue = this.providerHashHue(key);
+        const dark = !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        return dark
+            ? {
+                bg: `linear-gradient(135deg, hsl(${hue} 28% 22%), hsl(${(hue + 28) % 360} 24% 16%))`,
+                color: `hsl(${hue} 62% 90%)`,
+                markBg: `color-mix(in srgb, hsl(${hue} 36% 36%) 58%, var(--md-sys-surface-container-highest))`
+            }
+            : {
+                bg: `linear-gradient(135deg, hsl(${hue} 64% 93%), hsl(${(hue + 28) % 360} 60% 90%))`,
+                color: `hsl(${hue} 52% 22%)`,
+                markBg: `color-mix(in srgb, hsl(${hue} 72% 80%) 56%, white)`
+            };
     },
 
     detectAdviceModelProvider(model = '') {
@@ -175,8 +296,11 @@ const advicePanel = {
 
     adviceModelVisual(model = '') {
         const provider = this.detectAdviceModelProvider(model);
-        const icon = this.MODEL_ICONS?.[provider.key] || this.MODEL_ICONS?.generic || '';
-        return { ...provider, icon };
+        const iconSrcs = this.iconFallbackSrcs(provider.key);
+        const theme = this.modelThemeFor(provider.key);
+        const visual = { ...provider, iconSrcs, theme };
+        this._lastVisual = visual;
+        return visual;
     },
 
     refreshAdviceModelPicker() {
@@ -191,9 +315,9 @@ const advicePanel = {
         picker.className = `advice-model-picker advice-model-${visual.key}`;
         picker.title = `切换分析模型：${visual.label}`;
         picker.setAttribute('aria-label', `切换分析模型：${visual.label}`);
-        mark.innerHTML = visual.icon
-            ? `<img class="advice-model-icon" src="${visual.icon}" alt="">`
-            : this.escapeHtml(visual.mark);
+        const style = this.adviceModelThemeStyle(visual);
+        if (style) picker.setAttribute('style', style);
+        mark.innerHTML = this.adviceModelIconHtml(visual);
     },
 
     toggleAdviceSearch() {
@@ -723,9 +847,9 @@ ${formatExerciseLogs(rangeExerciseLogs) || `${rangeLabel}暂无手动运动记�
         const activeModelName = modelOptions.find(m => m.id === activeModel)?.name || modelOptions[0]?.name || '模型';
         const activeModelValue = activeModel === '__current__' ? ai.cfg.model : activeModelName;
         const modelVisual = this.adviceModelVisual(activeModelValue);
-        const modelMark = modelVisual.icon
-            ? `<img class="advice-model-icon" src="${modelVisual.icon}" alt="">`
-            : this.escapeHtml(modelVisual.mark);
+        const modelThemeStyle = this.adviceModelThemeStyle(modelVisual);
+        const modelMark = this.adviceModelIconHtml(modelVisual);
+        const sendHint = this.isMobileAdviceInput() ? '回车换行，点击发送按钮提交' : 'Enter 发送，Shift + Enter 换行';
         const contexts = { diet: true, training: true, weight: true, goal: true, ...(this.adviceContexts || {}) };
         const range = this.adviceRange || 'today';
         const searchQuery = this.escapeHtml(this.adviceSearchQuery || '');
@@ -761,7 +885,7 @@ ${formatExerciseLogs(rangeExerciseLogs) || `${rangeLabel}暂无手动运动记�
                 <div class="advice-chat-list">${this.renderAdviceMessages(visibleMessages)}</div>
                 <div class="advice-quick-prompts">${quicks.map(q => `<button onclick="data.useAdvicePrompt('${this.escapeHtml(q)}')" type="button">${this.escapeHtml(q)}</button>`).join('')}</div>
                 <div class="advice-composer">
-                    <label class="advice-model-picker advice-model-${modelVisual.key}" aria-label="切换分析模型：${this.escapeHtml(modelVisual.label)}" title="切换分析模型：${this.escapeHtml(modelVisual.label)}">
+                    <label class="advice-model-picker advice-model-${modelVisual.key}" style="${this.escapeHtml(modelThemeStyle)}" aria-label="切换分析模型：${this.escapeHtml(modelVisual.label)}" title="切换分析模型：${this.escapeHtml(modelVisual.label)}">
                         <span class="advice-model-mark">${modelMark}</span>
                         <span class="material-symbols-rounded advice-model-picker-arrow">expand_more</span>
                         <select id="adviceModel" class="advice-model-switch" onchange="data.setAdviceModel(this.value)">${modelOptions.map(m => `<option value="${this.escapeHtml(m.id)}" ${m.id === activeModel ? 'selected' : ''}>${this.escapeHtml(m.name || m.id)}</option>`).join('')}</select>
@@ -769,7 +893,7 @@ ${formatExerciseLogs(rangeExerciseLogs) || `${rangeLabel}暂无手动运动记�
                     <textarea id="advicePrompt" class="advice-composer-input" rows="1" placeholder="向 AI 提问…" oninput="data.onAdvicePromptInput(this)" onkeydown="data.onAdvicePromptKeydown(event)">${draft}</textarea>
                     <button id="adviceSendBtn" class="advice-send-btn" onclick="data.sendAiAdvice()" type="button" ${draft.trim() ? '' : 'disabled'} aria-label="发送问题"><span class="material-symbols-rounded">send</span></button>
                 </div>
-                <div id="adviceStatus" class="food-ai-status advice-status-line">Enter 发送，Shift + Enter 换行</div>
+                <div id="adviceStatus" class="food-ai-status advice-status-line">${sendHint}</div>
             </div>
         </div>`;
     }
