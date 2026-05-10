@@ -683,7 +683,7 @@ const data = {
     renderRecordsPage() {
         const overview = document.getElementById('recordsOverview');
         const content = document.getElementById('recordsContent');
-        if (overview) overview.innerHTML = this.renderRecordOverview();
+        if (overview) overview.innerHTML = '';
         if (content) {
             content.innerHTML = `
                 ${this.renderHealthTabs()}
@@ -696,8 +696,8 @@ const data = {
 
     renderHealthTabs() {
         const tabs = [
-            ['diet', 'restaurant', '饮食'],
             ['weight', 'monitor_weight', '体重'],
+            ['diet', 'restaurant', '饮食'],
             ['training', 'fitness_center', '训练记录'],
             ['calendar', 'calendar_month', '记录日历']
         ];

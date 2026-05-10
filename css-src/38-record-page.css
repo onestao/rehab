@@ -94,9 +94,9 @@
 }
 .record-tabs-scroll::-webkit-scrollbar { display: none; }
 .record-tabs-scroll .record-tab {
-    flex: none;
+    flex: 1;
     min-width: 0;
-    padding: 0 12px;
+    padding: 0 8px;
     white-space: nowrap;
     font-size: 12px;
 }
