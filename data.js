@@ -910,6 +910,12 @@ const data = {
         const goals = this.defaultDietGoals();
         const progress = goalCal ? Math.min(100, Math.round((intake / goalCal) * 100)) : 0;
         const remaining = goalCal ? goalCal - intake : 0;
+        const macroStops = {
+            pro: Math.min(120, this.ratio(macros.pro, goals.pro) * 1.2),
+            carb: 120 + Math.min(120, this.ratio(macros.carb, goals.carb) * 1.2),
+            fat: 240 + Math.min(120, this.ratio(macros.fat, goals.fat) * 1.2)
+        };
+        const remainingText = goalCal ? (remaining >= 0 ? `剩余${remaining}kcal` : `超出${Math.abs(remaining)}kcal`) : '';
         const monthNum = Number(today.slice(5, 7));
         const dayNum = Number(today.slice(8, 10));
         const weekdays = ['周日','周一','周二','周三','周四','周五','周六'];
@@ -928,7 +934,7 @@ const data = {
                     <h3>${monthNum}月${dayNum}日 ${weekday}</h3>
                     ${weight ? `<p>体重 ${weight.weight.toFixed(1)} kg</p>` : ''}
                 </div>
-                ${goalCal ? `<div class="today-focus-ring" style="--progress:${progress}"><div><b>${progress}%</b><small>摄入</small></div></div>` : ''}
+                ${goalCal ? `<div class="today-focus-ring macro-focus-ring" style="--progress:${progress};--pro-stop:${macroStops.pro}deg;--carb-stop:${macroStops.carb}deg;--fat-stop:${macroStops.fat}deg"><div><b>${progress}%</b><small>摄入</small><em>${remainingText}</em></div></div>` : ''}
             </div>
             <div class="record-overview-stats">
                 <div class="record-overview-stat"><b>${intake}${goalCal ? `/${goalCal}` : ''}</b><small>摄入 kcal</small></div>
