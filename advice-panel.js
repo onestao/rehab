@@ -32,6 +32,7 @@ const advicePanel = {
             adviceRangeStart: this.adviceRangeStart,
             filterByAdviceRange: this.filterByAdviceRange,
             visibleAdviceMessages: this.visibleAdviceMessages,
+            adviceMessageSummary: this.adviceMessageSummary,
             adviceConversationContext: this.adviceConversationContext,
             buildAdviceMessages: this.buildAdviceMessages,
             parsePromptTargetDate: this.parsePromptTargetDate,
@@ -524,14 +525,12 @@ ${formatExerciseLogs(rangeExerciseLogs) || `${rangeLabel}暂无手动运动记�
                     this.db.health.aiAdviceChat[idx].content = accumulated;
                     if (this.db.health.aiAdviceChat[idx].pending && accumulated) this.db.health.aiAdviceChat[idx].pending = false;
                     const bubble = document.querySelector(`[data-advice-id="${pendingId}"]`);
-                    if (bubble) {
+                    if (bubble && accumulated) {
                         const contentEl = bubble.querySelector('.advice-bubble-content');
                         if (contentEl) contentEl.innerHTML = this.renderAdviceMarkdown(accumulated);
-                        if (accumulated) {
-                            bubble.classList.remove('pending');
-                            const dots = bubble.querySelector('.advice-typing-dot');
-                            if (dots) dots.remove();
-                        }
+                        bubble.classList.remove('pending');
+                        const dots = bubble.querySelector('.advice-typing-dot');
+                        if (dots) dots.remove();
                     }
                     this.scheduleAdviceStreamScroll();
                 });
@@ -635,9 +634,10 @@ ${formatExerciseLogs(rangeExerciseLogs) || `${rangeLabel}暂无手动运动记�
         const label = msg.role === 'user' ? '我' : 'AI';
         const time = this.parseHistoryDate(msg.at).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
         const model = msg.model ? ` · ${this.escapeHtml(msg.model)}` : '';
+        const rawContent = String(msg.content || '');
         const content = msg.role === 'assistant'
-            ? this.renderAdviceMarkdown(msg.content)
-            : this.escapeHtml(msg.content).replace(/\n/g, '<br>');
+            ? (rawContent ? this.renderAdviceMarkdown(rawContent) : '')
+            : `<p>${this.escapeHtml(rawContent).replace(/\n/g, '<br>')}</p>`;
         const state = msg.pending ? ' pending' : msg.error ? ' error' : '';
         const actions = msg.role === 'assistant'
             ? `<div class="advice-bubble-actions">

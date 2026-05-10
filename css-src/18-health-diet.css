@@ -480,10 +480,27 @@
 .advice-bubble b small { font-size: 10px; font-weight: 600; color: var(--md-sys-on-surface-variant); opacity: 0.8; }
 .advice-bubble.user b,
 .advice-bubble.user b small,
+.advice-bubble.user .advice-bubble-content,
 .advice-bubble.user p { color: var(--md-sys-on-primary-container); }
 .advice-bubble.error b,
 .advice-bubble.error b small,
+.advice-bubble.error .advice-bubble-content,
 .advice-bubble.error p { color: var(--md-sys-on-error-container); }
+.advice-bubble-content {
+    color: var(--md-sys-on-surface);
+    font-size: 13px;
+    line-height: 1.58;
+    min-height: 1.58em;
+    overflow-wrap: anywhere;
+}
+.advice-bubble.assistant .advice-bubble-content,
+.advice-bubble.assistant .advice-bubble-content p,
+.advice-bubble.assistant .advice-bubble-content li,
+.advice-bubble.assistant .advice-bubble-content h1,
+.advice-bubble.assistant .advice-bubble-content h2,
+.advice-bubble.assistant .advice-bubble-content h3 { color: var(--md-sys-on-surface); }
+.advice-bubble.user .advice-bubble-content,
+.advice-bubble.user .advice-bubble-content p { color: var(--md-sys-on-primary-container); }
 .advice-bubble p { font-size: 13px; line-height: 1.58; white-space: normal; }
 .advice-delete-btn {
     border: none;
