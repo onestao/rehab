@@ -283,7 +283,7 @@ const advicePanel = {
         return '';
     },
 
-    async requestAiAdvice(prompt, model) {
+    buildAdviceMessages(prompt, model) {
         const contexts = { diet: true, training: true, weight: true, goal: true, ...(this.adviceContexts || {}) };
         const range = this.adviceRange || 'today';
         const today = this.dateKey(new Date());
@@ -417,10 +417,15 @@ ${formatWeights(rangeWeights) || `${rangeLabel}暂无体重记录`}
 ${formatExerciseLogs(rangeExerciseLogs) || `${rangeLabel}暂无手动运动记录`}`;
 
         const conversation = this.adviceConversationContext();
+        return [{ role: 'system', content: sys }, ...conversation, { role: 'user', content: user }];
+    },
+
+    async requestAiAdvice(prompt, model) {
+        const messages = this.buildAdviceMessages(prompt, model);
         const oldModel = ai.cfg.model;
         ai.cfg.model = model;
         try {
-            return await ai.call([{ role: 'system', content: sys }, ...conversation, { role: 'user', content: user }], 2400);
+            return await ai.call(messages, 2400);
         } finally {
             ai.cfg.model = oldModel;
         }
@@ -438,15 +443,39 @@ ${formatExerciseLogs(rangeExerciseLogs) || `${rangeLabel}暂无手动运动记�
         const pendingId = `pending_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
         this._adviceSending = true;
         this.db.health.aiAdviceChat.push({ role: 'user', content: prompt, at: now });
-        this.db.health.aiAdviceChat.push({ role: 'assistant', content: '正在结合你的训练、饮食和体重记录分析...', at: now, model, pending: true, id: pendingId });
+        this.db.health.aiAdviceChat.push({ role: 'assistant', content: '', at: now, model, pending: true, id: pendingId });
         if (input) input.value = '';
         this.clearAdviceDraft();
         this.save();
         requestAnimationFrame(() => this.scrollAdviceToLatest(true));
         try {
-            const messages = await this.requestAiAdvice(prompt, model, true);
+            const messages = this.buildAdviceMessages(prompt, model);
+            const oldModel = ai.cfg.model;
+            ai.cfg.model = model;
+            let full = '';
+            try {
+                full = await ai.callStream(messages, 2400, (delta, accumulated) => {
+                    const idx = this.db.health.aiAdviceChat.findIndex(msg => msg.id === pendingId);
+                    if (idx < 0) return;
+                    this.db.health.aiAdviceChat[idx].content = accumulated;
+                    if (this.db.health.aiAdviceChat[idx].pending && accumulated) this.db.health.aiAdviceChat[idx].pending = false;
+                    const bubble = document.querySelector(`[data-advice-id="${pendingId}"]`);
+                    if (bubble) {
+                        const contentEl = bubble.querySelector('.advice-bubble-content');
+                        if (contentEl) contentEl.innerHTML = this.renderAdviceMarkdown(accumulated);
+                        if (accumulated) {
+                            bubble.classList.remove('pending');
+                            const dots = bubble.querySelector('.advice-typing-dot');
+                            if (dots) dots.remove();
+                        }
+                    }
+                    this.scrollAdviceToLatest(true);
+                });
+            } finally {
+                ai.cfg.model = oldModel;
+            }
             const idx = this.db.health.aiAdviceChat.findIndex(msg => msg.id === pendingId);
-            if (idx >= 0) this.db.health.aiAdviceChat[idx] = { role: 'assistant', content: messages, at: new Date().toISOString(), model };
+            if (idx >= 0) this.db.health.aiAdviceChat[idx] = { role: 'assistant', content: full, at: new Date().toISOString(), model };
             this.save();
             requestAnimationFrame(() => this.scrollAdviceToLatest(true));
         } catch (e) {
@@ -535,7 +564,7 @@ ${formatExerciseLogs(rangeExerciseLogs) || `${rangeLabel}暂无手动运动记�
                 <button onclick="data.deleteAiAdviceMessage(${msg.idx})" type="button">删除</button>
             </div>`
             : `<div class="advice-bubble-actions"><button onclick="data.deleteAiAdviceMessage(${msg.idx})" type="button">删除</button></div>`;
-        return `<div class="advice-bubble ${msg.role}${state}" ${latest ? 'data-advice-latest="true"' : ''}>
+        return `<div class="advice-bubble ${msg.role}${state}" ${msg.id ? `data-advice-id="${msg.id}"` : ''} ${latest ? 'data-advice-latest="true"' : ''}>
             <div class="advice-bubble-head">
                 <b>${label}<small>${time}${model}</small></b>
                 ${msg.pending ? '<span class="advice-typing-dot"></span>' : ''}
