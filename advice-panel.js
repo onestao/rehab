@@ -28,6 +28,7 @@ const advicePanel = {
             filterByAdviceRange: this.filterByAdviceRange,
             visibleAdviceMessages: this.visibleAdviceMessages,
             adviceConversationContext: this.adviceConversationContext,
+            buildAdviceMessages: this.buildAdviceMessages,
             parsePromptTargetDate: this.parsePromptTargetDate,
             preserveAdviceScroll: this.preserveAdviceScroll,
             renderAdviceMarkdown: this.renderAdviceMarkdown,
