@@ -151,12 +151,49 @@ const data = {
     toggleCollapse(id) {
         this.captureAdviceDraft?.();
         this._collapse = this._collapse || {};
+        const currentCollapsed = this.currentDomCollapseState(id);
         if (this._collapse[id] === undefined) {
-            this._collapse[id] = id === 'dietPanel' ? true : false;
+            this._collapse[id] = currentCollapsed === null ? (id === 'dietPanel' ? true : false) : !currentCollapsed;
         } else {
             this._collapse[id] = !this._collapse[id];
         }
+        if (this.applyCollapseStateToDom(id)) return;
         this.render();
+    },
+
+    currentDomCollapseState(id) {
+        const container = this.findCollapseContainer(id);
+        return container ? container.classList.contains('collapsed') : null;
+    },
+
+    applyCollapseStateToDom(id) {
+        const container = this.findCollapseContainer(id);
+        if (!container) return false;
+        const button = this.findCollapseButton(id);
+        const collapsed = !!this._collapse?.[id];
+        container.classList.toggle('collapsed', collapsed);
+        if (button?.classList.contains('collapsible-head-btn')) {
+            button.setAttribute('aria-expanded', String(!collapsed));
+        }
+        const icons = Array.from(button?.querySelectorAll('.material-symbols-rounded') || []);
+        const icon = icons.findLast?.(el => /^expand_(more|less)$/.test(el.textContent.trim()))
+            || icons.reverse().find(el => /^expand_(more|less)$/.test(el.textContent.trim()));
+        if (icon) icon.textContent = collapsed ? 'expand_more' : 'expand_less';
+        return true;
+    },
+
+    findCollapseContainer(id) {
+        const button = this.findCollapseButton(id);
+        return button?.closest('.collapsible-card, .diet-meal-group, .history-month-group, .history-older-group, .weight-history-card') || null;
+    },
+
+    findCollapseButton(id) {
+        const button = Array.from(document.querySelectorAll('button[onclick^="data.toggleCollapse"]'))
+            .find(btn => {
+                const handler = btn.getAttribute('onclick') || '';
+                return handler.includes(`'${id}'`) || handler.includes(`\"${id}\"`);
+            });
+        return button || null;
     },
 
     isCollapsed(id, defaultState = true) {
@@ -696,8 +733,8 @@ const data = {
 
     renderHealthTabs() {
         const tabs = [
-            ['weight', 'monitor_weight', '体重'],
             ['diet', 'restaurant', '饮食'],
+            ['weight', 'monitor_weight', '体重'],
             ['training', 'fitness_center', '训练记录'],
             ['calendar', 'calendar_month', '记录日历']
         ];
@@ -705,7 +742,7 @@ const data = {
     },
 
     healthViewOrder() {
-        return ['weight', 'diet', 'training', 'calendar'];
+        return ['diet', 'weight', 'training', 'calendar'];
     },
 
     renderHealthSwipeDeck() {
@@ -734,7 +771,7 @@ const data = {
             this.renderRecordsPage();
             return;
         }
-        deck.scrollTo({ left: index * deck.clientWidth, behavior: 'smooth' });
+        deck.scrollLeft = index * deck.clientWidth;
         if (view === 'diet') requestAnimationFrame(() => this.autoResizeDietInput?.());
     },
 
@@ -743,7 +780,9 @@ const data = {
         if (!deck) return;
         const order = this.healthViewOrder();
         const index = Math.max(0, order.indexOf(this.healthView));
-        deck.scrollTo({ left: index * deck.clientWidth, behavior: smooth ? 'smooth' : 'auto' });
+        const left = index * deck.clientWidth;
+        if (smooth) deck.scrollTo({ left, behavior: 'smooth' });
+        else deck.scrollLeft = left;
     },
 
     onHealthDeckScroll(deck) {

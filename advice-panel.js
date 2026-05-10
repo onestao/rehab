@@ -844,8 +844,9 @@ ${formatExerciseLogs(rangeExerciseLogs) || `${rangeLabel}暂无手动运动记�
         const draft = this.escapeHtml(this.restoreAdviceDraft());
         const activeModel = this.adviceModel || '__current__';
         const modelOptions = [{ id: '__current__', name: ai.cfg.model ? `当前配置：${ai.cfg.model}` : '当前配置模型' }, ...(ai.models || [])];
-        const activeModelName = modelOptions.find(m => m.id === activeModel)?.name || modelOptions[0]?.name || '模型';
-        const activeModelValue = activeModel === '__current__' ? ai.cfg.model : activeModelName;
+        const activeEntry = modelOptions.find(m => m.id === activeModel);
+        const activeModelLabel = activeEntry?.name || activeEntry?.id || modelOptions[0]?.name || activeModel || '模型';
+        const activeModelValue = activeModel === '__current__' ? (ai.cfg.model || activeModelLabel) : activeModelLabel;
         const modelVisual = this.adviceModelVisual(activeModelValue);
         const modelThemeStyle = this.adviceModelThemeStyle(modelVisual);
         const modelMark = this.adviceModelIconHtml(modelVisual);
