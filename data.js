@@ -687,7 +687,9 @@ const data = {
         if (content) {
             content.innerHTML = `
                 ${this.renderHealthTabs()}
-                ${this.renderHealthView()}`;
+                <div class="health-swipe-area" ontouchstart="data.onHealthSwipeStart(event)" ontouchmove="data.onHealthSwipeMove(event)" ontouchend="data.onHealthSwipeEnd(event)">
+                    ${this.renderHealthView()}
+                </div>`;
         }
         if (this.healthView === 'diet') {
             requestAnimationFrame(() => this.autoResizeDietInput?.());
@@ -702,6 +704,50 @@ const data = {
             ['calendar', 'calendar_month', '记录日历']
         ];
         return `<div class="record-tabs record-tabs-scroll" role="tablist" aria-label="健康记录视图">${tabs.map(([key, icon, label]) => `<button class="record-tab ${this.healthView === key ? 'active' : ''}" onclick="data.setHealthView('${key}')"><span class="material-symbols-rounded">${icon}</span>${label}</button>`).join('')}</div>`;
+    },
+
+    healthViewOrder() {
+        return ['weight', 'diet', 'training', 'calendar'];
+    },
+
+    onHealthSwipeStart(event) {
+        const touch = event.touches?.[0];
+        if (!touch) return;
+        this._healthSwipe = {
+            startX: touch.clientX,
+            startY: touch.clientY,
+            lastX: touch.clientX,
+            lastY: touch.clientY,
+            locked: false
+        };
+    },
+
+    onHealthSwipeMove(event) {
+        const state = this._healthSwipe;
+        const touch = event.touches?.[0];
+        if (!state || !touch) return;
+        state.lastX = touch.clientX;
+        state.lastY = touch.clientY;
+        const dx = state.lastX - state.startX;
+        const dy = state.lastY - state.startY;
+        if (!state.locked && Math.abs(dx) > 12 && Math.abs(dx) > Math.abs(dy) * 1.2) {
+            state.locked = true;
+        }
+        if (state.locked) event.preventDefault();
+    },
+
+    onHealthSwipeEnd() {
+        const state = this._healthSwipe;
+        this._healthSwipe = null;
+        if (!state) return;
+        const dx = state.lastX - state.startX;
+        const dy = state.lastY - state.startY;
+        if (Math.abs(dx) < 56 || Math.abs(dx) < Math.abs(dy) * 1.25) return;
+        const order = this.healthViewOrder();
+        const idx = order.indexOf(this.healthView);
+        if (idx < 0) return;
+        const nextIdx = dx < 0 ? Math.min(order.length - 1, idx + 1) : Math.max(0, idx - 1);
+        if (nextIdx !== idx) this.setHealthView(order[nextIdx]);
     },
 
     renderHealthView() {

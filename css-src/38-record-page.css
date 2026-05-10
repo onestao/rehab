@@ -100,6 +100,11 @@
     white-space: nowrap;
     font-size: 12px;
 }
+.health-swipe-area {
+    min-width: 0;
+    touch-action: pan-y;
+    overscroll-behavior-x: contain;
+}
 
 /* Today Timeline */
 .today-timeline-card { display: grid; gap: 0; padding: 14px; }
