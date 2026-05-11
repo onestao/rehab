@@ -299,30 +299,41 @@
 }
 .exercise-grid { margin: 0; }
 .manual-ex-list { display: grid; gap: 4px; }
+#ai-coach.page {
+    padding: 0;
+    height: calc(100dvh - 76px - env(safe-area-inset-bottom));
+    min-height: 0;
+    max-height: calc(100dvh - 76px - env(safe-area-inset-bottom));
+    overflow: hidden;
+}
+#ai-coach.page.active {
+    display: flex;
+    flex-direction: column;
+}
+#ai-coach.page.active > #aiCoachContent {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
 .advice-main-card {
-    display: grid;
-    gap: 12px;
-    padding-top: 8px;
-    padding-bottom: 0;
-    margin-bottom: calc(214px + env(safe-area-inset-bottom));
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin: 0;
+    padding: 8px 12px 0;
     border: none;
     border-radius: 0;
     box-shadow: none;
     background: transparent;
 }
-#ai-coach::after {
-    content: '';
-    position: fixed;
-    left: 0;
-    right: 0;
-    bottom: calc(76px + env(safe-area-inset-bottom));
-    height: 144px;
-    background: var(--md-sys-surface);
-    z-index: 125;
-    pointer-events: none;
-}
 .advice-chat-shell {
-    display: grid;
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
     gap: 12px;
 }
 .advice-chat-header {
@@ -407,19 +418,13 @@
     cursor: pointer;
 }
 .advice-quick-prompts {
-    position: fixed;
-    left: 0;
-    right: 0;
-    bottom: calc(168px + env(safe-area-inset-bottom));
-    max-width: 520px;
-    margin: 0 auto;
-    z-index: 128;
     display: flex;
     gap: 6px;
     overflow-x: auto;
-    padding: 4px 12px;
+    padding: 4px 2px;
     background: transparent;
     scrollbar-width: none;
+    flex: none;
 }
 .advice-range-tabs,
 .advice-context-toggles {
@@ -456,14 +461,21 @@
     margin-top: 12px;
 }
 .advice-chat-list {
+    flex: 1 1 auto;
+    min-height: 0;
     display: flex;
     flex-direction: column;
     gap: 10px;
-    overflow-y: visible;
-    padding: 8px 2px 24px 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 8px 2px 12px 0;
     scroll-behavior: auto;
     scrollbar-color: color-mix(in srgb, var(--md-sys-outline) 34%, transparent) transparent;
     scrollbar-width: thin;
+}
+.advice-bubble[data-advice-latest="true"],
+.advice-date-group:last-child {
+    scroll-margin-bottom: 16px;
 }
 .advice-chat-list::-webkit-scrollbar { width: 4px; }
 .advice-chat-list::-webkit-scrollbar-track { background: transparent; }
@@ -635,11 +647,8 @@
 }
 @keyframes advicePulse { from { opacity: 0.35; transform: scale(0.8); } to { opacity: 1; transform: scale(1.2); } }
 .advice-composer {
-    position: fixed;
-    left: 8px;
-    right: 8px;
-    bottom: calc(108px + env(safe-area-inset-bottom));
-    width: auto;
+    position: relative;
+    width: 100%;
     max-width: 504px;
     margin: 0 auto;
     display: grid;
@@ -653,7 +662,8 @@
     box-shadow:
         0 1px 3px 1px rgba(0,0,0,0.08),
         0 1px 2px rgba(0,0,0,0.1);
-    z-index: 130;
+    z-index: 5;
+    flex: none;
     transition:
         box-shadow var(--md-sys-motion-duration-short) var(--md-sys-motion-emphasized),
         background var(--md-sys-motion-duration-short) var(--md-sys-motion-emphasized);
@@ -846,19 +856,25 @@
 }
 .advice-send-btn:disabled::after { display: none; }
 .advice-status-line {
-    position: fixed;
-    left: 16px;
-    right: 16px;
-    bottom: calc(82px + env(safe-area-inset-bottom));
-    max-width: 496px;
     margin: 0 auto;
+    max-width: 496px;
     min-height: 18px;
-    z-index: 129;
-    pointer-events: none;
     text-align: center;
     font-size: 11px;
+    flex: none;
+    pointer-events: none;
 }
 .advice-empty { align-self: stretch; }
 .advice-bubble.assistant p { color: var(--md-sys-on-surface); }
 .advice-bubble.assistant.error p { color: var(--md-sys-on-error-container); }
+
+.advice-composer-tail {
+    flex: none;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 0 0 calc(8px + env(safe-area-inset-bottom));
+    background: var(--md-sys-surface);
+    z-index: 4;
+}
 

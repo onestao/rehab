@@ -1453,16 +1453,31 @@ body {
 .exercise-grid { margin: 0; }
 .manual-ex-list { display: grid; gap: 4px; }
 #ai-coach {
-    height: calc(100dvh - 76px - env(safe-area-inset-bottom));
-    min-height: 0;
     padding-bottom: 0;
+    --advice-nav-height: calc(76px + env(safe-area-inset-bottom));
+    --advice-composer-gap: 24px;
+    --advice-composer-height: 56px;
+    --advice-quick-height: 40px;
+    --advice-composer-bottom: calc(var(--advice-nav-height) + var(--advice-composer-gap));
+    --advice-quick-bottom: calc(var(--advice-composer-bottom) + var(--advice-composer-height) + 4px);
+    --advice-status-bottom: calc(var(--advice-nav-height) + 2px);
+    --advice-scrim-height: calc(var(--advice-composer-gap) + var(--advice-composer-height) + var(--advice-quick-height) + 28px);
+    --advice-bottom-reserve: calc(var(--advice-nav-height) + var(--advice-composer-gap) + var(--advice-composer-height) + var(--advice-quick-height) + 64px);
+    --advice-viewport-bottom: 0px;
+}
+body.advice-keyboard-open #ai-coach {
+    --advice-nav-height: 0px;
+    --advice-composer-gap: 10px;
+    --advice-quick-height: 0px;
+    --advice-scrim-height: calc(var(--advice-composer-height) + 28px + env(safe-area-inset-bottom));
+    --advice-bottom-reserve: calc(var(--advice-composer-height) + 34px + env(safe-area-inset-bottom) + var(--advice-viewport-bottom, 0px));
 }
 .advice-main-card {
     display: grid;
     gap: 12px;
     padding-top: 8px;
     padding-bottom: 0;
-    margin-bottom: calc(214px + env(safe-area-inset-bottom));
+    margin-bottom: var(--advice-bottom-reserve);
     border: none;
     border-radius: 0;
     box-shadow: none;
@@ -1473,8 +1488,8 @@ body {
     position: fixed;
     left: 0;
     right: 0;
-    bottom: calc(76px + env(safe-area-inset-bottom));
-    height: 144px;
+    bottom: calc(var(--advice-nav-height) + var(--advice-viewport-bottom, 0px));
+    height: var(--advice-scrim-height);
     background: var(--md-sys-surface);
     z-index: 125;
     pointer-events: none;
@@ -1511,7 +1526,7 @@ body {
     position: fixed;
     left: 0;
     right: 0;
-    bottom: calc(168px + env(safe-area-inset-bottom));
+    bottom: var(--advice-quick-bottom);
     max-width: 520px;
     margin: 0 auto;
     z-index: 128;
@@ -1574,6 +1589,10 @@ body {
 }
 .advice-chat-list:hover::-webkit-scrollbar-thumb {
     background: color-mix(in srgb, var(--md-sys-outline) 48%, transparent);
+}
+.advice-bubble[data-advice-latest="true"],
+.advice-date-group:last-child {
+    scroll-margin-bottom: var(--advice-bottom-reserve);
 }
 .advice-date-group { display: grid; gap: 8px; }
 .advice-date-head {
@@ -1737,7 +1756,7 @@ body {
     position: fixed;
     left: 8px;
     right: 8px;
-    bottom: calc(108px + env(safe-area-inset-bottom));
+    bottom: calc(var(--advice-composer-bottom) + var(--advice-viewport-bottom, 0px));
     width: auto;
     max-width: 504px;
     margin: 0 auto;
@@ -1846,7 +1865,7 @@ body {
     position: fixed;
     left: 16px;
     right: 16px;
-    bottom: calc(82px + env(safe-area-inset-bottom));
+    bottom: var(--advice-status-bottom);
     max-width: 496px;
     margin: 0 auto;
     min-height: 18px;
@@ -1858,7 +1877,24 @@ body {
 .advice-empty { align-self: stretch; }
 .advice-bubble.assistant p { color: var(--md-sys-on-surface); }
 .advice-bubble.assistant.error p { color: var(--md-sys-on-error-container); }
-/* --- Weight Loss Plan --- */
+body.advice-keyboard-open .advice-quick-prompts,
+body.advice-keyboard-open .advice-status-line {
+    display: none;
+}
+@media (max-width: 599px) {
+    body.advice-keyboard-open .md-nav-rail {
+        transform: translateY(110%);
+        pointer-events: none;
+    }
+}
+@media (min-width: 600px) and (max-width: 768px) {
+    body.advice-keyboard-open .md-nav-rail {
+        transform: translate(-50%, 110%);
+        pointer-events: none;
+    }
+}
+
+/* --- Weight Loss Plan --- */
 .weightloss-card { display: grid; gap: 14px; }
 .weightloss-card,
 .diet-card,

@@ -863,7 +863,13 @@ ${formatExerciseLogs(rangeExerciseLogs) || `${rangeLabel}暂无手动运动记�
         if (list) {
             const distance = list.scrollHeight - list.clientHeight - list.scrollTop;
             if (force || distance < 180 || this._adviceFollowStream) {
-                list.scrollTo({ top: list.scrollHeight, behavior });
+                const scrollable = getComputedStyle(list).overflowY !== 'visible' && list.scrollHeight > list.clientHeight + 2;
+                if (scrollable) {
+                    list.scrollTo({ top: list.scrollHeight, behavior });
+                    return;
+                }
+                const latest = list.querySelector('[data-advice-latest="true"]') || list.lastElementChild;
+                latest?.scrollIntoView({ block: 'end', behavior });
             }
         }
     },
@@ -972,17 +978,19 @@ ${formatExerciseLogs(rangeExerciseLogs) || `${rangeLabel}暂无手动运动记�
                     <div class="advice-context-toggles">${[['diet','饮食'],['training','训练'],['weight','体重'],['goal','目标']].map(([key, label]) => `<button class="advice-pill ${contexts[key] ? 'active' : ''}" onclick="data.toggleAdviceContext('${key}')" type="button">${label}</button>`).join('')}</div>
                 </div>
                 <div class="advice-chat-list">${this.renderAdviceMessages(visibleMessages)}</div>
-                <div class="advice-quick-prompts">${quicks.map(q => `<button onclick="data.useAdvicePrompt('${this.escapeHtml(q)}')" type="button">${this.escapeHtml(q)}</button>`).join('')}</div>
-                <div class="advice-composer">
-                    <label class="advice-model-picker advice-model-${modelVisual.key}" style="${this.escapeHtml(modelThemeStyle)}" aria-label="切换分析模型：${this.escapeHtml(modelVisual.label)}" title="切换分析模型：${this.escapeHtml(modelVisual.label)}">
-                        <span class="advice-model-mark">${modelMark}</span>
-                        <span class="material-symbols-rounded advice-model-picker-arrow">expand_more</span>
-                        <select id="adviceModel" class="advice-model-switch" onchange="data.setAdviceModel(this.value)">${modelOptions.map(m => `<option value="${this.escapeHtml(m.id)}" ${m.id === activeModel ? 'selected' : ''}>${this.escapeHtml(m.name || m.id)}</option>`).join('')}</select>
-                    </label>
-                    <textarea id="advicePrompt" class="advice-composer-input" rows="1" placeholder="向 AI 提问…" oninput="data.onAdvicePromptInput(this)" onkeydown="data.onAdvicePromptKeydown(event)">${draft}</textarea>
-                    <button id="adviceSendBtn" class="advice-send-btn" onclick="data.sendAiAdvice()" type="button" ${draft.trim() ? '' : 'disabled'} aria-label="发送问题"><span class="material-symbols-rounded">send</span></button>
+                <div class="advice-composer-tail">
+                    <div class="advice-quick-prompts">${quicks.map(q => `<button onclick="data.useAdvicePrompt('${this.escapeHtml(q)}')" type="button">${this.escapeHtml(q)}</button>`).join('')}</div>
+                    <div class="advice-composer">
+                        <label class="advice-model-picker advice-model-${modelVisual.key}" style="${this.escapeHtml(modelThemeStyle)}" aria-label="切换分析模型：${this.escapeHtml(modelVisual.label)}" title="切换分析模型：${this.escapeHtml(modelVisual.label)}">
+                            <span class="advice-model-mark">${modelMark}</span>
+                            <span class="material-symbols-rounded advice-model-picker-arrow">expand_more</span>
+                            <select id="adviceModel" class="advice-model-switch" onchange="data.setAdviceModel(this.value)">${modelOptions.map(m => `<option value="${this.escapeHtml(m.id)}" ${m.id === activeModel ? 'selected' : ''}>${this.escapeHtml(m.name || m.id)}</option>`).join('')}</select>
+                        </label>
+                        <textarea id="advicePrompt" class="advice-composer-input" rows="1" placeholder="向 AI 提问…" oninput="data.onAdvicePromptInput(this)" onkeydown="data.onAdvicePromptKeydown(event)">${draft}</textarea>
+                        <button id="adviceSendBtn" class="advice-send-btn" onclick="data.sendAiAdvice()" type="button" ${draft.trim() ? '' : 'disabled'} aria-label="发送问题"><span class="material-symbols-rounded">send</span></button>
+                    </div>
+                    <div id="adviceStatus" class="food-ai-status advice-status-line">${sendHint}</div>
                 </div>
-                <div id="adviceStatus" class="food-ai-status advice-status-line">${sendHint}</div>
             </div>
         </div>`;
     }
