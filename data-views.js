@@ -1,0 +1,80 @@
+(function () {
+    window.dataViews = {
+        render() {
+            this.renderActions();
+            this.renderWorkoutPlanCard();
+            this.renderTodayPage();
+            this.renderRecordsPage();
+            this.renderAiCoachPage();
+            this.renderProfilePage();
+        },
+
+        renderTodayPage() {
+            const overview = document.getElementById('todayOverview');
+            const quickActions = document.getElementById('todayQuickActions');
+            const timeline = document.getElementById('todayTimeline');
+            const aiCard = document.getElementById('todayAiCard');
+            if (overview) overview.innerHTML = this.renderRecordOverview();
+            if (quickActions) quickActions.innerHTML = this.renderRecordQuickActions();
+            if (timeline) timeline.innerHTML = this.renderTodayTimeline();
+            if (aiCard) aiCard.innerHTML = this.renderContextAiCard('today');
+        },
+
+        renderDietPage() {
+            const content = document.getElementById('dietContent');
+            const aiCard = document.getElementById('dietAiCard');
+            if (content) content.innerHTML = this.renderDietPanel();
+            if (aiCard) aiCard.innerHTML = this.renderContextAiCard('diet');
+            requestAnimationFrame(() => this.autoResizeDietInput?.());
+        },
+
+        renderRecordsPage() {
+            const overview = document.getElementById('recordsOverview');
+            const content = document.getElementById('recordsContent');
+            if (overview) overview.innerHTML = '';
+            if (content) {
+                content.innerHTML = `
+                ${this.renderHealthTabs()}
+                ${this.renderHealthSwipeDeck()}`;
+            }
+            requestAnimationFrame(() => {
+                this.syncHealthDeckPosition(false);
+                this.updateHealthSwipeEffects();
+                if (this.healthView === 'diet') this.autoResizeDietInput?.();
+            });
+        },
+
+        renderHealthView() {
+            switch (this.healthView) {
+                case 'weight':
+                    return this.renderWeightPanel() + this.renderContextAiCard('weight');
+                case 'training':
+                    return this.renderManualExercisePanel() +
+                        '<div class="record-section-title">最近训练记录</div>' +
+                        this.renderRecentHistoryList(5) +
+                        this.renderContextAiCard('exercise');
+                case 'calendar':
+                    return '<div class="record-section-title">记录日历</div>' +
+                        this.renderHistoryCalendar() +
+                        this.renderCalendarDayDetail() +
+                        '<div class="record-section-title">历史明细</div>' +
+                        this.renderHistoryList();
+                case 'diet':
+                default:
+                    return this.renderDietPanel() + this.renderContextAiCard('diet');
+            }
+        },
+
+        renderAiCoachPage() {
+            const content = document.getElementById('aiCoachContent');
+            if (content) {
+                content.innerHTML = this.renderAdvicePanel();
+                requestAnimationFrame(() => this.autoResizeAdvicePrompt?.());
+                requestAnimationFrame(() => {
+                    this.bindAdviceScrollListener?.();
+                    this.restoreAdviceScroll?.();
+                });
+            }
+        }
+    };
+})();

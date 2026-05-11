@@ -192,7 +192,28 @@ body {
 .md-card:active {
     transform: scale(0.996);
 }
-/* --- Timer Panel (Expressive) --- */
+
+/* AI 卡片搜索命中高亮 */
+.ai-card mark.ai-hit,
+.advice-card mark.ai-hit,
+mark.ai-hit {
+    background: var(--md-sys-color-tertiary-container, #ffe08a);
+    color: var(--md-sys-color-on-tertiary-container, #2a1a00);
+    padding: 0 2px;
+    border-radius: 3px;
+    font-weight: 600;
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
+}
+
+@media (prefers-color-scheme: dark) {
+    mark.ai-hit {
+        background: var(--md-sys-color-tertiary, #ffb866);
+        color: #1a1200;
+    }
+}
+
+/* --- Timer Panel (Expressive) --- */
 .timer-panel {
     background: linear-gradient(145deg, var(--timer-gradient-start), var(--timer-gradient-mid) 42%, var(--timer-gradient-end) 100%);
     color: white;
@@ -1682,10 +1703,6 @@ body {
 }
 .advice-chat-list:hover::-webkit-scrollbar-thumb {
     background: color-mix(in srgb, var(--md-sys-outline) 48%, transparent);
-}
-.advice-bubble[data-advice-latest="true"],
-.advice-date-group:last-child {
-    scroll-margin-bottom: 16px;
 }
 .advice-date-group { display: grid; gap: 8px; }
 .advice-date-head {

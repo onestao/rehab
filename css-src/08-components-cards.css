@@ -13,4 +13,24 @@
 .md-card:active {
     transform: scale(0.996);
 }
-
+
+/* AI 卡片搜索命中高亮 */
+.ai-card mark.ai-hit,
+.advice-card mark.ai-hit,
+mark.ai-hit {
+    background: var(--md-sys-color-tertiary-container, #ffe08a);
+    color: var(--md-sys-color-on-tertiary-container, #2a1a00);
+    padding: 0 2px;
+    border-radius: 3px;
+    font-weight: 600;
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
+}
+
+@media (prefers-color-scheme: dark) {
+    mark.ai-hit {
+        background: var(--md-sys-color-tertiary, #ffb866);
+        color: #1a1200;
+    }
+}
+
