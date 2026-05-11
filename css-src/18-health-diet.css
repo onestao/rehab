@@ -90,6 +90,12 @@
     color: var(--md-sys-on-primary-container);
     background: color-mix(in srgb, var(--md-sys-primary-container) 70%, var(--md-sys-surface-container));
 }
+.food-cal-hint {
+    font-size: 11px;
+    line-height: 1.45;
+    color: var(--md-sys-tertiary);
+    padding: 0 2px;
+}
 .food-source-tag {
     padding: 4px 10px;
     border-radius: var(--md-sys-shape-full);

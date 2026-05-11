@@ -61,6 +61,67 @@ const data = {
         }
     },
 
+    foodCalUnitFactor(unit) {
+        return unit === 'kj' ? 4.184 : 1;
+    },
+
+    foodCalLabel(unit) {
+        return unit === 'kj' ? '千焦 kJ/100g' : '千卡 kcal/100g';
+    },
+
+    parseFoodCaloriesToKcal(value, unit) {
+        const raw = Number(value || 0);
+        if (!raw || raw <= 0) return 0;
+        return raw / this.foodCalUnitFactor(unit);
+    },
+
+    convertFoodCaloriesValue(value, fromUnit, toUnit) {
+        const raw = Number(value || 0);
+        if (!raw || raw <= 0 || fromUnit === toUnit) return raw ? Number(raw.toFixed(1)) : '';
+        const kcal = this.parseFoodCaloriesToKcal(raw, fromUnit);
+        const converted = kcal * this.foodCalUnitFactor(toUnit);
+        return Number(converted.toFixed(1));
+    },
+
+    syncFoodCalLabel() {
+        const unit = this._foodCalUnit || 'kj';
+        const label = document.getElementById('foodCalLabel');
+        if (label) label.textContent = this.foodCalLabel(unit);
+        const hint = document.getElementById('foodCalUnitHint');
+        if (hint) hint.textContent = unit === 'kj'
+            ? '输入千焦后会自动换算为 kcal 保存和统计'
+            : '输入千卡后会直接按 kcal 保存和统计';
+        const select = document.getElementById('foodCalUnit');
+        if (select && select.value !== unit) select.value = unit;
+    },
+
+    changeFoodCalUnit(unit) {
+        const nextUnit = unit === 'kcal' ? 'kcal' : 'kj';
+        const input = document.getElementById('foodCal');
+        if (input && input.value) {
+            const converted = this.convertFoodCaloriesValue(input.value, this._foodCalUnit || 'kj', nextUnit);
+            input.value = converted === '' ? '' : String(converted);
+        }
+        this._foodCalUnit = nextUnit;
+        this.syncFoodCalLabel();
+        this.updateFoodComputedPreview?.();
+    },
+
+    updateEditingFoodCalInput(value) {
+        if (!this._editingFoodDraft) return;
+        this._editingFoodDraft.calInputPer100g = value;
+        this._editingFoodDraft.calPer100g = this.parseFoodCaloriesToKcal(value, this._editingFoodDraft.calUnit || 'kcal');
+    },
+
+    changeEditingFoodCalUnit(unit) {
+        if (!this._editingFoodDraft) return;
+        const nextUnit = unit === 'kj' ? 'kj' : 'kcal';
+        const prevUnit = this._editingFoodDraft.calUnit || 'kcal';
+        this._editingFoodDraft.calInputPer100g = this.convertFoodCaloriesValue(this._editingFoodDraft.calInputPer100g, prevUnit, nextUnit);
+        this._editingFoodDraft.calUnit = nextUnit;
+        this.render();
+    },
+
     async saveAndBackup() {
         this.save();
         await sync.autoBackup('history');
@@ -247,6 +308,9 @@ const data = {
     openDietModal() {
         const el = document.getElementById('dietModalContent');
         if (el) el.innerHTML = this.renderDietModalContent();
+        this._foodCalUnit = 'kj';
+        this.syncFoodCalLabel?.();
+        this.setFoodSource('');
         document.getElementById('dietModal').classList.remove('hidden');
         this._dietInputMode = 'ai';
     },
@@ -266,10 +330,12 @@ const data = {
             '<div id="foodManualArea" class="diet-manual-area hidden"><div class="md-grid diet-input-grid">' +
             '<div class="md-field span-full"><input type="text" id="foodName" placeholder=" " oninput="data.onFoodSearchInput()" onblur="data.autoFillFoodByName()"><label>食物名称</label></div>' +
             '<div class="md-field"><input type="number" id="foodGrams" step="1" placeholder=" " oninput="data.updateFoodComputedPreview()"><label>克数</label></div>' +
-            '<div class="md-field"><input type="number" id="foodCal" step="1" placeholder=" " oninput="data.updateFoodComputedPreview()"><label>kcal/100g</label></div>' +
+            '<div class="md-field"><select id="foodCalUnit" onchange="data.changeFoodCalUnit(this.value)"><option value="kj" selected>千焦 kJ</option><option value="kcal">千卡 kcal</option></select><label>热量单位</label></div>' +
+            '<div class="md-field"><input type="number" id="foodCal" step="0.1" placeholder=" " oninput="data.updateFoodComputedPreview()"><label id="foodCalLabel">千焦 kJ/100g</label></div>' +
             '<div class="md-field"><input type="number" id="foodPro" step="0.1" placeholder=" " oninput="data.updateFoodComputedPreview()"><label>蛋白/100g</label></div>' +
             '<div class="md-field"><input type="number" id="foodCarb" step="0.1" placeholder=" " oninput="data.updateFoodComputedPreview()"><label>碳水/100g</label></div>' +
             '<div class="md-field"><input type="number" id="foodFat" step="0.1" placeholder=" " oninput="data.updateFoodComputedPreview()"><label>脂肪/100g</label></div>' +
+            '<div id="foodCalUnitHint" class="food-cal-hint span-full">输入千焦后会自动换算为 kcal 保存和统计</div>' +
             '<div id="foodComputed" class="food-computed span-full">输入食物和重量后自动计算</div>' +
             '<div id="foodSourceHint" class="food-source-hint span-full">输入食物后可从食物库或 AI 自动填充营养</div>' +
             '<div class="diet-btn-row"><button class="md-btn md-btn-filled" onclick="data.addFoodLog()"><span class="material-symbols-rounded">add</span> 添加</button><button class="md-btn md-btn-tonal" onclick="data.aiParseFood()"><span class="material-symbols-rounded">psychology</span></button></div>' +
@@ -1309,6 +1375,8 @@ const data = {
             meal: f.meal || 'lunch',
             name: f.name || '',
             grams: f.grams || '',
+            calUnit: f.calUnit || 'kcal',
+            calInputPer100g: f.calInputPer100g || f.calPer100g || '',
             calPer100g: f.calPer100g || '',
             proPer100g: f.proPer100g || '',
             carbPer100g: f.carbPer100g || '',
@@ -1319,7 +1387,8 @@ const data = {
                 <div class="md-field"><select onchange="data._editingFoodDraft.meal=this.value"><option value="breakfast" ${draft.meal === 'breakfast' ? 'selected' : ''}>早餐</option><option value="lunch" ${draft.meal === 'lunch' ? 'selected' : ''}>午餐</option><option value="dinner" ${draft.meal === 'dinner' ? 'selected' : ''}>晚餐</option><option value="snack" ${draft.meal === 'snack' ? 'selected' : ''}>加餐</option></select><label>餐次</label></div>
                 <div class="md-field"><input type="text" value="${this.escapeHtml(draft.name)}" oninput="data._editingFoodDraft.name=this.value" placeholder=" "><label>食物</label></div>
                 <div class="md-field"><input type="number" value="${draft.grams}" oninput="data._editingFoodDraft.grams=this.value" placeholder=" "><label>克数</label></div>
-                <div class="md-field"><input type="number" value="${draft.calPer100g}" oninput="data._editingFoodDraft.calPer100g=this.value" placeholder=" "><label>kcal/100g</label></div>
+                <div class="md-field"><select onchange="data.changeEditingFoodCalUnit(this.value)"><option value="kj" ${draft.calUnit === 'kj' ? 'selected' : ''}>千焦 kJ</option><option value="kcal" ${draft.calUnit === 'kcal' ? 'selected' : ''}>千卡 kcal</option></select><label>热量单位</label></div>
+                <div class="md-field"><input type="number" step="0.1" value="${draft.calInputPer100g}" oninput="data.updateEditingFoodCalInput(this.value)" placeholder=" "><label>${this.foodCalLabel ? this.foodCalLabel(draft.calUnit) : '千卡 kcal/100g'}</label></div>
                 <div class="md-field"><input type="number" value="${draft.proPer100g}" oninput="data._editingFoodDraft.proPer100g=this.value" placeholder=" "><label>蛋白/100g</label></div>
                 <div class="md-field"><input type="number" value="${draft.carbPer100g}" oninput="data._editingFoodDraft.carbPer100g=this.value" placeholder=" "><label>碳水/100g</label></div>
                 <div class="md-field"><input type="number" value="${draft.fatPer100g}" oninput="data._editingFoodDraft.fatPer100g=this.value" placeholder=" "><label>脂肪/100g</label></div>

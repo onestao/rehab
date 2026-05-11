@@ -56,12 +56,16 @@ const foodLog = {
         if (!log) return;
         this._editingFoodLogId = id;
         const grams = log.grams || 0;
+        const calUnit = log.calUnit || 'kcal';
+        const storedCalPer100g = Number(log.calPer100g || (grams ? Math.round((log.cal || 0) * 100 / grams) : 0));
         this._editingFoodDraft = {
             id,
             meal: log.meal || 'lunch',
             name: log.name || '',
             grams: grams,
-            calPer100g: log.calPer100g || (grams ? Math.round((log.cal || 0) * 100 / grams) : ''),
+            calUnit,
+            calPer100g: storedCalPer100g || '',
+            calInputPer100g: log.calInputPer100g || (storedCalPer100g ? this.convertFoodCaloriesValue(storedCalPer100g, 'kcal', calUnit) : ''),
             proPer100g: log.proPer100g || (grams ? Number(((log.pro || 0) * 100 / grams).toFixed(1)) : ''),
             carbPer100g: log.carbPer100g || (grams ? Number(((log.carb || 0) * 100 / grams).toFixed(1)) : ''),
             fatPer100g: log.fatPer100g || (grams ? Number(((log.fat || 0) * 100 / grams).toFixed(1)) : '')
@@ -82,19 +86,23 @@ const foodLog = {
         if (idx < 0) return;
         const name = String(draft.name || '').trim();
         const grams = Number(draft.grams || 0);
-        const calPer100g = Number(draft.calPer100g || 0);
+        const calUnit = draft.calUnit || 'kcal';
+        const calInputPer100g = Number(draft.calInputPer100g || 0);
+        const calPer100g = this.parseFoodCaloriesToKcal(calInputPer100g, calUnit);
         const proPer100g = Number(draft.proPer100g || 0);
         const carbPer100g = Number(draft.carbPer100g || 0);
         const fatPer100g = Number(draft.fatPer100g || 0);
         if (!name) return alert('请输入食物名称');
         if (!grams || grams <= 0) return alert('请输入有效克数');
-        if (!calPer100g || calPer100g <= 0) return alert('请输入有效热量');
+        if (!calInputPer100g || calInputPer100g <= 0 || !calPer100g) return alert('请输入有效热量');
         const prev = this.db.health.foodLogs[idx];
         this.db.health.foodLogs[idx] = {
             ...prev,
             meal: draft.meal || 'lunch',
             name,
             grams,
+            calUnit,
+            calInputPer100g: Number(calInputPer100g.toFixed(1)),
             calPer100g,
             proPer100g,
             carbPer100g,
@@ -112,14 +120,16 @@ const foodLog = {
     addFoodLog() {
         const name = document.getElementById('foodName')?.value?.trim();
         const grams = parseFloat(document.getElementById('foodGrams')?.value);
-        const cal = parseFloat(document.getElementById('foodCal')?.value);
+        const calInput = parseFloat(document.getElementById('foodCal')?.value);
+        const calUnit = this._foodCalUnit || 'kj';
+        const cal = this.parseFoodCaloriesToKcal(calInput, calUnit);
         const pro = parseFloat(document.getElementById('foodPro')?.value) || 0;
         const carb = parseFloat(document.getElementById('foodCarb')?.value) || 0;
         const fat = parseFloat(document.getElementById('foodFat')?.value) || 0;
         const meal = this._dietMeal || 'lunch';
         if (!name) return alert('请输入食物名称');
         if (!grams || grams <= 0) return alert('请输入食物重量');
-        if (!cal || cal <= 0) return alert('请先选择食物或填写每100g热量');
+        if (!calInput || calInput <= 0 || !cal) return alert('请先选择食物或填写每100g热量');
         const log = {
             id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
             date: this.dateKey(new Date()),
@@ -127,6 +137,8 @@ const foodLog = {
             name,
             grams,
             cal: Math.round(cal * grams / 100),
+            calUnit,
+            calInputPer100g: Number(calInput.toFixed(1)),
             calPer100g: cal,
             pro: Number((pro * grams / 100).toFixed(1)),
             carb: Number((carb * grams / 100).toFixed(1)),
@@ -143,6 +155,8 @@ const foodLog = {
         if (document.getElementById('foodPro')) document.getElementById('foodPro').value = '';
         if (document.getElementById('foodCarb')) document.getElementById('foodCarb').value = '';
         if (document.getElementById('foodFat')) document.getElementById('foodFat').value = '';
+        this._foodCalUnit = 'kj';
+        this.syncFoodCalLabel?.();
         this.setFoodSource('');
         this._aiFoodResults = [];
         this._aiFoodDrafts = [];
@@ -179,6 +193,8 @@ const foodLog = {
         const item = fooddb.getAll().find(f => f.id === id);
         if (!item) return;
         if (document.getElementById('foodName')) document.getElementById('foodName').value = item.name;
+        this._foodCalUnit = 'kcal';
+        this.syncFoodCalLabel?.();
         if (document.getElementById('foodCal')) document.getElementById('foodCal').value = item.cal;
         if (document.getElementById('foodPro')) document.getElementById('foodPro').value = item.pro || 0;
         if (document.getElementById('foodCarb')) document.getElementById('foodCarb').value = item.carb || 0;
@@ -212,18 +228,20 @@ const foodLog = {
 
     updateFoodComputedPreview() {
         const grams = parseFloat(document.getElementById('foodGrams')?.value) || 0;
-        const cal = parseFloat(document.getElementById('foodCal')?.value) || 0;
+        const calInput = parseFloat(document.getElementById('foodCal')?.value) || 0;
+        const cal = this.parseFoodCaloriesToKcal(calInput, this._foodCalUnit || 'kj');
         const pro = parseFloat(document.getElementById('foodPro')?.value) || 0;
         const carb = parseFloat(document.getElementById('foodCarb')?.value) || 0;
         const fat = parseFloat(document.getElementById('foodFat')?.value) || 0;
         const el = document.getElementById('foodComputed');
         if (!el) return;
-        if (!grams || !cal) { el.textContent = '输入食物和重量后自动计算'; return; }
+        if (!grams || !calInput || !cal) { el.textContent = '输入食物和重量后自动计算'; return; }
         const kcal = Math.round(cal * grams / 100);
         const p = (pro * grams / 100).toFixed(1);
         const c = (carb * grams / 100).toFixed(1);
         const f = (fat * grams / 100).toFixed(1);
-        el.textContent = `本次记录：${kcal} kcal · 蛋白 ${p}g · 碳水 ${c}g · 脂肪 ${f}g`;
+        const unitText = (this._foodCalUnit || 'kj') === 'kj' ? `（由 ${Number(calInput.toFixed(1))} kJ/100g 自动换算）` : '';
+        el.textContent = `本次记录：${kcal} kcal${unitText} · 蛋白 ${p}g · 碳水 ${c}g · 脂肪 ${f}g`;
     },
 
     foodSourceTag() {
@@ -370,6 +388,8 @@ const foodLog = {
     applyAiFood(item) {
         if (document.getElementById('foodName')) document.getElementById('foodName').value = item.name;
         if (document.getElementById('foodGrams')) document.getElementById('foodGrams').value = item.grams || '';
+        this._foodCalUnit = 'kcal';
+        this.syncFoodCalLabel?.();
         if (document.getElementById('foodCal')) document.getElementById('foodCal').value = item.cal || '';
         if (document.getElementById('foodPro')) document.getElementById('foodPro').value = item.pro || 0;
         if (document.getElementById('foodCarb')) document.getElementById('foodCarb').value = item.carb || 0;
