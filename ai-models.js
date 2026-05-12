@@ -12,6 +12,7 @@
         try {
             let models = [];
             if (provider === 'gemini') models = await this.fetchGeminiModels(baseUrl, apiKey);
+            else if (provider === 'claude') models = await this.fetchClaudeModels(baseUrl, apiKey);
             else models = await this.fetchOpenAIModels(baseUrl, apiKey);
             this.models = models.map(m => ({ ...m, provider }));
             await this.idbSet(this.MODELS_KEY, JSON.stringify(this.models));
@@ -40,6 +41,23 @@
             const id = (m.name || '').replace('models/', '');
             return { id, displayName: m.displayName || id, vision: this.isVisionModel(id) || (m.supportedGenerationMethods || []).includes('generateContent') };
         }).sort((a, b) => a.vision === b.vision ? a.id.localeCompare(b.id) : (a.vision ? -1 : 1));
+    },
+
+    async fetchClaudeModels(baseUrl, apiKey) {
+        const res = await fetch(`${baseUrl}/models`, {
+            headers: {
+                'x-api-key': apiKey,
+                'anthropic-version': '2023-06-01',
+                'anthropic-dangerous-direct-browser-access': 'true'
+            }
+        });
+        if (!res.ok) throw new Error(`${res.status}`);
+        const json = await res.json();
+        return (json.data || json.models || []).map(m => ({
+            id: m.id || m.name || '',
+            displayName: m.display_name || m.id || '',
+            vision: /claude-3|claude-opus|claude-sonnet|claude-haiku|claude-4/i.test(m.id || '')
+        })).sort((a, b) => a.vision === b.vision ? a.id.localeCompare(b.id) : (a.vision ? -1 : 1));
     },
 
     isVisionModel(id) {

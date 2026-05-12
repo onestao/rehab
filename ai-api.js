@@ -1,43 +1,32 @@
 ﻿Object.assign(ai, {
-    // --- API Calls ---
+    // --- API Calls (统一入口，按 provider 分发) ---
     async call(messages, maxTokens = 2000) {
         if (!this.cfg.enabled) throw new Error('请先在设置中配置 AI 接口');
         const key = this.apiKeyFor(this.cfg.activeProfileId);
         if (!key) throw new Error('请先在当前 AI 配置中填写 API Key');
-        const url = `${this.cfg.baseUrl}/chat/completions`;
-        const body = { model: this.cfg.model, messages, temperature: 0.3, max_tokens: maxTokens };
-        const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` }, body: JSON.stringify(body) });
-        if (!res.ok) {
-            const txt = await res.text().catch(() => '');
-            throw new Error(`AI 请求失败: ${res.status} ${txt.slice(0, 120)}`);
-        }
-        const raw = await res.text();
-        try {
-            const d = JSON.parse(raw);
-            return d.choices?.[0]?.message?.content || '';
-        } catch {
-            let content = '';
-            const parts = raw.split(/\r?\n/);
-            for (const line of parts) {
-                if (!line.startsWith('data:')) continue;
-                const payload = line.slice(5).trim();
-                if (!payload || payload === '[DONE]') continue;
-                try {
-                    const json = JSON.parse(payload);
-                    content += json.choices?.[0]?.delta?.content ?? json.choices?.[0]?.message?.content ?? '';
-                } catch {}
-            }
-            if (content) return content;
-            throw new Error('AI 返回格式异常');
-        }
+        const provider = this.cfg.provider || 'openai';
+        if (provider === 'claude')           return this._callClaude(messages, maxTokens, key, false);
+        if (provider === 'openai-responses') return this._callOpenAIResponses(messages, maxTokens, key, false);
+        if (provider === 'gemini')           return this._callGemini(messages, maxTokens, key, false);
+        return this._callOpenAIChat(messages, maxTokens, key, false);
     },
 
     async callStream(messages, maxTokens = 2000, onChunk = () => {}) {
         if (!this.cfg.enabled) throw new Error('请先在设置中配置 AI 接口');
         const key = this.apiKeyFor(this.cfg.activeProfileId);
         if (!key) throw new Error('请先在当前 AI 配置中填写 API Key');
+        const provider = this.cfg.provider || 'openai';
+        if (provider === 'claude')           return this._callClaude(messages, maxTokens, key, true, onChunk);
+        if (provider === 'openai-responses') return this._callOpenAIResponses(messages, maxTokens, key, true, onChunk);
+        if (provider === 'gemini')           return this._callGemini(messages, maxTokens, key, true, onChunk);
+        return this._callOpenAIChat(messages, maxTokens, key, true, onChunk);
+    },
+
+    // ---------- OpenAI Chat Completions ----------
+    async _callOpenAIChat(messages, maxTokens, key, stream, onChunk) {
         const url = `${this.cfg.baseUrl}/chat/completions`;
-        const body = { model: this.cfg.model, messages, temperature: 0.3, max_tokens: maxTokens, stream: true };
+        const body = { model: this.cfg.model, messages, temperature: 0.3, max_tokens: maxTokens };
+        if (stream) body.stream = true;
         const res = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
@@ -47,17 +36,164 @@
             const txt = await res.text().catch(() => '');
             throw new Error(`AI 请求失败: ${res.status} ${txt.slice(0, 120)}`);
         }
-        if (!res.body) {
-            const content = await this.call(messages, maxTokens);
-            if (content) onChunk(content);
-            return content;
+        if (!stream) {
+            const raw = await res.text();
+            try {
+                const d = JSON.parse(raw);
+                return d.choices?.[0]?.message?.content || '';
+            } catch {
+                let content = '';
+                const parts = raw.split(/\r?\n/);
+                for (const line of parts) {
+                    if (!line.startsWith('data:')) continue;
+                    const payload = line.slice(5).trim();
+                    if (!payload || payload === '[DONE]') continue;
+                    try {
+                        const json = JSON.parse(payload);
+                        content += json.choices?.[0]?.delta?.content ?? json.choices?.[0]?.message?.content ?? '';
+                    } catch {}
+                }
+                if (content) return content;
+                throw new Error('AI 返回格式异常');
+            }
         }
+        return this._readSSE(res, onChunk, (json) =>
+            json.choices?.[0]?.delta?.content ?? json.choices?.[0]?.message?.content ?? ''
+        );
+    },
 
+    // ---------- OpenAI Responses API（最新 /v1/responses） ----------
+    async _callOpenAIResponses(messages, maxTokens, key, stream, onChunk) {
+        const url = `${this.cfg.baseUrl}/responses`;
+        const sys = messages.filter(m => m.role === 'system').map(m => m.content).join('\n');
+        const input = messages.filter(m => m.role !== 'system').map(m => ({
+            role: m.role,
+            content: [{ type: m.role === 'assistant' ? 'output_text' : 'input_text', text: m.content }]
+        }));
+        const body = {
+            model: this.cfg.model,
+            input,
+            max_output_tokens: maxTokens,
+            temperature: 0.3
+        };
+        if (sys) body.instructions = sys;
+        if (stream) body.stream = true;
+
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
+            body: JSON.stringify(body)
+        });
+        if (!res.ok) {
+            const txt = await res.text().catch(() => '');
+            throw new Error(`AI 请求失败: ${res.status} ${txt.slice(0, 120)}`);
+        }
+        if (!stream) {
+            const d = await res.json();
+            if (d.output_text) return d.output_text;
+            let txt = '';
+            for (const item of (d.output || [])) {
+                for (const c of (item.content || [])) {
+                    if (c.type === 'output_text' || c.type === 'text') txt += c.text || '';
+                }
+            }
+            return txt;
+        }
+        return this._readSSE(res, onChunk, (json) => {
+            if (json.type === 'response.output_text.delta') return json.delta || '';
+            return '';
+        });
+    },
+
+    // ---------- Anthropic Claude Messages API ----------
+    async _callClaude(messages, maxTokens, key, stream, onChunk) {
+        const url = `${this.cfg.baseUrl}/messages`;
+        const sys = messages.filter(m => m.role === 'system').map(m => m.content).join('\n');
+        const msgs = messages.filter(m => m.role !== 'system').map(m => ({
+            role: m.role === 'assistant' ? 'assistant' : 'user',
+            content: m.content
+        }));
+        const body = {
+            model: this.cfg.model,
+            messages: msgs,
+            max_tokens: maxTokens,
+            temperature: 0.3
+        };
+        if (sys) body.system = sys;
+        if (stream) body.stream = true;
+
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-api-key': key,
+                'anthropic-version': '2023-06-01',
+                'anthropic-dangerous-direct-browser-access': 'true'
+            },
+            body: JSON.stringify(body)
+        });
+        if (!res.ok) {
+            const txt = await res.text().catch(() => '');
+            throw new Error(`AI 请求失败: ${res.status} ${txt.slice(0, 120)}`);
+        }
+        if (!stream) {
+            const d = await res.json();
+            return (d.content || []).filter(c => c.type === 'text').map(c => c.text).join('');
+        }
+        return this._readSSE(res, onChunk, (json) => {
+            if (json.type === 'content_block_delta' && json.delta?.type === 'text_delta') {
+                return json.delta.text || '';
+            }
+            return '';
+        });
+    },
+
+    // ---------- Gemini ----------
+    async _callGemini(messages, maxTokens, key, stream, onChunk) {
+        const sys = messages.filter(m => m.role === 'system').map(m => m.content).join('\n');
+        const contents = messages.filter(m => m.role !== 'system').map(m => ({
+            role: m.role === 'assistant' ? 'model' : 'user',
+            parts: [{ text: m.content }]
+        }));
+        const action = stream ? `streamGenerateContent?alt=sse&key=${key}` : `generateContent?key=${key}`;
+        const url = `${this.cfg.baseUrl}/models/${this.cfg.model}:${action}`;
+        const body = {
+            contents,
+            generationConfig: { temperature: 0.3, maxOutputTokens: maxTokens },
+            ...(sys ? { systemInstruction: { parts: [{ text: sys }] } } : {})
+        };
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+        if (!res.ok) {
+            const txt = await res.text().catch(() => '');
+            throw new Error(`AI 请求失败: ${res.status} ${txt.slice(0, 120)}`);
+        }
+        if (!stream) {
+            const d = await res.json();
+            return d.candidates?.[0]?.content?.parts?.map(p => p.text).join('') || '';
+        }
+        return this._readSSE(res, onChunk, (json) =>
+            json.candidates?.[0]?.content?.parts?.map(p => p.text).join('') || ''
+        );
+    },
+
+    // ---------- 通用 SSE 读取 ----------
+    async _readSSE(res, onChunk, extract) {
+        if (!res.body) {
+            const text = await res.text();
+            try {
+                const d = JSON.parse(text);
+                const t = extract(d);
+                if (t) onChunk(t, t);
+                return t;
+            } catch { return ''; }
+        }
         const reader = res.body.getReader();
         const decoder = new TextDecoder('utf-8');
-        let buffer = '';
-        let full = '';
-
+        let buffer = '', full = '';
         const flush = (chunk) => {
             const parts = chunk.split(/\r?\n/).filter(Boolean);
             for (const part of parts) {
@@ -66,16 +202,13 @@
                 if (!payload || payload === '[DONE]') continue;
                 try {
                     const json = JSON.parse(payload);
-                    const delta = json.choices?.[0]?.delta?.content ?? json.choices?.[0]?.message?.content ?? '';
+                    const delta = extract(json);
                     if (!delta) continue;
                     full += delta;
                     onChunk(delta, full);
-                } catch {
-                    // Ignore malformed partial chunks from non-SSE responses.
-                }
+                } catch {}
             }
         };
-
         while (true) {
             const { value, done } = await reader.read();
             if (done) break;
