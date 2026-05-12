@@ -164,7 +164,7 @@
 
     writePipDocument(doc) {
         doc.open();
-        doc.write(`<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>训练画中画</title><style>${this.pipStyles()}</style></head><body><main class="pip-card"><div class="pip-head"><span class="pip-kicker">训练助手</span><button id="pipClose" class="pip-icon-btn" aria-label="关闭">×</button></div><div id="pipStatus" class="pip-status">READY</div><div id="pipTime" class="pip-time">00</div><div id="pipSub" class="pip-sub">准备就绪</div><div class="pip-stats"><div><small id="pipLabelA">总用时</small><b id="pipValueA">00:00</b></div><div><small id="pipLabelB">组数</small><b id="pipValueB">0/0</b></div><div><small id="pipLabelC">次数</small><b id="pipValueC">0/0</b></div></div><div class="pip-actions"><button id="pipPlay" class="pip-btn pip-primary">暂停</button><button id="pipSkip" class="pip-btn">跳过</button><button id="pipStop" class="pip-btn pip-danger">停止</button></div><p class="pip-hint">保持此小窗可降低后台暂停概率</p></main></body></html>`);
+        doc.write(`<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>训练画中画</title><style>${this.pipStyles()}</style></head><body><main class="pip-card"><div class="pip-head"><span class="pip-kicker">训练助手</span><button id="pipClose" class="pip-icon-btn" aria-label="关闭">×</button></div><div id="pipStatus" class="pip-status">READY</div><div id="pipTime" class="pip-time">00</div><div id="pipSub" class="pip-sub">准备就绪</div><div id="pipNext" class="pip-next"></div><div class="pip-stats"><div><small id="pipLabelA">总用时</small><b id="pipValueA">00:00</b></div><div><small id="pipLabelB">组数</small><b id="pipValueB">0/0</b></div><div><small id="pipLabelC">次数</small><b id="pipValueC">0/0</b></div></div><div class="pip-actions"><button id="pipPlay" class="pip-btn pip-primary">暂停</button><button id="pipSkip" class="pip-btn">跳过</button><button id="pipStop" class="pip-btn pip-danger">停止</button></div><p class="pip-hint">保持此小窗可降低后台暂停概率</p></main></body></html>`);
         doc.close();
     },
 
@@ -184,6 +184,7 @@
             .pip-status{justify-self:center;display:inline-flex;align-items:center;justify-content:center;padding:6px 14px;border-radius:999px;background:rgba(209,228,255,.15);color:var(--primary);font-size:13px;font-weight:950;letter-spacing:.16em;min-width:96px}
             .pip-time{align-self:end;font-size:clamp(72px,28vw,118px);font-weight:950;line-height:.9;color:#d1e4ff;text-shadow:0 10px 34px rgba(160,202,253,.32);font-variant-numeric:tabular-nums;letter-spacing:-3px}
             .pip-sub{align-self:start;min-height:52px;color:rgba(255,255,255,.78);font-size:18px;font-weight:800;line-height:1.35;word-break:break-word;display:flex;align-items:flex-start;justify-content:center;padding:0 8px}
+            .pip-next{color:rgba(160,202,253,.85);font-size:14px;font-weight:800;text-align:center;min-height:20px;line-height:1.35}
             .pip-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
             .pip-stats div{padding:12px 8px;border-radius:20px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.12);box-shadow:0 10px 26px rgba(0,0,0,.14)}
             .pip-stats small{display:block;color:rgba(255,255,255,.64);font-size:12px;font-weight:800;line-height:1.2}
@@ -234,6 +235,13 @@
         doc.getElementById('pipValueB').innerText = `${text('curSet')}/${text('totalSet')}`;
         doc.getElementById('pipLabelC').innerText = document.querySelectorAll('.stat-label')[2]?.innerText || '次数';
         doc.getElementById('pipValueC').innerText = `${text('curRep')}/${text('totalRep')}`;
+        const pipNext = doc.getElementById('pipNext');
+        if (pipNext) {
+            const next = workout._nextActionName || '';
+            const done = workout._doneSetsAll || 0;
+            const total = workout._totalSetsAll || 0;
+            pipNext.innerText = next ? `下一组：${next}${total ? ` · ${done}/${total}` : ''}` : '';
+        }
         doc.getElementById('pipPlay').innerText = this.isPaused ? '继续' : '暂停';
         doc.getElementById('pipSkip').disabled = this.mode === 'cardio' || !this.isPlaying;
         this.updatePipButton();
@@ -296,6 +304,13 @@
         ctx.fillStyle = 'rgba(255,255,255,0.78)';
         ctx.font = '800 30px system-ui, sans-serif';
         this.wrapCanvasText(ctx, sub, w / 2, 250, w - 112, 34, 2);
+        const next = workout._nextActionName || '';
+        if (next) {
+            ctx.fillStyle = 'rgba(160,202,253,0.85)';
+            ctx.font = '800 22px system-ui, sans-serif';
+            const progress = workout._totalSetsAll ? ` · ${workout._doneSetsAll || 0}/${workout._totalSetsAll}` : '';
+            ctx.fillText(`下一组：${next}${progress}`, w / 2, 320);
+        }
         ctx.textAlign = 'left';
         this.drawVideoPipStat(ctx, 55, 294, labelA, valueA);
         this.drawVideoPipStat(ctx, 238, 294, labelB, valueB);

@@ -313,7 +313,7 @@ Object.assign(advicePanel, {
                 <b>${label}<small>${time}${model}</small></b>
                 ${msg.pending ? '<span class="advice-typing-dot"></span>' : ''}
             </div>
-            <div class="advice-bubble-content">${content}</div>
+            <div class="advice-bubble-content">${msg.pending ? '<div class="skeleton-line skeleton" style="width:80%"></div><div class="skeleton-line skeleton" style="width:60%"></div><div class="skeleton-line skeleton" style="width:90%"></div>' : content}</div>
             ${actions}
         </div>`;
     },

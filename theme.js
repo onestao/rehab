@@ -73,6 +73,9 @@ const theme = {
     },
 
     apply(seed) {
+        document.documentElement.classList.add('theme-transitioning');
+        clearTimeout(this._tT);
+        this._tT = setTimeout(() => document.documentElement.classList.remove('theme-transitioning'), 400);
         const rgb = this.hexToRgb(seed);
         const hsl = this.rgbToHsl(rgb.r, rgb.g, rgb.b);
         const systemDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;

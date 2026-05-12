@@ -9,8 +9,24 @@
         document.body.classList.toggle('is-training', this.isPlaying);
         document.body.classList.toggle('is-paused', this.isPlaying && this.isPaused);
         document.body.classList.toggle('is-cardio-mode', this.mode === 'cardio');
+        const tweak = document.getElementById('timerTweak');
+        if (tweak) tweak.classList.toggle('hidden', !this.isPlaying);
         this.updatePipButton();
         this.renderPip();
+    },
+
+    tweakPhase(delta) {
+        if (!this.isPlaying) return;
+        if (this._phaseLeft == null) return;
+        const next = Math.max(0, this._phaseLeft + delta);
+        this._phaseLeft = next;
+        const el = document.getElementById('mainTime');
+        if (el) el.innerText = next;
+        if (next === 0 && this._countResolve) {
+            this._countResolve();
+            this._countResolve = null;
+            clearInterval(this.timer);
+        }
     },
 
     setTrainingPaused(paused) {
@@ -77,6 +93,13 @@
     },
 
     async toggle() {
+        const fab = document.getElementById('playBtn');
+        if (fab) {
+            const r = document.createElement('span');
+            r.className = 'ripple';
+            fab.appendChild(r);
+            setTimeout(() => r.remove(), 600);
+        }
         if (this.mode === 'cardio') return cardio.toggle();
         if (!this.isPlaying) {
             if (data.db.actions.length === 0) return;
@@ -190,6 +213,9 @@
         document.getElementById('playIcon').innerText = 'play_arrow';
         document.getElementById('stopBtn').classList.add('hidden');
         if (window.workoutState) workoutState.clear();
+        workout._nextActionName = ''; workout._totalSetsAll = 0; workout._doneSetsAll = 0;
+        const bar = document.getElementById('globalTrainingBar');
+        if (bar) { bar.classList.add('hidden'); bar.querySelector('span').style.width = '0%'; }
         if (duration < 20) {
             this.speak("训练时间过短，无法记录");
             alert("训练时间低于20秒，无法保存记录");
@@ -197,8 +223,39 @@
             return;
         }
         this.speak("训练完成");
-        data.db.history.unshift({ date: new Date().toLocaleString(), duration, actions: [...data.db.actions] });
+        data.db.history.unshift({
+            date: new Date().toLocaleString(), duration,
+            actions: [...data.db.actions],
+            actualSets: data.db.actualSetsBuffer || []
+        });
+        data.db.actualSetsBuffer = [];
         data.saveAndBackup();
         this.resetMainPanel();
+    },
+
+    openSetReview(actionName, setIdx, plannedReps) {
+        this._reviewCtx = { actionName, setIdx, plannedReps };
+        document.getElementById('setReviewTitle').textContent = `${actionName} 第${setIdx}组`;
+        document.getElementById('setReviewReps').value = plannedReps;
+        document.getElementById('setReviewWeight').value = '';
+        document.getElementById('setReviewNote').value = '';
+        document.getElementById('setReviewModal').classList.remove('hidden');
+    },
+    closeSetReview() {
+        document.getElementById('setReviewModal').classList.add('hidden');
+        this._reviewCtx = null;
+    },
+    saveSetReview() {
+        if (!this._reviewCtx) return;
+        const w = parseFloat(document.getElementById('setReviewWeight').value) || 0;
+        const reps = parseInt(document.getElementById('setReviewReps').value) || this._reviewCtx.plannedReps;
+        const note = document.getElementById('setReviewNote').value || '';
+        data.db.actualSetsBuffer = data.db.actualSetsBuffer || [];
+        data.db.actualSetsBuffer.push({
+            action: this._reviewCtx.actionName, setIdx: this._reviewCtx.setIdx,
+            weightKg: w, reps, note, at: new Date().toISOString()
+        });
+        data.save();
+        this.closeSetReview();
     }
 });

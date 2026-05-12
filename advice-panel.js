@@ -435,7 +435,15 @@
                     const bubble = document.querySelector(`[data-advice-id="${pendingId}"]`);
                     if (bubble && accumulated) {
                         const contentEl = bubble.querySelector('.advice-bubble-content');
-                        if (contentEl) contentEl.innerHTML = this.renderAdviceMarkdown(accumulated);
+                        if (contentEl) {
+                            contentEl.innerHTML = this.renderAdviceMarkdown(accumulated);
+                            contentEl.querySelectorAll('p, li, h1, h2, h3').forEach(el => {
+                                if (!el.dataset.m3e) {
+                                    el.dataset.m3e = '1';
+                                    el.classList.add('m3e-token-in');
+                                }
+                            });
+                        }
                         bubble.classList.remove('pending');
                         const dots = bubble.querySelector('.advice-typing-dot');
                         if (dots) dots.remove();

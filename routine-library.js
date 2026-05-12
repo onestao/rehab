@@ -10,7 +10,8 @@
                 actionRest: parseInt(document.getElementById('actionRest').value) || 10,
                 groupRest: parseInt(document.getElementById('groupRest').value) || 15,
                 switchRest: 3,
-                isAlt: document.getElementById('isAlt').checked
+                isAlt: document.getElementById('isAlt').checked,
+                phase: document.getElementById('actionPhase')?.value || 'main'
             };
             this.db.actions.push(a);
             this.db.lastActionDraft = {
@@ -47,7 +48,19 @@
         loadRoutine(idx) {
             const r = this.db.routines[idx];
             if (!r) return;
-            this.db.actions = JSON.parse(JSON.stringify(r.actions));
+            const hasActions = this.db.actions.length > 0;
+            if (!hasActions) {
+                this.db.actions = JSON.parse(JSON.stringify(r.actions));
+                this.save();
+                ui.tab('workout', document.querySelector('.nav-item'));
+                return;
+            }
+            const choice = confirm(`当前已有 ${this.db.actions.length} 个动作。\n点"确定"=替换，点"取消"=追加`);
+            if (choice) {
+                this.db.actions = JSON.parse(JSON.stringify(r.actions));
+            } else {
+                this.db.actions = this.db.actions.concat(JSON.parse(JSON.stringify(r.actions)));
+            }
             this.save();
             ui.tab('workout', document.querySelector('.nav-item'));
         },
@@ -80,19 +93,24 @@
                 </div>`;
                 return;
             }
-            list.innerHTML = this.db.actions.map((a, i) => `
-            <div class="list-item">
-                <div class="sort-btns">
-                    <button class="sort-btn" onclick="data.move(${i},-1)"><span class="material-symbols-rounded">expand_less</span></button>
-                    <button class="sort-btn" onclick="data.move(${i},1)"><span class="material-symbols-rounded">expand_more</span></button>
-                </div>
-                <div style="flex:1;min-width:0">
-                    <strong>${a.name}</strong>
-                    <small>${a.sets}组 &middot; ${a.reps}次 &middot; ${a.work}s</small>
-                    <div class="item-chip">组休${a.actionRest}s &middot; 项休${a.groupRest}s${a.isAlt ? ' &middot; 双侧' : ''}</div>
-                </div>
-                <button class="delete-btn" onclick="data.db.actions.splice(${i},1);data.save();"><span class="material-symbols-rounded">delete</span></button>
-            </div>`).join('');
+            const phases = [['warmup','暖身'],['main','正式'],['cooldown','放松']];
+            list.innerHTML = phases.map(([key, label]) => {
+                const items = this.db.actions.map((a, i) => ({ a, i })).filter(x => (x.a.phase || 'main') === key);
+                if (!items.length) return '';
+                return `<div class="action-phase-group"><div class="action-phase-head">${label} · ${items.length}个</div>${items.map(({a, i}) => `
+                <div class="list-item">
+                    <div class="sort-btns">
+                        <button class="sort-btn" onclick="data.move(${i},-1)"><span class="material-symbols-rounded">expand_less</span></button>
+                        <button class="sort-btn" onclick="data.move(${i},1)"><span class="material-symbols-rounded">expand_more</span></button>
+                    </div>
+                    <div style="flex:1;min-width:0">
+                        <strong>${a.name}</strong>
+                        <small>${a.sets}组 &middot; ${a.reps}次 &middot; ${a.work}s</small>
+                        <div class="item-chip">组休${a.actionRest}s &middot; 项休${a.groupRest}s${a.isAlt ? ' &middot; 双侧' : ''}</div>
+                    </div>
+                    <button class="delete-btn" onclick="data.db.actions.splice(${i},1);data.save();"><span class="material-symbols-rounded">delete</span></button>
+                </div>`).join('')}</div>`;
+            }).join('');
         },
 
         renderWorkoutPlanCard() {
@@ -265,7 +283,7 @@
             const overview = document.getElementById('profileOverview');
             const content = document.getElementById('profileContent');
             const settings = document.getElementById('profileSettings');
-            if (overview) overview.innerHTML = this.renderRoutineOverview();
+            if (overview) overview.innerHTML = (this.renderWeeklySummaryCard?.() || '') + this.renderRoutineOverview();
             if (content) {
                 const isSettings = this.routineView === 'settings';
                 if (settings) settings.classList.toggle('hidden', !isSettings);

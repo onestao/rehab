@@ -25,6 +25,7 @@ Object.assign(
     window.dataGoalPlan || {},
     window.dataRoutineLibrary || {},
     window.dataHistoryView || {},
+    window.dataWeeklySummary || {},
     window.dataViews || {}
 );
 

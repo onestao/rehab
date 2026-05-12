@@ -113,6 +113,23 @@ const workoutEngine = {
     async stepAction(action) {
         const actions = data.db.actions || [];
         const sides = action.isAlt ? ['左侧', '右侧'] : [''];
+        let totalSetsAll = 0;
+        let doneSetsAll = 0;
+        actions.forEach((a, i) => {
+            const s = a.sets || 1;
+            totalSetsAll += s;
+            if (i < this.state.actionIndex) doneSetsAll += s;
+        });
+        doneSetsAll += this.state.setIndex;
+        workout._totalSetsAll = totalSetsAll;
+        workout._doneSetsAll = doneSetsAll;
+        const bar = document.getElementById('globalTrainingBar');
+        if (bar && totalSetsAll > 0) {
+            bar.classList.remove('hidden');
+            bar.querySelector('span').style.width = `${Math.round((doneSetsAll / totalSetsAll) * 100)}%`;
+        }
+        const nextAction = actions[this.state.actionIndex + 1];
+        workout._nextActionName = nextAction?.name || '';
         while (workout.isPlaying && this.state.actionIndex < (data.db.actions || []).length) {
             if (this.state.phase === 'intro') {
                 await workout.speak(`下一项：${action.name}`);
@@ -191,6 +208,7 @@ const workoutEngine = {
                     this.transition('actionBreak');
                     continue;
                 }
+                workout.openSetReview(action.name, this.state.setIndex, action.reps);
                 await workout.speak('组间休息');
                 if (this.applySkipOverride()) continue;
                 await this.runCount(action.actionRest, '稍作休息', 'SET REST', 'nextSet');
