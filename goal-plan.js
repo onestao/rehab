@@ -28,8 +28,8 @@
                 if (statusEl) statusEl.textContent = 'AI 方案已生成，请选择';
                 this.renderHistory();
             } catch (e) {
-                if (statusEl) statusEl.textContent = '生成失败: ' + e.message;
-                alert('AI 方案生成失败: ' + e.message);
+                if (statusEl) statusEl.textContent = '生成失败: ' + (window.toast ? toast.sanitize(e) : e.message);
+                alert('AI 方案生成失败: ' + (window.toast ? toast.sanitize(e) : e.message));
             }
         },
 

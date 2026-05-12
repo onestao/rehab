@@ -107,7 +107,9 @@
             this.syncFoodCalLabel?.();
             this.setFoodSource('');
             document.getElementById('dietModal').classList.remove('hidden');
-            this._dietInputMode = 'ai';
+            const savedMode = this.db.health.dietInputMode || 'ai';
+            this._dietInputMode = savedMode;
+            this.setDietInputMode(savedMode);
         },
 
         closeDietModal() {
@@ -122,8 +124,9 @@
             return '<div class="diet-modal-body">' +
                 '<div class="diet-meal-selector">' + meals.map(([k,v]) => '<button class="diet-meal-pill' + (meal===k ? ' active' : '') + '" onclick="data.setDietMeal(\''+k+'\')" type="button">' + v + '</button>').join('') + '</div>' +
                 '<div class="diet-mode-tabs" role="tablist"><button class="diet-mode-tab active" data-mode="ai" onclick="data.setDietInputMode(\'ai\')" type="button"><span class="material-symbols-rounded">psychology</span>AI录入</button><button class="diet-mode-tab" data-mode="manual" onclick="data.setDietInputMode(\'manual\')" type="button"><span class="material-symbols-rounded">edit</span>手动录入</button></div>' +
-                '<div class="diet-ai-entry"><textarea id="foodAiText" class="diet-ai-input" rows="2" placeholder="描述这顿吃了什么..." oninput="data.autoResizeDietInput(this)"></textarea><button class="md-btn md-btn-filled diet-ai-run" onclick="data.aiParseFood()"><span class="material-symbols-rounded">psychology</span>AI识别</button></div>' +
-                '<div id="foodSearchResults" class="food-search-results"></div><div id="foodAiStatus" class="food-ai-status"></div>' +
+                '<div id="foodAiArea"><div class="diet-ai-entry"><textarea id="foodAiText" class="diet-ai-input" rows="2" placeholder="描述这顿吃了什么..." oninput="data.autoResizeDietInput(this)"></textarea><button class="md-btn md-btn-filled diet-ai-run" onclick="data.aiParseFood()"><span class="material-symbols-rounded">psychology</span>AI识别</button></div>' +
+                '<div id="foodAiResults" class="food-search-results"></div><div id="foodAiStatus" class="food-ai-status"></div></div>' +
+                '<div id="foodSearchSuggest" class="food-search-results"></div>' +
                 '<div id="foodManualArea" class="diet-manual-area hidden"><div class="md-grid diet-input-grid">' +
                 '<div class="md-field span-full"><input type="text" id="foodName" placeholder=" " oninput="data.onFoodSearchInput()" onblur="data.autoFillFoodByName()"><label>食物名称</label></div>' +
                 '<div class="md-field"><input type="number" id="foodGrams" step="1" placeholder=" " oninput="data.updateFoodComputedPreview()"><label>克数</label></div>' +
@@ -135,7 +138,7 @@
                 '<div id="foodCalUnitHint" class="food-cal-hint span-full">输入千焦后会自动换算为 kcal 保存和统计</div>' +
                 '<div id="foodComputed" class="food-computed span-full">输入食物和重量后自动计算</div>' +
                 '<div id="foodSourceHint" class="food-source-hint span-full">输入食物后可从食物库或 AI 自动填充营养</div>' +
-                '<div class="diet-btn-row"><button class="md-btn md-btn-filled" onclick="data.addFoodLog()"><span class="material-symbols-rounded">add</span> 添加</button><button class="md-btn md-btn-tonal" onclick="data.aiParseFood()"><span class="material-symbols-rounded">psychology</span></button></div>' +
+                '<div class="diet-btn-row"><button class="md-btn md-btn-filled" onclick="data.addFoodLog()"><span class="material-symbols-rounded">add</span> 添加</button></div>' +
                 '</div></div></div>';
         },
 
@@ -152,8 +155,11 @@
 
         renderExerciseModalContent() {
             return '<div class="exercise-modal-body"><div class="md-grid exercise-grid">' +
-                '<div class="md-field"><select id="manualExerciseType" onchange="data.toggleManualCustomExercise(this.value)"><option value="walk">步行</option><option value="run">跑步</option><option value="cycling">骑行</option><option value="swim">游泳</option><option value="battle_rope">战绳</option><option value="spin_bike">动感单车</option><option value="strength">力量训练</option><option value="stretch">拉伸/瑜伽</option><option value="custom">自定义运动</option></select><label>运动种类</label></div>' +
-                '<div class="md-field hidden" id="manualExerciseCustomField"><input type="text" id="manualExerciseCustom" placeholder=" "><label>自定义运动名称</label></div>' +
+                '<div class="md-field"><select id="manualExerciseType" onchange="data.toggleManualCustomExercise(this.value)"><option value="walk">步行</option><option value="run">跑步</option><option value="cycling">骑行</option><option value="swim">游泳</option><option value="battle_rope">战绳</option><option value="spin_bike">动感单车</option><option value="strength">力量训练 (无氧)</option><option value="stretch">拉伸/瑜伽</option><option value="custom">自定义运动</option></select><label>运动种类</label></div>' +
+                '<div class="md-field hidden" id="manualExerciseCustomField"><input type="text" id="manualExerciseCustom" placeholder=" "><label>动作 / 自定义名称</label></div>' +
+                '<div class="md-field hidden" id="manualExerciseWeightField"><input type="number" id="manualExerciseWeight" step="0.5" placeholder=" "><label>负重 kg</label></div>' +
+                '<div class="md-field hidden" id="manualExerciseSetsField"><input type="number" id="manualExerciseSets" step="1" placeholder=" "><label>组数</label></div>' +
+                '<div class="md-field hidden" id="manualExerciseRepsField"><input type="number" id="manualExerciseReps" step="1" placeholder=" "><label>每组次数</label></div>' +
                 '<div class="md-field"><input type="number" id="manualExerciseMinutes" step="1" placeholder=" "><label>时长 分钟</label></div>' +
                 '<div class="md-field"><input type="number" id="manualExerciseCalories" step="1" placeholder=" "><label>热量 kcal</label></div>' +
                 '<div class="md-field"><input type="number" id="manualExerciseDistance" step="0.1" placeholder=" "><label>距离 km</label></div>' +
@@ -162,10 +168,11 @@
         },
 
         addExerciseFromModal() {
-            this.addManualExercise();
-            ['manualExerciseCustom','manualExerciseMinutes','manualExerciseCalories','manualExerciseDistance','manualExerciseNote'].forEach(function(id) { var el = document.getElementById(id); if (el) el.value = ''; });
+            if (!this.addManualExercise()) return;
+            ['manualExerciseCustom','manualExerciseWeight','manualExerciseSets','manualExerciseReps','manualExerciseMinutes','manualExerciseCalories','manualExerciseDistance','manualExerciseNote'].forEach(function(id) { var el = document.getElementById(id); if (el) el.value = ''; });
             var t = document.getElementById('manualExerciseType'); if (t) t.value = 'walk';
             var cf = document.getElementById('manualExerciseCustomField'); if (cf) cf.classList.add('hidden');
+            ['manualExerciseWeightField','manualExerciseSetsField','manualExerciseRepsField'].forEach(function(id) { var el = document.getElementById(id); if (el) el.classList.add('hidden'); });
             if (typeof workout !== 'undefined' && workout.showToast) workout.showToast('运动记录已添加');
         },
 

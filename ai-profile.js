@@ -192,7 +192,7 @@
             data.save();
             document.getElementById('aiEncryptPass').value = '';
             alert('所有 AI 配置档案已加密并存入同步数据');
-        } catch (e) { alert('加密失败: ' + e.message); }
+        } catch (e) { alert('加密失败: ' + (window.toast ? toast.sanitize(e) : e.message)); }
     },
 
     async importFromSync() {

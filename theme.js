@@ -7,15 +7,38 @@ const theme = {
         orange: '#9a4600',
         rose: '#ba005c'
     },
-    cfg: { mode: 'blue', seed: '#0061a4' },
+    cfg: { mode: 'blue', seed: '#0061a4', colorMode: 'auto' },
 
     init() {
         const saved = localStorage.getItem(this.KEY);
         if (saved) this.cfg = { ...this.cfg, ...JSON.parse(saved) };
+        this.applyColorMode(this.cfg.colorMode || 'auto');
         this.apply(this.cfg.seed);
         this.syncUI();
         if (window.matchMedia) {
-            window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => this.apply(this.cfg.seed));
+            window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+                if (this.cfg.colorMode === 'auto') this.apply(this.cfg.seed);
+            });
+        }
+    },
+
+    setMode(colorMode) {
+        this.cfg.colorMode = colorMode || 'auto';
+        this.persist();
+        this.applyColorMode(colorMode);
+        this.apply(this.cfg.seed);
+        this.syncUI();
+    },
+
+    applyColorMode(colorMode) {
+        const root = document.documentElement;
+        root.removeAttribute('data-theme-mode');
+        if (colorMode === 'auto') {
+            root.setAttribute('data-theme-mode', 'auto');
+        } else if (colorMode === 'dark') {
+            root.setAttribute('data-theme-mode', 'dark');
+        } else {
+            root.setAttribute('data-theme-mode', 'light');
         }
     },
 
@@ -52,7 +75,9 @@ const theme = {
     apply(seed) {
         const rgb = this.hexToRgb(seed);
         const hsl = this.rgbToHsl(rgb.r, rgb.g, rgb.b);
-        const dark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        const systemDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        const colorMode = this.cfg.colorMode || 'auto';
+        const dark = colorMode === 'dark' ? true : colorMode === 'light' ? false : systemDark;
         const primary = this.hslToHex(hsl.h, Math.max(0.48, hsl.s), 0.36);
         const primaryContainer = this.hslToHex(hsl.h, 0.84, 0.88);
         const darkPrimary = this.hslToHex(hsl.h, 0.74, 0.80);
@@ -106,6 +131,8 @@ const theme = {
         const color = document.getElementById('themeColor');
         if (color) color.value = this.cfg.seed;
         document.querySelectorAll('.theme-swatch').forEach(btn => btn.classList.toggle('active', btn.dataset.theme === this.cfg.mode));
+        const colorMode = this.cfg.colorMode || 'auto';
+        document.querySelectorAll('.theme-mode-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.colorMode === colorMode));
     },
 
     persist() { localStorage.setItem(this.KEY, JSON.stringify(this.cfg)); },

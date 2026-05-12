@@ -20,7 +20,7 @@
             this.renderModels(this.models, false);
             if (statusEl) statusEl.textContent = `已获取 ${models.length} 个模型`;
         } catch (e) {
-            if (statusEl) statusEl.textContent = '获取失败: ' + e.message;
+            if (statusEl) statusEl.textContent = '获取失败: ' + (window.toast ? toast.sanitize(e) : e.message);
         }
     },
 

@@ -182,11 +182,16 @@
 
         setDietInputMode(mode) {
             this._dietInputMode = mode || 'ai';
+            this.db.health.dietInputMode = this._dietInputMode;
             const manualArea = document.getElementById('foodManualArea');
+            const aiArea = document.getElementById('foodAiArea');
             if (manualArea) manualArea.classList.toggle('hidden', mode !== 'manual');
+            if (aiArea) aiArea.classList.toggle('hidden', mode !== 'ai');
+            if (mode === 'manual') this.clearAiResults?.();
             document.querySelectorAll('.diet-mode-tab').forEach(btn => {
                 btn.classList.toggle('active', btn.dataset.mode === mode);
             });
+            this.save?.();
         },
 
         setGoalType(type) {

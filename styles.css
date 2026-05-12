@@ -3211,3 +3211,12 @@ body.is-training .fab-pip.active {
 .weight-history-head small { position: relative; z-index: 1; color: var(--md-sys-on-surface-variant); font-size: 11px; font-weight: 700; white-space: nowrap; }
 .weight-history-content { display: grid; gap: 6px; }
 .weight-history-card.collapsed .weight-history-content { display: none; }
+
+.app-toast{position:fixed;left:50%;bottom:80px;transform:translateX(-50%) translateY(20px);
+    background:rgba(40,40,40,.92);color:#fff;padding:10px 16px;border-radius:20px;
+    font-size:14px;opacity:0;pointer-events:none;transition:.2s;z-index:9999;max-width:80vw}
+.app-toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.app-toast[data-type=error]{background:#b3261e}
+.app-toast[data-type=success]{background:#1f6e3a}
+
+.theme-mode-btn.active{background:var(--md-sys-primary);color:var(--md-sys-on-primary);border-color:var(--md-sys-primary)}

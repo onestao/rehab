@@ -96,29 +96,44 @@ const sync = {
             alert("配置已本地保存");
         },
 
+    async _fetchRemoteSafe() {
+        try {
+            const res = await this.syncReq('GET');
+            if (res.ok) return await res.json();
+        } catch {}
+        return null;
+    },
+
     async pull() {
         try {
             this.setStatus('syncing', '正在从云端拉取数据');
-            const res = await this.syncReq('GET');
-            if (res.ok) {
-                const remote = await res.json();
-                data.db = { ...data.db, ...remote };
-                if (typeof data.normalizeDb === 'function') data.normalizeDb();
-                data.save();
-                if (typeof ai !== 'undefined') await ai.init({ saveData: true, renderData: false });
-                data.render();
-                this.setStatus('cloud', '下载恢复成功');
-                alert("下载恢复成功（含训练记录）");
-            } else {
-                this.setStatus('error', `拉取失败：${res.status}`);
+            const remote = await this._fetchRemoteSafe();
+            if (!remote) {
+                this.setStatus('error', '拉取失败：无法获取远端数据');
                 alert("拉取失败，请检查参数");
+                return;
             }
+            if ((data.db.lastModified || 0) > (remote.lastModified || 0) + 60_000) {
+                if (!confirm('本地比云端更新，下载会覆盖本地，继续吗？')) return;
+            }
+            data.db = { ...data.db, ...remote };
+            if (typeof data.normalizeDb === 'function') data.normalizeDb();
+            data.save();
+            if (typeof ai !== 'undefined') await ai.init({ saveData: true, renderData: false });
+            data.render();
+            this.setStatus('cloud', '下载恢复成功');
+            alert("下载恢复成功（含训练记录）");
         } catch (e) { this.setStatus('error', '同步失败: ' + e.message); alert("同步失败: " + e.message); }
     },
 
     async push() {
         try {
             this.setStatus('syncing', '正在上传备份到云端');
+            const remote = await this._fetchRemoteSafe();
+            if (remote && remote.lastModified > (data.db.lastModified || 0) + 60_000
+                && remote.deviceId !== data.db.deviceId) {
+                if (!confirm('远端备份较新（来自其他设备），确定要用本地覆盖吗？')) return;
+            }
             const payload = JSON.stringify(data.db);
             const res = await this.syncReq('PUT', payload);
             this.setStatus(res.ok ? 'cloud' : 'error', res.ok ? '备份上传成功' : `备份失败：${res.status}`);

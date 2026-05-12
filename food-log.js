@@ -161,7 +161,7 @@ const foodLog = {
         this._aiFoodResults = [];
         this._aiFoodDrafts = [];
         this._aiFoodAdded = null;
-        const searchEl = document.getElementById('foodSearchResults');
+        const searchEl = document.getElementById('foodSearchSuggest');
         if (searchEl) searchEl.innerHTML = '';
         this.saveAndBackup();
     },
@@ -200,7 +200,7 @@ const foodLog = {
         if (document.getElementById('foodCarb')) document.getElementById('foodCarb').value = item.carb || 0;
         if (document.getElementById('foodFat')) document.getElementById('foodFat').value = item.fat || 0;
         if (document.getElementById('foodGrams')) document.getElementById('foodGrams').value = '';
-        document.getElementById('foodSearchResults').innerHTML = '';
+        document.getElementById('foodSearchSuggest').innerHTML = '';
         this._aiFoodResults = [];
         this._aiFoodDrafts = [];
         this._aiFoodAdded = null;
@@ -211,7 +211,7 @@ const foodLog = {
     onFoodSearchInput() {
         const kw = document.getElementById('foodName')?.value?.trim() || '';
         const results = fooddb.searchAll(kw);
-        const el = document.getElementById('foodSearchResults');
+        const el = document.getElementById('foodSearchSuggest');
         if (!el) return;
         if (!kw || results.length === 0) { el.innerHTML = ''; return; }
         el.innerHTML = results.map(item =>
@@ -272,7 +272,7 @@ const foodLog = {
             this.renderAiFoodResults();
             if (statusEl) statusEl.textContent = `AI 已识别 ${items.length} 项，点击逐个添加或批量添加`;
         } catch (e) {
-            if (statusEl) statusEl.textContent = 'AI 识别失败: ' + e.message;
+            if (statusEl) statusEl.textContent = 'AI 识别失败: ' + (window.toast ? toast.sanitize(e) : e.message);
         }
     },
 
@@ -296,7 +296,7 @@ const foodLog = {
 
     renderAiFoodResults() {
         const items = this._aiFoodResults || [];
-        const el = document.getElementById('foodSearchResults');
+        const el = document.getElementById('foodAiResults');
         if (!el) return;
         if (items.length === 0) { el.innerHTML = ''; return; }
         el.innerHTML = `
@@ -379,7 +379,7 @@ const foodLog = {
         this._aiFoodResults = [];
         this._aiFoodDrafts = [];
         this._aiFoodAdded = null;
-        const el = document.getElementById('foodSearchResults');
+        const el = document.getElementById('foodAiResults');
         if (el) el.innerHTML = '';
         const statusEl = document.getElementById('foodAiStatus');
         if (statusEl) statusEl.textContent = '';
@@ -394,7 +394,7 @@ const foodLog = {
         if (document.getElementById('foodPro')) document.getElementById('foodPro').value = item.pro || 0;
         if (document.getElementById('foodCarb')) document.getElementById('foodCarb').value = item.carb || 0;
         if (document.getElementById('foodFat')) document.getElementById('foodFat').value = item.fat || 0;
-        document.getElementById('foodSearchResults').innerHTML = '';
+        document.getElementById('foodSearchSuggest').innerHTML = '';
         this.setFoodSource('AI 识别结果');
         this.updateFoodComputedPreview();
     }

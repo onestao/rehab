@@ -13,6 +13,14 @@
                 isAlt: document.getElementById('isAlt').checked
             };
             this.db.actions.push(a);
+            this.db.lastActionDraft = {
+                sets: a.sets,
+                reps: a.reps,
+                work: a.work,
+                repRest: a.repRest,
+                actionRest: a.actionRest,
+                groupRest: a.groupRest
+            };
             this.save();
             document.getElementById('name').value = '';
         },
@@ -22,12 +30,16 @@
             const name = nameInput.value.trim();
             if (!name) return alert('请输入方案名称');
             if (this.db.actions.length === 0) return alert('请先添加训练动作');
+            const tagsInput = document.getElementById('routineTagsInput');
+            const tags = tagsInput ? tagsInput.value.split(/[,，]/).map(t => t.trim()).filter(Boolean) : [];
             this.db.routines.push({
                 name,
                 actions: JSON.parse(JSON.stringify(this.db.actions)),
+                tags,
                 created: new Date().toLocaleDateString()
             });
             nameInput.value = '';
+            if (tagsInput) tagsInput.value = '';
             this.save();
             alert('方案 "' + name + '" 已保存');
         },
@@ -43,6 +55,18 @@
         deleteRoutine(idx) {
             this.db.routines.splice(idx, 1);
             this.save();
+        },
+
+        duplicateRoutine(idx) {
+            const src = this.db.routines[idx];
+            if (!src) return;
+            const copy = JSON.parse(JSON.stringify(src));
+            copy.name = copy.name + ' (副本)';
+            copy.created = new Date().toLocaleDateString();
+            this.db.routines.push(copy);
+            this.save();
+            this.showWorkoutLibrary();
+            this.renderWorkoutPlanCard();
         },
 
         renderActions() {
@@ -201,6 +225,9 @@
                                 <span class="material-symbols-rounded">upload</span>
                             </div>
                             <div class="workout-lib-item-actions">
+                                <button class="md-btn md-btn-tonal" onclick="event.stopPropagation();data.duplicateRoutine(${i})" aria-label="复制方案" title="复制方案" style="padding:0;height:28px;min-width:28px">
+                                    <span class="material-symbols-rounded" style="font-size:16px">content_copy</span>
+                                </button>
                                 <button class="delete-btn" onclick="event.stopPropagation();data.deleteRoutineFromLib(${i})" aria-label="删除方案">
                                     <span class="material-symbols-rounded">delete</span>
                                 </button>
@@ -292,13 +319,23 @@
             if (this.db.routines.length === 0) {
                 return `<div class="empty-state"><span class="material-symbols-rounded">bookmark_border</span><p>暂无保存的方案</p></div>`;
             }
-            return this.db.routines.map((r, i) => {
+            const allTags = [...new Set(this.db.routines.flatMap(r => r.tags || []))];
+            const filterTag = this._routineFilterTag || '';
+            const filtered = filterTag ? this.db.routines.filter(r => (r.tags || []).includes(filterTag)) : this.db.routines;
+            return `${allTags.length ? `<div class="routine-tag-chips" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
+                <button class="routine-tag-chip md-btn md-btn-tonal${!filterTag ? ' active' : ''}" onclick="data._routineFilterTag='';data.renderRoutines()" type="button" style="font-size:12px;padding:2px 10px">全部</button>
+                ${allTags.map(t => `<button class="routine-tag-chip md-btn md-btn-tonal${filterTag===t ? ' active' : ''}" onclick="data._routineFilterTag='${this.escapeHtml(t)}';data.renderRoutines()" type="button" style="font-size:12px;padding:2px 10px">${this.escapeHtml(t)}</button>`).join('')}
+            </div>` : ''}
+            ${filtered.map((r, ri) => {
+                const i = this.db.routines.indexOf(r);
                 const expanded = this.isCollapsed('routine_' + i, true) === false;
+                const tags = r.tags || [];
                 return `<div class="routine-card">
                 <div class="routine-card-head" onclick="data.toggleCollapse('routine_${i}')">
                     <div style="flex:1;min-width:0">
                         <strong>${r.name}</strong>
                         <small>${r.actions.length}个动作 &middot; ${r.created}</small>
+                        ${tags.length ? `<div style="margin-top:2px">${tags.map(t => `<span style="display:inline-block;font-size:10px;padding:1px 6px;border-radius:8px;background:var(--md-sys-secondary-container);color:var(--md-sys-on-secondary-container);margin-right:4px">${this.escapeHtml(t)}</span>`).join('')}</div>` : ''}
                     </div>
                     <span class="routine-expand-icon material-symbols-rounded">${expanded ? 'expand_less' : 'expand_more'}</span>
                 </div>
@@ -310,11 +347,12 @@
                     </div>`).join('')}
                     <div class="routine-card-actions">
                         <button class="md-btn md-btn-tonal" style="padding:0 14px;height:32px;font-size:12px" onclick="event.stopPropagation();data.loadRoutine(${i})"><span class="material-symbols-rounded" style="font-size:16px">upload</span> 载入</button>
+                        <button class="md-btn md-btn-tonal" style="padding:0 14px;height:32px;font-size:12px" onclick="event.stopPropagation();data.duplicateRoutine(${i})"><span class="material-symbols-rounded" style="font-size:16px">content_copy</span> 复制</button>
                         <button class="delete-btn" onclick="event.stopPropagation();data.deleteRoutine(${i})"><span class="material-symbols-rounded">delete</span></button>
                     </div>
                 </div>` : ''}
             </div>`;
-            }).join('');
+            }).join('')}`;
         },
 
         move(i, d) {

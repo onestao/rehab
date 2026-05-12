@@ -174,3 +174,6 @@ const CACHE = 'training-assistant-v7';
 ## 开发
 
 本项目不依赖构建工具，直接编辑源码即可。修改后打开 `index.html` 或部署到静态服务器查看效果。
+
+### 发版
+执行 `node scripts/bump-version.js` 自动提升 SW 与静态资源版本号。

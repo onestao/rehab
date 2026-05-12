@@ -39,8 +39,10 @@
         this.mode = mode;
         document.getElementById('modeStrengthBtn').classList.toggle('active', mode === 'strength');
         document.getElementById('modeCardioBtn').classList.toggle('active', mode === 'cardio');
+        document.getElementById('modeStrengthLogBtn').classList.toggle('active', mode === 'strengthLog');
         document.getElementById('strengthCard').classList.toggle('hidden', mode !== 'strength');
         document.querySelector('.cardio-card').classList.toggle('hidden', mode !== 'cardio');
+        document.getElementById('strengthLogCard').classList.toggle('hidden', mode !== 'strengthLog');
         document.getElementById('currentActionList').classList.toggle('hidden', mode !== 'strength');
         document.querySelector('.routine-tool').classList.toggle('hidden', mode !== 'strength');
         this.resetMainPanel();

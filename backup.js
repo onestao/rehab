@@ -17,6 +17,29 @@ const backup = {
         setTimeout(() => URL.revokeObjectURL(url), 1000);
     },
 
+    exportCSV(kind) {
+        let rows = [];
+        if (kind === 'food') {
+            rows.push(['date','meal','name','grams','cal','pro','carb','fat']);
+            (data.db.health.foodLogs||[]).forEach(f =>
+                rows.push([f.date,f.meal,f.name,f.grams,f.cal,f.pro,f.carb,f.fat]));
+        } else if (kind === 'exercise') {
+            rows.push(['date','type','name','minutes','calories','distance','weightKg','sets','reps']);
+            (data.db.health.exerciseLogs||[]).forEach(e =>
+                rows.push([e.date,e.type,e.customName||'',e.minutes,e.calories,e.distance||0,
+                           e.weightKg||'',e.sets||'',e.repsPerSet||'']));
+        }
+        const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = `${kind}-${data.dateKey(new Date())}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+    },
+
     promptImport() {
         if (window.workout?.isPlaying) return alert('训练进行中无法导入备份');
         document.getElementById('backupImportInput')?.click();

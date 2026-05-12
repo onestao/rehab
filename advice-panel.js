@@ -15,6 +15,7 @@
             deleteAiAdviceMessage: this.deleteAiAdviceMessage,
             copyAdviceMessage: this.copyAdviceMessage,
             retryAdviceFrom: this.retryAdviceFrom,
+            regenerateAdvice: this.regenerateAdvice,
             captureAdviceDraft: this.captureAdviceDraft,
             adviceSavedScrollTop: this.adviceSavedScrollTop,
             adviceSavedPageScrollOffset: this.adviceSavedPageScrollOffset,
@@ -450,7 +451,7 @@
             requestAnimationFrame(() => this.scrollAdviceToLatest(true));
         } catch (e) {
             const idx = this.db.health.aiAdviceChat.findIndex(msg => msg.id === pendingId);
-            const failed = { role: 'assistant', content: `分析失败：${e.message}`, at: new Date().toISOString(), model, error: true, retryPrompt: prompt };
+            const failed = { role: 'assistant', content: `分析失败：${window.toast ? toast.sanitize(e) : e.message}`, at: new Date().toISOString(), model, error: true, retryPrompt: prompt };
             if (idx >= 0) this.db.health.aiAdviceChat[idx] = failed;
             else this.db.health.aiAdviceChat.push(failed);
             this.save();
@@ -484,6 +485,19 @@
         const msg = (this.db.health.aiAdviceChat || [])[idx];
         const prompt = msg?.retryPrompt || this.db.health.aiAdviceChat?.slice(0, idx).reverse().find(m => m.role === 'user')?.content;
         if (prompt) this.sendAiAdvice(prompt);
+    },
+
+    regenerateAdvice() {
+        const messages = this.db.health.aiAdviceChat || [];
+        for (let i = messages.length - 1; i >= 0; i--) {
+            if (messages[i].role === 'assistant') {
+                const prompt = messages[i].retryPrompt || messages.slice(0, i).reverse().find(m => m.role === 'user')?.content;
+                messages.splice(i, 1);
+                this.save();
+                if (prompt) this.sendAiAdvice(prompt);
+                return;
+            }
+        }
     },
 
     renderAdvicePanel() {

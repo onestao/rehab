@@ -1,7 +1,7 @@
 /* --- Mode Tabs --- */
 .mode-tabs {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 8px;
     margin: 8px 16px;
     padding: 4px;
@@ -60,4 +60,9 @@
 }
 .mode-tab:active { transform: scale(0.96); }
 .mode-tab:active::after { opacity: var(--md-state-press); }
+
+@media (max-width: 480px) {
+    .mode-tab { font-size: 12px; gap: 4px; height: 38px; }
+    .mode-tab .material-symbols-rounded { font-size: 18px; }
+}
 
