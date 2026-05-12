@@ -34,45 +34,29 @@
         const rangeExerciseLogs = contexts.training ? this.filterByAdviceRange(allExerciseLogs, e => e.date ? new Date(e.date) : null) : [];
         const rangeWeights = contexts.weight ? this.filterByAdviceRange(allWeights, w => w.date ? new Date(w.date) : null) : [];
 
-        const todayHistory = allHistory.filter(h => this.dateKey(this.parseHistoryDate(h.date)) === today);
-        const todayFoods = allFoods.filter(f => f.date === today);
-        const todayExerciseLogs = allExerciseLogs.filter(e => e.date === today);
-        const todayWeights = allWeights.filter(w => w.date === today);
+        const todayHistory = contexts.training ? allHistory.filter(h => this.dateKey(this.parseHistoryDate(h.date)) === today) : [];
+        const todayFoods = contexts.diet ? allFoods.filter(f => f.date === today) : [];
+        const todayExerciseLogs = contexts.training ? allExerciseLogs.filter(e => e.date === today) : [];
+        const todayWeights = contexts.weight ? allWeights.filter(w => w.date === today) : [];
 
         const dietGoal = contexts.goal ? (this.db.health.dietGoal || {}) : {};
         const targetDate = this.parsePromptTargetDate(prompt);
 
-        const todayMacros = contexts.diet
-            ? todayFoods.reduce((acc, f) => {
-                acc.cal += Number(f.cal || 0);
-                acc.pro += Number(f.pro || 0);
-                acc.carb += Number(f.carb || 0);
-                acc.fat += Number(f.fat || 0);
-                return acc;
-            }, { cal: 0, pro: 0, carb: 0, fat: 0 })
-            : { cal: 0, pro: 0, carb: 0, fat: 0 };
+        const sumMacros = list => list.reduce((a, f) => {
+            a.cal += Number(f.cal || 0); a.pro += Number(f.pro || 0);
+            a.carb += Number(f.carb || 0); a.fat += Number(f.fat || 0);
+            return a;
+        }, { cal: 0, pro: 0, carb: 0, fat: 0 });
 
-        const rangeMacros = contexts.diet
-            ? rangeFoods.reduce((acc, f) => {
-                acc.pro += Number(f.pro || 0);
-                acc.carb += Number(f.carb || 0);
-                acc.fat += Number(f.fat || 0);
-                return acc;
-            }, { pro: 0, carb: 0, fat: 0 })
-            : {};
+        const todayMacros = sumMacros(todayFoods);
+        const rangeMacros = sumMacros(rangeFoods);
 
-        const targetHistory = targetDate ? allHistory.filter(h => this.dateKey(this.parseHistoryDate(h.date)) === targetDate) : [];
-        const targetFoods = targetDate ? allFoods.filter(f => f.date === targetDate) : [];
-        const targetExerciseLogs = targetDate ? allExerciseLogs.filter(e => e.date === targetDate) : [];
-        const targetWeights = targetDate ? allWeights.filter(w => w.date === targetDate) : [];
-        const targetMacros = contexts.diet
-            ? targetFoods.reduce((acc, f) => {
-                acc.pro += Number(f.pro || 0);
-                acc.carb += Number(f.carb || 0);
-                acc.fat += Number(f.fat || 0);
-                return acc;
-            }, { pro: 0, carb: 0, fat: 0 })
-            : { pro: 0, carb: 0, fat: 0 };
+        const targetHistory = (targetDate && contexts.training) ? allHistory.filter(h => this.dateKey(this.parseHistoryDate(h.date)) === targetDate) : [];
+        const targetFoods = (targetDate && contexts.diet) ? allFoods.filter(f => f.date === targetDate) : [];
+        const targetExerciseLogs = (targetDate && contexts.training) ? allExerciseLogs.filter(e => e.date === targetDate) : [];
+        const targetWeights = (targetDate && contexts.weight) ? allWeights.filter(w => w.date === targetDate) : [];
+        const targetMacros = sumMacros(targetFoods);
+
         const rangeLabel = { today: '今日', week: '最近7天', month: '最近30天', all: '全部记录' }[range];
 
         const formatTraining = (list) => list.map(h => {
@@ -84,76 +68,59 @@
                 : `${h.actions.length}个动作`;
             return `- ${h.date}｜训练时长 ${mins}分${secs}秒｜项目 ${names || '未命名'}｜${meta}`;
         }).join('\n');
-
         const formatFoods = (list) => list.map(f =>
             `- ${f.date}｜${f.meal === 'breakfast' ? '早餐' : f.meal === 'lunch' ? '午餐' : f.meal === 'dinner' ? '晚餐' : '加餐'}｜${f.name}${f.grams ? ' ' + f.grams + 'g' : ''}｜${f.cal} kcal｜P${Number(f.pro || 0).toFixed(0)} C${Number(f.carb || 0).toFixed(0)} F${Number(f.fat || 0).toFixed(0)}`
         ).join('\n');
-
         const formatExerciseLogs = (list) => list.map(e => {
             const label = this.exerciseLabel(e.type, e);
             return `- ${e.date}｜${label}｜${e.minutes}分钟｜${e.calories || 0} kcal${e.distance ? `｜${e.distance}km` : ''}`;
         }).join('\n');
+        const formatWeights = (list) => list.map(w => `- ${w.date}｜${w.weight.toFixed(1)} kg`).join('\n');
 
-        const formatWeights = (list) => list.map(w =>
-            `- ${w.date}｜${w.weight.toFixed(1)} kg`
-        ).join('\n');
+        const enabledLabels = [
+            contexts.diet && '饮食', contexts.training && '训练',
+            contexts.weight && '体重', contexts.goal && '目标'
+        ].filter(Boolean).join('、') || '无';
 
-        const sys = `你是训练与营养健康顾问。基于用户的实际记录回答问题。规则：
-1. 如果下方提供了训练/饮食/体重记录，你必须优先基于这些记录分析，不能忽略它们，也不能说"暂无记录"
-2. 必须引用至少 2 条具体的训练/饮食/体重记录作为证据
-3. 引用时请写出具体日期和内容，例如"5月6日午餐鸡胸肉饭 520 kcal"
-3. 如果某一类数据确实为空，再说明该类数据不足，不要笼统说全部记录不足
-4. 优先用短段落和清单表达，不要输出 markdown 表格
-5. 如果用户问题提到了某个具体日期，你必须优先分析该日期的数据，再结合近期整体趋势补充
-6. 回答后可给出 1-2 条具体可执行的建议`;
+        const sys = `你是训练与营养健康顾问。基于用户的实际记录回答问题。
+当前启用的分析维度：${enabledLabels}。未启用的维度不会提供数据，请不要编造，也不要要求用户开启。
+规则：
+1. 只能引用下方实际提供的记录，不能凭空编造数据
+2. 必须引用至少 2 条具体记录作为证据（如果数据足够）
+3. 引用时写出具体日期和内容，例如"5月6日午餐鸡胸肉饭 520 kcal"
+4. 如果某一类数据为空或未启用，简要说明，不要笼统说全部不足
+5. 优先用短段落和清单表达，不要输出 markdown 表格
+6. 如果用户问题提到了某个具体日期，优先分析该日期的数据
+7. 回答后给出 1-2 条具体可执行的建议`;
 
-        const user = `分析范围：${rangeLabel}
-用户提问：${prompt}
-
-【优先分析日期】
-${targetDate || '未指定具体日期'}
-
-【该日期训练记录】
-${formatTraining(targetHistory) || '该日期无训练记录'}
-
-【该日期饮食记录】
-${formatFoods(targetFoods) || '该日期无饮食记录'}
-
-【该日期宏量营养】
-蛋白 ${targetMacros.pro?.toFixed(1) || 0}g / 碳水 ${targetMacros.carb?.toFixed(1) || 0}g / 脂肪 ${targetMacros.fat?.toFixed(1) || 0}g
-
-【该日期体重记录】
-${formatWeights(targetWeights) || '该日期无体重记录'}
-
-【该日期手动运动】
-${formatExerciseLogs(targetExerciseLogs) || '该日期无手动运动记录'}
-
-【今日饮食记录】
-${formatFoods(todayFoods) || '今日无饮食记录'}
-
-【今日宏量营养】
-摄入 ${todayMacros.cal || 0} kcal · 蛋白 ${todayMacros.pro?.toFixed(1) || 0}g / 碳水 ${todayMacros.carb?.toFixed(1) || 0}g / 脂肪 ${todayMacros.fat?.toFixed(1) || 0}g
-
-【${rangeLabel}训练记录】
-${formatTraining(rangeHistory) || `${rangeLabel}暂无训练记录`}
-
-【${rangeLabel}饮食记录】
-${formatFoods(rangeFoods) || `${rangeLabel}暂无饮食记录`}
-
-【${rangeLabel}宏量营养】
-蛋白 ${rangeMacros.pro?.toFixed(1) || 0}g / 碳水 ${rangeMacros.carb?.toFixed(1) || 0}g / 脂肪 ${rangeMacros.fat?.toFixed(1) || 0}g
-
-【饮食目标】
-${dietGoal.dailyCal ? `每日 ${dietGoal.dailyCal} kcal · 目标类型：${dietGoal.goalType === 'gain' ? '增肌' : '减重'}` : '未设置'}
-
-【${rangeLabel}体重记录】
-${formatWeights(rangeWeights) || `${rangeLabel}暂无体重记录`}
-
-【${rangeLabel}手动运动】
-${formatExerciseLogs(rangeExerciseLogs) || `${rangeLabel}暂无手动运动记录`}`;
+        const blocks = [`分析范围：${rangeLabel}`, `用户提问：${prompt}`];
+        if (targetDate) blocks.push(`【优先分析日期】\n${targetDate}`);
+        if (contexts.training && targetDate) blocks.push(`【该日期训练记录】\n${formatTraining(targetHistory) || '该日期无训练记录'}`);
+        if (contexts.diet && targetDate) {
+            blocks.push(`【该日期饮食记录】\n${formatFoods(targetFoods) || '该日期无饮食记录'}`);
+            blocks.push(`【该日期宏量营养】\n蛋白 ${targetMacros.pro.toFixed(1)}g / 碳水 ${targetMacros.carb.toFixed(1)}g / 脂肪 ${targetMacros.fat.toFixed(1)}g`);
+        }
+        if (contexts.weight && targetDate) blocks.push(`【该日期体重记录】\n${formatWeights(targetWeights) || '该日期无体重记录'}`);
+        if (contexts.training && targetDate) blocks.push(`【该日期手动运动】\n${formatExerciseLogs(targetExerciseLogs) || '该日期无手动运动记录'}`);
+        if (contexts.diet) {
+            blocks.push(`【今日饮食记录】\n${formatFoods(todayFoods) || '今日无饮食记录'}`);
+            blocks.push(`【今日宏量营养】\n摄入 ${todayMacros.cal || 0} kcal · 蛋白 ${todayMacros.pro.toFixed(1)}g / 碳水 ${todayMacros.carb.toFixed(1)}g / 脂肪 ${todayMacros.fat.toFixed(1)}g`);
+            blocks.push(`【${rangeLabel}饮食记录】\n${formatFoods(rangeFoods) || `${rangeLabel}暂无饮食记录`}`);
+            blocks.push(`【${rangeLabel}宏量营养】\n蛋白 ${rangeMacros.pro.toFixed(1)}g / 碳水 ${rangeMacros.carb.toFixed(1)}g / 脂肪 ${rangeMacros.fat.toFixed(1)}g`);
+        }
+        if (contexts.training) {
+            blocks.push(`【${rangeLabel}训练记录】\n${formatTraining(rangeHistory) || `${rangeLabel}暂无训练记录`}`);
+            blocks.push(`【${rangeLabel}手动运动】\n${formatExerciseLogs(rangeExerciseLogs) || `${rangeLabel}暂无手动运动记录`}`);
+        }
+        if (contexts.weight) {
+            blocks.push(`【${rangeLabel}体重记录】\n${formatWeights(rangeWeights) || `${rangeLabel}暂无体重记录`}`);
+        }
+        if (contexts.goal && dietGoal.dailyCal) {
+            blocks.push(`【饮食目标】\n每日 ${dietGoal.dailyCal} kcal · 目标类型：${dietGoal.goalType === 'gain' ? '增肌' : '减重'}`);
+        }
 
         const conversation = this.adviceConversationContext();
-        return [{ role: 'system', content: sys }, ...conversation, { role: 'user', content: user }];
+        return [{ role: 'system', content: sys }, ...conversation, { role: 'user', content: blocks.join('\n\n') }];
     },
 
     async requestAiAdvice(prompt, model) {

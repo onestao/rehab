@@ -33,6 +33,7 @@
             setAdviceModel: this.setAdviceModel,
             setAdviceRange: this.setAdviceRange,
             toggleAdviceContext: this.toggleAdviceContext,
+            toggleAdviceContextPanel: this.toggleAdviceContextPanel,
             toggleAdviceSearch: this.toggleAdviceSearch,
             onAdviceSearchInput: this.onAdviceSearchInput,
             clearAdviceSearch: this.clearAdviceSearch,
@@ -320,6 +321,14 @@
         requestAnimationFrame(() => this.autoResizeAdvicePrompt());
     },
 
+    toggleAdviceContextPanel() {
+        this.adviceContextOpen = !this.adviceContextOpen;
+        this.captureAdviceDraft();
+        this.captureAdviceScroll();
+        this.renderAiCoachPage?.() || this.renderRoutines?.();
+        requestAnimationFrame(() => this.autoResizeAdvicePrompt());
+    },
+
     useAdvicePrompt(text) {
         const input = document.getElementById('advicePrompt');
         if (!input) return;
@@ -426,6 +435,8 @@
             const oldModel = ai.cfg.model;
             ai.cfg.model = model;
             let full = '';
+            let _lastRender = 0;
+            let _pendingFrame = 0;
             try {
                 full = await ai.callStream(messages, 2400, (delta, accumulated) => {
                     const idx = this.db.health.aiAdviceChat.findIndex(msg => msg.id === pendingId);
@@ -433,21 +444,30 @@
                     this.db.health.aiAdviceChat[idx].content = accumulated;
                     if (this.db.health.aiAdviceChat[idx].pending && accumulated) this.db.health.aiAdviceChat[idx].pending = false;
                     const bubble = document.querySelector(`[data-advice-id="${pendingId}"]`);
-                    if (bubble && accumulated) {
-                        const contentEl = bubble.querySelector('.advice-bubble-content');
-                        if (contentEl) {
-                            contentEl.innerHTML = this.renderAdviceMarkdown(accumulated);
-                            contentEl.querySelectorAll('p, li, h1, h2, h3').forEach(el => {
-                                if (!el.dataset.m3e) {
-                                    el.dataset.m3e = '1';
-                                    el.classList.add('m3e-token-in');
-                                }
+                    if (!bubble || !accumulated) return;
+                    const contentEl = bubble.querySelector('.advice-bubble-content');
+                    if (!contentEl) return;
+                    const now = performance.now();
+                    const force = accumulated.length - (contentEl._renderedLen || 0) > 40;
+                    if (!force && now - _lastRender < 80) {
+                        if (!_pendingFrame) {
+                            _pendingFrame = requestAnimationFrame(() => {
+                                _pendingFrame = 0;
+                                _lastRender = performance.now();
+                                const ci = this.db.health.aiAdviceChat.findIndex(m => m.id === pendingId);
+                                if (ci < 0) return;
+                                contentEl.innerHTML = this.renderAdviceMarkdown(this.db.health.aiAdviceChat[ci].content);
+                                contentEl._renderedLen = this.db.health.aiAdviceChat[ci].content.length;
                             });
                         }
-                        bubble.classList.remove('pending');
-                        const dots = bubble.querySelector('.advice-typing-dot');
-                        if (dots) dots.remove();
+                    } else {
+                        _lastRender = now;
+                        contentEl.innerHTML = this.renderAdviceMarkdown(accumulated);
+                        contentEl._renderedLen = accumulated.length;
                     }
+                    bubble.classList.remove('pending');
+                    const dots = bubble.querySelector('.advice-typing-dot');
+                    if (dots) dots.remove();
                     this.scheduleAdviceStreamScroll();
                 });
             } finally {
@@ -456,7 +476,19 @@
             const idx = this.db.health.aiAdviceChat.findIndex(msg => msg.id === pendingId);
             if (idx >= 0) this.db.health.aiAdviceChat[idx] = { role: 'assistant', content: full, at: new Date().toISOString(), model };
             this.save();
-            requestAnimationFrame(() => this.scrollAdviceToLatest(true));
+            requestAnimationFrame(() => {
+                const bubble = document.querySelector(`[data-advice-id="${pendingId}"]`);
+                if (bubble) {
+                    const contentEl = bubble.querySelector('.advice-bubble-content');
+                    if (contentEl) {
+                        contentEl.innerHTML = this.renderAdviceMarkdown(full);
+                        contentEl.querySelectorAll('p, li, h1, h2, h3').forEach(el => {
+                            el.classList.add('m3e-token-in');
+                        });
+                    }
+                }
+                this.scrollAdviceToLatest(true);
+            });
         } catch (e) {
             const idx = this.db.health.aiAdviceChat.findIndex(msg => msg.id === pendingId);
             const failed = { role: 'assistant', content: `分析失败：${window.toast ? toast.sanitize(e) : e.message}`, at: new Date().toISOString(), model, error: true, retryPrompt: prompt };
@@ -522,6 +554,8 @@
         const modelMark = this.adviceModelIconHtml(modelVisual);
         const sendHint = this.isMobileAdviceInput() ? '回车换行，点击发送按钮提交' : 'Enter 发送，Shift + Enter 换行';
         const contexts = { diet: true, training: true, weight: true, goal: true, ...(this.adviceContexts || {}) };
+        const ctxOpen = !!this.adviceContextOpen;
+        const enabledCount = ['diet','training','weight','goal'].filter(k => contexts[k]).length;
         const range = this.adviceRange || 'today';
         const searchQuery = this.escapeHtml(this.adviceSearchQuery || '');
         const searchOpen = !!this.adviceSearchOpen || !!this.adviceSearchQuery;
@@ -544,14 +578,27 @@
                 <div class="advice-context-bar">
                     <div class="advice-filter-row">
                         <div class="advice-range-tabs">${[['today','今日'],['week','7天'],['month','30天'],['all','全部']].map(([key, label]) => `<button class="advice-pill ${range === key ? 'active' : ''}" onclick="data.setAdviceRange('${key}')" type="button">${label}</button>`).join('')}</div>
-                        <button class="advice-search-toggle ${searchOpen ? 'active' : ''}" onclick="data.toggleAdviceSearch()" type="button" aria-label="搜索聊天记录"><span class="material-symbols-rounded">search</span></button>
+                        <div class="advice-filter-actions">
+                            <button class="advice-search-toggle ${ctxOpen ? 'active' : ''}" onclick="data.toggleAdviceContextPanel()" type="button" aria-label="数据维度" title="数据维度">
+                                <span class="material-symbols-rounded">tune</span>
+                                ${enabledCount < 4 ? `<span class="advice-ctx-badge">${enabledCount}</span>` : ''}
+                            </button>
+                            <button class="advice-search-toggle ${searchOpen ? 'active' : ''}" onclick="data.toggleAdviceSearch()" type="button" aria-label="搜索聊天记录"><span class="material-symbols-rounded">search</span></button>
+                        </div>
                     </div>
                     ${searchOpen ? `<div class="advice-search-row">
                         <span class="material-symbols-rounded">search</span>
                         <input id="adviceSearchInput" value="${searchQuery}" oninput="data.onAdviceSearchInput(this)" placeholder="搜索聊天记录、日期或模型" autocomplete="off">
                         ${searchQuery ? '<button onclick="data.clearAdviceSearch()" type="button" aria-label="清空搜索"><span class="material-symbols-rounded">close</span></button>' : ''}
                     </div>` : ''}
-                    <div class="advice-context-toggles">${[['diet','饮食'],['training','训练'],['weight','体重'],['goal','目标']].map(([key, label]) => `<button class="advice-pill ${contexts[key] ? 'active' : ''}" onclick="data.toggleAdviceContext('${key}')" type="button">${label}</button>`).join('')}</div>
+                    ${ctxOpen ? `<div class="advice-context-popover">
+                        <div class="advice-context-popover-head">
+                            <span>选择给 AI 的数据维度</span>
+                            <button onclick="data.toggleAdviceContextPanel()" type="button" aria-label="关闭"><span class="material-symbols-rounded">close</span></button>
+                        </div>
+                        <div class="advice-context-toggles">${[['diet','饮食','restaurant'],['training','训练','fitness_center'],['weight','体重','monitor_weight'],['goal','目标','flag']].map(([key, label, icon]) => `<button class="advice-pill ${contexts[key] ? 'active' : ''}" onclick="data.toggleAdviceContext('${key}')" type="button"><span class="material-symbols-rounded">${icon}</span>${label}</button>`).join('')}</div>
+                        <small class="advice-context-hint">关闭后该维度的记录不会发给 AI，回答会更聚焦</small>
+                    </div>` : ''}
                 </div>
                 <div class="advice-chat-list">${this.renderAdviceMessages(visibleMessages)}</div>
                 <div class="advice-composer-tail">
