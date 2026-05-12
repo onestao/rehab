@@ -92,4 +92,20 @@
 }
 .color-picker .material-symbols-rounded { font-size: 18px; }
 .compact-divider { margin: 8px 0; }
+.theme-mode-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 0 12px;
+    height: 36px;
+    line-height: 1;
+    white-space: nowrap;
+    font-size: 13px;
+    font-weight: 700;
+}
+.theme-mode-btn .material-symbols-rounded { font-size: 18px; flex: none; }
+.theme-actions:has(.theme-mode-btn) { flex-wrap: nowrap; }
 

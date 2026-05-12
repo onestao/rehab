@@ -192,4 +192,14 @@
 .weight-history-head small { position: relative; z-index: 1; color: var(--md-sys-on-surface-variant); font-size: 11px; font-weight: 700; white-space: nowrap; }
 .weight-history-content { display: grid; gap: 6px; }
 .weight-history-card.collapsed .weight-history-content { display: none; }
+
+.action-phase-group { display: grid; gap: 6px; margin-bottom: 10px; }
+.action-phase-head {
+    font-size: 12px; font-weight: 800;
+    color: var(--md-sys-on-surface-variant);
+    padding: 4px 12px;
+    border-radius: var(--md-sys-shape-full);
+    background: var(--md-sys-surface-container);
+    width: max-content;
+}
 

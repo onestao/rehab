@@ -673,6 +673,16 @@ mark.ai-hit {
 .weight-history-head small { position: relative; z-index: 1; color: var(--md-sys-on-surface-variant); font-size: 11px; font-weight: 700; white-space: nowrap; }
 .weight-history-content { display: grid; gap: 6px; }
 .weight-history-card.collapsed .weight-history-content { display: none; }
+
+.action-phase-group { display: grid; gap: 6px; margin-bottom: 10px; }
+.action-phase-head {
+    font-size: 12px; font-weight: 800;
+    color: var(--md-sys-on-surface-variant);
+    padding: 4px 12px;
+    border-radius: var(--md-sys-shape-full);
+    background: var(--md-sys-surface-container);
+    width: max-content;
+}
 /* --- Record Calendar --- */
 .record-section-title {
     margin: 14px 20px 6px;
@@ -2351,15 +2361,32 @@ mark.ai-hit {
 .ai-vision-badge .material-symbols-rounded { font-size: 12px; }
 .ai-model-empty { text-align: center; padding: 12px; color: var(--md-sys-on-surface-variant); font-size: 13px; }
 .ai-profile-actions {
-    align-items: flex-end;
+    align-items: center;
     gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
+}
+.ai-profile-actions .md-field {
+    margin: 0 !important;
+    display: flex;
+    flex: 1 1 160px;
+    min-width: 0;
+}
+.ai-profile-actions .md-field input {
+    height: 48px;
+    box-sizing: border-box;
 }
 .ai-profile-actions .md-btn {
     flex: none;
-    margin-top: 0;
+    margin: 0 !important;
     white-space: nowrap;
     padding: 0 14px;
+    height: 48px;
+    box-sizing: border-box;
+    font-size: 13px;
+    align-self: center;
 }
+.ai-profile-actions .md-btn .material-symbols-rounded { font-size: 18px; }
 .ai-encrypt-section {
     display: grid; gap: 8px; padding-top: 10px; margin-top: 10px;
     border-top: 1px solid var(--md-sys-outline-variant);
@@ -2489,6 +2516,9 @@ mark.ai-hit {
     .mode-tab { font-size: 12px; gap: 4px; height: 38px; }
     .mode-tab .material-symbols-rounded { font-size: 18px; }
 }
+
+.timer-tweak { display: flex; gap: 8px; justify-content: center; margin-top: 8px; }
+.timer-tweak .md-chip { font-weight: 800; }
 /* --- Routine Tool --- */
 .routine-tool {
     display: flex;
@@ -3025,6 +3055,22 @@ body.is-training .fab-pip.active {
 }
 .color-picker .material-symbols-rounded { font-size: 18px; }
 .compact-divider { margin: 8px 0; }
+.theme-mode-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 0 12px;
+    height: 36px;
+    line-height: 1;
+    white-space: nowrap;
+    font-size: 13px;
+    font-weight: 700;
+}
+.theme-mode-btn .material-symbols-rounded { font-size: 18px; flex: none; }
+.theme-actions:has(.theme-mode-btn) { flex-wrap: nowrap; }
 /* --- Modal --- */
 .md-modal {
     position: fixed;
@@ -3858,6 +3904,141 @@ body.is-training .fab-pip.active {
         background: var(--advice-model-mark-bg, color-mix(in srgb, var(--md-sys-surface-container-highest) 60%, transparent));
     }
 }
+/* === M3 Expressive Effects === */
+
+/* TASK-16: 首屏进度环形变动画 */
+@keyframes m3e-ring-pulse {
+    0%, 100% { transform: scale(1); filter: saturate(1) drop-shadow(0 0 0 transparent); }
+    50% { transform: scale(1.03); filter: saturate(1.15) drop-shadow(0 6px 18px var(--md-sys-primary-container)); }
+}
+.today-focus-ring {
+    animation: m3e-ring-pulse 4.8s var(--md-expressive-spring, cubic-bezier(.34,1.56,.64,1)) infinite;
+    will-change: transform, filter;
+}
+.today-focus-ring > div { transition: transform .35s var(--md-expressive-spring); }
+.today-focus-ring:hover > div { transform: scale(1.06); }
+
+@keyframes m3e-card-rise {
+    from { opacity: 0; transform: translateY(8px) scale(.985); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.md-card { animation: m3e-card-rise .42s var(--md-expressive-spring) both; }
+
+@keyframes m3e-chip-press {
+    0% { transform: scale(1); }
+    40% { transform: scale(.92) rotate(-1deg); }
+    100% { transform: scale(1); }
+}
+.md-chip:active, .mode-tab:active, .record-quick-btn:active { animation: m3e-chip-press .35s var(--md-expressive-spring); }
+
+/* TASK-18: FAB启动训练morph+涟漪 */
+.md-fab.fab-play {
+    overflow: hidden; position: relative;
+    transition: border-radius .42s var(--md-expressive-spring),
+                transform .42s var(--md-expressive-spring),
+                box-shadow .42s var(--md-expressive-spring);
+}
+body.is-training .md-fab.fab-play {
+    border-radius: 28px; transform: scale(1.08);
+    box-shadow: 0 10px 28px var(--md-sys-primary-container);
+}
+.md-fab.fab-play .ripple {
+    position: absolute; top: 50%; left: 50%;
+    width: 12px; height: 12px; border-radius: 50%;
+    background: rgba(255,255,255,.55);
+    transform: translate(-50%, -50%) scale(0); pointer-events: none;
+    animation: m3e-ripple .55s ease-out forwards;
+}
+@keyframes m3e-ripple {
+    to { transform: translate(-50%, -50%) scale(20); opacity: 0; }
+}
+
+/* TASK-19: AI教练气泡逐字流入动画 */
+@keyframes m3e-token-in {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+.m3e-token-in { animation: m3e-token-in .26s var(--md-expressive-spring) both; }
+
+/* TASK-20: 主题切换液态过渡 */
+:root { transition: background-color .35s ease, color .35s ease; }
+.md-card, .md-btn, .md-chip, .md-fab, .nav-item, .calendar-day,
+.advice-bubble, .day-detail-item, .list-item {
+    transition: background-color .35s ease, color .35s ease,
+                border-color .35s ease, box-shadow .35s ease;
+}
+
+/* TASK-21: AI教练快捷预设chip横滑 */
+.advice-quick-prompts {
+    display: flex !important; gap: 8px;
+    overflow-x: auto; scroll-snap-type: x mandatory;
+    padding-bottom: 4px; -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+}
+.advice-quick-prompts::-webkit-scrollbar { display: none; }
+.advice-quick-prompts > button {
+    flex: none; scroll-snap-align: start;
+    transition: transform .25s var(--md-expressive-spring),
+                background .25s ease;
+}
+.advice-quick-prompts > button:active { transform: scale(.92) rotate(-1deg); }
+
+/* TASK-23: 骨架屏Shimmer加载占位 */
+.skeleton {
+    background: linear-gradient(90deg,
+        var(--md-sys-surface-container) 0%,
+        var(--md-sys-surface-container-high) 50%,
+        var(--md-sys-surface-container) 100%);
+    background-size: 200% 100%;
+    border-radius: var(--md-sys-shape-sm);
+    animation: m3e-shimmer 1.4s ease-in-out infinite;
+    color: transparent !important;
+}
+@keyframes m3e-shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+.skeleton-line { height: 12px; margin: 6px 0; }
+
+/* TASK-25: 训练总进度全局指示条 */
+.global-training-bar {
+    position: fixed; top: 0; left: 0; right: 0; height: 3px;
+    background: var(--md-sys-surface-container); z-index: 10000;
+    transition: opacity .3s ease;
+}
+.global-training-bar > span {
+    display: block; height: 100%; width: 0%;
+    background: linear-gradient(90deg, var(--md-sys-primary), var(--md-sys-tertiary));
+    transition: width .42s var(--md-expressive-spring);
+}
+.global-training-bar.hidden { opacity: 0; pointer-events: none; }
+
+/* TASK-22: 记录条目滑动删除 */
+.day-detail-item, .today-timeline-item, .list-item {
+    transition: transform .28s var(--md-expressive-spring);
+    touch-action: pan-y;
+}
+.day-detail-item.swipe-open .delete-btn,
+.today-timeline-item.swipe-open .delete-btn,
+.list-item.swipe-open .delete-btn {
+    background: var(--md-sys-error, #b3261e); color: #fff;
+}
+
+/* TASK-26: 首次启动引导 */
+.onboarding-root {
+    position: fixed; inset: 0; z-index: 99999;
+    background: var(--md-sys-surface);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    animation: m3e-card-rise .4s var(--md-expressive-spring) both;
+}
+.onboarding-page { display: none; flex-direction: column; align-items: center; gap: 14px; padding: 32px; text-align: center; }
+.onboarding-page.active { display: flex; animation: m3e-card-rise .4s var(--md-expressive-spring) both; }
+.onboarding-icon { font-size: 72px !important; color: var(--md-sys-primary); }
+.onboarding-controls { position: fixed; bottom: 32px; left: 0; right: 0; display: flex; flex-direction: column; align-items: center; gap: 14px; }
+.onboarding-dots { display: flex; gap: 8px; }
+.onboarding-dots span { width: 8px; height: 8px; border-radius: 50%; background: var(--md-sys-surface-container-high); transition: width .3s var(--md-expressive-spring), background .3s ease; }
+.onboarding-dots span.active { width: 24px; background: var(--md-sys-primary); }
+.onboarding-root.fade-out { opacity: 0; transition: opacity .3s ease; }
+
+/* TASK-24: 每周总结卡片 */
+.weekly-summary-card { animation: m3e-card-rise .42s var(--md-expressive-spring) both; }
 /* Migration branch custom overrides live here.
    Keep this file for branch-only additions that are not yet merged into styles.css snapshot. */
 

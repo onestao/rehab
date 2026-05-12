@@ -65,4 +65,7 @@
     .mode-tab { font-size: 12px; gap: 4px; height: 38px; }
     .mode-tab .material-symbols-rounded { font-size: 18px; }
 }
+
+.timer-tweak { display: flex; gap: 8px; justify-content: center; margin-top: 8px; }
+.timer-tweak .md-chip { font-weight: 800; }
 
