@@ -219,7 +219,7 @@
                 <div class="md-field"><input type="number" value="${draft.distance}" oninput="data._editingExerciseDraft.distance=this.value" step="0.1" placeholder=" "><label>距离 km</label></div>
                 <div class="md-field span-full"><input type="text" value="${this.escapeHtml(draft.note || '')}" oninput="data._editingExerciseDraft.note=this.value" placeholder=" "><label>备注</label></div>
             </div>
-            <div class="food-inline-actions">
+            <div class="food-inline-actions food-edit-actions">
                 <button class="md-btn md-btn-tonal" onclick="data.cancelEditManualExercise()">取消</button>
                 <button class="md-btn md-btn-filled" onclick="data.saveEditManualExercise('${e.id}')"><span class="material-symbols-rounded">save</span> 保存</button>
             </div>

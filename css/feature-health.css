@@ -106,6 +106,14 @@
 .diet-btn-row { display: flex; gap: 6px; grid-column: 1 / -1; }
 .diet-btn-row .md-btn-filled { flex: 1; margin-top: 0; }
 .diet-btn-row .md-btn-tonal { flex: none; width: 48px; padding: 0; margin-top: 0; }
+/* 编辑食物/运动行内操作按钮：统一两个按钮高度，去掉 filled 默认 margin-top */
+.food-edit-actions { align-items: center; }
+.food-edit-actions .md-btn,
+.food-edit-actions .md-btn-tonal,
+.food-edit-actions .md-btn-filled {
+    height: 44px;
+    margin-top: 0;
+}
 .food-search-results { display: grid; gap: 4px; max-height: 160px; overflow-y: auto; }
 .food-result-item {
     border: none; background: var(--md-sys-surface-container-lowest); color: var(--md-sys-on-surface);

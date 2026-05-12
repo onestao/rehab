@@ -173,7 +173,7 @@
                 <div class="md-field"><input type="number" value="${draft.carbPer100g}" oninput="data._editingFoodDraft.carbPer100g=this.value" placeholder=" "><label>碳水/100g</label></div>
                 <div class="md-field"><input type="number" value="${draft.fatPer100g}" oninput="data._editingFoodDraft.fatPer100g=this.value" placeholder=" "><label>脂肪/100g</label></div>
             </div>
-            <div class="food-inline-actions">
+            <div class="food-inline-actions food-edit-actions">
                 <button class="md-btn md-btn-tonal" onclick="data.cancelEditFoodLog()">取消</button>
                 <button class="md-btn md-btn-filled" onclick="data.saveEditFoodLog('${f.id}')"><span class="material-symbols-rounded">save</span> 保存</button>
             </div>
