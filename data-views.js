@@ -1,12 +1,15 @@
 (function () {
     window.dataViews = {
         render() {
-            this.renderActions();
-            this.renderWorkoutPlanCard();
-            this.renderTodayPage();
-            this.renderRecordsPage();
-            this.renderAiCoachPage();
-            this.renderProfilePage();
+            const safe = (label, fn) => {
+                try { fn(); } catch (e) { console.error('[render] ' + label + ' failed', e); }
+            };
+            safe('renderActions', () => this.renderActions?.());
+            safe('renderWorkoutPlanCard', () => this.renderWorkoutPlanCard?.());
+            safe('renderTodayPage', () => this.renderTodayPage?.());
+            safe('renderRecordsPage', () => this.renderRecordsPage?.());
+            safe('renderAiCoachPage', () => this.renderAiCoachPage?.());
+            safe('renderProfilePage', () => this.renderProfilePage?.());
         },
 
         renderTodayPage() {
