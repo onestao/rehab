@@ -37,7 +37,9 @@ window.onboarding = {
         if (btn) btn.textContent = this.idx === this.pages.length - 1 ? '开始使用' : '下一步';
     },
     finish() {
-        data.db.onboarded = true; data.save();
+        data.db.onboarded = true;
+        data.save({ render: false });
+        data.flushSync?.();
         const root = document.getElementById('onboardingRoot');
         if (root) { root.classList.add('fade-out'); setTimeout(() => root.remove(), 300); }
     }
