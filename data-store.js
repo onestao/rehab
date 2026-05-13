@@ -120,6 +120,11 @@
             this.db.aiProfiles = this.db.aiProfiles || [];
             this.db.aiActiveId = this.db.aiActiveId || '';
             this.db.aiModels = this.db.aiModels || [];
+            this.db.syncMeta = this.db.syncMeta || {};
+            this.db.syncMeta.lastSyncAt = Number(this.db.syncMeta.lastSyncAt || 0);
+            this.db.syncMeta.lastIncrementalTs = Number(this.db.syncMeta.lastIncrementalTs || 0);
+            this.db.syncMeta.etags = this.db.syncMeta.etags || {};
+            this.db.syncMeta.pendingQueue = Array.isArray(this.db.syncMeta.pendingQueue) ? this.db.syncMeta.pendingQueue : [];
             this.db.actions.forEach(a => { if (!a.phase) a.phase = 'main'; });
             this.db.routines.forEach(r => (r.actions || []).forEach(a => { if (!a.phase) a.phase = 'main'; }));
         },

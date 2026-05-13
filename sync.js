@@ -1,51 +1,216 @@
 const sync = {
+    INCREMENTAL_WINDOW_MS: 5 * 60 * 1000,
+    COMPACTION_THRESHOLD: 50,
+    REMOTE_SNAPSHOT: 'rehab_pro_data.json',
+    REMOTE_MANIFEST: 'manifest.json',
+    REMOTE_INCREMENTAL_DIR: 'incremental',
+
     async sha256(s) {
-        const b = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
-        return Array.from(new Uint8Array(b)).map(x => x.toString(16).padStart(2, "0")).join("");
+        const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
+        return Array.from(new Uint8Array(b)).map(x => x.toString(16).padStart(2, '0')).join('');
     },
 
     async hmac(k, d) {
-        const cK = typeof k === "string" ? new TextEncoder().encode(k) : k;
-        const key = await crypto.subtle.importKey("raw", cK, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
-        return await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(d));
+        const cK = typeof k === 'string' ? new TextEncoder().encode(k) : k;
+        const key = await crypto.subtle.importKey('raw', cK, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+        return crypto.subtle.sign('HMAC', key, new TextEncoder().encode(d));
     },
 
-    async s3Req(method, body = null) {
-        const { endpoint, region, bucket, key, secret } = data.cfg.s3;
+    getSyncMeta() {
+        data.db.syncMeta = data.db.syncMeta || {};
+        data.db.syncMeta.lastSyncAt = Number(data.db.syncMeta.lastSyncAt || 0);
+        data.db.syncMeta.lastIncrementalTs = Number(data.db.syncMeta.lastIncrementalTs || 0);
+        data.db.syncMeta.etags = data.db.syncMeta.etags || {};
+        data.db.syncMeta.pendingQueue = Array.isArray(data.db.syncMeta.pendingQueue) ? data.db.syncMeta.pendingQueue : [];
+        return data.db.syncMeta;
+    },
+
+    saveSyncMeta() {
+        data.touchRecord(data.db.syncMeta);
+        data.save({ render: false });
+    },
+
+    remoteEntityMapFromDb(dbObj) {
+        const db = dbObj || {};
+        const health = db.health || {};
+        return {
+            actions: db.actions || [],
+            routines: db.routines || [],
+            history: db.history || [],
+            weights: health.weights || [],
+            foodLogs: health.foodLogs || [],
+            exerciseLogs: health.exerciseLogs || [],
+            aiAdviceChat: health.aiAdviceChat || []
+        };
+    },
+
+    remoteEntityMap() {
+        return this.remoteEntityMapFromDb(data.db);
+    },
+
+    ensureManifestShape(raw) {
+        const manifest = raw && typeof raw === 'object' ? raw : {};
+        return {
+            snapshotTs: Number(manifest.snapshotTs || 0),
+            snapshotHash: String(manifest.snapshotHash || ''),
+            lastIncrementalTs: Number(manifest.lastIncrementalTs || 0),
+            entities: manifest.entities && typeof manifest.entities === 'object' ? manifest.entities : {},
+            schemaVersion: Number(manifest.schemaVersion || data.SCHEMA_VERSION || 2)
+        };
+    },
+
+    incrementalWindowTs(ts = Date.now()) {
+        return Math.floor(Number(ts) / this.INCREMENTAL_WINDOW_MS) * this.INCREMENTAL_WINDOW_MS;
+    },
+
+    mergeRecordLists(localList, remoteList) {
+        const merged = new Map();
+        (localList || []).forEach(item => {
+            if (!item || !item.id) return;
+            merged.set(item.id, item);
+        });
+        (remoteList || []).forEach(item => {
+            if (!item || !item.id) return;
+            const local = merged.get(item.id);
+            if (!local) {
+                merged.set(item.id, item);
+                return;
+            }
+            const localTs = Number(local.updatedAt || 0);
+            const remoteTs = Number(item.updatedAt || 0);
+            if (remoteTs > localTs) merged.set(item.id, item);
+        });
+        return Array.from(merged.values());
+    },
+
+    getEntityRef(dbObj, entity) {
+        const db = dbObj || data.db;
+        switch (entity) {
+            case 'actions':
+                return {
+                    get: () => db.actions || [],
+                    set: (value) => { db.actions = value; }
+                };
+            case 'routines':
+                return {
+                    get: () => db.routines || [],
+                    set: (value) => { db.routines = value; }
+                };
+            case 'history':
+                return {
+                    get: () => db.history || [],
+                    set: (value) => { db.history = value; }
+                };
+            case 'weights':
+                return {
+                    get: () => (db.health || {}).weights || [],
+                    set: (value) => {
+                        db.health = db.health || {};
+                        db.health.weights = value;
+                    }
+                };
+            case 'foodLogs':
+                return {
+                    get: () => (db.health || {}).foodLogs || [],
+                    set: (value) => {
+                        db.health = db.health || {};
+                        db.health.foodLogs = value;
+                    }
+                };
+            case 'exerciseLogs':
+                return {
+                    get: () => (db.health || {}).exerciseLogs || [],
+                    set: (value) => {
+                        db.health = db.health || {};
+                        db.health.exerciseLogs = value;
+                    }
+                };
+            case 'aiAdviceChat':
+                return {
+                    get: () => (db.health || {}).aiAdviceChat || [],
+                    set: (value) => {
+                        db.health = db.health || {};
+                        db.health.aiAdviceChat = value;
+                    }
+                };
+            default:
+                return null;
+        }
+    },
+
+    mergeEntityRecords(entity, remoteRecords) {
+        const ref = this.getEntityRef(data.db, entity);
+        if (!ref) return false;
+        const merged = this.mergeRecordLists(ref.get(), remoteRecords || []);
+        ref.set(merged);
+        return true;
+    },
+
+    applySnapshot(remoteDb) {
+        const localBefore = JSON.parse(JSON.stringify(data.db));
+        data.db = remoteDb || {};
+        data.normalizeDb();
+        const entities = Object.keys(this.remoteEntityMap());
+        entities.forEach(entity => {
+            const localRef = this.getEntityRef(localBefore, entity);
+            const remoteRef = this.getEntityRef(data.db, entity);
+            if (!localRef || !remoteRef) return;
+            remoteRef.set(this.mergeRecordLists(localRef.get(), remoteRef.get()));
+        });
+        data.normalizeDb();
+    },
+
+    async s3Req(method, remotePath, body = null, extraHeaders = {}) {
+        const { endpoint, region, bucket, key, secret } = data.cfg.s3 || {};
+        if (!endpoint || !region || !bucket || !key || !secret) throw new Error('请完整填写 S3 参数');
         const host = new URL(endpoint).host;
-        const path = `/${bucket}/rehab_pro_data.json`;
+        const path = `/${bucket}/${remotePath}`;
         const dt = new Date().toISOString().replace(/[:\-]|\.\d{3}/g, '');
         const date = dt.slice(0, 8);
         const hash = body
             ? await this.sha256(body)
-            : "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
+            : 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855';
         const canon = `${method}\n${path}\n\nhost:${host}\nx-amz-content-sha256:${hash}\nx-amz-date:${dt}\n\nhost;x-amz-content-sha256;x-amz-date\n${hash}`;
         const scope = `${date}/${region}/s3/aws4_request`;
         const stringToSign = `AWS4-HMAC-SHA256\n${dt}\n${scope}\n${await this.sha256(canon)}`;
-        const kDate = await this.hmac("AWS4" + secret, date);
+        const kDate = await this.hmac('AWS4' + secret, date);
         const kRegion = await this.hmac(kDate, region);
-        const kService = await this.hmac(kRegion, "s3");
-        const kSigning = await this.hmac(kService, "aws4_request");
+        const kService = await this.hmac(kRegion, 's3');
+        const kSigning = await this.hmac(kService, 'aws4_request');
         const sig = Array.from(new Uint8Array(await this.hmac(kSigning, stringToSign)))
-            .map(x => x.toString(16).padStart(2, "0")).join("");
+            .map(x => x.toString(16).padStart(2, '0')).join('');
+
         return fetch(`${endpoint}${path}`, {
             method,
             headers: {
-                'Authorization': `AWS4-HMAC-SHA256 Credential=${key}/${scope}, SignedHeaders=host;x-amz-content-sha256;x-amz-date, Signature=${sig}`,
+                Authorization: `AWS4-HMAC-SHA256 Credential=${key}/${scope}, SignedHeaders=host;x-amz-content-sha256;x-amz-date, Signature=${sig}`,
                 'x-amz-date': dt,
                 'x-amz-content-sha256': hash,
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                ...extraHeaders
             },
             body
         });
     },
 
-    davUrl() {
+    davRoot() {
+        const cfg = data.cfg.dav || {};
+        const raw = String(cfg.path || '').trim().replace(/^\/+|\/+$/g, '');
+        if (!raw) return '';
+        if (/\.json$/i.test(raw)) {
+            const pos = raw.lastIndexOf('/');
+            return pos >= 0 ? raw.slice(0, pos) : '';
+        }
+        return raw;
+    },
+
+    davUrl(remotePath) {
         const cfg = data.cfg.dav || {};
         const base = (cfg.url || '').trim().replace(/\/+$/, '');
-        const file = (cfg.path || 'training_assistant_data.json').trim().replace(/^\/+/, '');
         if (!base) throw new Error('请填写 WebDAV 地址');
-        return `${base}/${file}`;
+        const root = this.davRoot();
+        const cleanPath = String(remotePath || '').replace(/^\/+/, '');
+        return `${base}/${root ? `${root}/` : ''}${cleanPath}`;
     },
 
     basicAuth(user, pass) {
@@ -55,25 +220,245 @@ const sync = {
         return btoa(binary);
     },
 
-    davHeaders() {
+    davHeaders(extraHeaders = {}) {
         const { user, pass } = data.cfg.dav || {};
-        const headers = { 'Content-Type': 'application/json' };
+        const headers = { 'Content-Type': 'application/json', ...extraHeaders };
         if (user || pass) headers.Authorization = `Basic ${this.basicAuth(user, pass)}`;
         return headers;
     },
 
-    async davReq(method, body = null) {
-        return fetch(this.davUrl(), {
+    async davReq(method, remotePath, body = null, extraHeaders = {}) {
+        return fetch(this.davUrl(remotePath), {
             method,
-            headers: this.davHeaders(),
+            headers: this.davHeaders(extraHeaders),
             body
         });
     },
 
-    async syncReq(method, body = null) {
-        if (data.cfg.mode === 's3') return this.s3Req(method, body);
-        if (data.cfg.mode === 'webdav') return this.davReq(method, body);
+    async syncReq(method, remotePath, body = null, extraHeaders = {}) {
+        if (data.cfg.mode === 's3') return this.s3Req(method, remotePath, body, extraHeaders);
+        if (data.cfg.mode === 'webdav') return this.davReq(method, remotePath, body, extraHeaders);
         throw new Error('请先选择并保存同步方式');
+    },
+
+    async fetchJson(remotePath, allow404 = false) {
+        const res = await this.syncReq('GET', remotePath);
+        if (res.status === 404 && allow404) return { data: null, etag: '' };
+        if (!res.ok) throw new Error(`远端读取失败(${remotePath}): ${res.status}`);
+        const etag = res.headers.get('ETag') || '';
+        const text = await res.text();
+        const data = text ? JSON.parse(text) : null;
+        const meta = this.getSyncMeta();
+        meta.etags[remotePath] = etag;
+        this.saveSyncMeta();
+        return { data, etag };
+    },
+
+    queueRetry(item, reason) {
+        const meta = this.getSyncMeta();
+        const queue = meta.pendingQueue || [];
+        queue.push({
+            ...item,
+            reason: reason || 'unknown',
+            queuedAt: Date.now(),
+            attempts: Number(item.attempts || 0) + 1
+        });
+        meta.pendingQueue = queue;
+        this.saveSyncMeta();
+    },
+
+    async writeJson(remotePath, payload, etagKey = remotePath) {
+        const body = JSON.stringify(payload);
+        let extraHeaders = {};
+        const meta = this.getSyncMeta();
+        const ifMatch = data.cfg.mode === 'webdav' ? (meta.etags[etagKey] || '') : '';
+        if (ifMatch) extraHeaders['If-Match'] = ifMatch;
+        const res = await this.syncReq('PUT', remotePath, body, extraHeaders);
+        if (res.status === 412) {
+            this.queueRetry({ remotePath, payload, etagKey }, 'etag_conflict');
+            throw new Error(`写入冲突(${remotePath})，已加入重试队列`);
+        }
+        if (!res.ok) throw new Error(`远端写入失败(${remotePath}): ${res.status}`);
+        const etag = res.headers.get('ETag') || '';
+        meta.etags[etagKey] = etag;
+        this.saveSyncMeta();
+        return etag;
+    },
+
+    async processRetryQueue() {
+        const meta = this.getSyncMeta();
+        const queue = meta.pendingQueue || [];
+        if (!queue.length) return;
+        const remain = [];
+        for (let i = 0; i < queue.length; i++) {
+            const item = queue[i];
+            try {
+                await this.writeJson(item.remotePath, item.payload, item.etagKey || item.remotePath);
+            } catch (e) {
+                remain.push({ ...item, reason: e.message || item.reason, attempts: Number(item.attempts || 0) + 1 });
+            }
+        }
+        meta.pendingQueue = remain;
+        this.saveSyncMeta();
+    },
+
+    diffChangesSince(ts) {
+        const changes = {};
+        const entities = this.remoteEntityMap();
+        Object.keys(entities).forEach(entity => {
+            changes[entity] = (entities[entity] || []).filter(item => Number(item.updatedAt || 0) > Number(ts || 0));
+        });
+        return changes;
+    },
+
+    manifestIncrementalCount(manifest) {
+        const entities = manifest.entities || {};
+        return Object.values(entities).reduce((sum, meta) => sum + Number(meta?.count || 0), 0);
+    },
+
+    async fullBackup(options = {}) {
+        await data.flush();
+        this.setStatus('syncing', options.quiet ? '正在重建快照' : '正在上传全量快照');
+        const snapshotTs = Date.now();
+        const snapshotBody = JSON.stringify(data.db);
+        const snapshotHash = await this.sha256(snapshotBody);
+        await this.writeJson(this.REMOTE_SNAPSHOT, data.db, this.REMOTE_SNAPSHOT);
+        const manifest = this.ensureManifestShape(options.baseManifest || null);
+        manifest.snapshotTs = snapshotTs;
+        manifest.snapshotHash = snapshotHash;
+        manifest.lastIncrementalTs = snapshotTs;
+        manifest.schemaVersion = Number(data.SCHEMA_VERSION || manifest.schemaVersion || 2);
+        manifest.entities = Object.keys(this.remoteEntityMap()).reduce((acc, entity) => {
+            acc[entity] = { lastTs: snapshotTs, count: 0, windows: [] };
+            return acc;
+        }, {});
+        await this.writeJson(this.REMOTE_MANIFEST, manifest, this.REMOTE_MANIFEST);
+        const meta = this.getSyncMeta();
+        meta.lastSyncAt = snapshotTs;
+        meta.lastIncrementalTs = snapshotTs;
+        this.saveSyncMeta();
+        await this.processRetryQueue();
+        this.setStatus('cloud', options.quiet ? '快照重建完成' : '全量备份完成');
+    },
+
+    async pushChanges() {
+        try {
+            await data.flush();
+            this.setStatus('syncing', '正在上传增量变更');
+            const remoteManifest = this.ensureManifestShape((await this.fetchJson(this.REMOTE_MANIFEST, true)).data);
+            const localMeta = this.getSyncMeta();
+            const sinceTs = Math.max(Number(localMeta.lastIncrementalTs || 0), Number(remoteManifest.lastIncrementalTs || 0));
+            const changes = this.diffChangesSince(sinceTs);
+            const changedEntities = Object.keys(changes).filter(entity => (changes[entity] || []).length > 0);
+            if (!changedEntities.length) {
+                this.setStatus('cloud', '没有待上传的增量变更');
+                return;
+            }
+
+            const ts = this.incrementalWindowTs(Date.now());
+            for (let i = 0; i < changedEntities.length; i++) {
+                const entity = changedEntities[i];
+                const payload = { ts, entity, records: changes[entity] };
+                await this.writeJson(`${this.REMOTE_INCREMENTAL_DIR}/${entity}/${ts}.json`, payload, `${this.REMOTE_INCREMENTAL_DIR}/${entity}/${ts}.json`);
+                const entityMeta = remoteManifest.entities[entity] || { lastTs: 0, count: 0, windows: [] };
+                entityMeta.lastTs = Math.max(Number(entityMeta.lastTs || 0), ts);
+                entityMeta.windows = Array.from(new Set([...(entityMeta.windows || []), ts])).sort((a, b) => a - b);
+                entityMeta.count = Number(entityMeta.windows.length);
+                remoteManifest.entities[entity] = entityMeta;
+            }
+            remoteManifest.lastIncrementalTs = Math.max(Number(remoteManifest.lastIncrementalTs || 0), ts);
+            remoteManifest.schemaVersion = Number(data.SCHEMA_VERSION || remoteManifest.schemaVersion || 2);
+            await this.writeJson(this.REMOTE_MANIFEST, remoteManifest, this.REMOTE_MANIFEST);
+
+            localMeta.lastSyncAt = Date.now();
+            localMeta.lastIncrementalTs = Number(remoteManifest.lastIncrementalTs || ts);
+            this.saveSyncMeta();
+
+            if (this.manifestIncrementalCount(remoteManifest) >= this.COMPACTION_THRESHOLD) {
+                await this.fullBackup({ quiet: true, baseManifest: remoteManifest });
+                return;
+            }
+
+            await this.processRetryQueue();
+            this.setStatus('cloud', `增量上传完成（${changedEntities.length} 个实体）`);
+        } catch (e) {
+            this.setStatus('error', `增量上传失败: ${e.message}`);
+            alert(`增量上传失败: ${e.message}`);
+        }
+    },
+
+    async pullChanges() {
+        try {
+            await data.flush();
+            this.setStatus('syncing', '正在拉取远端变更');
+            const snapshotRes = await this.fetchJson(this.REMOTE_SNAPSHOT, true);
+            if (snapshotRes.data) this.applySnapshot(snapshotRes.data);
+            const manifest = this.ensureManifestShape((await this.fetchJson(this.REMOTE_MANIFEST, true)).data);
+            const meta = this.getSyncMeta();
+            const startTs = Math.max(Number(meta.lastIncrementalTs || 0), Number(manifest.snapshotTs || 0));
+
+            const replayTasks = [];
+            Object.keys(manifest.entities || {}).forEach(entity => {
+                const windows = (manifest.entities[entity] && manifest.entities[entity].windows) || [];
+                windows
+                    .filter(ts => Number(ts) > startTs)
+                    .sort((a, b) => a - b)
+                    .forEach(ts => replayTasks.push({ entity, ts: Number(ts) }));
+            });
+            replayTasks.sort((a, b) => a.ts - b.ts || a.entity.localeCompare(b.entity));
+
+            for (let i = 0; i < replayTasks.length; i++) {
+                const task = replayTasks[i];
+                const remotePath = `${this.REMOTE_INCREMENTAL_DIR}/${task.entity}/${task.ts}.json`;
+                const inc = await this.fetchJson(remotePath, true);
+                const records = inc.data && Array.isArray(inc.data.records) ? inc.data.records : [];
+                this.mergeEntityRecords(task.entity, records);
+            }
+
+            data.normalizeDb();
+            data.save({ render: false });
+            await data.flush();
+            if (typeof ai !== 'undefined') await ai.init({ saveData: true, renderData: false });
+            data.render();
+
+            meta.lastSyncAt = Date.now();
+            meta.lastIncrementalTs = Math.max(Number(meta.lastIncrementalTs || 0), Number(manifest.lastIncrementalTs || 0));
+            this.saveSyncMeta();
+            await this.processRetryQueue();
+            this.setStatus('cloud', '拉取完成');
+        } catch (e) {
+            this.setStatus('error', `拉取失败: ${e.message}`);
+            alert(`拉取失败: ${e.message}`);
+        }
+    },
+
+    async fullRestore() {
+        await this.pullChanges();
+    },
+
+    async push() {
+        await this.pushChanges();
+    },
+
+    async pull() {
+        await this.fullRestore();
+    },
+
+    async autoBackup(reason = 'auto') {
+        if (data.cfg.mode === 'none') return;
+        if (data.cfg.mode === 's3') {
+            const { endpoint, region, bucket, key, secret } = data.cfg.s3 || {};
+            if (!endpoint || !region || !bucket || !key || !secret) return;
+        }
+        if (data.cfg.mode === 'webdav') {
+            const { url } = data.cfg.dav || {};
+            if (!url) return;
+        }
+        try {
+            await this.pushChanges();
+        } catch (e) {
+            console.warn('Auto incremental backup failed', reason, e);
+        }
     },
 
     saveConfig() {
@@ -92,78 +477,8 @@ const sync = {
             path: document.getElementById('davPath').value || 'training_assistant_data.json'
         };
         if (typeof data.persistCfg === 'function') data.persistCfg();
-            this.setStatus(data.cfg.mode === 'none' ? 'local' : 'cloud', data.cfg.mode === 'none' ? '当前仅保存本地数据' : '同步配置已本地保存');
-            alert("配置已本地保存");
-        },
-
-    async _fetchRemoteSafe() {
-        try {
-            const res = await this.syncReq('GET');
-            if (res.ok) return await res.json();
-        } catch {}
-        return null;
-    },
-
-    async pull() {
-        try {
-            if (typeof data.flush === 'function') await data.flush();
-            this.setStatus('syncing', '正在从云端拉取数据');
-            const remote = await this._fetchRemoteSafe();
-            if (!remote) {
-                this.setStatus('error', '拉取失败：无法获取远端数据');
-                alert("拉取失败，请检查参数");
-                return;
-            }
-            if ((data.db.lastModified || 0) > (remote.lastModified || 0) + 60_000) {
-                if (!confirm('本地比云端更新，下载会覆盖本地，继续吗？')) return;
-            }
-            data.db = remote;
-            if (typeof data.normalizeDb === 'function') data.normalizeDb();
-            data.save();
-            if (typeof ai !== 'undefined') await ai.init({ saveData: true, renderData: false });
-            data.render();
-            this.setStatus('cloud', '下载恢复成功');
-            alert("下载恢复成功（含训练记录）");
-        } catch (e) { this.setStatus('error', '同步失败: ' + e.message); alert("同步失败: " + e.message); }
-    },
-
-    async push() {
-        try {
-            if (typeof data.flush === 'function') await data.flush();
-            this.setStatus('syncing', '正在上传备份到云端');
-            const remote = await this._fetchRemoteSafe();
-            if (remote && remote.lastModified > (data.db.lastModified || 0) + 60_000
-                && remote.deviceId !== data.db.deviceId) {
-                if (!confirm('远端备份较新（来自其他设备），确定要用本地覆盖吗？')) return;
-            }
-            const payload = JSON.stringify(data.db);
-            const res = await this.syncReq('PUT', payload);
-            this.setStatus(res.ok ? 'cloud' : 'error', res.ok ? '备份上传成功' : `备份失败：${res.status}`);
-            if (res.ok) alert("备份成功（含训练记录、方案库、动作列表）");
-            else alert("备份失败，请检查参数");
-        } catch (e) { this.setStatus('error', '备份失败: ' + e.message); alert("备份失败: " + e.message); }
-    },
-
-    async autoBackup(reason = 'auto') {
-        if (data.cfg.mode === 'none') return;
-        if (data.cfg.mode === 's3') {
-            const { endpoint, region, bucket, key, secret } = data.cfg.s3 || {};
-            if (!endpoint || !region || !bucket || !key || !secret) return;
-        }
-        if (data.cfg.mode === 'webdav') {
-            const { url } = data.cfg.dav || {};
-            if (!url) return;
-        }
-        this.setStatus('syncing', '检测到数据变更，自动备份中');
-        try {
-            if (typeof data.flush === 'function') await data.flush();
-            const res = await this.syncReq('PUT', JSON.stringify(data.db));
-            this.setStatus(res.ok ? 'cloud' : 'error', res.ok ? '自动备份成功' : `自动备份失败：${res.status}`);
-            if (!res.ok) console.warn('Auto backup failed', reason, res.status);
-        } catch (e) {
-            this.setStatus('error', '自动备份失败: ' + e.message);
-            console.warn('Auto backup failed', reason, e);
-        }
+        this.setStatus(data.cfg.mode === 'none' ? 'local' : 'cloud', data.cfg.mode === 'none' ? '当前仅保存本地数据' : '同步配置已本地保存');
+        alert('配置已本地保存');
     },
 
     setStatus(state, detail = '') {
@@ -175,7 +490,9 @@ const sync = {
             cloud: ['cloud_done', '云端'],
             error: ['cloud_alert', '同步失败']
         };
-        const [icon, label] = map[state] || map.local;
+        const pair = map[state] || map.local;
+        const icon = pair[0];
+        const label = pair[1];
         el.innerHTML = `<span class="material-symbols-rounded" style="font-size:14px">${icon}</span> ${label}`;
         el.dataset.state = state;
         el.dataset.detail = detail;
