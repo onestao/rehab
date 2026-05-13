@@ -191,17 +191,27 @@
         },
 
         renderHealthSwipeDeck() {
+            const renderOne = (view) => {
+                try {
+                    return this.renderHealthViewByKey(view);
+                } catch (e) {
+                    console.error('[renderHealthViewByKey] ' + view + ' failed', e);
+                    return `<div class="md-card" style="padding:16px"><strong>${view} 面板加载失败</strong><p style="margin-top:8px;color:var(--md-sys-on-surface-variant);font-size:12px">请下拉刷新页面，或在控制台查看 [render] 错误日志</p></div>`;
+                }
+            };
             return `<div id="healthSwipeDeck" class="health-swipe-deck" onscroll="data.onHealthDeckScroll(this)">
-            ${this.healthViewOrder().map(view => `<section class="health-swipe-page" data-health-page="${view}">${this.renderHealthViewByKey(view)}</section>`).join('')}
+            ${this.healthViewOrder().map(view => `<section class="health-swipe-page" data-health-page="${view}">${renderOne(view)}</section>`).join('')}
         </div>`;
         },
 
         renderHealthViewByKey(view) {
             const previous = this.healthView;
             this.healthView = view;
-            const html = this.renderHealthView();
-            this.healthView = previous;
-            return html;
+            try {
+                return this.renderHealthView();
+            } finally {
+                this.healthView = previous;
+            }
         },
 
         scrollToHealthView(view) {
@@ -245,7 +255,14 @@
         },
 
         updateHealthSwipeEffects(deck = document.getElementById('healthSwipeDeck')) {
-            if (!deck || !deck.clientWidth) return;
+            if (!deck) return;
+            if (!deck.clientWidth) {
+                deck.querySelectorAll('.health-swipe-page').forEach(page => {
+                    page.style.transform = '';
+                    page.style.opacity = '';
+                });
+                return;
+            }
             const progress = deck.scrollLeft / deck.clientWidth;
             deck.querySelectorAll('.health-swipe-page').forEach((page, index) => {
                 const distance = Math.min(1, Math.abs(progress - index));
