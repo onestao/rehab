@@ -1,12 +1,47 @@
 (function () {
     window.dataStore = {
+        STORAGE_VERSION_KEY: 'storageVersion',
+        MIGRATION_FAILED_KEY: 'migration.failed',
+        FLUSH_DEBOUNCE_MS: 300,
+        _storage: null,
+        _flushHooksBound: false,
+        _persistTimer: null,
+        _pendingPersistPromise: null,
+        _resolvePersist: null,
+        _rejectPersist: null,
+        _dbDirty: false,
+
+        resolveStorageAdapter() {
+            if (this._storage) return this._storage;
+            this._storage = {
+                mode: 'localStorage',
+                read(key) {
+                    const raw = localStorage.getItem(key);
+                    if (!raw) return null;
+                    return JSON.parse(raw);
+                },
+                write(key, value) {
+                    localStorage.setItem(key, JSON.stringify(value));
+                },
+                flushSync(key, value) {
+                    localStorage.setItem(key, JSON.stringify(value));
+                },
+                remove(key) {
+                    localStorage.removeItem(key);
+                }
+            };
+            return this._storage;
+        },
+
         async init() {
-            const localDb = localStorage.getItem(this.DB_KEY);
-            const localCfg = localStorage.getItem(this.CFG_KEY);
-            if (localDb) this.db = JSON.parse(localDb);
+            const storage = this.resolveStorageAdapter();
+            const localDb = storage.read(this.DB_KEY);
+            const localCfg = storage.read(this.CFG_KEY);
+            if (localDb) this.db = localDb;
             else this.migrateLegacy();
-            if (localCfg) this.cfg = JSON.parse(localCfg);
+            if (localCfg) this.cfg = localCfg;
             this.normalizeDb();
+            this.bindFlushHooks();
             sync.initUI();
             if (typeof ai !== 'undefined') await ai.init({ saveData: true, renderData: false });
             this.render();
@@ -56,21 +91,98 @@
 
         migrateLegacy() {
             const legacy = ['rp_v31_db', 'rp_v28_db', 'rp_v21_main'];
+            const storage = this.resolveStorageAdapter();
             for (let key of legacy) {
-                let old = localStorage.getItem(key);
-                if (old) { this.db = JSON.parse(old); this.save(); break; }
+                const old = storage.read(key);
+                if (!old) continue;
+                this.db = old;
+                this.flushSync();
+                break;
             }
         },
 
-        save() {
+        bindFlushHooks() {
+            if (this._flushHooksBound || typeof window === 'undefined') return;
+            this._flushHooksBound = true;
+            window.addEventListener('pagehide', () => this.flushSync());
+            document.addEventListener('visibilitychange', () => {
+                if (document.visibilityState === 'hidden') this.flushSync();
+            });
+        },
+
+        ensurePersistPromise() {
+            if (this._pendingPersistPromise) return this._pendingPersistPromise;
+            this._pendingPersistPromise = new Promise((resolve, reject) => {
+                this._resolvePersist = resolve;
+                this._rejectPersist = reject;
+            });
+            return this._pendingPersistPromise;
+        },
+
+        clearPersistState() {
+            this._pendingPersistPromise = null;
+            this._resolvePersist = null;
+            this._rejectPersist = null;
+        },
+
+        schedulePersist() {
+            this.ensurePersistPromise();
+            clearTimeout(this._persistTimer);
+            this._persistTimer = setTimeout(() => {
+                this.flush().catch((e) => {
+                    if (window.toast) toast.show(`数据保存失败：${toast.sanitize(e)}`, 'error');
+                    else console.error('flush failed', e);
+                });
+            }, this.FLUSH_DEBOUNCE_MS);
+        },
+
+        save(options = {}) {
+            const shouldRender = options.render !== false;
             this.db.lastModified = Date.now();
             this.db.deviceId = this.db.deviceId || `dev-${Math.random().toString(36).slice(2,10)}`;
-            localStorage.setItem(this.DB_KEY, JSON.stringify(this.db));
-            this.render();
+            this._dbDirty = true;
+            this.schedulePersist();
+            if (shouldRender) this.render();
+        },
+
+        persistCfg() {
+            this.resolveStorageAdapter().write(this.CFG_KEY, this.cfg);
+        },
+
+        flushSync() {
+            const storage = this.resolveStorageAdapter();
+            try {
+                storage.flushSync(this.DB_KEY, this.db);
+                if (this.cfg) storage.flushSync(this.CFG_KEY, this.cfg);
+                this._dbDirty = false;
+            } catch (e) {
+                if (window.toast) toast.show(`本地快照写入失败：${toast.sanitize(e)}`, 'error');
+                else console.error('flushSync failed', e);
+            }
+        },
+
+        async flush() {
+            if (!this._dbDirty && !this._pendingPersistPromise) return;
+            clearTimeout(this._persistTimer);
+            this._persistTimer = null;
+            this.ensurePersistPromise();
+            try {
+                if (this._dbDirty) {
+                    this.resolveStorageAdapter().write(this.DB_KEY, this.db);
+                    this._dbDirty = false;
+                }
+                this._resolvePersist?.();
+            } catch (e) {
+                this._rejectPersist?.(e);
+                throw e;
+            } finally {
+                this.clearPersistState();
+            }
         },
 
         async saveAndBackup() {
             this.save();
+            await this.flush();
             await sync.autoBackup('history');
         }
     };

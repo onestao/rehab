@@ -1,8 +1,8 @@
-﻿Object.assign(workout, {
+Object.assign(workout, {
     updateRate(val) {
         data.db.rate = parseFloat(val);
         document.getElementById('rateLabel').innerText = val;
-        localStorage.setItem(data.DB_KEY, JSON.stringify(data.db));
+        data.save({ render: false });
     },
 
     updateStateClasses() {

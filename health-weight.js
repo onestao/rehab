@@ -150,7 +150,7 @@
 
         saveHeight(val) {
             const h = parseFloat(val);
-            if (h > 0) { this.db.health.height = h; localStorage.setItem(this.DB_KEY, JSON.stringify(this.db)); this.renderHistory(); }
+            if (h > 0) { this.db.health.height = h; this.save({ render: false }); this.renderHistory(); }
         },
 
         showWeightTip(event, date, weight) {

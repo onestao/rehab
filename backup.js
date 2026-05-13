@@ -1,5 +1,6 @@
 const backup = {
-    exportData() {
+    async exportData() {
+        if (typeof data.flush === 'function') await data.flush();
         const payload = {
             exportedAt: new Date().toISOString(),
             schemaVersion: data.db.schemaVersion || data.SCHEMA_VERSION || 1,
@@ -17,7 +18,8 @@ const backup = {
         setTimeout(() => URL.revokeObjectURL(url), 1000);
     },
 
-    exportCSV(kind) {
+    async exportCSV(kind) {
+        if (typeof data.flush === 'function') await data.flush();
         let rows = [];
         if (kind === 'food') {
             rows.push(['date','meal','name','grams','cal','pro','carb','fat']);
@@ -56,7 +58,8 @@ const backup = {
             if (!confirm('导入后会覆盖当前本地数据，是否继续？')) return;
             data.db = nextDb;
             data.normalizeDb();
-            localStorage.setItem(data.DB_KEY, JSON.stringify(data.db));
+            data.save({ render: false });
+            await data.flush();
             if (typeof ai !== 'undefined') await ai.init({ saveData: true, renderData: false });
             if (typeof syncStatus !== 'undefined') syncStatus.render();
             data.render();

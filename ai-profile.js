@@ -112,11 +112,8 @@
     persistDataDb(render = true) {
         this.syncToDataDb();
         if (typeof data === 'undefined' || !data.db) return;
-        if (render && typeof data.save === 'function') {
-            data.save();
-            return;
-        }
-        try { localStorage.setItem(data.DB_KEY, JSON.stringify(data.db)); } catch {}
+        if (typeof data.save !== 'function') return;
+        data.save({ render });
     },
 
     syncToDataDb() {

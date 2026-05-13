@@ -35,7 +35,7 @@
     updatePlan() {
         const plan = this.currentPlan();
         data.db.cardio = { type: plan.type, weight: plan.weight, target: plan.target };
-        localStorage.setItem(data.DB_KEY, JSON.stringify(data.db));
+        data.save({ render: false });
         if (workout.mode === 'cardio') {
             document.getElementById('subText').innerText = `${plan.name} · ${plan.weight}kg · ${plan.met} MET`;
             document.getElementById('curSet').innerText = plan.met;

@@ -91,7 +91,7 @@ const sync = {
             pass: document.getElementById('davPass').value,
             path: document.getElementById('davPath').value || 'training_assistant_data.json'
         };
-        localStorage.setItem(data.CFG_KEY, JSON.stringify(data.cfg));
+        if (typeof data.persistCfg === 'function') data.persistCfg();
             this.setStatus(data.cfg.mode === 'none' ? 'local' : 'cloud', data.cfg.mode === 'none' ? '当前仅保存本地数据' : '同步配置已本地保存');
             alert("配置已本地保存");
         },
@@ -106,6 +106,7 @@ const sync = {
 
     async pull() {
         try {
+            if (typeof data.flush === 'function') await data.flush();
             this.setStatus('syncing', '正在从云端拉取数据');
             const remote = await this._fetchRemoteSafe();
             if (!remote) {
@@ -128,6 +129,7 @@ const sync = {
 
     async push() {
         try {
+            if (typeof data.flush === 'function') await data.flush();
             this.setStatus('syncing', '正在上传备份到云端');
             const remote = await this._fetchRemoteSafe();
             if (remote && remote.lastModified > (data.db.lastModified || 0) + 60_000
@@ -154,6 +156,7 @@ const sync = {
         }
         this.setStatus('syncing', '检测到数据变更，自动备份中');
         try {
+            if (typeof data.flush === 'function') await data.flush();
             const res = await this.syncReq('PUT', JSON.stringify(data.db));
             this.setStatus(res.ok ? 'cloud' : 'error', res.ok ? '自动备份成功' : `自动备份失败：${res.status}`);
             if (!res.ok) console.warn('Auto backup failed', reason, res.status);
