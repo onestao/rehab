@@ -78,6 +78,36 @@
 .weight-grid-line { stroke: var(--md-sys-outline-variant); stroke-width: 1; fill: none; opacity: 0.7; }
 .weight-line { stroke: var(--md-sys-primary); stroke-width: 4; stroke-linecap: round; stroke-linejoin: round; fill: none; }
 .weight-dot { fill: var(--md-sys-primary-container); stroke: var(--md-sys-primary); stroke-width: 2; }
+.weight-dot-label {
+    font-size: 10px;
+    fill: var(--md-sys-on-surface);
+    font-weight: 600;
+    pointer-events: none;
+}
+.weight-dot {
+    cursor: pointer;
+    transition: r 0.15s;
+}
+.weight-dot:hover, .weight-dot:active {
+    r: 7;
+}
+.weight-chart-wrap {
+    position: relative;
+}
+.weight-chart-tip {
+    position: absolute;
+    top: 6px;
+    background: var(--md-sys-surface-container-high, #2a2a2a);
+    color: var(--md-sys-on-surface, #fff);
+    padding: 4px 10px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    pointer-events: none;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+    white-space: nowrap;
+    z-index: 2;
+}
 .weight-chart-labels,
 .weight-analysis,
 .weight-list-item {

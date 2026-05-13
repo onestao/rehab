@@ -33,6 +33,7 @@
         const rangeFoods = contexts.diet ? this.filterByAdviceRange(allFoods, f => f.date ? new Date(f.date) : null) : [];
         const rangeExerciseLogs = contexts.training ? this.filterByAdviceRange(allExerciseLogs, e => e.date ? new Date(e.date) : null) : [];
         const rangeWeights = contexts.weight ? this.filterByAdviceRange(allWeights, w => w.date ? new Date(w.date) : null) : [];
+        const trendWeights = contexts.weight ? allWeights.slice(-30) : [];
 
         const todayHistory = contexts.training ? allHistory.filter(h => this.dateKey(this.parseHistoryDate(h.date)) === today) : [];
         const todayFoods = contexts.diet ? allFoods.filter(f => f.date === today) : [];
@@ -91,7 +92,8 @@
 4. 如果某一类数据为空或未启用，简要说明，不要笼统说全部不足
 5. 优先用短段落和清单表达，不要输出 markdown 表格
 6. 如果用户问题提到了某个具体日期，优先分析该日期的数据
-7. 回答后给出 1-2 条具体可执行的建议`;
+7. 回答后给出 1-2 条具体可执行的建议
+8. 体重为状态量，进行趋势分析时应综合"近30条体重记录"，不局限于当前分析范围`;
 
         const blocks = [`分析范围：${rangeLabel}`, `用户提问：${prompt}`];
         if (targetDate) blocks.push(`【优先分析日期】\n${targetDate}`);
@@ -114,6 +116,9 @@
         }
         if (contexts.weight) {
             blocks.push(`【${rangeLabel}体重记录】\n${formatWeights(rangeWeights) || `${rangeLabel}暂无体重记录`}`);
+            if (range === 'today' && trendWeights.length) {
+                blocks.push(`【近30条体重记录（用于趋势分析）】\n${formatWeights(trendWeights)}`);
+            }
         }
         if (contexts.goal && dietGoal.dailyCal) {
             blocks.push(`【饮食目标】\n每日 ${dietGoal.dailyCal} kcal · 目标类型：${dietGoal.goalType === 'gain' ? '增肌' : '减重'}`);

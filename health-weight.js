@@ -80,7 +80,7 @@
 
         renderWeightChart() {
             const points = this.weightPointsForRange();
-            if (points.length < 2) return `<div class="weight-empty-chart"><span class="material-symbols-rounded">show_chart</span><p>至少需要 2 条记录生成曲线</p></div>`;
+            if (points.length < 2) return `<div class="weight-empty-chart"><span class="material-symbols-rounded">show_chart</span><p>至少需要 2 条记录生成曲线（当前 ${points.length} 条）</p></div>`;
             const values = points.map(p => p.weight);
             const min = Math.min(...values) - 0.5;
             const max = Math.max(...values) + 0.5;
@@ -93,14 +93,30 @@
                 return { ...p, x, y };
             });
             const path = coords.map((p, i) => `${i ? 'L' : 'M'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
-            return `<div class="weight-chart-wrap">
-            <svg class="weight-chart" viewBox="0 0 ${width} ${height}" role="img" aria-label="体重变化曲线">
-                <path class="weight-grid-line" d="M${pad},${pad} H${width - pad} M${pad},${height / 2} H${width - pad} M${pad},${height - pad} H${width - pad}" />
-                <path class="weight-line" d="${path}" />
-                ${coords.map(p => `<circle class="weight-dot" cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="4"><title>${p.date}: ${p.weight}kg</title></circle>`).join('')}
-            </svg>
-            <div class="weight-chart-labels"><span>${points[0].date.slice(5)}</span><span>${points[points.length - 1].date.slice(5)}</span></div>
-        </div>`;
+
+            // 关键点：最低、最高、最新
+            const minIdx = values.indexOf(Math.min(...values));
+            const maxIdx = values.indexOf(Math.max(...values));
+            const lastIdx = coords.length - 1;
+            const labelIndices = new Set([minIdx, maxIdx, lastIdx]);
+            const labels = coords.map((p, i) => labelIndices.has(i)
+                ? `<text class="weight-dot-label" x="${p.x.toFixed(1)}" y="${(p.y - 8).toFixed(1)}" text-anchor="middle">${p.weight.toFixed(1)}</text>`
+                : '').join('');
+
+            const dots = coords.map((p, i) =>
+                `<circle class="weight-dot" cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="6" data-date="${p.date}" data-weight="${p.weight}" onclick="data.showWeightTip(event, '${p.date}', ${p.weight})"><title>${p.date}: ${p.weight}kg</title></circle>`
+            ).join('');
+
+            return `<div class="weight-chart-wrap" id="weightChartWrap">
+                <svg class="weight-chart" viewBox="0 0 ${width} ${height}" role="img" aria-label="体重变化曲线">
+                    <path class="weight-grid-line" d="M${pad},${pad} H${width - pad} M${pad},${height / 2} H${width - pad} M${pad},${height - pad} H${width - pad}" />
+                    <path class="weight-line" d="${path}" />
+                    ${dots}
+                    ${labels}
+                </svg>
+                <div class="weight-chart-tip" id="weightChartTip" style="display:none"></div>
+                <div class="weight-chart-labels"><span>${points[0].date.slice(5)}</span><span>${points[points.length - 1].date.slice(5)}</span></div>
+            </div>`;
         },
 
         renderWeightList(weights) {
@@ -136,6 +152,19 @@
         saveHeight(val) {
             const h = parseFloat(val);
             if (h > 0) { this.db.health.height = h; localStorage.setItem(this.DB_KEY, JSON.stringify(this.db)); this.renderHistory(); }
+        },
+
+        showWeightTip(event, date, weight) {
+            const wrap = document.getElementById('weightChartWrap');
+            const tip = document.getElementById('weightChartTip');
+            if (!wrap || !tip) return;
+            const rect = wrap.getBoundingClientRect();
+            const x = (event.clientX || (event.touches && event.touches[0]?.clientX) || 0) - rect.left;
+            tip.style.display = 'block';
+            tip.style.left = Math.max(8, Math.min(rect.width - 80, x - 40)) + 'px';
+            tip.textContent = `${date}  ${Number(weight).toFixed(1)} kg`;
+            clearTimeout(this._weightTipTimer);
+            this._weightTipTimer = setTimeout(() => { tip.style.display = 'none'; }, 2200);
         }
     };
 })();

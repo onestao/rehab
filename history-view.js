@@ -335,6 +335,7 @@
 
         askContextAi(context, prompt) {
             if (!ai.cfg.enabled) return alert('请先在设置中配置 AI');
+            if (context === 'weight') this.adviceRange = 'month';
             this.routineView = 'advice';
             const nav = document.querySelectorAll('.nav-item')[3];
             ui.tab('ai-coach', nav);
