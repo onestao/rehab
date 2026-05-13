@@ -23,6 +23,27 @@
                 </div>
             `).join('');
 
+            const detailSections = `
+                ${conds.length ? `<div class="profile-section">
+                    <div class="profile-section-title"><span class="material-symbols-rounded">warning</span> 训练禁忌与健康状况（${conds.length}）</div>
+                    <div class="profile-condition-list">${condChips}</div>
+                </div>` : ''}
+                ${allergies.length ? `<div class="profile-section">
+                    <div class="profile-section-title"><span class="material-symbols-rounded">no_food</span> 过敏 / 不耐受</div>
+                    <div class="profile-chip-row">${allergies.map(a => `<span class="profile-chip">${this.escapeHtml ? this.escapeHtml(a) : a}</span>`).join('')}</div>
+                </div>` : ''}
+                ${equipment.length ? `<div class="profile-section">
+                    <div class="profile-section-title"><span class="material-symbols-rounded">fitness_center</span> 可用器材</div>
+                    <div class="profile-chip-row">${equipment.map(a => `<span class="profile-chip">${this.escapeHtml ? this.escapeHtml(a) : a}</span>`).join('')}</div>
+                </div>` : ''}
+                ${sports.length ? `<div class="profile-section">
+                    <div class="profile-section-title"><span class="material-symbols-rounded">sports</span> 偏好运动</div>
+                    <div class="profile-chip-row">${sports.map(a => `<span class="profile-chip">${this.escapeHtml ? this.escapeHtml(a) : a}</span>`).join('')}</div>
+                </div>` : ''}
+                ${p.vitals?.restingHR ? `<div class="profile-section profile-vitals">
+                    <span class="material-symbols-rounded">monitor_heart</span>静息心率 ${p.vitals.restingHR} bpm
+                </div>` : ''}`;
+
             return `<div class="md-card health-profile-card">
                 <div class="profile-head">
                     <div class="profile-head-main">
@@ -35,25 +56,10 @@
                     </div>
                     <button class="md-btn md-btn-tonal profile-edit-btn" onclick="data.openProfileModal()" type="button"><span class="material-symbols-rounded">edit</span> 编辑</button>
                 </div>
-                ${conds.length ? `<div class="profile-section">
-                    <div class="profile-section-title"><span class="material-symbols-rounded">warning</span> 训练禁忌与健康状况（${conds.length}）</div>
-                    <div class="profile-condition-list">${condChips}</div>
-                </div>` : ''}
-                ${allergies.length ? `<div class="profile-section">
-                    <div class="profile-section-title"><span class="material-symbols-rounded">no_food</span> 过敏 / 不耐受</div>
-                    <div class="profile-chip-row">${allergies.map(a => `<span class="profile-chip">${a}</span>`).join('')}</div>
-                </div>` : ''}
-                ${equipment.length ? `<div class="profile-section">
-                    <div class="profile-section-title"><span class="material-symbols-rounded">fitness_center</span> 可用器材</div>
-                    <div class="profile-chip-row">${equipment.map(a => `<span class="profile-chip">${a}</span>`).join('')}</div>
-                </div>` : ''}
-                ${sports.length ? `<div class="profile-section">
-                    <div class="profile-section-title"><span class="material-symbols-rounded">sports</span> 偏好运动</div>
-                    <div class="profile-chip-row">${sports.map(a => `<span class="profile-chip">${a}</span>`).join('')}</div>
-                </div>` : ''}
-                ${p.vitals?.restingHR ? `<div class="profile-section profile-vitals">
-                    <span class="material-symbols-rounded">monitor_heart</span>静息心率 ${p.vitals.restingHR} bpm
-                </div>` : ''}
+                ${hasAny ? `<details class="profile-details">
+                    <summary><span class="material-symbols-rounded">expand_more</span> 查看详细健康档案</summary>
+                    <div class="profile-details-body">${detailSections}</div>
+                </details>` : ''}
                 <div class="profile-footnote"><span class="material-symbols-rounded">lock</span>仅保存在本机/你的同步账号</div>
             </div>`;
         },
@@ -90,12 +96,12 @@
                         </div>
                         <div class="profile-form-section profile-form-allergy">
                             <h4><span class="profile-section-icon material-symbols-rounded">no_food</span>过敏 / 不耐受</h4>
-                            <div class="md-field"><input type="text" id="profAllergies" value="${(p.allergies || []).join('、')}" placeholder=" "><label>用「、」分隔，如：乳糖、花生</label></div>
+                            <div class="md-field"><textarea id="profAllergies" class="profile-auto-textarea" rows="1" placeholder=" " oninput="data.autoResizeProfileTextareas(this)">${this.escapeHtml ? this.escapeHtml((p.allergies || []).join('、')) : (p.allergies || []).join('、')}</textarea><label>用「、」分隔，如：乳糖、花生</label></div>
                         </div>
                         <div class="profile-form-section profile-form-preference">
                             <h4><span class="profile-section-icon material-symbols-rounded">tune</span>偏好</h4>
-                            <div class="md-field"><input type="text" id="profEquip" value="${(p.preferences?.equipment || []).join('、')}" placeholder=" "><label>可用器材，「、」分隔</label></div>
-                            <div class="md-field"><input type="text" id="profSports" value="${(p.preferences?.sports || []).join('、')}" placeholder=" "><label>偏好运动，「、」分隔</label></div>
+                            <div class="md-field"><textarea id="profEquip" class="profile-auto-textarea" rows="1" placeholder=" " oninput="data.autoResizeProfileTextareas(this)">${this.escapeHtml ? this.escapeHtml((p.preferences?.equipment || []).join('、')) : (p.preferences?.equipment || []).join('、')}</textarea><label>可用器材，「、」分隔</label></div>
+                            <div class="md-field"><textarea id="profSports" class="profile-auto-textarea" rows="1" placeholder=" " oninput="data.autoResizeProfileTextareas(this)">${this.escapeHtml ? this.escapeHtml((p.preferences?.sports || []).join('、')) : (p.preferences?.sports || []).join('、')}</textarea><label>偏好运动，「、」分隔</label></div>
                         </div>
                         <p class="profile-privacy"><span class="material-symbols-rounded">shield</span>数据仅保存在本机或你的同步账号，不会上传第三方服务</p>
                     </div>
@@ -106,28 +112,38 @@
                 </div>
             </div>`;
             document.body.insertAdjacentHTML('beforeend', html);
+            this.autoResizeProfileTextareas(document.getElementById('profileModal'));
         },
 
         renderConditionEditor(c, i) {
             c = c || {};
+            const esc = value => this.escapeHtml ? this.escapeHtml(value || '') : String(value || '');
             const types = [['injury', '运动损伤'], ['chronic', '慢性病'], ['allergy', '过敏'], ['surgery', '手术史'], ['medication', '用药'], ['other', '其他']];
             const sevs = [['mild', '轻'], ['moderate', '中'], ['severe', '重']];
             return `<div class="profile-cond-row" data-idx="${i}">
-                <div class="md-grid">
-                    <div class="md-field">
+                <div class="md-grid profile-cond-meta-grid">
+                    <div class="md-field profile-cond-type-field">
                         <select class="prof-cond-type">${types.map(([v, l]) => `<option value="${v}" ${c.type === v ? 'selected' : ''}>${l}</option>`).join('')}</select>
                         <label>类型</label>
                     </div>
-                    <div class="md-field">
+                    <div class="md-field profile-cond-sev-field">
                         <select class="prof-cond-sev">${sevs.map(([v, l]) => `<option value="${v}" ${c.severity === v ? 'selected' : ''}>${l}</option>`).join('')}</select>
                         <label>严重程度</label>
                     </div>
                 </div>
-                <div class="md-field"><input type="text" class="prof-cond-label" value="${c.label || ''}" placeholder=" "><label>描述（如：左膝半月板二级损伤）</label></div>
-                <div class="md-field"><input type="text" class="prof-cond-avoid" value="${(c.avoid || []).join('、')}" placeholder=" "><label>需避免的动作/食物，「、」分隔</label></div>
-                <div class="md-field"><input type="text" class="prof-cond-note" value="${c.note || ''}" placeholder=" "><label>备注（可选）</label></div>
+                <div class="md-field"><textarea class="prof-cond-label profile-auto-textarea" rows="1" placeholder=" " oninput="data.autoResizeProfileTextareas(this)">${esc(c.label)}</textarea><label>描述（如：左膝半月板二级损伤）</label></div>
+                <div class="md-field"><textarea class="prof-cond-avoid profile-auto-textarea" rows="1" placeholder=" " oninput="data.autoResizeProfileTextareas(this)">${esc((c.avoid || []).join('、'))}</textarea><label>需避免的动作/食物，「、」分隔</label></div>
+                <div class="md-field"><textarea class="prof-cond-note profile-auto-textarea" rows="1" placeholder=" " oninput="data.autoResizeProfileTextareas(this)">${esc(c.note)}</textarea><label>备注（可选）</label></div>
                 <button class="md-btn profile-cond-del" onclick="data.removeConditionRow(this)" type="button"><span class="material-symbols-rounded">delete</span> 删除此条</button>
             </div>`;
+        },
+
+        autoResizeProfileTextareas(target) {
+            const textareas = target?.matches?.('.profile-auto-textarea') ? [target] : Array.from(target?.querySelectorAll?.('.profile-auto-textarea') || []);
+            textareas.forEach(textarea => {
+                textarea.style.height = 'auto';
+                textarea.style.height = Math.max(46, textarea.scrollHeight) + 'px';
+            });
         },
 
         addConditionRow() {
@@ -135,6 +151,7 @@
             if (!list) return;
             const idx = list.children.length;
             list.insertAdjacentHTML('beforeend', this.renderConditionEditor({}, idx));
+            this.autoResizeProfileTextareas(list.lastElementChild);
         },
 
         removeConditionRow(btn) {
