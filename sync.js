@@ -116,7 +116,7 @@ const sync = {
             if ((data.db.lastModified || 0) > (remote.lastModified || 0) + 60_000) {
                 if (!confirm('本地比云端更新，下载会覆盖本地，继续吗？')) return;
             }
-            data.db = { ...data.db, ...remote };
+            data.db = remote;
             if (typeof data.normalizeDb === 'function') data.normalizeDb();
             data.save();
             if (typeof ai !== 'undefined') await ai.init({ saveData: true, renderData: false });

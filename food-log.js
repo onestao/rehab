@@ -22,6 +22,7 @@ const foodLog = {
             renderAiFoodResults: this.renderAiFoodResults,
             addSingleAiFood: this.addSingleAiFood,
             addAllAiFoods: this.addAllAiFoods,
+            undoRecentAiFoodAdd: this.undoRecentAiFoodAdd,
             aiFoodLog: this.aiFoodLog,
             clearAiResults: this.clearAiResults,
             applyAiFood: this.applyAiFood
@@ -132,7 +133,7 @@ const foodLog = {
         if (!calInput || calInput <= 0 || !cal) return alert('请先选择食物或填写每100g热量');
         const log = {
             id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-            date: this.dateKey(new Date()),
+            date: this.logicalDateKey(),
             meal,
             name,
             grams,
@@ -172,8 +173,38 @@ const foodLog = {
     },
 
     todayFoodLogs() {
-        const today = this.dateKey(new Date());
+        const today = this.logicalDateKey();
         return (this.db.health.foodLogs || []).filter(f => f.date === today);
+    },
+
+    rememberRecentAiFoodAdd(logs) {
+        const added = (logs || []).filter(Boolean);
+        if (!added.length) return;
+        this._recentAiFoodAdd = {
+            ids: added.map(item => item.id),
+            logs: added,
+            expiresAt: Date.now() + 5000
+        };
+        if (window.toast?.show) {
+            toast.show(`已添加 ${added.length} 项 AI 食物`, 'success', 5000, {
+                label: '撤销',
+                onClick: () => this.undoRecentAiFoodAdd()
+            });
+        }
+    },
+
+    undoRecentAiFoodAdd() {
+        const recent = this._recentAiFoodAdd;
+        if (!recent || !recent.ids?.length) return;
+        if (Date.now() > Number(recent.expiresAt || 0)) {
+            this._recentAiFoodAdd = null;
+            return;
+        }
+        const ids = new Set(recent.ids);
+        this.db.health.foodLogs = (this.db.health.foodLogs || []).filter(item => !ids.has(item.id));
+        this._recentAiFoodAdd = null;
+        this.saveAndBackup();
+        toast?.show?.('已撤销最近一次 AI 添加', 'info', 2400);
     },
 
     todayCalories() {
@@ -323,10 +354,12 @@ const foodLog = {
         if (!this._aiFoodAdded) this._aiFoodAdded = new Set();
         if (this._aiFoodAdded.has(idx)) return;
         const meal = this._dietMeal || 'lunch';
-        this.db.health.foodLogs.push(this.aiFoodLog(item, meal, idx));
+        const addedLog = this.aiFoodLog(item, meal, idx);
+        this.db.health.foodLogs.push(addedLog);
         this._aiFoodAdded.add(idx);
         this.renderAiFoodResults();
-        this.save();
+        this.rememberRecentAiFoodAdd([addedLog]);
+        this.saveAndBackup();
     },
 
     addAllAiFoods() {
@@ -335,12 +368,15 @@ const foodLog = {
         if (!this._aiFoodAdded) this._aiFoodAdded = new Set();
         const meal = this._dietMeal || 'lunch';
         const addedNow = [];
+        const addedLogs = [];
         items.forEach((item, idx) => {
             if (this._aiFoodAdded.has(idx)) return;
             const entry = this.foodEntry(item);
             if (!entry.name) return;
             addedNow.push(idx);
-            this.db.health.foodLogs.push(this.aiFoodLog(entry, meal, idx));
+            const addedLog = this.aiFoodLog(entry, meal, idx);
+            addedLogs.push(addedLog);
+            this.db.health.foodLogs.push(addedLog);
         });
         addedNow.forEach(idx => {
             this._aiFoodAdded.add(idx);
@@ -348,6 +384,7 @@ const foodLog = {
         this.renderAiFoodResults();
         const statusEl = document.getElementById('foodAiStatus');
         if (statusEl) statusEl.textContent = addedNow.length ? `已添加 ${addedNow.length} 项 AI 食物` : '这些 AI 食物已全部添加';
+        this.rememberRecentAiFoodAdd(addedLogs);
         this.saveAndBackup();
     },
 
@@ -359,7 +396,7 @@ const foodLog = {
         const fat = Number(item.fat || 0);
         return {
             id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${idx}`,
-            date: this.dateKey(new Date()),
+            date: this.logicalDateKey(),
             meal,
             name: item.name || 'AI 识别食物',
             grams,

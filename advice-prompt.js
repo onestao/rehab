@@ -10,10 +10,9 @@
             const now = new Date();
             return this.dateKey(new Date(now.getFullYear(), Number(md[1]) - 1, Number(md[2])));
         }
-        if (/今天/.test(text)) return this.dateKey(new Date());
+        if (/今天/.test(text)) return this.logicalDateKey();
         if (/昨天/.test(text)) {
-            const d = new Date();
-            d.setDate(d.getDate() - 1);
+            const d = new Date(this.logicalDayStart().getTime() - 86400000);
             return this.dateKey(d);
         }
         return '';
@@ -22,7 +21,7 @@
     buildAdviceMessages(prompt, model) {
         const contexts = { diet: true, training: true, weight: true, goal: true, ...(this.adviceContexts || {}) };
         const range = this.adviceRange || 'today';
-        const today = this.dateKey(new Date());
+        const today = this.logicalDateKey();
 
         const allHistory = this.db.history || [];
         const allFoods = this.db.health.foodLogs || [];
@@ -30,12 +29,12 @@
         const allWeights = this.sortedWeights();
 
         const rangeHistory = contexts.training ? this.filterByAdviceRange(allHistory, h => this.parseHistoryDate(h.date)) : [];
-        const rangeFoods = contexts.diet ? this.filterByAdviceRange(allFoods, f => f.date ? new Date(f.date) : null) : [];
-        const rangeExerciseLogs = contexts.training ? this.filterByAdviceRange(allExerciseLogs, e => e.date ? new Date(e.date) : null) : [];
-        const rangeWeights = contexts.weight ? this.filterByAdviceRange(allWeights, w => w.date ? new Date(w.date) : null) : [];
+        const rangeFoods = contexts.diet ? this.filterByAdviceRange(allFoods, f => f.date ? this.dateFromKey(f.date) : null) : [];
+        const rangeExerciseLogs = contexts.training ? this.filterByAdviceRange(allExerciseLogs, e => e.date ? this.dateFromKey(e.date) : null) : [];
+        const rangeWeights = contexts.weight ? this.filterByAdviceRange(allWeights, w => w.date ? this.dateFromKey(w.date) : null) : [];
         const trendWeights = contexts.weight ? allWeights.slice(-30) : [];
 
-        const todayHistory = contexts.training ? allHistory.filter(h => this.dateKey(this.parseHistoryDate(h.date)) === today) : [];
+        const todayHistory = contexts.training ? allHistory.filter(h => this.historyDayKey(h) === today) : [];
         const todayFoods = contexts.diet ? allFoods.filter(f => f.date === today) : [];
         const todayExerciseLogs = contexts.training ? allExerciseLogs.filter(e => e.date === today) : [];
         const todayWeights = contexts.weight ? allWeights.filter(w => w.date === today) : [];
@@ -86,6 +85,7 @@
         const sys = `你是训练与营养健康顾问。基于用户的实际记录回答问题。
 当前启用的分析维度：${enabledLabels}。未启用的维度不会提供数据，请不要编造，也不要要求用户开启。
 规则：
+0. 用户健康档案为最高优先级：在生成任何训练或饮食建议前必须先核对【健康档案】。如果建议涉及档案中标记的避免项或用户过敏/不耐受的食物，必须替换为安全替代方案，并在回答中显式说明（例如"考虑到你的左膝问题，已用臀桥替代深蹲"）。
 1. 只能引用下方实际提供的记录，不能凭空编造数据
 2. 必须引用至少 2 条具体记录作为证据（如果数据足够）
 3. 引用时写出具体日期和内容，例如"5月6日午餐鸡胸肉饭 520 kcal"
@@ -96,6 +96,25 @@
 8. 体重为状态量，进行趋势分析时应综合"近30条体重记录"，不局限于当前分析范围`;
 
         const blocks = [`分析范围：${rangeLabel}`, `用户提问：${prompt}`];
+        const profile = this.db.health?.profile || {};
+        const profileLines = [];
+        const _typeMap = { injury: '运动损伤', chronic: '慢性病', allergy: '过敏', surgery: '手术史', medication: '用药', other: '其他' };
+        if (profile.gender || profile.age) {
+            profileLines.push(`基础：${profile.gender === 'female' ? '女' : '男'} · ${profile.age || '?'} 岁${this.db.health?.height ? ' · 身高 ' + this.db.health.height + ' cm' : ''}`);
+        }
+        if (profile.conditions?.length) {
+            profileLines.push('健康状况：');
+            profile.conditions.forEach(c => {
+                profileLines.push(`  - [${_typeMap[c.type] || c.type}] ${c.label}${c.severity ? '（' + c.severity + '）' : ''}${c.avoid?.length ? '；避免：' + c.avoid.join('、') : ''}${c.note ? '；备注：' + c.note : ''}`);
+            });
+        }
+        if (profile.allergies?.length) profileLines.push(`过敏/不耐受：${profile.allergies.join('、')}`);
+        if (profile.preferences?.equipment?.length) profileLines.push(`可用器材：${profile.preferences.equipment.join('、')}`);
+        if (profile.preferences?.sports?.length) profileLines.push(`偏好运动：${profile.preferences.sports.join('、')}`);
+        if (profile.vitals?.restingHR) profileLines.push(`静息心率：${profile.vitals.restingHR} bpm`);
+        if (profileLines.length) {
+            blocks.unshift(`【健康档案（必须遵守）】\n${profileLines.join('\n')}`);
+        }
         if (targetDate) blocks.push(`【优先分析日期】\n${targetDate}`);
         if (contexts.training && targetDate) blocks.push(`【该日期训练记录】\n${formatTraining(targetHistory) || '该日期无训练记录'}`);
         if (contexts.diet && targetDate) {

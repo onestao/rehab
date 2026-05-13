@@ -265,7 +265,7 @@ Object.assign(advicePanel, {
                 : '<div class="empty-state advice-empty"><span class="material-symbols-rounded">forum</span><p>还没有 AI 建议，选择下方快捷问题开始</p></div>';
         }
         const groups = messages.reduce((acc, msg, idx) => {
-            const date = this.dateKey(this.parseHistoryDate(msg.at));
+            const date = this.logicalDateKey(this.parseHistoryDate(msg.at));
             if (!acc[date]) acc[date] = [];
             acc[date].push({ ...msg, idx: Number.isInteger(msg.idx) ? msg.idx : idx });
             return acc;
@@ -273,7 +273,7 @@ Object.assign(advicePanel, {
         const lastVisibleIdx = messages[messages.length - 1]?.idx ?? messages.length - 1;
         return Object.keys(groups).sort((a, b) => a.localeCompare(b)).map(date => {
             const list = groups[date];
-            const today = date === this.dateKey(new Date());
+            const today = date === this.logicalDateKey();
             const collapsed = this.isCollapsed(`advice_${date}`, !today && list.every(msg => msg.idx < lastVisibleIdx - 4));
             return `<section class="advice-date-group ${collapsed ? 'collapsed' : ''}">
                 <button class="advice-date-head" onclick="data.toggleCollapse('advice_${date}')" type="button">

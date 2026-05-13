@@ -1,5 +1,5 @@
 window.toast = {
-    show(msg, type = 'info', ms = 2400) {
+    show(msg, type = 'info', ms = 2400, action = null) {
         let el = document.getElementById('appToast');
         if (!el) {
             el = document.createElement('div');
@@ -7,7 +7,22 @@ window.toast = {
             el.className = 'app-toast';
             document.body.appendChild(el);
         }
-        el.textContent = msg;
+        el.innerHTML = '';
+        const text = document.createElement('span');
+        text.className = 'app-toast-text';
+        text.textContent = msg;
+        el.appendChild(text);
+        if (action?.label && typeof action.onClick === 'function') {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'app-toast-action';
+            btn.textContent = action.label;
+            btn.onclick = () => {
+                action.onClick();
+                el.classList.remove('show');
+            };
+            el.appendChild(btn);
+        }
         el.dataset.type = type;
         el.classList.add('show');
         clearTimeout(el._t);

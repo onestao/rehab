@@ -12,7 +12,7 @@
         },
 
         renderRecordOverview() {
-            const today = this.dateKey(new Date());
+            const today = this.logicalDateKey();
             const weight = (this.db.health.weights || []).find(w => w.date === today) || this.sortedWeights().slice(-1)[0];
             const intake = this.todayCalories();
             const exerciseCal = this.todayTrainingCalories();
@@ -30,7 +30,7 @@
             const monthNum = Number(today.slice(5, 7));
             const dayNum = Number(today.slice(8, 10));
             const weekdays = ['周日','周一','周二','周三','周四','周五','周六'];
-            const weekday = weekdays[new Date(today).getDay()];
+            const weekday = weekdays[this.dateFromKey(today).getDay()];
             let status = '', hint = '';
             if (goalCal) {
                 if (remaining >= 500) { status = '空间充足'; hint = '还可摄入约 ' + remaining + ' kcal，优先补蛋白和蔬菜'; }
@@ -69,8 +69,8 @@
         },
 
         renderTodayTimeline() {
-            const today = this.dateKey(new Date());
-            const entries = this.db.history.filter(h => this.dateKey(this.parseHistoryDate(h.date)) === today);
+            const today = this.logicalDateKey();
+            const entries = this.db.history.filter(h => this.historyDayKey(h) === today);
             const foods = (this.db.health.foodLogs || []).filter(f => f.date === today);
             const exercises = (this.db.health.exerciseLogs || []).filter(e => e.date === today);
             const weight = (this.db.health.weights || []).find(w => w.date === today);
@@ -126,7 +126,7 @@
                 if (!groups[key]) groups[key] = [];
                 groups[key].push({ h, i });
             });
-            const currentMonth = this.dateKey(new Date()).slice(0, 7);
+            const currentMonth = this.logicalDateKey().slice(0, 7);
             return Object.keys(groups).sort((a, b) => b.localeCompare(a)).map(key => {
                 const [y, m] = key.split('-');
                 const items = groups[key];
@@ -244,7 +244,7 @@
         renderCalendarDayDetail() {
             if (!this.selectedCalendarDate) return '';
             const date = this.selectedCalendarDate;
-            const entries = this.db.history.filter(h => this.dateKey(this.parseHistoryDate(h.date)) === date);
+            const entries = this.db.history.filter(h => this.historyDayKey(h) === date);
             const foods = (this.db.health.foodLogs || []).filter(f => f.date === date);
             const manualExercises = (this.db.health.exerciseLogs || []).filter(e => e.date === date);
             const weight = (this.db.health.weights || []).find(w => w.date === date);
@@ -286,7 +286,7 @@
 
         groupHistoryByDate() {
             return this.db.history.reduce((map, h) => {
-                const key = this.dateKey(this.parseHistoryDate(h.date));
+                const key = this.historyDayKey(h);
                 if (!map[key]) map[key] = [];
                 map[key].push(h);
                 return map;
@@ -296,7 +296,7 @@
         groupCalendarActivitiesByDate() {
             const map = {};
             (this.db.history || []).forEach(h => {
-                const key = this.dateKey(this.parseHistoryDate(h.date));
+                const key = this.historyDayKey(h);
                 if (!map[key]) map[key] = [];
                 this.historyNames(h).forEach((name, idx) => {
                     map[key].push({ name, minutes: idx === 0 ? (h.duration || 0) / 60 : 0, source: 'history' });

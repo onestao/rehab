@@ -49,7 +49,8 @@
                 case 'weight':
                     return this.renderWeightPanel() + this.renderContextAiCard('weight');
                 case 'training':
-                    return this.renderManualExercisePanel() +
+                    return this.renderHealthProfileCard() +
+                        this.renderManualExercisePanel() +
                         '<div class="record-section-title">最近训练记录</div>' +
                         this.renderRecentHistoryList(5) +
                         this.renderContextAiCard('exercise');

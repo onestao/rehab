@@ -1,7 +1,7 @@
 (function () {
     window.dataHealthWeight = {
         addWeight() {
-            const date = document.getElementById('modalWeightDate').value || this.dateKey(new Date());
+            const date = document.getElementById('modalWeightDate').value || this.logicalDateKey();
             const weight = parseFloat(document.getElementById('modalWeightValue').value);
             const note = document.getElementById('modalWeightNote').value.trim();
             const height = parseFloat(document.getElementById('modalHeight').value);
@@ -16,7 +16,7 @@
                 note,
                 createdAt: new Date().toISOString()
             });
-            this.db.health.weights.sort((a, b) => new Date(b.date) - new Date(a.date));
+            this.db.health.weights.sort((a, b) => this.dateFromKey(b.date) - this.dateFromKey(a.date));
             document.getElementById('modalWeightValue').value = '';
             document.getElementById('modalWeightNote').value = '';
             this.closeWeightModal();
@@ -127,14 +127,13 @@
         },
 
         sortedWeights() {
-            return [...(this.db.health?.weights || [])].sort((a, b) => new Date(a.date) - new Date(b.date));
+            return [...(this.db.health?.weights || [])].sort((a, b) => this.dateFromKey(a.date) - this.dateFromKey(b.date));
         },
 
         weightPointsForRange() {
             const days = this.weightRange === 'week' ? 7 : this.weightRange === 'month' ? 31 : 366;
-            const cutoff = new Date();
-            cutoff.setDate(cutoff.getDate() - days);
-            return this.sortedWeights().filter(w => new Date(w.date) >= cutoff);
+            const cutoffKey = this.dateKey(new Date(this.logicalDayStart().getTime() - days * 86400000));
+            return this.sortedWeights().filter(w => w.date >= cutoffKey);
         },
 
         weightAnalysis() {
@@ -142,7 +141,7 @@
             if (points.length < 2) return { avgText: '-- kg/日', trend: '记录不足' };
             const first = points[0];
             const last = points[points.length - 1];
-            const days = Math.max(1, Math.round((new Date(last.date) - new Date(first.date)) / 86400000));
+            const days = Math.max(1, Math.round((this.dateFromKey(last.date) - this.dateFromKey(first.date)) / 86400000));
             const total = last.weight - first.weight;
             const avg = total / days;
             const trend = Math.abs(avg) < 0.01 ? '基本不变' : avg < 0 ? '下降趋势' : '上升趋势';

@@ -22,6 +22,7 @@ Object.assign(
     window.dataHealthDiet || {},
     window.dataHealthWeight || {},
     window.dataHealthExercise || {},
+    window.dataHealthProfile || {},
     window.dataGoalPlan || {},
     window.dataRoutineLibrary || {},
     window.dataHistoryView || {},

@@ -3,6 +3,7 @@
         async requestWeightLossPlan() {
             const goalType = this.db.health.goalType || 'loss';
             const isGain = goalType === 'gain';
+            const profile = this.db.health?.profile || {};
             const latest = this.sortedWeights().slice(-1)[0];
             const currentWeight = parseFloat(document.getElementById('planCurrentWeight')?.value) || latest?.weight;
             const targetWeight = parseFloat(document.getElementById('planTargetWeight')?.value);
@@ -13,8 +14,6 @@
             const intensity = document.getElementById('planIntensity')?.value || 'moderate';
             const sportType = document.getElementById('planSportType')?.value || (isGain ? 'strength' : 'mixed');
             const experience = document.getElementById('planExperience')?.value || 'beginner';
-            const gender = document.getElementById('planGender')?.value || 'male';
-            const age = parseInt(document.getElementById('planAge')?.value) || 30;
             if (!currentWeight || currentWeight <= 0) return alert('请先填写当前体重');
             if (!targetWeight || targetWeight <= 0) return alert('请输入目标体重');
             if (!isGain && targetWeight >= currentWeight) return alert('减重目标体重需低于当前体重');
@@ -22,8 +21,9 @@
             const statusEl = document.getElementById('planStatus');
             if (statusEl) statusEl.textContent = 'AI 分析中...';
             try {
-                const plan = await ai.bodyGoalPlan({ goalType, currentWeight, targetWeight, activityLevel, dailyTrainMin, height, weeklyFreq, intensity, sportType, experience, gender, age });
-                this.db.health.profile = { ...(this.db.health.profile || {}), gender, age };
+                const conditions = profile.conditions || [];
+                const allergies = profile.allergies || [];
+                const plan = await ai.bodyGoalPlan({ goalType, currentWeight, targetWeight, activityLevel, dailyTrainMin, height, weeklyFreq, intensity, sportType, experience, gender: profile.gender, age: profile.age, conditions, allergies });
                 const normalized = this.normalizeBodyPlan(plan, { currentWeight, targetWeight }, goalType);
                 this.db.health.bodyPlan = normalized;
                 this.db.health.weightPlan = normalized;
@@ -116,6 +116,7 @@
         renderWeightLossPanel() {
             const goalType = this.db.health.goalType || 'loss';
             const isGain = goalType === 'gain';
+            const profile = this.db.health?.profile || {};
             const plan = this.db.health.bodyPlan || this.db.health.weightPlan;
             const goal = this.db.health.dietGoal;
             const latest = this.sortedWeights().slice(-1)[0];
@@ -147,11 +148,6 @@
                     <div class="md-field"><input type="number" id="planCurrentWeight" step="0.1" value="${currentWeight || ''}" placeholder=" "><label>当前体重 kg</label></div>
                     <div class="md-field"><input type="number" id="planTargetWeight" step="0.1" placeholder=" "><label>目标体重 kg</label></div>
                     <div class="md-field"><input type="number" id="planHeight" step="1" value="${this.db.health?.height || ''}" placeholder=" "><label>身高 cm</label></div>
-                    <div class="md-field"><select id="planGender">
-                        <option value="male" ${(this.db.health?.profile?.gender || 'male') === 'male' ? 'selected' : ''}>男</option>
-                        <option value="female" ${this.db.health?.profile?.gender === 'female' ? 'selected' : ''}>女</option>
-                    </select><label>性别</label></div>
-                    <div class="md-field"><input type="number" id="planAge" min="10" max="100" step="1" value="${this.db.health?.profile?.age || ''}" placeholder=" "><label>年龄</label></div>
                     <div class="md-field"><select id="planActivity"><option value="sedentary">久坐</option><option value="light">轻度活动</option><option value="moderate">中等活动</option><option value="active">高强度活动</option></select><label>日常活动水平</label></div>
                     <div class="md-field"><input type="number" id="planTrainMin" value="30" step="5" placeholder=" "><label>每次运动分钟</label></div>
                     <div class="md-field"><input type="number" id="planWeeklyFreq" value="${isGain ? 4 : 3}" step="1" min="0" max="7" placeholder=" "><label>每周运动次数</label></div>
@@ -159,6 +155,7 @@
                     <div class="md-field"><select id="planSportType"><option value="strength" ${isGain ? 'selected' : ''}>力量训练</option><option value="cardio">有氧运动</option><option value="mixed" ${!isGain ? 'selected' : ''}>力量+有氧混合</option><option value="flexibility">拉伸/瑜伽</option></select><label>主要运动项目</label></div>
                     ${isGain ? `<div class="md-field span-full"><select id="planExperience"><option value="beginner">新手</option><option value="intermediate">中级</option><option value="advanced">高级</option></select><label>训练经验</label></div>` : ''}
                 </div>
+                <div id="planProfileHint" class="food-ai-status">性别 / 年龄已从健康档案自动读取：${profile.gender === 'female' ? '女' : '男'} · ${profile.age || '未填写'} 岁${profile.age ? '' : '，建议先到「健康」页补充年龄以提升方案准确度'}</div>
                 <button class="md-btn md-btn-filled" onclick="data.requestWeightLossPlan()"><span class="material-symbols-rounded">psychology</span> AI 生成${isGain ? '增肌' : '减重'}方案</button>
                 <div id="planStatus" class="food-ai-status"></div>
             </div>
@@ -184,11 +181,11 @@
                         </ul>
                     </div>
                     <div>
-                        <b>性别与年龄</b>
-                        <p>用于估算基础代谢（BMR）和蛋白质需求，缺失会导致每日热量偏差 100–200 kcal。</p>
+                        <b>健康档案中的性别与年龄</b>
+                        <p>目标指导会自动读取健康档案中的性别和年龄，用于估算基础代谢（BMR）和蛋白质需求；如果年龄缺失，每日热量可能偏差 100–200 kcal。</p>
                         <ul>
                             <li>同身高体重下，男性 BMR 通常比女性高 5–10%</li>
-                            <li>每增长 10 岁 BMR 约下降 2–3%，请如实填写</li>
+                            <li>每增长 10 岁 BMR 约下降 2–3%，建议在健康档案中如实填写</li>
                             <li>40 岁以上减重期建议提高蛋白质比例以保留肌肉</li>
                         </ul>
                     </div>

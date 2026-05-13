@@ -10,7 +10,7 @@ const backup = {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `rehab-backup-${data.dateKey(new Date())}.json`;
+        a.download = `rehab-backup-${data.logicalDateKey()}.json`;
         document.body.appendChild(a);
         a.click();
         a.remove();
@@ -33,7 +33,7 @@ const backup = {
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
-        a.href = url; a.download = `${kind}-${data.dateKey(new Date())}.csv`;
+        a.href = url; a.download = `${kind}-${data.logicalDateKey()}.csv`;
         document.body.appendChild(a);
         a.click();
         a.remove();

@@ -268,28 +268,32 @@
 }
 .diet-meal-title small { font-weight: 600; color: var(--md-sys-primary); }
 .diet-log-item {
-    display: grid; gap: 2px; padding: 8px 10px;
+    display: grid; gap: 4px; padding: 8px 10px;
     background: var(--md-sys-surface-container-lowest); border-radius: var(--md-sys-shape-sm); margin-bottom: 3px;
     font-size: 13px;
+    min-width: 0;
 }
 .diet-log-main {
-    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    display: flex; align-items: flex-start; justify-content: space-between; gap: 8px;
+    min-width: 0;
 }
 .diet-log-name {
-    flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-    font-weight: 600; color: var(--md-sys-on-surface);
+    flex: 1 1 auto; min-width: 0; font-weight: 600; color: var(--md-sys-on-surface);
+    overflow-wrap: anywhere; word-break: break-word;
+    display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
 }
-.diet-log-cal { white-space: nowrap; color: var(--md-sys-primary); font-size: 13px; }
+.diet-log-cal { flex: 0 0 auto; white-space: nowrap; color: var(--md-sys-primary); font-size: 13px; font-weight: 700; }
 .diet-log-sub {
     display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    min-width: 0;
 }
 .diet-log-sub small {
-    min-width: 0; color: var(--md-sys-on-surface-variant); font-size: 11px; font-weight: 600;
+    flex: 1 1 auto; min-width: 0; color: var(--md-sys-on-surface-variant); font-size: 11px; font-weight: 600;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.diet-log-actions { display: flex; gap: 2px; flex: none; }
-.diet-log-item span:first-child { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.diet-log-item b { white-space: nowrap; color: var(--md-sys-primary); font-size: 13px; }
+.diet-log-actions { display: flex; gap: 2px; flex: 0 0 auto; align-items: center; }
+.diet-log-actions .delete-btn,
+.diet-log-actions .food-log-action-btn { opacity: 1; }
 .food-log-action-btn {
     border: none;
     width: 30px;

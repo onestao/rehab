@@ -1,7 +1,7 @@
 (function () {
     window.dataHealthExercise = {
         addStrengthLog() {
-            const date = this.dateKey(new Date());
+            const date = this.logicalDateKey();
             const name = document.getElementById('slName')?.value?.trim() || '';
             const weightKg = parseFloat(document.getElementById('slWeight')?.value) || 0;
             const sets = parseInt(document.getElementById('slSets')?.value) || 0;
@@ -33,9 +33,9 @@
             this.saveAndBackup();
         },
         todayTrainingCalories() {
-            const today = this.dateKey(new Date());
+            const today = this.logicalDateKey();
             const autoCal = this.db.history
-                .filter(h => this.dateKey(this.parseHistoryDate(h.date)) === today)
+                .filter(h => this.historyDayKey(h) === today)
                 .reduce((sum, h) => sum + (h.cardio?.calories || 0), 0);
             const manualCal = (this.db.health.exerciseLogs || [])
                 .filter(e => e.date === today)
@@ -44,7 +44,7 @@
         },
 
         addManualExercise() {
-            const date = this.dateKey(new Date());
+            const date = this.logicalDateKey();
             const type = document.getElementById('manualExerciseType')?.value || 'walk';
             const customName = document.getElementById('manualExerciseCustom')?.value?.trim() || '';
             const minutes = parseInt(document.getElementById('manualExerciseMinutes')?.value) || 0;
@@ -104,7 +104,7 @@
         },
 
         todayExerciseLogs() {
-            const today = this.dateKey(new Date());
+            const today = this.logicalDateKey();
             return (this.db.health.exerciseLogs || []).filter(e => e.date === today);
         },
 

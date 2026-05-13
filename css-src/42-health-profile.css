@@ -1,0 +1,433 @@
+/* ============================================
+   Health Profile Card — Material 3 Expressive
+   ============================================ */
+
+.health-profile-card {
+    padding: 16px;
+    border-radius: var(--md-sys-shape-lg);
+    background:
+        radial-gradient(circle at 0 0, color-mix(in srgb, var(--md-sys-primary-container) 48%, transparent), transparent 36%),
+        linear-gradient(135deg, color-mix(in srgb, var(--md-sys-surface-container-low) 86%, var(--md-sys-primary-container)), var(--md-sys-surface-container-lowest));
+    box-shadow: var(--md-sys-elevation-1);
+    margin-bottom: 12px;
+    overflow: hidden;
+    position: relative;
+    border: 1px solid color-mix(in srgb, var(--md-sys-primary) 12%, transparent);
+    transition:
+        box-shadow var(--md-sys-motion-duration-medium) var(--md-sys-motion-emphasized),
+        transform var(--md-sys-motion-duration-medium) var(--md-expressive-spring);
+}
+
+.health-profile-card:hover {
+    box-shadow: var(--md-sys-elevation-2);
+    transform: translateY(-1px);
+}
+
+.profile-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.profile-head-main {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+}
+
+.profile-card-icon {
+    width: 48px;
+    height: 48px;
+    flex: 0 0 auto;
+    display: inline-grid;
+    place-items: center;
+    border-radius: 18px;
+    background: linear-gradient(135deg, var(--md-sys-primary-container), color-mix(in srgb, var(--md-sys-tertiary-container) 72%, var(--md-sys-primary-container)));
+    color: var(--md-sys-on-primary-container);
+    box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 55%, transparent), var(--md-sys-elevation-1);
+    font-size: 26px;
+    font-variation-settings: 'FILL' 1, 'wght' 600, 'GRAD' 0, 'opsz' 24;
+}
+
+.profile-head h3 {
+    margin: 4px 0 2px;
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--md-sys-on-surface);
+}
+
+.profile-head small {
+    color: var(--md-sys-on-surface-variant);
+    font-size: 12px;
+}
+
+.profile-edit-btn {
+    flex-shrink: 0;
+    border-radius: var(--md-sys-shape-full);
+    padding: 6px 14px !important;
+    font-size: 13px !important;
+}
+
+.profile-section {
+    padding: 12px;
+    border: 1px solid color-mix(in srgb, var(--md-sys-outline-variant) 72%, transparent);
+    border-radius: var(--md-sys-shape-md);
+    background: color-mix(in srgb, var(--md-sys-surface-container-lowest) 78%, transparent);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    margin-top: 10px;
+}
+
+.profile-section-title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--md-sys-on-surface-variant);
+    margin-bottom: 8px;
+}
+
+.profile-section-title .material-symbols-rounded {
+    font-size: 18px;
+    color: var(--md-sys-primary);
+    width: 28px;
+    height: 28px;
+    display: inline-grid;
+    place-items: center;
+    border-radius: var(--md-sys-shape-full);
+    background: var(--md-sys-primary-container);
+}
+
+.profile-condition-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.profile-condition {
+    background: var(--md-sys-surface-container);
+    padding: 10px 12px;
+    border-radius: var(--md-sys-shape-md);
+    border-left: 3px solid var(--md-sys-primary);
+    transition: transform var(--md-sys-motion-duration-short) var(--md-expressive-spring);
+}
+
+.profile-condition:hover {
+    transform: translateX(2px);
+}
+
+.profile-condition-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.profile-condition-head b {
+    font-size: 14px;
+    color: var(--md-sys-on-surface);
+}
+
+.profile-condition-type {
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: var(--md-sys-shape-full);
+    background: var(--md-sys-secondary-container);
+    color: var(--md-sys-on-secondary-container);
+    font-weight: 600;
+}
+
+.profile-condition-type.type-injury { background: #ffd9d9; color: #410002; }
+.profile-condition-type.type-chronic { background: var(--md-sys-tertiary-container); color: var(--md-sys-on-tertiary-container); }
+.profile-condition-type.type-allergy { background: var(--md-sys-amber-container); color: var(--md-sys-on-amber-container); }
+
+.profile-sev {
+    font-size: 11px;
+    padding: 1px 6px;
+    border-radius: var(--md-sys-shape-xs);
+    font-weight: 600;
+}
+
+.profile-sev.sev-mild { background: #d4edda; color: #155724; }
+.profile-sev.sev-moderate { background: #fff3cd; color: #856404; }
+.profile-sev.sev-severe { background: #f8d7da; color: #721c24; }
+
+.profile-condition-avoid {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 6px;
+    font-size: 12px;
+    color: var(--md-sys-error);
+}
+
+.profile-condition-avoid .material-symbols-rounded {
+    font-size: 14px;
+}
+
+.profile-condition-note {
+    margin-top: 4px;
+    font-size: 12px;
+    color: var(--md-sys-on-surface-variant);
+    font-style: italic;
+}
+
+.profile-chip-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.profile-chip {
+    padding: 6px 12px;
+    border-radius: var(--md-sys-shape-full);
+    background: color-mix(in srgb, var(--md-sys-secondary-container) 86%, var(--md-sys-surface-container-lowest));
+    color: var(--md-sys-on-secondary-container);
+    font-size: 12px;
+    font-weight: 500;
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--md-sys-secondary) 12%, transparent);
+    transition:
+        background var(--md-sys-motion-duration-short) var(--md-sys-motion-emphasized),
+        transform var(--md-sys-motion-duration-short) var(--md-expressive-spring);
+}
+
+.profile-chip:hover {
+    transform: translateY(-1px);
+    background: var(--md-sys-secondary-container);
+}
+
+.profile-vitals {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: var(--md-sys-on-surface-variant);
+}
+
+.profile-vitals .material-symbols-rounded {
+    font-size: 18px;
+    color: var(--md-sys-primary);
+}
+
+.profile-footnote {
+    margin-top: 12px;
+    padding-top: 8px;
+    border-top: 1px solid var(--md-sys-outline-variant);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    color: var(--md-sys-on-surface-variant);
+}
+
+.profile-footnote .material-symbols-rounded {
+    font-size: 14px;
+}
+
+/* ============================================
+   Profile Edit Modal
+   ============================================ */
+
+.md-modal-overlay#profileModal {
+    position: fixed;
+    inset: 0;
+    z-index: 240;
+    display: grid;
+    place-items: center;
+    padding: 18px;
+    background: color-mix(in srgb, #05070d 50%, transparent);
+    backdrop-filter: blur(18px) saturate(1.2);
+    -webkit-backdrop-filter: blur(18px) saturate(1.2);
+}
+
+.profile-modal {
+    position: relative;
+    inset: auto;
+    z-index: 1;
+    max-width: 560px;
+    width: 92%;
+    max-height: 88vh;
+    border-radius: var(--md-sys-shape-xl);
+    background:
+        radial-gradient(circle at 8% 0, color-mix(in srgb, var(--md-sys-tertiary-container) 46%, transparent), transparent 34%),
+        linear-gradient(180deg, var(--md-sys-surface-container-lowest), var(--md-sys-surface-container-low));
+    box-shadow: var(--md-sys-elevation-3);
+    display: flex;
+    flex-direction: column;
+    border: 1px solid color-mix(in srgb, var(--md-sys-primary) 16%, transparent);
+    animation: profileModalIn var(--md-sys-motion-duration-medium) var(--md-expressive-spring);
+}
+
+.profile-modal .md-modal-head {
+    padding: 18px 20px 10px;
+    border-bottom: 1px solid color-mix(in srgb, var(--md-sys-outline-variant) 64%, transparent);
+}
+
+.profile-modal .md-modal-head h3 {
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 20px;
+    color: var(--md-sys-on-surface);
+}
+
+.profile-modal-title-icon {
+    width: 36px;
+    height: 36px;
+    display: inline-grid;
+    place-items: center;
+    border-radius: var(--md-sys-shape-full);
+    background: var(--md-sys-primary-container);
+    color: var(--md-sys-on-primary-container);
+    font-size: 21px;
+    font-variation-settings: 'FILL' 1, 'wght' 600, 'GRAD' 0, 'opsz' 24;
+}
+
+.profile-modal .md-icon-btn {
+    width: 40px;
+    height: 40px;
+    border: 0;
+    border-radius: var(--md-sys-shape-full);
+    display: inline-grid;
+    place-items: center;
+    background: var(--md-sys-surface-container-high);
+    color: var(--md-sys-on-surface-variant);
+}
+
+@keyframes profileModalIn {
+    from { transform: scale(0.92) translateY(20px); opacity: 0; }
+    to { transform: scale(1) translateY(0); opacity: 1; }
+}
+
+.profile-modal .md-modal-body {
+    padding: 16px 20px;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.profile-form-section {
+    margin-bottom: 14px;
+    padding: 14px;
+    border: 1px solid color-mix(in srgb, var(--md-sys-outline-variant) 68%, transparent);
+    border-radius: var(--md-sys-shape-lg);
+    background: color-mix(in srgb, var(--md-sys-surface-container-lowest) 78%, transparent);
+    box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 38%, transparent);
+}
+
+.profile-form-section:last-of-type {
+    border-bottom: 1px solid color-mix(in srgb, var(--md-sys-outline-variant) 68%, transparent);
+}
+
+.profile-form-section h4 {
+    margin: 0 0 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--md-sys-primary);
+}
+
+.profile-section-icon {
+    width: 32px;
+    height: 32px;
+    display: inline-grid;
+    place-items: center;
+    border-radius: var(--md-sys-shape-full);
+    background: var(--md-sys-primary-container);
+    color: var(--md-sys-on-primary-container);
+    font-size: 19px;
+}
+
+.profile-form-health .profile-section-icon { background: var(--md-sys-tertiary-container); color: var(--md-sys-on-tertiary-container); }
+.profile-form-allergy .profile-section-icon { background: var(--md-sys-amber-container); color: var(--md-sys-on-amber-container); }
+.profile-form-preference .profile-section-icon { background: var(--md-sys-secondary-container); color: var(--md-sys-on-secondary-container); }
+
+.profile-cond-row {
+    background: linear-gradient(135deg, color-mix(in srgb, var(--md-sys-tertiary-container) 24%, var(--md-sys-surface-container-lowest)), var(--md-sys-surface-container));
+    padding: 12px;
+    border-radius: var(--md-sys-shape-md);
+    margin-bottom: 10px;
+    border-left: 3px solid var(--md-sys-tertiary);
+}
+
+.profile-cond-del {
+    margin-top: 8px !important;
+    color: var(--md-sys-error) !important;
+    background: transparent !important;
+    border-radius: var(--md-sys-shape-full);
+    padding: 4px 12px !important;
+    font-size: 12px !important;
+}
+
+.profile-cond-del .material-symbols-rounded {
+    font-size: 16px;
+}
+
+.profile-privacy {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 12px 0 0;
+    padding: 10px 12px;
+    border-radius: var(--md-sys-shape-md);
+    background: var(--md-sys-surface-container-high);
+    color: var(--md-sys-on-surface-variant);
+    font-size: 12px;
+}
+
+.profile-modal .md-modal-foot {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 20px 18px;
+    border-top: 1px solid color-mix(in srgb, var(--md-sys-outline-variant) 64%, transparent);
+}
+
+.profile-modal .md-modal-foot .md-btn,
+.profile-modal .md-modal-foot .md-btn-filled {
+    flex: 0 0 auto;
+    width: auto;
+    min-width: 88px;
+    height: 44px;
+    margin-top: 0;
+    padding: 0 20px;
+    white-space: nowrap;
+    line-height: 1;
+    font-size: 14px;
+}
+
+.profile-privacy .material-symbols-rounded {
+    font-size: 16px;
+    color: var(--md-sys-primary);
+}
+
+/* ============================================
+   Responsive
+   ============================================ */
+
+@media (max-width: 480px) {
+    .health-profile-card { padding: 14px; }
+    .profile-card-icon { width: 42px; height: 42px; border-radius: 16px; font-size: 23px; }
+    .profile-head h3 { font-size: 16px; }
+    .profile-edit-btn { padding: 5px 10px !important; font-size: 12px !important; }
+    .profile-condition { padding: 8px 10px; }
+}
+
+/* ============================================
+   Dark Mode
+   ============================================ */
+
+@media (prefers-color-scheme: dark) {
+    .profile-condition-type.type-injury { background: #5d1717; color: #ffd9d9; }
+    .profile-sev.sev-mild { background: #1f3a23; color: #d4edda; }
+    .profile-sev.sev-moderate { background: #4a3e1a; color: #fff3cd; }
+    .profile-sev.sev-severe { background: #4a1f23; color: #f8d7da; }
+    .profile-form-section { box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 8%, transparent); }
+}

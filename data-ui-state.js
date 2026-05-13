@@ -91,7 +91,7 @@
         },
 
         openWeightModal() {
-            document.getElementById('modalWeightDate').value = this.dateKey(new Date());
+            document.getElementById('modalWeightDate').value = this.logicalDateKey();
             document.getElementById('modalHeight').value = this.db.health.height || '';
             document.getElementById('weightModal').classList.remove('hidden');
         },
@@ -180,7 +180,7 @@
             const tabs = [
                 ['diet', 'restaurant', '饮食'],
                 ['weight', 'monitor_weight', '体重'],
-                ['training', 'fitness_center', '训练记录'],
+                ['training', 'health_and_safety', '健康'],
                 ['calendar', 'calendar_month', '记录日历']
             ];
             return `<div class="record-tabs record-tabs-scroll" role="tablist" aria-label="健康记录视图">${tabs.map(([key, icon, label]) => `<button class="record-tab ${this.healthView === key ? 'active' : ''}" data-health-view="${key}" onclick="data.scrollToHealthView('${key}')" type="button"><span class="material-symbols-rounded">${icon}</span>${label}</button>`).join('')}</div>`;

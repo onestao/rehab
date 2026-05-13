@@ -338,8 +338,7 @@
     },
 
     adviceRangeStart(range = this.adviceRange || 'today') {
-        const start = new Date();
-        start.setHours(0, 0, 0, 0);
+        const start = this.logicalDayStart();
         if (range === 'week') start.setDate(start.getDate() - 6);
         if (range === 'month') start.setDate(start.getDate() - 29);
         if (range === 'all') return null;
@@ -363,7 +362,7 @@
         if (!query) return ranged;
         const matched = new Set();
         ranged.forEach((msg, localIdx) => {
-            const date = this.dateKey(this.parseHistoryDate(msg.at));
+            const date = this.logicalDateKey(this.parseHistoryDate(msg.at));
             const haystack = `${msg.content || ''} ${msg.model || ''} ${msg.role || ''} ${date}`.toLowerCase();
             if (!haystack.includes(query)) return;
             matched.add(localIdx);
@@ -383,8 +382,8 @@
 
     adviceConversationContext(limit = 12) {
         const messages = this.db.health.aiAdviceChat || [];
-        const today = this.dateKey(new Date());
-        const todayMessages = messages.filter(msg => this.dateKey(this.parseHistoryDate(msg.at)) === today);
+        const today = this.logicalDateKey();
+        const todayMessages = messages.filter(msg => this.logicalDateKey(this.parseHistoryDate(msg.at)) === today);
         const recentMessages = messages.slice(-limit);
         const merged = [];
         [...todayMessages, ...recentMessages].forEach(msg => {

@@ -33,6 +33,15 @@
             this.db.health.exerciseLogs = this.db.health.exerciseLogs || [];
             this.db.health.aiAdviceChat = this.db.health.aiAdviceChat || [];
             this.db.health.dietInputMode = this.db.health.dietInputMode || 'ai';
+            this.db.health.profile = this.db.health.profile || {};
+            this.db.health.profile.gender = this.db.health.profile.gender || 'male';
+            this.db.health.profile.age = this.db.health.profile.age || null;
+            this.db.health.profile.conditions = this.db.health.profile.conditions || [];
+            this.db.health.profile.allergies = this.db.health.profile.allergies || [];
+            this.db.health.profile.preferences = this.db.health.profile.preferences || { equipment: [], sports: [] };
+            this.db.health.profile.vitals = this.db.health.profile.vitals || { restingHR: null };
+            this.db.health.dayCutoffHour = Number(this.db.health.dayCutoffHour ?? this.dayCutoffHour ?? 4) || 4;
+            this.dayCutoffHour = this.db.health.dayCutoffHour;
             this.db.lastModified = this.db.lastModified || 0;
             this.db.deviceId = this.db.deviceId || `dev-${Math.random().toString(36).slice(2,10)}`;
             this.db.lastActionDraft = this.db.lastActionDraft || null;

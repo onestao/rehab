@@ -224,7 +224,7 @@
         }
         this.speak("训练完成");
         data.db.history.unshift({
-            date: new Date().toLocaleString(), duration,
+            date: new Date().toLocaleString(), dayKey: data.logicalDateKey(), duration,
             actions: [...data.db.actions],
             actualSets: data.db.actualSetsBuffer || []
         });

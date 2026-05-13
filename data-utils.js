@@ -26,6 +26,33 @@
             return String(value).replace(/[&<>'"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[ch]));
         },
 
+        dayCutoffHour: 4,
+
+        dateFromKey(value) {
+            const text = String(value || '');
+            const match = text.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+            if (match) return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+            return this.parseHistoryDate(value);
+        },
+
+        logicalDateKey(date = new Date()) {
+            const d = new Date(date);
+            if (d.getHours() < this.dayCutoffHour) d.setDate(d.getDate() - 1);
+            return this.dateKey(d);
+        },
+
+        logicalDayStart(date = new Date()) {
+            const d = new Date(date);
+            if (d.getHours() < this.dayCutoffHour) d.setDate(d.getDate() - 1);
+            d.setHours(this.dayCutoffHour, 0, 0, 0);
+            return d;
+        },
+
+        historyDayKey(entry) {
+            if (entry?.dayKey) return entry.dayKey;
+            return this.logicalDateKey(this.parseHistoryDate(entry?.date));
+        },
+
         ratio(value, total) {
             if (!total || total <= 0) return 0;
             return Math.max(0, Math.min(100, Math.round((value / total) * 100)));

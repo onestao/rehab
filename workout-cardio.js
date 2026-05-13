@@ -164,6 +164,7 @@
         data.db.history.unshift({
             type: 'cardio',
             date: new Date().toLocaleString(),
+            dayKey: data.logicalDateKey(),
             duration,
             actions: [],
             cardio: {
