@@ -70,6 +70,7 @@
             this.render();
             this.restoreActionDraft();
             if (window.cardio) cardio.initUI();
+            if (window.onboarding && !this.db.onboarded) onboarding.show();
         },
 
         restoreActionDraft() {

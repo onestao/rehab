@@ -473,15 +473,20 @@
                 try { data.render(); } catch (e) { console.error('data.render failed in ui.tab', e); }
             }
         };
-        window.onload = () => {
+        window.onload = async () => {
             theme.init();
-            data.init();
-            workout.setMode('strength');
-            if (window.onboarding) onboarding.show();
-            if (window.swipeActions) swipeActions.init();
-            if (window.syncStatus) syncStatus.init();
             if (window.workoutState) workoutState.init();
             if (window.appUpdate) appUpdate.registerServiceWorker();
+            try {
+                await data.init();
+            } catch (e) {
+                console.error('data.init failed', e);
+                if (window.toast) toast.show(`数据初始化失败：${toast.sanitize ? toast.sanitize(e) : e?.message || e}`, 'error');
+            }
+            workout.setMode('strength');
+            if (window.swipeActions) swipeActions.init();
+            if (window.syncStatus) syncStatus.init();
+            if (window.onboarding) onboarding.show();
             window.addEventListener('scroll', () => {
                 document.querySelector('.md-top-app-bar')?.classList.toggle('scrolled', window.scrollY > 8);
             }, { passive: true });

@@ -6,6 +6,7 @@ window.onboarding = {
         { icon: 'cloud_sync', title: '云端备份', desc: 'S3 / WebDAV 自动同步，多端不丢失' }
     ],
     show() {
+        if (!window.data || !data.db) return;
         if (data.db.onboarded) return;
         const root = document.createElement('div');
         root.id = 'onboardingRoot';
