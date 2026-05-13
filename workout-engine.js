@@ -2,6 +2,10 @@ const workoutEngine = {
     state: null,
     skipOverride: null,
 
+    currentActions() {
+        return data.activeRecords(data.db.actions || []);
+    },
+
     createInitialState() {
         return {
             actionIndex: 0,
@@ -46,7 +50,7 @@ const workoutEngine = {
 
     skipTarget() {
         if (!this.state) return null;
-        const action = this.state.activeAction || (data.db.actions || [])[this.state.actionIndex];
+        const action = this.state.activeAction || this.currentActions()[this.state.actionIndex];
         const nextSetIndex = this.state.setIndex + 1;
         switch (this.state.phase) {
             case 'intro': return { phase: 'announceSet' };
@@ -92,7 +96,7 @@ const workoutEngine = {
     },
 
     async run() {
-        const actions = data.db.actions || [];
+        const actions = this.currentActions();
         while (workout.isPlaying && this.state && this.state.actionIndex < actions.length) {
             const action = actions[this.state.actionIndex];
             this.state.activeAction = JSON.parse(JSON.stringify(action));
@@ -111,7 +115,7 @@ const workoutEngine = {
     },
 
     async stepAction(action) {
-        const actions = data.db.actions || [];
+        const actions = this.currentActions();
         const sides = action.isAlt ? ['左侧', '右侧'] : [''];
         let totalSetsAll = 0;
         let doneSetsAll = 0;
@@ -130,7 +134,7 @@ const workoutEngine = {
         }
         const nextAction = actions[this.state.actionIndex + 1];
         workout._nextActionName = nextAction?.name || '';
-        while (workout.isPlaying && this.state.actionIndex < (data.db.actions || []).length) {
+        while (workout.isPlaying && this.state.actionIndex < actions.length) {
             if (this.state.phase === 'intro') {
                 await workout.speak(`下一项：${action.name}`);
                 if (this.applySkipOverride()) continue;
@@ -272,7 +276,7 @@ const workoutEngine = {
         if (!snapshot) return;
         this.state = JSON.parse(JSON.stringify(snapshot));
         if (!this.state.activeAction) {
-            this.state.activeAction = JSON.parse(JSON.stringify((data.db.actions || [])[this.state.actionIndex] || null));
+            this.state.activeAction = JSON.parse(JSON.stringify(this.currentActions()[this.state.actionIndex] || null));
         }
         document.getElementById('statusText').innerText = labels?.statusText || snapshot.phaseStatus || 'READY';
         document.getElementById('mainTime').innerText = labels?.mainTime || snapshot.phaseLeft || '00';

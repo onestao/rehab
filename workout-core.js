@@ -102,7 +102,7 @@ Object.assign(workout, {
         }
         if (this.mode === 'cardio') return cardio.toggle();
         if (!this.isPlaying) {
-            if (data.db.actions.length === 0) return;
+            if (data.activeRecords(data.db.actions || []).length === 0) return;
             this.isPlaying = true; this.isPaused = false; this.totalSec = 0;
             if (window.workoutEngine) workoutEngine.state = workoutEngine.createInitialState();
             this.updateStateClasses();
@@ -224,9 +224,12 @@ Object.assign(workout, {
         }
         this.speak("训练完成");
         data.db.history.unshift({
+            id: data.generateRecordId('history'),
             date: new Date().toLocaleString(), dayKey: data.logicalDateKey(), duration,
-            actions: [...data.db.actions],
-            actualSets: data.db.actualSetsBuffer || []
+            actions: [...data.activeRecords(data.db.actions || [])],
+            actualSets: data.db.actualSetsBuffer || [],
+            updatedAt: Date.now(),
+            deleted: false
         });
         data.db.actualSetsBuffer = [];
         data.saveAndBackup();

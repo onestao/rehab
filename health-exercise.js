@@ -14,7 +14,7 @@
             const estMin = minutes || Math.max(1, sets * 1.5);
             const calories = Math.round(5.0 * bodyWeight * (estMin / 60));
             this.db.health.exerciseLogs.push({
-                id: `${Date.now()}-${Math.random().toString(36).slice(2,8)}`,
+                id: this.generateRecordId('exercise'),
                 date,
                 type: 'strength',
                 customName: name,
@@ -25,7 +25,9 @@
                 calories,
                 distance: 0,
                 note,
-                createdAt: new Date().toISOString()
+                createdAt: new Date().toISOString(),
+                updatedAt: Date.now(),
+                deleted: false
             });
             ['slName','slWeight','slSets','slReps','slMinutes','slNote'].forEach(id => {
                 const el = document.getElementById(id); if (el) el.value = '';
@@ -34,10 +36,10 @@
         },
         todayTrainingCalories() {
             const today = this.logicalDateKey();
-            const autoCal = this.db.history
+            const autoCal = this.activeRecords(this.db.history)
                 .filter(h => this.historyDayKey(h) === today)
                 .reduce((sum, h) => sum + (h.cardio?.calories || 0), 0);
-            const manualCal = (this.db.health.exerciseLogs || [])
+            const manualCal = this.activeRecords(this.db.health.exerciseLogs || [])
                 .filter(e => e.date === today)
                 .reduce((sum, e) => sum + (e.calories || 0), 0);
             return autoCal + manualCal;
@@ -69,7 +71,7 @@
                 if (minutes <= 0) { alert('请输入有效运动时长'); return false; }
             }
             this.db.health.exerciseLogs.push({
-                id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+                id: this.generateRecordId('exercise'),
                 date,
                 type,
                 customName,
@@ -80,7 +82,9 @@
                 calories,
                 distance,
                 note,
-                createdAt: new Date().toISOString()
+                createdAt: new Date().toISOString(),
+                updatedAt: Date.now(),
+                deleted: false
             });
             const customEl = document.getElementById('manualExerciseCustom');
             if (customEl) customEl.value = '';
@@ -99,13 +103,13 @@
         },
 
         deleteManualExercise(id) {
-            this.db.health.exerciseLogs = (this.db.health.exerciseLogs || []).filter(e => e.id !== id);
+            this.softDeleteById(this.db.health.exerciseLogs, id);
             this.saveAndBackup();
         },
 
         todayExerciseLogs() {
             const today = this.logicalDateKey();
-            return (this.db.health.exerciseLogs || []).filter(e => e.date === today);
+            return this.activeRecords(this.db.health.exerciseLogs || []).filter(e => e.date === today);
         },
 
         renderManualExercisePanel() {
@@ -145,7 +149,7 @@
         },
 
         startEditManualExercise(id) {
-            const log = (this.db.health.exerciseLogs || []).find(e => e.id === id);
+            const log = this.activeRecords(this.db.health.exerciseLogs || []).find(e => e.id === id);
             if (!log) return;
             this._editingExerciseId = id;
             this._editingExerciseDraft = {
@@ -188,7 +192,9 @@
                 minutes,
                 calories,
                 distance,
-                note: draft.note
+                note: draft.note,
+                deleted: false,
+                updatedAt: Date.now()
             };
             this._editingExerciseId = null;
             this._editingExerciseDraft = null;

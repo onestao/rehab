@@ -162,6 +162,7 @@
         }
         const info = this.types[type] || this.types.walk;
         data.db.history.unshift({
+            id: data.generateRecordId('history'),
             type: 'cardio',
             date: new Date().toLocaleString(),
             dayKey: data.logicalDateKey(),
@@ -174,7 +175,9 @@
                 weight,
                 target,
                 calories
-            }
+            },
+            updatedAt: Date.now(),
+            deleted: false
         });
         this.closeEditModal();
         this.speak('有氧训练完成');

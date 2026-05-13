@@ -1,7 +1,7 @@
 (function () {
     window.dataHistoryView = {
-        deleteHistory(idx) {
-            this.db.history.splice(idx, 1);
+        deleteHistory(id) {
+            this.softDeleteById(this.db.history, id);
             this.save();
         },
 
@@ -13,7 +13,7 @@
 
         renderRecordOverview() {
             const today = this.logicalDateKey();
-            const weight = (this.db.health.weights || []).find(w => w.date === today) || this.sortedWeights().slice(-1)[0];
+            const weight = this.activeRecords(this.db.health.weights || []).find(w => w.date === today) || this.sortedWeights().slice(-1)[0];
             const intake = this.todayCalories();
             const exerciseCal = this.todayTrainingCalories();
             const macros = this.todayMacros();
@@ -70,10 +70,10 @@
 
         renderTodayTimeline() {
             const today = this.logicalDateKey();
-            const entries = this.db.history.filter(h => this.historyDayKey(h) === today);
-            const foods = (this.db.health.foodLogs || []).filter(f => f.date === today);
-            const exercises = (this.db.health.exerciseLogs || []).filter(e => e.date === today);
-            const weight = (this.db.health.weights || []).find(w => w.date === today);
+            const entries = this.activeRecords(this.db.history).filter(h => this.historyDayKey(h) === today);
+            const foods = this.activeRecords(this.db.health.foodLogs || []).filter(f => f.date === today);
+            const exercises = this.activeRecords(this.db.health.exerciseLogs || []).filter(e => e.date === today);
+            const weight = this.activeRecords(this.db.health.weights || []).find(w => w.date === today);
             const items = [];
             const mealGroups = { breakfast: [], lunch: [], dinner: [], snack: [] };
             foods.forEach(f => (mealGroups[f.meal] || mealGroups.snack).push(f));
@@ -104,23 +104,24 @@
         },
 
         renderRecentHistoryList(limit = 5) {
-            if (!this.db.history.length) return '<div class="empty-state"><span class="material-symbols-rounded">event_note</span><p>暂无训练记录</p></div>';
-            const sorted = [...this.db.history].sort((a, b) => this.parseHistoryDate(b.date) - this.parseHistoryDate(a.date)).slice(0, limit);
+            const liveHistory = this.activeRecords(this.db.history);
+            if (!liveHistory.length) return '<div class="empty-state"><span class="material-symbols-rounded">event_note</span><p>暂无训练记录</p></div>';
+            const sorted = [...liveHistory].sort((a, b) => this.parseHistoryDate(b.date) - this.parseHistoryDate(a.date)).slice(0, limit);
             return '<div class="recent-history-list">' + sorted.map(h => {
                 const mins = Math.floor(h.duration / 60), secs = h.duration % 60;
                 const names = this.historyNames(h).join('、');
                 const meta = h.type === 'cardio' ? Math.round(h.cardio.calories||0)+' kcal' : h.actions.length+'个动作';
-                const ri = this.db.history.indexOf(h);
-                return '<div class="list-item"><span class="record-icon material-symbols-rounded">' + this.historyIcon(h) + '</span><div style="flex:1;min-width:0"><strong>' + h.date + '</strong><small>' + mins + '分' + secs + '秒 · ' + meta + '</small><div class="item-chip">' + (names.length > 20 ? names.slice(0, 20) + '...' : names) + '</div></div><button class="delete-btn" onclick="data.deleteHistory(' + ri + ')"><span class="material-symbols-rounded">delete</span></button></div>';
-            }).join('') + (this.db.history.length > limit ? '<button class="md-btn md-btn-tonal" style="margin:8px auto;display:flex" onclick="data.setRecordView(\'calendar\')"><span class="material-symbols-rounded">calendar_month</span> 查看全部记录</button>' : '') + '</div>';
+                return '<div class="list-item"><span class="record-icon material-symbols-rounded">' + this.historyIcon(h) + '</span><div style="flex:1;min-width:0"><strong>' + h.date + '</strong><small>' + mins + '分' + secs + '秒 · ' + meta + '</small><div class="item-chip">' + (names.length > 20 ? names.slice(0, 20) + '...' : names) + '</div></div><button class="delete-btn" onclick="data.deleteHistory(\'' + h.id + '\')"><span class="material-symbols-rounded">delete</span></button></div>';
+            }).join('') + (liveHistory.length > limit ? '<button class="md-btn md-btn-tonal" style="margin:8px auto;display:flex" onclick="data.setRecordView(\'calendar\')"><span class="material-symbols-rounded">calendar_month</span> 查看全部记录</button>' : '') + '</div>';
         },
 
         renderHistoryList() {
-            if (this.db.history.length === 0) {
+            const liveHistory = this.activeRecords(this.db.history);
+            if (liveHistory.length === 0) {
                 return `<div class="empty-state"><span class="material-symbols-rounded">event_note</span><p>暂无训练记录，完成一次训练后自动记录</p></div>`;
             }
             const groups = {};
-            this.db.history.forEach((h, i) => {
+            liveHistory.forEach((h, i) => {
                 const d = this.parseHistoryDate(h.date);
                 const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
                 if (!groups[key]) groups[key] = [];
@@ -164,7 +165,7 @@
                                     <small>${mins}分${secs}秒 &middot; ${meta}</small>
                                     <div class="item-chip">${names.length > 20 ? names.slice(0, 20) + '...' : names}</div>
                                 </div>
-                                <button class="delete-btn" onclick="data.deleteHistory(${i})"><span class="material-symbols-rounded">delete</span></button>
+                                <button class="delete-btn" onclick="data.deleteHistory('${h.id}')"><span class="material-symbols-rounded">delete</span></button>
                             </div>`;
                         };
                         let html = recentItems.map(renderOne).join('');
@@ -244,10 +245,10 @@
         renderCalendarDayDetail() {
             if (!this.selectedCalendarDate) return '';
             const date = this.selectedCalendarDate;
-            const entries = this.db.history.filter(h => this.historyDayKey(h) === date);
-            const foods = (this.db.health.foodLogs || []).filter(f => f.date === date);
-            const manualExercises = (this.db.health.exerciseLogs || []).filter(e => e.date === date);
-            const weight = (this.db.health.weights || []).find(w => w.date === date);
+            const entries = this.activeRecords(this.db.history).filter(h => this.historyDayKey(h) === date);
+            const foods = this.activeRecords(this.db.health.foodLogs || []).filter(f => f.date === date);
+            const manualExercises = this.activeRecords(this.db.health.exerciseLogs || []).filter(e => e.date === date);
+            const weight = this.activeRecords(this.db.health.weights || []).find(w => w.date === date);
             const totalMin = Math.round(entries.reduce((s, h) => s + (h.duration || 0), 0) / 60 + manualExercises.reduce((s, e) => s + (e.minutes || 0), 0));
             const totalCal = Math.round(entries.reduce((s, h) => s + (h.cardio?.calories || 0), 0) + manualExercises.reduce((s, e) => s + (e.calories || 0), 0));
             const foodCal = foods.reduce((s, f) => s + (f.cal || 0), 0);
@@ -285,7 +286,7 @@
         },
 
         groupHistoryByDate() {
-            return this.db.history.reduce((map, h) => {
+            return this.activeRecords(this.db.history).reduce((map, h) => {
                 const key = this.historyDayKey(h);
                 if (!map[key]) map[key] = [];
                 map[key].push(h);
@@ -295,14 +296,14 @@
 
         groupCalendarActivitiesByDate() {
             const map = {};
-            (this.db.history || []).forEach(h => {
+            this.activeRecords(this.db.history || []).forEach(h => {
                 const key = this.historyDayKey(h);
                 if (!map[key]) map[key] = [];
                 this.historyNames(h).forEach((name, idx) => {
                     map[key].push({ name, minutes: idx === 0 ? (h.duration || 0) / 60 : 0, source: 'history' });
                 });
             });
-            (this.db.health.exerciseLogs || []).forEach(e => {
+            this.activeRecords(this.db.health.exerciseLogs || []).forEach(e => {
                 if (!e.date) return;
                 if (!map[e.date]) map[e.date] = [];
                 const name = this.exerciseLabel(e.type, e);

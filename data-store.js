@@ -83,13 +83,25 @@
         },
 
         normalizeDb() {
+            const nowTs = Date.now();
             this.db.schemaVersion = Math.max(Number(this.db.schemaVersion) || 0, this.SCHEMA_VERSION);
             this.db.cardio = { weight: 70, target: 30, type: 'walk', ...(this.db.cardio || {}) };
             this.db.health = { weights: [], foodLogs: [], exerciseLogs: [], goalType: 'loss', bodyPlan: null, weightPlan: null, dietGoal: null, aiAdviceChat: [], ...(this.db.health || {}) };
-            this.db.health.weights = this.db.health.weights || [];
-            this.db.health.foodLogs = this.db.health.foodLogs || [];
-            this.db.health.exerciseLogs = this.db.health.exerciseLogs || [];
-            this.db.health.aiAdviceChat = this.db.health.aiAdviceChat || [];
+            this.db.actions = (this.db.actions || []).map(a => this.ensureRecordMeta(a, 'action', nowTs));
+            this.db.routines = (this.db.routines || []).map(r => {
+                this.ensureRecordMeta(r, 'routine', nowTs);
+                r.actions = (r.actions || []).map(a => this.ensureRecordMeta(a, 'routine-action', Number(r.updatedAt || nowTs)));
+                return r;
+            });
+            this.db.history = (this.db.history || []).map(h => {
+                this.ensureRecordMeta(h, 'history', nowTs);
+                h.actions = (h.actions || []).map(a => this.ensureRecordMeta(a, 'history-action', Number(h.updatedAt || nowTs)));
+                return h;
+            });
+            this.db.health.weights = (this.db.health.weights || []).map(item => this.ensureRecordMeta(item, 'weight', nowTs));
+            this.db.health.foodLogs = (this.db.health.foodLogs || []).map(item => this.ensureRecordMeta(item, 'food', nowTs));
+            this.db.health.exerciseLogs = (this.db.health.exerciseLogs || []).map(item => this.ensureRecordMeta(item, 'exercise', nowTs));
+            this.db.health.aiAdviceChat = (this.db.health.aiAdviceChat || []).map(item => this.ensureRecordMeta(item, 'advice', nowTs));
             this.db.health.dietInputMode = this.db.health.dietInputMode || 'ai';
             this.db.health.profile = this.db.health.profile || {};
             this.db.health.profile.gender = this.db.health.profile.gender || 'male';
@@ -108,8 +120,85 @@
             this.db.aiProfiles = this.db.aiProfiles || [];
             this.db.aiActiveId = this.db.aiActiveId || '';
             this.db.aiModels = this.db.aiModels || [];
-            (this.db.actions || []).forEach(a => { if (!a.phase) a.phase = 'main'; });
-            (this.db.routines || []).forEach(r => (r.actions || []).forEach(a => { if (!a.phase) a.phase = 'main'; }));
+            this.db.actions.forEach(a => { if (!a.phase) a.phase = 'main'; });
+            this.db.routines.forEach(r => (r.actions || []).forEach(a => { if (!a.phase) a.phase = 'main'; }));
+        },
+
+        generateRecordId(prefix = 'rec') {
+            return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        },
+
+        ensureRecordMeta(record, prefix = 'rec', fallbackTs = Date.now()) {
+            if (!record || typeof record !== 'object') return record;
+            if (!record.id) record.id = this.generateRecordId(prefix);
+            const ts = Number(record.updatedAt || 0);
+            record.updatedAt = Number.isFinite(ts) && ts > 0 ? ts : Number(fallbackTs || Date.now());
+            record.deleted = !!record.deleted;
+            return record;
+        },
+
+        touchRecord(record) {
+            if (!record || typeof record !== 'object') return;
+            if (!record.id) record.id = this.generateRecordId('rec');
+            record.updatedAt = Date.now();
+            if (typeof record.deleted !== 'boolean') record.deleted = false;
+        },
+
+        activeRecords(list) {
+            return (list || []).filter(item => item && !item.deleted);
+        },
+
+        softDeleteById(list, id) {
+            const record = (list || []).find(item => item && item.id === id);
+            if (!record) return false;
+            record.deleted = true;
+            record.updatedAt = Date.now();
+            return true;
+        },
+
+        restoreById(list, id) {
+            const record = (list || []).find(item => item && item.id === id);
+            if (!record) return false;
+            record.deleted = false;
+            record.updatedAt = Date.now();
+            return true;
+        },
+
+        purgeBefore(ts, retentionMs = 30 * 24 * 60 * 60 * 1000) {
+            const lastSyncAt = Number((window.syncStatus && (syncStatus.lastSyncAt || syncStatus.meta?.lastSuccessAt))
+                ? new Date(syncStatus.lastSyncAt || syncStatus.meta.lastSuccessAt).getTime()
+                : 0);
+            if (!lastSyncAt) return { purged: 0, skipped: 'unsynced' };
+            const cutoff = Date.now() - retentionMs;
+            if (Number(ts) > cutoff) return { purged: 0, skipped: 'retention' };
+
+            const entities = [
+                this.db.actions,
+                this.db.routines,
+                this.db.history,
+                this.db.health.weights,
+                this.db.health.foodLogs,
+                this.db.health.exerciseLogs,
+                this.db.health.aiAdviceChat
+            ];
+            let purged = 0;
+            entities.forEach((list, idx) => {
+                if (!Array.isArray(list)) return;
+                const next = list.filter(item => !(item?.deleted && Number(item.updatedAt || 0) <= Number(ts)));
+                purged += list.length - next.length;
+                entities[idx] = next;
+            });
+            [
+                this.db.actions,
+                this.db.routines,
+                this.db.history,
+                this.db.health.weights,
+                this.db.health.foodLogs,
+                this.db.health.exerciseLogs,
+                this.db.health.aiAdviceChat
+            ] = entities;
+            if (purged > 0) this.save({ render: false });
+            return { purged };
         },
 
         async migrateLegacy() {

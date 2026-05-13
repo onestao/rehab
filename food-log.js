@@ -53,7 +53,7 @@ const foodLog = {
     },
 
     startEditFoodLog(id) {
-        const log = (this.db.health.foodLogs || []).find(item => item.id === id);
+        const log = this.activeRecords(this.db.health.foodLogs || []).find(item => item.id === id);
         if (!log) return;
         this._editingFoodLogId = id;
         const grams = log.grams || 0;
@@ -111,7 +111,9 @@ const foodLog = {
             cal: Math.round(calPer100g * grams / 100),
             pro: Number((proPer100g * grams / 100).toFixed(1)),
             carb: Number((carbPer100g * grams / 100).toFixed(1)),
-            fat: Number((fatPer100g * grams / 100).toFixed(1))
+            fat: Number((fatPer100g * grams / 100).toFixed(1)),
+            deleted: false,
+            updatedAt: Date.now()
         };
         this._editingFoodLogId = null;
         this._editingFoodDraft = null;
@@ -132,7 +134,7 @@ const foodLog = {
         if (!grams || grams <= 0) return alert('请输入食物重量');
         if (!calInput || calInput <= 0 || !cal) return alert('请先选择食物或填写每100g热量');
         const log = {
-            id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            id: this.generateRecordId('food'),
             date: this.logicalDateKey(),
             meal,
             name,
@@ -147,7 +149,9 @@ const foodLog = {
             proPer100g: pro,
             carbPer100g: carb,
             fatPer100g: fat,
-            createdAt: new Date().toISOString()
+            createdAt: new Date().toISOString(),
+            updatedAt: Date.now(),
+            deleted: false
         };
         this.db.health.foodLogs.push(log);
         if (document.getElementById('foodName')) document.getElementById('foodName').value = '';
@@ -168,13 +172,13 @@ const foodLog = {
     },
 
     deleteFoodLog(id) {
-        this.db.health.foodLogs = (this.db.health.foodLogs || []).filter(f => f.id !== id);
+        this.softDeleteById(this.db.health.foodLogs, id);
         this.saveAndBackup();
     },
 
     todayFoodLogs() {
         const today = this.logicalDateKey();
-        return (this.db.health.foodLogs || []).filter(f => f.date === today);
+        return this.activeRecords(this.db.health.foodLogs || []).filter(f => f.date === today);
     },
 
     rememberRecentAiFoodAdd(logs) {
@@ -201,7 +205,11 @@ const foodLog = {
             return;
         }
         const ids = new Set(recent.ids);
-        this.db.health.foodLogs = (this.db.health.foodLogs || []).filter(item => !ids.has(item.id));
+        (this.db.health.foodLogs || []).forEach(item => {
+            if (!item || !ids.has(item.id)) return;
+            item.deleted = true;
+            item.updatedAt = Date.now();
+        });
         this._recentAiFoodAdd = null;
         this.saveAndBackup();
         toast?.show?.('已撤销最近一次 AI 添加', 'info', 2400);
@@ -395,7 +403,7 @@ const foodLog = {
         const carb = Number(item.carb || 0);
         const fat = Number(item.fat || 0);
         return {
-            id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${idx}`,
+            id: this.generateRecordId(`ai-food-${idx}`),
             date: this.logicalDateKey(),
             meal,
             name: item.name || 'AI 识别食物',
@@ -408,7 +416,9 @@ const foodLog = {
             proPer100g: grams ? Number((pro * 100 / grams).toFixed(1)) : 0,
             carbPer100g: grams ? Number((carb * 100 / grams).toFixed(1)) : 0,
             fatPer100g: grams ? Number((fat * 100 / grams).toFixed(1)) : 0,
-            createdAt: new Date().toISOString()
+            createdAt: new Date().toISOString(),
+            updatedAt: Date.now(),
+            deleted: false
         };
     },
 

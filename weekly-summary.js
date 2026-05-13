@@ -7,11 +7,11 @@
             monday.setHours(0,0,0,0);
             const lastMonday = new Date(monday); lastMonday.setDate(lastMonday.getDate() - 7);
             const summarize = (start, end) => {
-                const hist = (this.db.history || []).filter(h => {
+                const hist = this.activeRecords(this.db.history || []).filter(h => {
                     const d = this.parseHistoryDate(h.date);
                     return d >= start && d < end;
                 });
-                const ex = (this.db.health.exerciseLogs || []).filter(e => {
+                const ex = this.activeRecords(this.db.health.exerciseLogs || []).filter(e => {
                     const d = new Date(e.date);
                     return d >= start && d < end;
                 });

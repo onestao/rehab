@@ -10,11 +10,13 @@
             this.db.health.weights = this.db.health.weights || [];
             if (height > 0) this.db.health.height = height;
             this.db.health.weights.push({
-                id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+                id: this.generateRecordId('weight'),
                 date,
                 weight,
                 note,
-                createdAt: new Date().toISOString()
+                createdAt: new Date().toISOString(),
+                updatedAt: Date.now(),
+                deleted: false
             });
             this.db.health.weights.sort((a, b) => this.dateFromKey(b.date) - this.dateFromKey(a.date));
             document.getElementById('modalWeightValue').value = '';
@@ -24,7 +26,7 @@
         },
 
         deleteWeight(id) {
-            this.db.health.weights = (this.db.health.weights || []).filter(w => w.id !== id);
+            this.softDeleteById(this.db.health.weights, id);
             this.saveAndBackup();
         },
 
@@ -127,7 +129,7 @@
         },
 
         sortedWeights() {
-            return [...(this.db.health?.weights || [])].sort((a, b) => this.dateFromKey(a.date) - this.dateFromKey(b.date));
+            return [...this.activeRecords(this.db.health?.weights || [])].sort((a, b) => this.dateFromKey(a.date) - this.dateFromKey(b.date));
         },
 
         weightPointsForRange() {

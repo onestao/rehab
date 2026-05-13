@@ -296,7 +296,7 @@
         const list = document.querySelector('.advice-chat-list');
         const summary = document.getElementById('adviceMessageSummary');
         if (!list) return;
-        const messages = this.db.health.aiAdviceChat || [];
+        const messages = this.activeRecords(this.db.health.aiAdviceChat || []);
         const visibleMessages = this.visibleAdviceMessages(messages);
         list.innerHTML = this.renderAdviceMessages(visibleMessages);
         if (summary) summary.textContent = this.adviceMessageSummary(messages, visibleMessages);
@@ -381,7 +381,7 @@
     },
 
     adviceConversationContext(limit = 12) {
-        const messages = this.db.health.aiAdviceChat || [];
+        const messages = this.activeRecords(this.db.health.aiAdviceChat || []);
         const today = this.logicalDateKey();
         const todayMessages = messages.filter(msg => this.logicalDateKey(this.parseHistoryDate(msg.at)) === today);
         const recentMessages = messages.slice(-limit);
@@ -421,10 +421,10 @@
         const selected = document.getElementById('adviceModel')?.value || this.adviceModel || '__current__';
         const model = selected === '__current__' ? ai.cfg.model : selected;
         const now = new Date().toISOString();
-        const pendingId = `pending_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+        const pendingId = this.generateRecordId('advice-pending');
         this._adviceSending = true;
-        this.db.health.aiAdviceChat.push({ role: 'user', content: prompt, at: now });
-        this.db.health.aiAdviceChat.push({ role: 'assistant', content: '', at: now, model, pending: true, id: pendingId });
+        this.db.health.aiAdviceChat.push({ id: this.generateRecordId('advice-user'), role: 'user', content: prompt, at: now, updatedAt: Date.now(), deleted: false });
+        this.db.health.aiAdviceChat.push({ id: pendingId, role: 'assistant', content: '', at: now, model, pending: true, updatedAt: Date.now(), deleted: false });
         if (input) input.value = '';
         this.clearAdviceDraft();
         this.save();
@@ -442,6 +442,7 @@
                     if (idx < 0) return;
                     this.db.health.aiAdviceChat[idx].content = accumulated;
                     if (this.db.health.aiAdviceChat[idx].pending && accumulated) this.db.health.aiAdviceChat[idx].pending = false;
+                    this.db.health.aiAdviceChat[idx].updatedAt = Date.now();
                     const bubble = document.querySelector(`[data-advice-id="${pendingId}"]`);
                     if (!bubble || !accumulated) return;
                     const contentEl = bubble.querySelector('.advice-bubble-content');
@@ -473,7 +474,16 @@
                 ai.cfg.model = oldModel;
             }
             const idx = this.db.health.aiAdviceChat.findIndex(msg => msg.id === pendingId);
-            if (idx >= 0) this.db.health.aiAdviceChat[idx] = { role: 'assistant', content: full, at: new Date().toISOString(), model };
+            if (idx >= 0) this.db.health.aiAdviceChat[idx] = {
+                ...this.db.health.aiAdviceChat[idx],
+                role: 'assistant',
+                content: full,
+                at: new Date().toISOString(),
+                model,
+                pending: false,
+                deleted: false,
+                updatedAt: Date.now()
+            };
             this.save();
             requestAnimationFrame(() => {
                 const bubble = document.querySelector(`[data-advice-id="${pendingId}"]`);
@@ -490,7 +500,7 @@
             });
         } catch (e) {
             const idx = this.db.health.aiAdviceChat.findIndex(msg => msg.id === pendingId);
-            const failed = { role: 'assistant', content: `分析失败：${window.toast ? toast.sanitize(e) : e.message}`, at: new Date().toISOString(), model, error: true, retryPrompt: prompt };
+            const failed = { id: pendingId, role: 'assistant', content: `分析失败：${window.toast ? toast.sanitize(e) : e.message}`, at: new Date().toISOString(), model, error: true, retryPrompt: prompt, deleted: false, updatedAt: Date.now() };
             if (idx >= 0) this.db.health.aiAdviceChat[idx] = failed;
             else this.db.health.aiAdviceChat.push(failed);
             this.save();
@@ -504,34 +514,35 @@
     },
 
     deleteAiAdviceMessage(idx) {
-        const messages = this.db.health.aiAdviceChat || [];
+        const messages = this.activeRecords(this.db.health.aiAdviceChat || []);
         if (idx < 0 || idx >= messages.length) return;
+        const targetId = messages[idx].id;
         this.preserveAdviceScroll(() => {
-            messages.splice(idx, 1);
-            this.db.health.aiAdviceChat = messages;
+            this.softDeleteById(this.db.health.aiAdviceChat, targetId);
             this.saveAndBackup();
         });
     },
 
     copyAdviceMessage(idx) {
-        const msg = (this.db.health.aiAdviceChat || [])[idx];
+        const msg = (this.activeRecords(this.db.health.aiAdviceChat || []))[idx];
         if (!msg?.content) return;
         navigator.clipboard?.writeText(msg.content).catch(() => {});
         workout?.showToast?.('已复制 AI 回答');
     },
 
     retryAdviceFrom(idx) {
-        const msg = (this.db.health.aiAdviceChat || [])[idx];
-        const prompt = msg?.retryPrompt || this.db.health.aiAdviceChat?.slice(0, idx).reverse().find(m => m.role === 'user')?.content;
+        const messages = this.activeRecords(this.db.health.aiAdviceChat || []);
+        const msg = messages[idx];
+        const prompt = msg?.retryPrompt || messages.slice(0, idx).reverse().find(m => m.role === 'user')?.content;
         if (prompt) this.sendAiAdvice(prompt);
     },
 
     regenerateAdvice() {
-        const messages = this.db.health.aiAdviceChat || [];
+        const messages = this.activeRecords(this.db.health.aiAdviceChat || []);
         for (let i = messages.length - 1; i >= 0; i--) {
             if (messages[i].role === 'assistant') {
                 const prompt = messages[i].retryPrompt || messages.slice(0, i).reverse().find(m => m.role === 'user')?.content;
-                messages.splice(i, 1);
+                this.softDeleteById(this.db.health.aiAdviceChat, messages[i].id);
                 this.save();
                 if (prompt) this.sendAiAdvice(prompt);
                 return;
@@ -540,7 +551,7 @@
     },
 
     renderAdvicePanel() {
-        const messages = this.db.health.aiAdviceChat || [];
+        const messages = this.activeRecords(this.db.health.aiAdviceChat || []);
         const visibleMessages = this.visibleAdviceMessages(messages);
         const draft = this.escapeHtml(this.restoreAdviceDraft());
         const activeModel = this.adviceModel || '__current__';

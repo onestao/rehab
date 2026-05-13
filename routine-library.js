@@ -11,7 +11,10 @@
                 groupRest: parseInt(document.getElementById('groupRest').value) || 15,
                 switchRest: 3,
                 isAlt: document.getElementById('isAlt').checked,
-                phase: document.getElementById('actionPhase')?.value || 'main'
+                phase: document.getElementById('actionPhase')?.value || 'main',
+                id: this.generateRecordId('action'),
+                updatedAt: Date.now(),
+                deleted: false
             };
             this.db.actions.push(a);
             this.db.lastActionDraft = {
@@ -30,15 +33,20 @@
             const nameInput = document.getElementById('newRoutineName');
             const name = nameInput.value.trim();
             if (!name) return alert('请输入方案名称');
-            if (this.db.actions.length === 0) return alert('请先添加训练动作');
+            const actions = this.activeRecords(this.db.actions);
+            if (actions.length === 0) return alert('请先添加训练动作');
             const tagsInput = document.getElementById('routineTagsInput');
             const tags = tagsInput ? tagsInput.value.split(/[,，]/).map(t => t.trim()).filter(Boolean) : [];
-            this.db.routines.push({
+            const routine = {
                 name,
-                actions: JSON.parse(JSON.stringify(this.db.actions)),
+                actions: JSON.parse(JSON.stringify(actions)).map(a => this.ensureRecordMeta(a, 'routine-action', Date.now())),
                 tags,
-                created: new Date().toLocaleDateString()
-            });
+                created: new Date().toLocaleDateString(),
+                id: this.generateRecordId('routine'),
+                updatedAt: Date.now(),
+                deleted: false
+            };
+            this.db.routines.push(routine);
             nameInput.value = '';
             if (tagsInput) tagsInput.value = '';
             this.save();
@@ -46,16 +54,17 @@
         },
 
         loadRoutine(idx) {
-            const r = this.db.routines[idx];
+            const routines = this.activeRecords(this.db.routines);
+            const r = routines[idx];
             if (!r) return;
-            const hasActions = this.db.actions.length > 0;
+            const hasActions = this.activeRecords(this.db.actions).length > 0;
             if (!hasActions) {
                 this.db.actions = JSON.parse(JSON.stringify(r.actions));
                 this.save();
                 ui.tab('workout', document.querySelector('.nav-item'));
                 return;
             }
-            const choice = confirm(`当前已有 ${this.db.actions.length} 个动作。\n点"确定"=替换，点"取消"=追加`);
+            const choice = confirm(`当前已有 ${this.activeRecords(this.db.actions).length} 个动作。\n点"确定"=替换，点"取消"=追加`);
             if (choice) {
                 this.db.actions = JSON.parse(JSON.stringify(r.actions));
             } else {
@@ -66,26 +75,37 @@
         },
 
         deleteRoutine(idx) {
-            this.db.routines.splice(idx, 1);
+            const routine = this.activeRecords(this.db.routines)[idx];
+            if (!routine) return;
+            this.softDeleteById(this.db.routines, routine.id);
             this.save();
         },
 
         duplicateRoutine(idx) {
-            const src = this.db.routines[idx];
+            const src = this.activeRecords(this.db.routines)[idx];
             if (!src) return;
             const copy = JSON.parse(JSON.stringify(src));
             copy.name = copy.name + ' (副本)';
             copy.created = new Date().toLocaleDateString();
+            copy.id = this.generateRecordId('routine');
+            copy.updatedAt = Date.now();
+            copy.deleted = false;
             this.db.routines.push(copy);
             this.save();
             this.showWorkoutLibrary();
             this.renderWorkoutPlanCard();
         },
 
+        deleteAction(id) {
+            if (!id) return;
+            if (!this.softDeleteById(this.db.actions, id)) return;
+            this.save();
+        },
+
         renderActions() {
             const list = document.getElementById('currentActionList');
             if (!list) return;
-            if (this.db.actions.length === 0) {
+            if (!this.activeRecords(this.db.actions).length) {
                 list.innerHTML = `
                 <div class="empty-state">
                     <span class="material-symbols-rounded">playlist_add</span>
@@ -95,7 +115,7 @@
             }
             const phases = [['warmup','暖身'],['main','正式'],['cooldown','放松']];
             list.innerHTML = phases.map(([key, label]) => {
-                const items = this.db.actions.map((a, i) => ({ a, i })).filter(x => (x.a.phase || 'main') === key);
+                const items = this.db.actions.map((a, i) => ({ a, i })).filter(x => !x.a.deleted && (x.a.phase || 'main') === key);
                 if (!items.length) return '';
                 return `<div class="action-phase-group"><div class="action-phase-head">${label} · ${items.length}个</div>${items.map(({a, i}) => `
                 <div class="list-item">
@@ -108,7 +128,7 @@
                         <small>${a.sets}组 &middot; ${a.reps}次 &middot; ${a.work}s</small>
                         <div class="item-chip">组休${a.actionRest}s &middot; 项休${a.groupRest}s${a.isAlt ? ' &middot; 双侧' : ''}</div>
                     </div>
-                    <button class="delete-btn" onclick="data.db.actions.splice(${i},1);data.save();"><span class="material-symbols-rounded">delete</span></button>
+                    <button class="delete-btn" onclick="data.deleteAction('${a.id}')"><span class="material-symbols-rounded">delete</span></button>
                 </div>`).join('')}</div>`;
             }).join('');
         },
@@ -116,8 +136,8 @@
         renderWorkoutPlanCard() {
             const el = document.getElementById('workoutPlanCard');
             if (!el) return;
-            const actions = this.db.actions;
-            const routines = this.db.routines;
+            const actions = this.activeRecords(this.db.actions);
+            const routines = this.activeRecords(this.db.routines);
             const recentRoutines = routines.slice(-3).reverse();
             const actionCount = actions.length;
 
@@ -216,7 +236,7 @@
             const sheet = document.getElementById('workoutLibrarySheet');
             if (!el || !sheet) return;
 
-            const routines = this.db.routines;
+            const routines = this.activeRecords(this.db.routines);
             if (routines.length === 0) {
                 el.innerHTML = `
                 <div class="empty-state" style="padding:24px 16px">
@@ -273,7 +293,9 @@
         },
 
         deleteRoutineFromLib(idx) {
-            if (!confirm('确定删除方案 "' + this.db.routines[idx]?.name + '"？')) return;
+            const routine = this.activeRecords(this.db.routines)[idx];
+            if (!routine) return;
+            if (!confirm('确定删除方案 "' + routine.name + '"？')) return;
             this.deleteRoutine(idx);
             this.showWorkoutLibrary();
             this.renderWorkoutPlanCard();
@@ -313,8 +335,8 @@
         },
 
         renderRoutineOverview() {
-            const routineCount = this.db.routines.length;
-            const actionCount = this.db.actions.length;
+            const routineCount = this.activeRecords(this.db.routines).length;
+            const actionCount = this.activeRecords(this.db.actions).length;
             const goal = this.db.health.dietGoal;
             return `<div class="md-card hero-card routines-hero">
             <div class="hero-kicker">方案总览</div>
@@ -334,18 +356,19 @@
         },
 
         renderRoutineLibrary() {
-            if (this.db.routines.length === 0) {
+            const routines = this.activeRecords(this.db.routines);
+            if (routines.length === 0) {
                 return `<div class="empty-state"><span class="material-symbols-rounded">bookmark_border</span><p>暂无保存的方案</p></div>`;
             }
-            const allTags = [...new Set(this.db.routines.flatMap(r => r.tags || []))];
+            const allTags = [...new Set(routines.flatMap(r => r.tags || []))];
             const filterTag = this._routineFilterTag || '';
-            const filtered = filterTag ? this.db.routines.filter(r => (r.tags || []).includes(filterTag)) : this.db.routines;
+            const filtered = filterTag ? routines.filter(r => (r.tags || []).includes(filterTag)) : routines;
             return `${allTags.length ? `<div class="routine-tag-chips" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
                 <button class="routine-tag-chip md-btn md-btn-tonal${!filterTag ? ' active' : ''}" onclick="data._routineFilterTag='';data.renderRoutines()" type="button" style="font-size:12px;padding:2px 10px">全部</button>
                 ${allTags.map(t => `<button class="routine-tag-chip md-btn md-btn-tonal${filterTag===t ? ' active' : ''}" onclick="data._routineFilterTag='${this.escapeHtml(t)}';data.renderRoutines()" type="button" style="font-size:12px;padding:2px 10px">${this.escapeHtml(t)}</button>`).join('')}
             </div>` : ''}
             ${filtered.map((r, ri) => {
-                const i = this.db.routines.indexOf(r);
+                const i = routines.indexOf(r);
                 const expanded = this.isCollapsed('routine_' + i, true) === false;
                 const tags = r.tags || [];
                 return `<div class="routine-card">
@@ -376,6 +399,8 @@
         move(i, d) {
             if (i + d >= 0 && i + d < this.db.actions.length) {
                 [this.db.actions[i], this.db.actions[i + d]] = [this.db.actions[i + d], this.db.actions[i]];
+                this.touchRecord(this.db.actions[i]);
+                this.touchRecord(this.db.actions[i + d]);
                 this.save();
             }
         }
