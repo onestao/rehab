@@ -4,6 +4,7 @@
         MIGRATION_FAILED_KEY: 'migration.failed',
         FLUSH_DEBOUNCE_MS: 300,
         _storage: null,
+        _storageMode: 'localStorage',
         _flushHooksBound: false,
         _persistTimer: null,
         _pendingPersistPromise: null,
@@ -11,9 +12,8 @@
         _rejectPersist: null,
         _dbDirty: false,
 
-        resolveStorageAdapter() {
-            if (this._storage) return this._storage;
-            this._storage = {
+        createLocalStorageAdapter() {
+            return {
                 mode: 'localStorage',
                 read(key) {
                     const raw = localStorage.getItem(key);
@@ -30,15 +30,38 @@
                     localStorage.removeItem(key);
                 }
             };
+        },
+
+        resolveStorageAdapter() {
+            if (this._storage) return this._storage;
+            this._storage = this.createLocalStorageAdapter();
             return this._storage;
         },
 
         async init() {
+            if (window.storageMigrate && typeof window.storageMigrate.createAdapter === 'function') {
+                const migrationResult = await window.storageMigrate.createAdapter({
+                    dbKey: this.DB_KEY,
+                    cfgKey: this.CFG_KEY,
+                    storageVersionKey: this.STORAGE_VERSION_KEY,
+                    migrationFailedKey: this.MIGRATION_FAILED_KEY,
+                    targetVersion: this.SCHEMA_VERSION
+                });
+                this._storage = migrationResult.adapter;
+                this._storageMode = migrationResult.mode;
+                if (migrationResult.migration && !migrationResult.migration.ok && migrationResult.migration.reason) {
+                    if (window.toast) toast.show(`迁移失败，继续使用本地存储：${migrationResult.migration.reason}`, 'error');
+                }
+            } else {
+                this._storage = this.createLocalStorageAdapter();
+                this._storageMode = this._storage.mode;
+            }
+
             const storage = this.resolveStorageAdapter();
-            const localDb = storage.read(this.DB_KEY);
-            const localCfg = storage.read(this.CFG_KEY);
+            const localDb = await Promise.resolve(storage.read(this.DB_KEY));
+            const localCfg = await Promise.resolve(storage.read(this.CFG_KEY));
             if (localDb) this.db = localDb;
-            else this.migrateLegacy();
+            else await this.migrateLegacy();
             if (localCfg) this.cfg = localCfg;
             this.normalizeDb();
             this.bindFlushHooks();
@@ -89,11 +112,11 @@
             (this.db.routines || []).forEach(r => (r.actions || []).forEach(a => { if (!a.phase) a.phase = 'main'; }));
         },
 
-        migrateLegacy() {
+        async migrateLegacy() {
             const legacy = ['rp_v31_db', 'rp_v28_db', 'rp_v21_main'];
             const storage = this.resolveStorageAdapter();
             for (let key of legacy) {
-                const old = storage.read(key);
+                const old = await Promise.resolve(storage.read(key));
                 if (!old) continue;
                 this.db = old;
                 this.flushSync();
@@ -146,7 +169,10 @@
         },
 
         persistCfg() {
-            this.resolveStorageAdapter().write(this.CFG_KEY, this.cfg);
+            Promise.resolve(this.resolveStorageAdapter().write(this.CFG_KEY, this.cfg)).catch((e) => {
+                if (window.toast) toast.show(`配置保存失败：${toast.sanitize(e)}`, 'error');
+                else console.error('persistCfg failed', e);
+            });
         },
 
         flushSync() {
@@ -154,7 +180,6 @@
             try {
                 storage.flushSync(this.DB_KEY, this.db);
                 if (this.cfg) storage.flushSync(this.CFG_KEY, this.cfg);
-                this._dbDirty = false;
             } catch (e) {
                 if (window.toast) toast.show(`本地快照写入失败：${toast.sanitize(e)}`, 'error');
                 else console.error('flushSync failed', e);
@@ -168,7 +193,7 @@
             this.ensurePersistPromise();
             try {
                 if (this._dbDirty) {
-                    this.resolveStorageAdapter().write(this.DB_KEY, this.db);
+                    await Promise.resolve(this.resolveStorageAdapter().write(this.DB_KEY, this.db));
                     this._dbDirty = false;
                 }
                 this._resolvePersist?.();
