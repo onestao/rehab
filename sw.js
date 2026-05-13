@@ -1,4 +1,4 @@
-const CACHE = 'training-assistant-v60';
+const CACHE = 'training-assistant-v61';
 const ASSETS = [
     'index.html',
     'build/generated.css?v=60',
@@ -9,6 +9,13 @@ const ASSETS = [
     'ai-profile.js?v=60',
     'ai-models.js?v=60',
     'ai-api.js?v=60',
+    'data-utils.js?v=60',
+    'storage/idb.js?v=60',
+    'storage/migrate.js?v=60',
+    'data-store.js?v=60',
+    'data-ui-state.js?v=60',
+    'health-diet.js?v=60',
+    'health-weight.js?v=60',
     'data.js?v=60',
     'food-log.js?v=60',
     'advice-panel.js?v=60',
@@ -47,7 +54,6 @@ const ASSETS = [
 
 self.addEventListener('install', e => {
     e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
-    self.skipWaiting();
 });
 
 self.addEventListener('activate', e => {
@@ -57,10 +63,6 @@ self.addEventListener('activate', e => {
         ))
     );
     self.clients.claim();
-});
-
-self.addEventListener('message', e => {
-    if (e.data?.type === 'SKIP_WAITING') self.skipWaiting();
 });
 
 self.addEventListener('fetch', e => {

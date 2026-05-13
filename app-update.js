@@ -5,7 +5,7 @@ const appUpdate = {
     async registerServiceWorker() {
         if (!('serviceWorker' in navigator)) return;
         try {
-            this.registration = await navigator.serviceWorker.register('sw.js?v=60');
+            this.registration = await navigator.serviceWorker.register('sw.js?v=61');
             this.bindRegistration(this.registration);
             this.registration.update?.();
             navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -35,7 +35,7 @@ const appUpdate = {
 
     apply() {
         if (!this.waitingWorker) return;
-        this.waitingWorker.postMessage({ type: 'SKIP_WAITING' });
+        window.location.reload();
     },
 
     dismiss() {
