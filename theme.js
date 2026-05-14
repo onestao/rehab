@@ -1,3 +1,4 @@
+// @ts-nocheck
 const theme = {
     KEY: 'rehab_pro_theme_cfg',
     presets: {
@@ -133,7 +134,11 @@ const theme = {
     syncUI() {
         const color = document.getElementById('themeColor');
         if (color) color.value = this.cfg.seed;
-        document.querySelectorAll('.theme-swatch').forEach(btn => btn.classList.toggle('active', btn.dataset.theme === this.cfg.mode));
+        document.querySelectorAll('.theme-swatch').forEach(btn => {
+            const active = btn.dataset.theme === this.cfg.mode;
+            btn.classList.toggle('active', active);
+            btn.setAttribute('aria-pressed', String(active));
+        });
         const colorMode = this.cfg.colorMode || 'auto';
         document.querySelectorAll('.theme-mode-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.colorMode === colorMode));
     },

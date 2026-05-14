@@ -1,3 +1,4 @@
+// @ts-nocheck
 const workoutState = {
     KEY: 'rehab_active_session',
 

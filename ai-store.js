@@ -1,4 +1,5 @@
-﻿const ai = {
+﻿// @ts-nocheck
+const ai = {
     KEY: 'rehab_pro_ai_cfg',
     MODELS_KEY: 'rehab_pro_ai_models',
     KEYS_KEY: 'rehab_pro_ai_keys',

@@ -1,3 +1,4 @@
+// @ts-nocheck
 const foodLog = {
     attach(target) {
         Object.assign(target, {

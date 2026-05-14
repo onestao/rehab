@@ -1,3 +1,4 @@
+// @ts-nocheck
 const syncStatus = {
     META_KEY: 'rehab_sync_meta',
     meta: { state: 'local', detail: '', lastAttemptAt: '', lastSuccessAt: '', lastErrorAt: '', mode: 'none', lastSyncAt: '', pendingCount: 0, lastError: '' },
@@ -14,6 +15,11 @@ const syncStatus = {
         this.refreshFromDbSyncMeta();
         this.patchSync();
         this.render();
+        if (typeof window !== 'undefined') {
+            window.addEventListener('online', () => sync.flushQueue?.());
+            clearInterval(this._queueTimer);
+            this._queueTimer = setInterval(() => sync.flushQueue?.(), 60000);
+        }
     },
 
     patchSync() {
@@ -59,6 +65,9 @@ const syncStatus = {
     refreshFromDbSyncMeta() {
         const pending = Number(data?.db?.syncMeta?.pendingQueue?.length || 0);
         this.meta.pendingCount = pending;
+        this.meta.detail = pending > 0 && this.meta.state !== 'syncing'
+            ? `待重试 ${pending}`
+            : this.meta.detail;
         this.lastSyncAt = this.meta.lastSyncAt || this.meta.lastSuccessAt || '';
         this.pendingCount = this.meta.pendingCount;
         this.lastError = this.meta.lastError || '';

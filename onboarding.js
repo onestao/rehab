@@ -1,3 +1,4 @@
+// @ts-nocheck
 window.onboarding = {
     pages: [
         { icon: 'fitness_center', title: '智能训练计时', desc: '语音播报 + 双侧交替 + 画中画' },

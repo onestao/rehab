@@ -1,4 +1,5 @@
-﻿Object.assign(workout, {
+﻿// @ts-nocheck
+Object.assign(workout, {
     isDocPipSupported() {
         return 'documentPictureInPicture' in window && typeof window.documentPictureInPicture.requestWindow === 'function';
     },

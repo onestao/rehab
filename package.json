@@ -1,0 +1,17 @@
+{
+  "name": "training-assistant",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build:css": "node scripts/build-css.mjs",
+    "icons": "node scripts/collect-icons.mjs",
+    "bump": "node scripts/bump-version.js",
+    "typecheck": "tsc -p tsconfig.check.json",
+    "test": "node --test test/*.test.mjs",
+    "ci": "npm run typecheck && npm run test"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.4.0"
+  }
+}

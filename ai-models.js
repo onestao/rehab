@@ -1,4 +1,5 @@
-﻿Object.assign(ai, {
+﻿// @ts-nocheck
+Object.assign(ai, {
     // --- Model Fetching ---
     async fetchModels() {
         const baseUrl = (document.getElementById('aiBaseUrl')?.value || '').trim().replace(/\/+$/, '');

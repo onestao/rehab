@@ -1,3 +1,4 @@
+// @ts-nocheck
 (function () {
     const DB_NAME = 'rehab_pro_storage';
     const STORE_NAME = 'kv';

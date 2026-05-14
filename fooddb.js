@@ -1,3 +1,4 @@
+// @ts-nocheck
 const fooddb = {
     items: [
         { id: 'rice', name: '米饭', cat: '主食', cal: 116, pro: 2.6, carb: 25.9, fat: 0.3, unit: '碗(150g)' },

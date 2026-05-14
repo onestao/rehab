@@ -1,4 +1,5 @@
-﻿Object.assign(advicePanel, {
+﻿// @ts-nocheck
+Object.assign(advicePanel, {
     parsePromptTargetDate(prompt) {
         const text = String(prompt || '');
         const explicit = text.match(/(\d{4})[\/\-.年](\d{1,2})[\/\-.月](\d{1,2})/);

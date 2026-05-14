@@ -1,3 +1,4 @@
+// @ts-nocheck
 const workoutEngine = {
     state: null,
     skipOverride: null,

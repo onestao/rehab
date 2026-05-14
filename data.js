@@ -30,4 +30,21 @@ Object.assign(
     window.dataViews || {}
 );
 
+data.refreshModules = function () {
+    Object.assign(data,
+        window.dataUtils || {},
+        window.dataStore || {},
+        window.dataUiState || {},
+        window.dataHealthDiet || {},
+        window.dataHealthWeight || {},
+        window.dataHealthExercise || {},
+        window.dataHealthProfile || {},
+        window.dataGoalPlan || {},
+        window.dataRoutineLibrary || {},
+        window.dataHistoryView || {},
+        window.dataWeeklySummary || {},
+        window.dataViews || {}
+    );
+};
+
 if (typeof window !== 'undefined') window.data = data;

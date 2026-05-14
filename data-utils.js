@@ -1,3 +1,4 @@
+// @ts-nocheck
 (function () {
     window.dataUtils = {
         foodCalUnitFactor(unit) {

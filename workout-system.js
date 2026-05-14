@@ -1,4 +1,5 @@
-﻿const workout = window.workout = window.workout || {};
+﻿// @ts-nocheck
+const workout = window.workout = window.workout || {};
 
 Object.assign(workout, {
     isPlaying: false, isPaused: false, skipFlag: false,

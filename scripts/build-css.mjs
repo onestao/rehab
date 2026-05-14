@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { readFile, mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { cssFiles } from './css-sections.mjs';

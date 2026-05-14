@@ -1,3 +1,4 @@
+// @ts-nocheck
 const backup = {
     async exportData() {
         if (typeof data.flush === 'function') await data.flush();

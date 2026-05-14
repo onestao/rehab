@@ -6,9 +6,9 @@
     <title>训练助手</title>
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#0061a4">
-    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
-    <link rel="stylesheet" href="build/generated.css?v=60">
-    <link rel="stylesheet" href="css-src/42-health-profile.css?v=60">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&icon_names=accessibility_new,add,add_circle,auto_awesome,backup,badge,balance,block,bookmark_add,bookmark_border,bookmarks,brightness_auto,calendar_month,check,check_circle,chevron_left,chevron_right,clinical_notes,close,close_fullscreen,cloud_alert,cloud_done,cloud_off,cloud_sync,content_copy,dark_mode,delete,directions_bike,directions_run,directions_walk,done_all,download,download_for_offline,edit,edit_note,egg_alt,error,event,event_note,exercise,expand_less,expand_more,fitness_center,flag,format_color_fill,forum,health_and_safety,help,history,info,inventory_2,keyboard_arrow_down,keyboard_arrow_left,keyboard_arrow_right,keyboard_arrow_up,library_books,light_mode,local_fire_department,lock,lock_open,mic,mic_off,monitor_heart,monitor_weight,monitoring,more_vert,no_food,notifications,notifications_active,palette,pause,pedal_bike,person,picture_in_picture_alt,play_arrow,playlist_add,pool,psychology,refresh,remove,replay,restart_alt,restaurant,rowing,save,schedule,search,search_off,self_improvement,send,settings,shield,show_chart,skip_next,skip_previous,speed,sports,sports_gymnastics,stop,swap_horiz,sync,sync_problem,system_update,timeline,timer,today,trending_down,trending_up,tune,upload,upload_file,visibility,visibility_off,volume_off,volume_up,warning,waterfall_chart" rel="stylesheet" />
+    <link rel="stylesheet" href="build/generated.css?v=73">
+    <link rel="stylesheet" href="css-src/42-health-profile.css?v=73">
 </head>
 <body>
     <div id="appUpdateBanner" class="app-update-banner hidden">
@@ -56,9 +56,9 @@
             </div>
 
             <div class="mode-tabs" role="tablist" aria-label="训练模式">
-                <button id="modeStrengthBtn" class="mode-tab active" onclick="workout.setMode('strength')" type="button"><span class="material-symbols-rounded">exercise</span>动作</button>
-                <button id="modeCardioBtn" class="mode-tab" onclick="workout.setMode('cardio')" type="button"><span class="material-symbols-rounded">directions_run</span>有氧</button>
-                <button id="modeStrengthLogBtn" class="mode-tab" onclick="workout.setMode('strengthLog')" type="button"><span class="material-symbols-rounded">fitness_center</span>无氧记录</button>
+                <button id="modeStrengthBtn" class="mode-tab active" role="tab" aria-selected="true" onclick="workout.setMode('strength')" type="button"><span class="material-symbols-rounded">exercise</span>动作</button>
+                <button id="modeCardioBtn" class="mode-tab" role="tab" aria-selected="false" onclick="workout.setMode('cardio')" type="button"><span class="material-symbols-rounded">directions_run</span>有氧</button>
+                <button id="modeStrengthLogBtn" class="mode-tab" role="tab" aria-selected="false" onclick="workout.setMode('strengthLog')" type="button"><span class="material-symbols-rounded">fitness_center</span>无氧记录</button>
             </div>
 
             <div class="md-card input-card" id="strengthCard">
@@ -87,9 +87,9 @@
                         </select>
                         <label>训练阶段</label>
                     </div>
-                    <div class="md-switch span-full">
+                    <div class="md-switch span-full" role="switch" aria-checked="false">
                         <span><span class="material-symbols-rounded" style="font-size:18px;vertical-align:middle;margin-right:6px">swap_horiz</span>双侧交替训练</span>
-                        <label class="switch-track"><input type="checkbox" id="isAlt"><span class="switch-thumb"></span></label>
+                        <label class="switch-track"><input type="checkbox" id="isAlt" onchange="ui.syncSwitchAria(this)"><span class="switch-thumb"></span></label>
                     </div>
                 </div>
                 <button class="md-btn md-btn-filled" onclick="data.addAction()">
@@ -197,11 +197,11 @@
                     <div class="theme-panel">
                         <div class="theme-panel-title"><span class="material-symbols-rounded">palette</span> 主题颜色</div>
                         <div class="theme-actions">
-                            <button class="theme-swatch theme-blue active" data-theme="blue" onclick="theme.setPreset('blue')" aria-label="蓝色主题"></button>
-                            <button class="theme-swatch theme-purple" data-theme="purple" onclick="theme.setPreset('purple')" aria-label="紫色主题"></button>
-                            <button class="theme-swatch theme-green" data-theme="green" onclick="theme.setPreset('green')" aria-label="绿色主题"></button>
-                            <button class="theme-swatch theme-orange" data-theme="orange" onclick="theme.setPreset('orange')" aria-label="橙色主题"></button>
-                            <button class="theme-swatch theme-rose" data-theme="rose" onclick="theme.setPreset('rose')" aria-label="玫红主题"></button>
+                            <button class="theme-swatch theme-blue active" data-theme="blue" aria-pressed="true" onclick="theme.setPreset('blue')" aria-label="蓝色主题"></button>
+                            <button class="theme-swatch theme-purple" data-theme="purple" aria-pressed="false" onclick="theme.setPreset('purple')" aria-label="紫色主题"></button>
+                            <button class="theme-swatch theme-green" data-theme="green" aria-pressed="false" onclick="theme.setPreset('green')" aria-label="绿色主题"></button>
+                            <button class="theme-swatch theme-orange" data-theme="orange" aria-pressed="false" onclick="theme.setPreset('orange')" aria-label="橙色主题"></button>
+                            <button class="theme-swatch theme-rose" data-theme="rose" aria-pressed="false" onclick="theme.setPreset('rose')" aria-label="玫红主题"></button>
                             <button class="md-btn md-btn-tonal theme-monet" data-theme="monet" onclick="theme.useMonet()" aria-label="莫奈取色"><span class="material-symbols-rounded">auto_awesome</span></button>
                             <label class="color-picker"><input type="color" id="themeColor" value="#0061a4" oninput="theme.setCustom(this.value)"><span class="material-symbols-rounded">format_color_fill</span></label>
                         </div>
@@ -321,45 +321,20 @@
         </button>
     </nav>
 
-    <script src="toast.js?v=60"></script>
-    <script src="theme.js?v=60"></script>
-    <script src="fooddb.js?v=60"></script>
-    <script src="ai-store.js?v=60"></script>
-    <script src="ai-profile.js?v=60"></script>
-    <script src="ai-models.js?v=60"></script>
-    <script src="ai-api.js?v=60"></script>
-    <script src="data-utils.js?v=60"></script>
-    <script src="storage/idb.js?v=60"></script>
-    <script src="storage/migrate.js?v=60"></script>
-    <script src="data-store.js?v=60"></script>
-    <script src="data-ui-state.js?v=60"></script>
-    <script src="health-diet.js?v=60"></script>
-    <script src="health-weight.js?v=60"></script>
-    <script src="health-profile.js?v=60"></script>
-    <script src="health-exercise.js?v=60"></script>
-    <script src="goal-plan.js?v=60"></script>
-    <script src="routine-library.js?v=60"></script>
-    <script src="history-view.js?v=60"></script>
-    <script src="weekly-summary.js?v=60"></script>
-    <script src="onboarding.js?v=60"></script>
-    <script src="swipe-actions.js?v=60"></script>
-    <script src="data-views.js?v=60"></script>
-    <script src="data.js?v=60"></script>
-    <script src="food-log.js?v=60"></script>
-    <script src="advice-panel.js?v=60"></script>
-    <script src="advice-render.js?v=60"></script>
-    <script src="advice-prompt.js?v=60"></script>
-    <script>if (typeof window !== 'undefined' && window.data) advicePanel.attach(window.data);</script>
-    <script src="backup.js?v=60"></script>
-    <script src="sync.js?v=60"></script>
-    <script src="sync-status.js?v=60"></script>
-    <script src="workout-system.js?v=60"></script>
-    <script src="workout-pip.js?v=60"></script>
-    <script src="workout-core.js?v=60"></script>
-    <script src="workout-cardio.js?v=60"></script>
-    <script src="workout-engine.js?v=60"></script>
-    <script src="workout-state.js?v=60"></script>
-    <script src="app-update.js?v=60"></script>
+    <script src="toast.js?v=73"></script>
+    <script src="error-bus.js?v=73"></script>
+    <script src="theme.js?v=73"></script>
+    <script src="fooddb.js?v=73"></script>
+    <script src="data-utils.js?v=73"></script>
+    <script src="storage/idb.js?v=73"></script>
+    <script src="storage/migrate.js?v=73"></script>
+    <script src="data-store.js?v=73"></script>
+    <script src="data-ui-state.js?v=73"></script>
+    <script src="onboarding.js?v=73"></script>
+    <script src="data-views.js?v=73"></script>
+    <script src="data.js?v=73"></script>
+    <script src="sync-status.js?v=73"></script>
+    <script src="app-update.js?v=73"></script>
     <div id="weightModal" class="md-modal md-modal-sheet hidden" aria-hidden="true">
         <div class="md-modal-backdrop" onclick="data.closeWeightModal()"></div>
         <div class="md-modal-card md-modal-sheet-card">
@@ -462,31 +437,86 @@
         </div>
     </div>
     <script>
+        const PAGE_DEPS = {
+            workout: ['workout-system','workout-pip','workout-core','workout-cardio','workout-engine','workout-state','swipe-actions','routine-library'],
+            'ai-coach': ['ai-store','ai-profile','ai-models','ai-api','advice-panel','advice-render','advice-prompt'],
+            profile: ['backup','sync'],
+            records: ['history-view','weekly-summary','health-diet','health-weight','health-profile','health-exercise','goal-plan','routine-library','food-log'],
+            today: ['health-diet','health-weight','health-exercise','food-log','history-view']
+        };
+        const _loaded = new Set();
+        function loadScript(name) {
+            if (_loaded.has(name)) return Promise.resolve();
+            return new Promise((res, rej) => {
+                const s = document.createElement('script');
+                s.src = `${name}.js?v=73`;
+                s.onload = () => { _loaded.add(name); res(); };
+                s.onerror = rej;
+                document.head.appendChild(s);
+            });
+        }
+        async function ensureDeps(page) {
+            const deps = PAGE_DEPS[page] || [];
+            for (const name of deps) await loadScript(name);
+            data.refreshModules?.();
+            if (page === 'ai-coach' && window.advicePanel) {
+                advicePanel.attach(data);
+            }
+            if (page === 'workout' && window.workoutState && !_loaded.has('_workoutStateInit')) {
+                workoutState.init();
+                _loaded.add('_workoutStateInit');
+            }
+            if (page === 'workout' && window.workout && typeof workout.setMode === 'function' && !_loaded.has('_workoutModeInit')) {
+                workout.setMode('strength');
+                _loaded.add('_workoutModeInit');
+            }
+            if (page === 'workout' && window.swipeActions && !_loaded.has('_swipeInit')) {
+                swipeActions.init();
+                _loaded.add('_swipeInit');
+            }
+            if (page === 'profile') {
+                if (window.sync && typeof sync.initUI === 'function' && !_loaded.has('_syncInit')) {
+                    sync.initUI();
+                    _loaded.add('_syncInit');
+                }
+                if (window.syncStatus && typeof syncStatus.patchSync === 'function') {
+                    syncStatus.patchSync();
+                    syncStatus.render?.();
+                }
+            }
+        }
         const ui = {
-            tab: (id, el) => {
-                try { data.captureAdviceDraft?.(); } catch (e) { console.warn('captureAdviceDraft failed', e); }
-                try { data.captureAdviceScroll?.(); } catch (e) { console.warn('captureAdviceScroll failed', e); }
+            syncSwitchAria(input) {
+                input?.closest('.md-switch')?.setAttribute('aria-checked', String(!!input?.checked));
+            },
+            async tab(id, el) {
+                try { data.captureAdviceDraft?.(); } catch (e) { errorBus?.report?.('ui.captureAdviceDraft', e); }
+                try { data.captureAdviceScroll?.(); } catch (e) { errorBus?.report?.('ui.captureAdviceScroll', e); }
+                await ensureDeps(id);
                 document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
                 document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
                 document.getElementById(id)?.classList.add('active');
                 el?.classList.add('active');
-                try { data.render(); } catch (e) { console.error('data.render failed in ui.tab', e); }
+                try { data.render(id); } catch (e) {
+                    errorBus?.report?.('ui.tab.render', e, { page: id });
+                    console.error('data.render failed in ui.tab', e);
+                }
             }
         };
         window.onload = async () => {
             theme.init();
-            if (window.workoutState) workoutState.init();
             if (window.appUpdate) appUpdate.registerServiceWorker();
             try {
+                await ensureDeps(document.querySelector('.page.active')?.id || 'today');
                 await data.init();
             } catch (e) {
+                errorBus?.report?.('boot', e);
                 console.error('data.init failed', e);
                 if (window.toast) toast.show(`数据初始化失败：${toast.sanitize ? toast.sanitize(e) : e?.message || e}`, 'error');
             }
-            workout.setMode('strength');
-            if (window.swipeActions) swipeActions.init();
             if (window.syncStatus) syncStatus.init();
             if (window.onboarding) onboarding.show();
+            ui.syncSwitchAria(document.getElementById('isAlt'));
             window.addEventListener('scroll', () => {
                 document.querySelector('.md-top-app-bar')?.classList.toggle('scrolled', window.scrollY > 8);
             }, { passive: true });

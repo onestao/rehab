@@ -1,3 +1,4 @@
+// @ts-nocheck
 (function () {
     window.dataHealthProfile = {
         renderHealthProfileCard() {
@@ -186,6 +187,7 @@
                 });
             });
             p.conditions = conds;
+            this.touchRecord(p);
             this.saveAndBackup();
             this.closeProfileModal();
             this.renderHistory();

@@ -1,3 +1,4 @@
+// @ts-nocheck
 (function () {
     function safeParse(raw, keyName) {
         if (!raw) return null;

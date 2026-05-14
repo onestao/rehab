@@ -1,3 +1,4 @@
+// @ts-nocheck
 const appUpdate = {
     registration: null,
     waitingWorker: null,

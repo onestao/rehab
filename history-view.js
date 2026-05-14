@@ -1,3 +1,4 @@
+// @ts-nocheck
 (function () {
     window.dataHistoryView = {
         deleteHistory(id) {
@@ -313,7 +314,7 @@
         },
 
         renderContextAiCard(context) {
-            if (!ai.cfg.enabled) return '';
+            if (!window.ai || !ai.cfg?.enabled) return '';
             const prompts = this.contextAiPrompts(context);
             return '<div class="md-card context-ai-card"><div class="context-ai-head"><div><span class="cardio-kicker">AI 建议</span><h3>' + this.contextAiTitle(context) + '</h3><small>' + this.contextAiDescription(context) + '</small></div><span class="context-ai-icon material-symbols-rounded">psychology</span></div><div class="context-ai-actions">' + prompts.map(p => '<button class="md-btn md-btn-tonal context-ai-btn" onclick="data.askContextAi(\'' + context + '\',\'' + this.escapeHtml(p.prompt) + '\')">' + p.label + '</button>').join('') + '</div></div>';
         },
@@ -335,7 +336,7 @@
         },
 
         askContextAi(context, prompt) {
-            if (!ai.cfg.enabled) return alert('请先在设置中配置 AI');
+            if (!window.ai || !ai.cfg?.enabled) return alert('请先在设置中配置 AI');
             if (context === 'weight') this.adviceRange = 'month';
             this.routineView = 'advice';
             const nav = document.querySelectorAll('.nav-item')[3];

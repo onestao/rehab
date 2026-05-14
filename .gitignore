@@ -1,1 +1,5 @@
 .kilo/
+archive/
+node_modules
+*.tsbuildinfo
+coverage

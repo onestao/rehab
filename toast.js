@@ -1,3 +1,4 @@
+// @ts-nocheck
 window.toast = {
     show(msg, type = 'info', ms = 2400, action = null) {
         let el = document.getElementById('appToast');

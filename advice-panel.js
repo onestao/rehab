@@ -1,4 +1,5 @@
-﻿const advicePanel = {
+﻿// @ts-nocheck
+const advicePanel = {
     DRAFT_KEY: 'rehab_advice_draft',
     SETTINGS_KEY: 'rehab_advice_settings',
     SCROLL_KEY: 'rehab_advice_scroll_top',

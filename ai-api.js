@@ -1,4 +1,5 @@
-﻿Object.assign(ai, {
+﻿// @ts-nocheck
+Object.assign(ai, {
     // --- API Calls (统一入口，按 provider 分发) ---
     async call(messages, maxTokens = 2000) {
         if (!this.cfg.enabled) throw new Error('请先在设置中配置 AI 接口');

@@ -1,3 +1,4 @@
+// @ts-nocheck
 (function () {
     window.dataStore = {
         STORAGE_VERSION_KEY: 'storageVersion',
@@ -65,7 +66,7 @@
             if (localCfg) this.cfg = localCfg;
             this.normalizeDb();
             this.bindFlushHooks();
-            sync.initUI();
+            if (window.sync && typeof sync.initUI === 'function') sync.initUI();
             if (typeof ai !== 'undefined') await ai.init({ saveData: true, renderData: false });
             this.render();
             this.restoreActionDraft();
@@ -104,7 +105,7 @@
             this.db.health.exerciseLogs = (this.db.health.exerciseLogs || []).map(item => this.ensureRecordMeta(item, 'exercise', nowTs));
             this.db.health.aiAdviceChat = (this.db.health.aiAdviceChat || []).map(item => this.ensureRecordMeta(item, 'advice', nowTs));
             this.db.health.dietInputMode = this.db.health.dietInputMode || 'ai';
-            this.db.health.profile = this.db.health.profile || {};
+            this.db.health.profile = this.ensureRecordMeta(this.db.health.profile || {}, 'profile', nowTs);
             this.db.health.profile.gender = this.db.health.profile.gender || 'male';
             this.db.health.profile.age = this.db.health.profile.age || null;
             this.db.health.profile.conditions = this.db.health.profile.conditions || [];
@@ -303,7 +304,9 @@
         async saveAndBackup() {
             this.save();
             await this.flush();
-            await sync.autoBackup('history');
+            if (window.sync && typeof sync.autoBackup === 'function') {
+                try { await sync.autoBackup('history'); } catch (e) { console.warn('autoBackup skipped', e); }
+            }
         }
     };
 })();

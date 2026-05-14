@@ -1,4 +1,5 @@
-﻿const cardio = {
+﻿// @ts-nocheck
+const cardio = {
     types: {
         walk: { name: '步行', met: 3.5 },
         brisk_walk: { name: '快走', met: 4.3 },

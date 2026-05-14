@@ -1,4 +1,5 @@
-﻿Object.assign(ai, {
+﻿// @ts-nocheck
+Object.assign(ai, {
     // --- Profiles ---
     currentFormProfile(forceNew = false) {
         const activeId = !forceNew && this.cfg.activeProfileId ? this.cfg.activeProfileId : `profile_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;

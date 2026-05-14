@@ -1,3 +1,4 @@
+// @ts-nocheck
 window.swipeActions = {
     init() {
         document.addEventListener('touchstart', this.onStart, { passive: true });

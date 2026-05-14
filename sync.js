@@ -1,9 +1,35 @@
+// @ts-nocheck
+/**
+ * @typedef {'none' | 's3' | 'webdav'} SyncMode
+ * @typedef {{ endpoint?: string, region?: string, bucket?: string, key?: string, secret?: string }} SyncS3Config
+ * @typedef {{ url?: string, user?: string, pass?: string, path?: string }} SyncDavConfig
+ * @typedef {{ mode?: SyncMode, s3?: SyncS3Config, dav?: SyncDavConfig }} SyncConfig
+ */
+
+function computeRetryDelay(attempt, opts = {}) {
+    const baseDelay = Number(opts.baseDelay || 800);
+    const factor = Number(opts.factor || 2);
+    const jitter = Number(opts.jitter || 0.2);
+    const base = baseDelay * (factor ** Math.max(0, attempt - 1));
+    const delta = base * jitter;
+    return Math.max(0, Math.round(base + delta));
+}
+
+function isRetryableError(error) {
+    const status = Number(error && typeof error === 'object' && 'status' in error ? error.status : 0);
+    if (status === 429 || status >= 500) return true;
+    if (status >= 400 && status < 500) return false;
+    const message = String(error && typeof error === 'object' && 'message' in error ? error.message : error || '');
+    return /fetch|network|timeout|load failed|failed to fetch/i.test(message);
+}
+
 const sync = {
     INCREMENTAL_WINDOW_MS: 5 * 60 * 1000,
     COMPACTION_THRESHOLD: 50,
     REMOTE_SNAPSHOT: 'rehab_pro_data.json',
     REMOTE_MANIFEST: 'manifest.json',
     REMOTE_INCREMENTAL_DIR: 'incremental',
+    RETRY_DEFAULTS: { retries: 3, baseDelay: 800, factor: 2, jitter: 0.2 },
 
     async sha256(s) {
         const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
@@ -40,6 +66,7 @@ const sync = {
             weights: health.weights || [],
             foodLogs: health.foodLogs || [],
             exerciseLogs: health.exerciseLogs || [],
+            healthProfile: health.profile && typeof health.profile === 'object' ? [health.profile] : [],
             aiAdviceChat: health.aiAdviceChat || []
         };
     },
@@ -123,6 +150,18 @@ const sync = {
                     set: (value) => {
                         db.health = db.health || {};
                         db.health.exerciseLogs = value;
+                    }
+                };
+            case 'healthProfile':
+                return {
+                    get: () => {
+                        const profile = (db.health || {}).profile;
+                        return profile && typeof profile === 'object' ? [profile] : [];
+                    },
+                    set: (value) => {
+                        db.health = db.health || {};
+                        const next = (value || []).find(item => item && !item.deleted) || (value || [])[0] || {};
+                        db.health.profile = next;
                     }
                 };
             case 'aiAdviceChat':
@@ -267,6 +306,23 @@ const sync = {
         this.saveSyncMeta();
     },
 
+    async delay(ms) {
+        await new Promise(resolve => setTimeout(resolve, ms));
+    },
+
+    async withRetry(fn, opts = {}) {
+        const retries = Number(opts.retries ?? this.RETRY_DEFAULTS.retries);
+        for (let attempt = 1; attempt <= retries; attempt++) {
+            try {
+                return await fn();
+            } catch (error) {
+                if (!isRetryableError(error) || attempt >= retries) throw error;
+                this.setStatus('syncing', `重试中… (${attempt}/${retries})`);
+                await this.delay(computeRetryDelay(attempt, opts));
+            }
+        }
+    },
+
     async writeJson(remotePath, payload, etagKey = remotePath) {
         const body = JSON.stringify(payload);
         let extraHeaders = {};
@@ -293,7 +349,7 @@ const sync = {
         for (let i = 0; i < queue.length; i++) {
             const item = queue[i];
             try {
-                await this.writeJson(item.remotePath, item.payload, item.etagKey || item.remotePath);
+                await this.withRetry(() => this.writeJson(item.remotePath, item.payload, item.etagKey || item.remotePath));
             } catch (e) {
                 remain.push({ ...item, reason: e.message || item.reason, attempts: Number(item.attempts || 0) + 1 });
             }
@@ -322,7 +378,7 @@ const sync = {
         const snapshotTs = Date.now();
         const snapshotBody = JSON.stringify(data.db);
         const snapshotHash = await this.sha256(snapshotBody);
-        await this.writeJson(this.REMOTE_SNAPSHOT, data.db, this.REMOTE_SNAPSHOT);
+        await this.withRetry(() => this.writeJson(this.REMOTE_SNAPSHOT, data.db, this.REMOTE_SNAPSHOT));
         const manifest = this.ensureManifestShape(options.baseManifest || null);
         manifest.snapshotTs = snapshotTs;
         manifest.snapshotHash = snapshotHash;
@@ -332,7 +388,7 @@ const sync = {
             acc[entity] = { lastTs: snapshotTs, count: 0, windows: [] };
             return acc;
         }, {});
-        await this.writeJson(this.REMOTE_MANIFEST, manifest, this.REMOTE_MANIFEST);
+        await this.withRetry(() => this.writeJson(this.REMOTE_MANIFEST, manifest, this.REMOTE_MANIFEST));
         const meta = this.getSyncMeta();
         meta.lastSyncAt = snapshotTs;
         meta.lastIncrementalTs = snapshotTs;
@@ -359,7 +415,7 @@ const sync = {
             for (let i = 0; i < changedEntities.length; i++) {
                 const entity = changedEntities[i];
                 const payload = { ts, entity, records: changes[entity] };
-                await this.writeJson(`${this.REMOTE_INCREMENTAL_DIR}/${entity}/${ts}.json`, payload, `${this.REMOTE_INCREMENTAL_DIR}/${entity}/${ts}.json`);
+                await this.withRetry(() => this.writeJson(`${this.REMOTE_INCREMENTAL_DIR}/${entity}/${ts}.json`, payload, `${this.REMOTE_INCREMENTAL_DIR}/${entity}/${ts}.json`));
                 const entityMeta = remoteManifest.entities[entity] || { lastTs: 0, count: 0, windows: [] };
                 entityMeta.lastTs = Math.max(Number(entityMeta.lastTs || 0), ts);
                 entityMeta.windows = Array.from(new Set([...(entityMeta.windows || []), ts])).sort((a, b) => a - b);
@@ -368,7 +424,7 @@ const sync = {
             }
             remoteManifest.lastIncrementalTs = Math.max(Number(remoteManifest.lastIncrementalTs || 0), ts);
             remoteManifest.schemaVersion = Number(data.SCHEMA_VERSION || remoteManifest.schemaVersion || 2);
-            await this.writeJson(this.REMOTE_MANIFEST, remoteManifest, this.REMOTE_MANIFEST);
+            await this.withRetry(() => this.writeJson(this.REMOTE_MANIFEST, remoteManifest, this.REMOTE_MANIFEST));
 
             localMeta.lastSyncAt = Date.now();
             localMeta.lastIncrementalTs = Number(remoteManifest.lastIncrementalTs || ts);
@@ -391,9 +447,9 @@ const sync = {
         try {
             await data.flush();
             this.setStatus('syncing', '正在拉取远端变更');
-            const snapshotRes = await this.fetchJson(this.REMOTE_SNAPSHOT, true);
+            const snapshotRes = await this.withRetry(() => this.fetchJson(this.REMOTE_SNAPSHOT, true));
             if (snapshotRes.data) this.applySnapshot(snapshotRes.data);
-            const manifest = this.ensureManifestShape((await this.fetchJson(this.REMOTE_MANIFEST, true)).data);
+            const manifest = this.ensureManifestShape((await this.withRetry(() => this.fetchJson(this.REMOTE_MANIFEST, true))).data);
             const meta = this.getSyncMeta();
             const startTs = Math.max(Number(meta.lastIncrementalTs || 0), Number(manifest.snapshotTs || 0));
 
@@ -410,7 +466,7 @@ const sync = {
             for (let i = 0; i < replayTasks.length; i++) {
                 const task = replayTasks[i];
                 const remotePath = `${this.REMOTE_INCREMENTAL_DIR}/${task.entity}/${task.ts}.json`;
-                const inc = await this.fetchJson(remotePath, true);
+                const inc = await this.withRetry(() => this.fetchJson(remotePath, true));
                 const records = inc.data && Array.isArray(inc.data.records) ? inc.data.records : [];
                 this.mergeEntityRecords(task.entity, records);
             }
@@ -459,6 +515,10 @@ const sync = {
         } catch (e) {
             console.warn('Auto incremental backup failed', reason, e);
         }
+    },
+
+    async flushQueue() {
+        await this.processRetryQueue();
     },
 
     saveConfig() {
