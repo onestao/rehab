@@ -1,0 +1,94 @@
+// @ts-nocheck
+(function () {
+    function createScheduler() {
+        let mode = 'live';
+        let chunkPerFrame = 8;
+        let scheduled = false;
+        return {
+            setMode(next) { mode = next; },
+            getMode() { return mode; },
+            setChunkPerFrame(n) { chunkPerFrame = Math.max(1, Number(n) || 8); },
+            tick(bufferLen) {
+                if (mode === 'paused') return 0;
+                if (mode === 'fast') return bufferLen;
+                return Math.min(bufferLen, chunkPerFrame);
+            },
+            schedule(fn) {
+                if (scheduled) return;
+                scheduled = true;
+                requestAnimationFrame(() => { scheduled = false; fn(); });
+            }
+        };
+    }
+
+    function create(target, opts = {}) {
+        const scheduler = createScheduler();
+        const state = {
+            buffer: '',
+            shown: '',
+            destroyed: false,
+            autoScroll: true
+        };
+
+        function emit(detail) {
+            try { window.dispatchEvent(new CustomEvent('advice:render-state', { detail })); } catch {}
+        }
+
+        function renderFrame() {
+            if (state.destroyed) return;
+            const n = scheduler.tick(state.buffer.length);
+            if (n <= 0) return;
+            const chunk = state.buffer.slice(0, n);
+            state.buffer = state.buffer.slice(n);
+            state.shown += chunk;
+            // Line-stable: only render complete lines; unfinished line stays text.
+            const lines = state.shown.split('\n');
+            const complete = lines.slice(0, -1).join('\n');
+            const tail = lines[lines.length - 1];
+            const safe = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            const html = complete
+                ? safe(complete).replace(/\n/g, '<br>') + '<br>' + safe(tail)
+                : safe(tail);
+            target.innerHTML = html;
+            if (state.autoScroll) {
+                target.scrollIntoView({ block: 'end' });
+            }
+            if (state.buffer.length) scheduler.schedule(renderFrame);
+        }
+
+        function enqueue(chunk) {
+            if (state.destroyed) return;
+            state.buffer += String(chunk || '');
+            scheduler.schedule(renderFrame);
+        }
+
+        function pause(reason = 'manual') {
+            scheduler.setMode('paused');
+            emit({ mode: 'paused', reason, bufferedChars: state.buffer.length });
+        }
+
+        function resume() {
+            scheduler.setMode('live');
+            emit({ mode: 'live', bufferedChars: state.buffer.length });
+            scheduler.schedule(renderFrame);
+        }
+
+        function flushAll() {
+            scheduler.setMode('fast');
+            emit({ mode: 'fast', bufferedChars: state.buffer.length });
+            scheduler.schedule(() => {
+                renderFrame();
+                scheduler.setMode('live');
+                emit({ mode: 'live', bufferedChars: state.buffer.length });
+            });
+        }
+
+        function destroy() {
+            state.destroyed = true;
+        }
+
+        return { enqueue, pause, resume, flushAll, destroy, getState: () => ({ ...state, mode: scheduler.getMode() }) };
+    }
+
+    window.adviceStreamRenderer = { create };
+})();

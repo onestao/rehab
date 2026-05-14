@@ -40,7 +40,7 @@ module.exports = {
                 data: 'readonly', workout: 'readonly', sync: 'readonly', ai: 'readonly', theme: 'readonly', toast: 'readonly', cardio: 'readonly',
                 errorBus: 'readonly', i18n: 'readonly', appUpdate: 'readonly', syncStatus: 'readonly', swipeActions: 'readonly', workoutState: 'readonly',
                 workoutWakeLock: 'readonly', workoutMediaSession: 'readonly', advicePanel: 'readonly', focusTrap: 'readonly',
-                ui: 'readonly', workoutEngine: 'readonly', onboarding: 'readonly', fooddb: 'readonly'
+                ui: 'readonly', workoutEngine: 'readonly', onboarding: 'readonly', fooddb: 'readonly', adviceStreamRenderer: 'readonly'
             }
         }
     ]

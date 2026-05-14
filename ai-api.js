@@ -12,15 +12,15 @@ Object.assign(ai, {
         return this._callOpenAIChat(messages, maxTokens, key, false);
     },
 
-    async callStream(messages, maxTokens = 2000, onChunk = () => {}) {
+    async callStream(messages, maxTokens = 2000, onToken = () => {}) {
         if (!this.cfg.enabled) throw new Error('请先在设置中配置 AI 接口');
         const key = this.apiKeyFor(this.cfg.activeProfileId);
         if (!key) throw new Error('请先在当前 AI 配置中填写 API Key');
         const provider = this.cfg.provider || 'openai';
-        if (provider === 'claude')           return this._callClaude(messages, maxTokens, key, true, onChunk);
-        if (provider === 'openai-responses') return this._callOpenAIResponses(messages, maxTokens, key, true, onChunk);
-        if (provider === 'gemini')           return this._callGemini(messages, maxTokens, key, true, onChunk);
-        return this._callOpenAIChat(messages, maxTokens, key, true, onChunk);
+        if (provider === 'claude')           return this._callClaude(messages, maxTokens, key, true, onToken);
+        if (provider === 'openai-responses') return this._callOpenAIResponses(messages, maxTokens, key, true, onToken);
+        if (provider === 'gemini')           return this._callGemini(messages, maxTokens, key, true, onToken);
+        return this._callOpenAIChat(messages, maxTokens, key, true, onToken);
     },
 
     // ---------- OpenAI Chat Completions ----------

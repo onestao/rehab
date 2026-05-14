@@ -448,23 +448,14 @@ const advicePanel = {
                     if (!bubble || !accumulated) return;
                     const contentEl = bubble.querySelector('.advice-bubble-content');
                     if (!contentEl) return;
-                    const now = performance.now();
-                    const force = accumulated.length - (contentEl._renderedLen || 0) > 40;
-                    if (!force && now - _lastRender < 80) {
-                        if (!_pendingFrame) {
-                            _pendingFrame = requestAnimationFrame(() => {
-                                _pendingFrame = 0;
-                                _lastRender = performance.now();
-                                const ci = this.db.health.aiAdviceChat.findIndex(m => m.id === pendingId);
-                                if (ci < 0) return;
-                                contentEl.innerHTML = this.renderAdviceMarkdown(this.db.health.aiAdviceChat[ci].content);
-                                contentEl._renderedLen = this.db.health.aiAdviceChat[ci].content.length;
-                            });
-                        }
+                    if (!contentEl._renderer && window.adviceStreamRenderer) {
+                        contentEl._renderer = adviceStreamRenderer.create(contentEl, { chunkPerFrame: 8 });
+                    }
+                    if (contentEl._renderer) {
+                        contentEl._renderer.enqueue(delta);
                     } else {
-                        _lastRender = now;
+                        // fallback
                         contentEl.innerHTML = this.renderAdviceMarkdown(accumulated);
-                        contentEl._renderedLen = accumulated.length;
                     }
                     bubble.classList.remove('pending');
                     const dots = bubble.querySelector('.advice-typing-dot');
