@@ -24,9 +24,9 @@ Object.assign(advicePanel, {
         const range = this.adviceRange || 'today';
         const today = this.logicalDateKey();
 
-        const allHistory = this.db.history || [];
-        const allFoods = this.db.health.foodLogs || [];
-        const allExerciseLogs = this.db.health.exerciseLogs || [];
+        const allHistory = this.activeRecords(this.db.history || []);
+        const allFoods = this.activeRecords(this.db.health.foodLogs || []);
+        const allExerciseLogs = this.activeRecords(this.db.health.exerciseLogs || []);
         const allWeights = this.sortedWeights();
 
         const rangeHistory = contexts.training ? this.filterByAdviceRange(allHistory, h => this.parseHistoryDate(h.date)) : [];
