@@ -29,6 +29,8 @@ sequenceDiagram
     participant SW as appUpdate
     participant Lazy as ensureDeps
     participant Data as data.init
+    participant WL as workoutWakeLock
+    participant MS as workoutMediaSession
 
     Browser->>HTML: load shell
     HTML->>Theme: theme.init()
@@ -39,6 +41,8 @@ sequenceDiagram
     Data->>HTML: first render
     Browser->>Lazy: tab change
     Lazy->>Data: refreshModules()
+    Data->>WL: workout:state events
+    Data->>MS: workout:state events
 ```
 
 ## Module Graph
@@ -57,6 +61,8 @@ graph LR
     DATA --> AI[ai modules]
     DATA --> SYNC[sync.js]
     WORKOUT[workout modules] --> DATA
+    WORKOUT --> WL[workout-wakelock.js]
+    WORKOUT --> MS[workout-media-session.js]
     SYNC --> STATUS[sync-status.js]
 ```
 

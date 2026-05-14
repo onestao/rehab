@@ -1,5 +1,17 @@
 // @ts-nocheck
 Object.assign(workout, {
+    prevAction() {
+        // Minimal, safe fallback: restart current phase/set.
+        if (!this.isPlaying) return;
+        if (window.workoutEngine?.state) {
+            workoutEngine.state.phase = 'announceSet';
+            workoutEngine.state.phaseLeft = null;
+            workoutEngine.state.phaseSub = '';
+            workoutEngine.state.phaseStatus = '';
+            workout.abortCurrentPhaseWait?.();
+            try { window.dispatchEvent(new CustomEvent('workout:state', { detail: { status: this.isPaused ? 'paused' : 'playing', phase: workoutEngine.state.phase, action: workoutEngine.state.activeAction, set: workoutEngine.state.setIndex, rep: workoutEngine.state.repIndex } })); } catch {}
+        }
+    },
     updateRate(val) {
         data.db.rate = parseFloat(val);
         document.getElementById('rateLabel').innerText = val;
@@ -14,6 +26,8 @@ Object.assign(workout, {
         if (tweak) tweak.classList.toggle('hidden', !this.isPlaying);
         this.updatePipButton();
         this.renderPip();
+        const prev = document.getElementById('prevBtn');
+        if (prev) prev.classList.toggle('hidden', !this.isPlaying);
     },
 
     tweakPhase(delta) {
@@ -49,6 +63,11 @@ Object.assign(workout, {
             this.reinforceKeepAlive();
         }
         this.updateStateClasses();
+        try {
+            window.dispatchEvent(new CustomEvent('workout:state', {
+                detail: { status: this.isPlaying ? (this.isPaused ? 'paused' : 'playing') : 'idle', phase: window.workoutEngine?.state?.phase || '', action: window.workoutEngine?.state?.activeAction || null, set: window.workoutEngine?.state?.setIndex || 0, rep: window.workoutEngine?.state?.repIndex || 0 }
+            }));
+        } catch {}
     },
 
     setMode(mode) {
@@ -114,6 +133,7 @@ Object.assign(workout, {
             document.getElementById('stopBtn').classList.remove('hidden');
             await this.acquireWakeLock();
             this.setupMediaSession();
+            try { window.dispatchEvent(new CustomEvent('workout:state', { detail: { status: 'playing', phase: 'intro', action: null, set: 0, rep: 0 } })); } catch {}
             this.keepAudioAlive();
             this.initBackGuard();
             
@@ -209,6 +229,7 @@ Object.assign(workout, {
         window.speechSynthesis.cancel();
         if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'none';
         this.releaseWakeLock();
+        try { window.dispatchEvent(new CustomEvent('workout:state', { detail: { status: 'stopped', phase: 'completed', action: null, set: 0, rep: 0 } })); } catch {}
         this._phaseLeft = null;
         this._lastActiveAt = null;
         if (window.workoutEngine) workoutEngine.state = null;

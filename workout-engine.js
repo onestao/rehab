@@ -29,6 +29,18 @@ const workoutEngine = {
         if (!this.state) return;
         Object.assign(this.state, patch, { phase });
         if (window.workoutState) workoutState.markActive();
+        try {
+            window.dispatchEvent(new CustomEvent('workout:state', {
+                detail: {
+                    status: workout.isPlaying ? (workout.isPaused ? 'paused' : 'playing') : 'idle',
+                    phase,
+                    action: this.state.activeAction,
+                    set: this.state.setIndex,
+                    rep: this.state.repIndex,
+                    statusText: this.state.phaseStatus
+                }
+            }));
+        } catch {}
     },
 
     applySkipOverride() {

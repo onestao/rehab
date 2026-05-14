@@ -141,4 +141,20 @@ Object.assign(workout, {
     showBackToast() {
         this.showToast('训练正在进行：按 Home 进入后台，或点停止结束训练');
     },
+
+    // Training keyboard shortcuts, only active when workout page is visible.
+    _kbdBound: false,
+    bindHotkeys() {
+        if (this._kbdBound) return;
+        this._kbdBound = true;
+        window.addEventListener('keydown', (e) => {
+            const active = document.querySelector('.page.active')?.id === 'workout';
+            if (!active) return;
+            if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable)) return;
+            if (e.code === 'Space') { e.preventDefault(); this.toggle(); }
+            if (e.code === 'ArrowRight') { e.preventDefault(); this.skip(); }
+            if (e.code === 'ArrowLeft') { e.preventDefault(); this.prevAction?.(); }
+            if (e.code === 'Escape') { e.preventDefault(); this.stop(); }
+        });
+    },
 });

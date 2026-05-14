@@ -25,6 +25,16 @@ The application uses record-level LWW (last-writer-wins by `updatedAt`).
 
 This keeps conflict resolution deterministic and cheap for a static app.
 
+### Fieldwise merge (optional)
+
+When `cfg.mergeStrategy` is set to `fieldwise`, the app can merge per-field updates using:
+
+```
+__fieldUpdatedAt: { fieldName: ISOString }
+```
+
+If either side lacks `__fieldUpdatedAt`, merge falls back to record-level LWW.
+
 ## Tombstones
 
 When a record is deleted, the tombstone must remain newer than any live copy.
@@ -58,6 +68,10 @@ Replay triggers:
 - next manual push/pull
 - periodic background flush from `sync-status.js`
 - browser `online` event
+
+### Batch replay
+
+Queue replay runs in FIFO batches (max 20 items per flush). On the first failure, remaining items in the current batch are kept and the flush stops.
 
 ## Encrypted AI Sync
 

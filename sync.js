@@ -345,16 +345,23 @@ const sync = {
         const meta = this.getSyncMeta();
         const queue = meta.pendingQueue || [];
         if (!queue.length) return;
+        const limit = 20;
+        const batch = queue.slice(0, limit);
+        const tail = queue.slice(limit);
         const remain = [];
-        for (let i = 0; i < queue.length; i++) {
-            const item = queue[i];
+        for (let i = 0; i < batch.length; i++) {
+            const item = batch[i];
             try {
                 await this.withRetry(() => this.writeJson(item.remotePath, item.payload, item.etagKey || item.remotePath));
             } catch (e) {
                 remain.push({ ...item, reason: e.message || item.reason, attempts: Number(item.attempts || 0) + 1 });
+                // stop the batch on first failure
+                meta.pendingQueue = remain.concat(batch.slice(i + 1)).concat(tail);
+                this.saveSyncMeta();
+                return;
             }
         }
-        meta.pendingQueue = remain;
+        meta.pendingQueue = tail;
         this.saveSyncMeta();
     },
 
@@ -579,6 +586,11 @@ const sync = {
         document.getElementById('syncMode').value = mode;
         this.toggleFields(mode);
         this.setStatus(mode === 'none' ? 'local' : 'cloud');
+        if (!this.__onlineBound) {
+            this.__onlineBound = true;
+            window.addEventListener('online', () => this.processRetryQueue());
+            window.addEventListener('offline', () => this.setStatus('local', '网络离线'));
+        }
     }
 };
 

@@ -71,6 +71,12 @@ const syncStatus = {
         this.lastSyncAt = this.meta.lastSyncAt || this.meta.lastSuccessAt || '';
         this.pendingCount = this.meta.pendingCount;
         this.lastError = this.meta.lastError || '';
+        const btn = document.getElementById('syncRetryBtn');
+        if (btn) {
+            const disabled = !(this.pendingCount > 0);
+            btn.disabled = disabled;
+            btn.setAttribute('aria-disabled', String(disabled));
+        }
     },
 
     persist() {
@@ -92,7 +98,8 @@ const syncStatus = {
             <div class="sync-meta-item"><strong>最近同步</strong><span>${this.formatTime(this.lastSyncAt)}</span></div>
             <div class="sync-meta-item"><strong>待重试</strong><span>${this.pendingCount}</span></div>
             <div class="sync-meta-item"><strong>最近错误</strong><span>${this.lastError ? this.lastError : '暂无'}</span></div>
-            <div class="sync-meta-item sync-meta-wide"><strong>状态</strong><span>${this.meta.detail || (this.meta.state === 'cloud' ? '云端同步正常' : this.meta.state === 'error' ? '同步失败' : '本地模式')}</span></div>`;
+            <div class="sync-meta-item sync-meta-wide"><strong>状态</strong><span>${this.meta.detail || (this.meta.state === 'cloud' ? '云端同步正常' : this.meta.state === 'error' ? '同步失败' : '本地模式')}</span></div>
+            <div class="sync-meta-item sync-meta-wide"><button class="md-btn md-btn-tonal" id="syncFlushBtn" ${this.pendingCount > 0 ? '' : 'disabled'} onclick="sync.flushQueue?.()">立即重试队列</button></div>`;
     }
 };
 
