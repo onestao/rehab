@@ -1,0 +1,14 @@
+{
+  "nav": { "today": "今日", "workout": "训练", "records": "记录", "ai": "AI", "profile": "我的" },
+  "workout": { "ready": "READY", "start": "开始训练", "pause": "暂停", "stop": "停止" },
+  "sync": { "local": "仅本地", "syncing": "同步中…", "cloud": "云端同步正常" },
+  "errors": { "boot": "启动失败：{message}", "network": "网络异常，请稍后再试" },
+  "advice": {
+    "scrollToLatest": "跳到最新 · {n} 行",
+    "pauseRender": "暂停渲染",
+    "resumeRender": "继续渲染",
+    "flushAll": "一次性显示全部",
+    "bufferedChars": "已缓冲 {n} 字",
+    "stopGenerate": "停止生成"
+  }
+}

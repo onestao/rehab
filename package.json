@@ -6,12 +6,22 @@
     "build:css": "node scripts/build-css.mjs",
     "icons": "node scripts/collect-icons.mjs",
     "bump": "node scripts/bump-version.js",
+    "lhci": "lhci autorun",
+    "lint:js": "eslint -c .eslintrc.cjs --quiet .",
+    "lint:css": "stylelint \"css-src/**/*.css\" --allow-empty-input",
+    "lint": "npm run lint:js",
     "typecheck": "tsc -p tsconfig.check.json",
     "test": "node --test test/*.test.mjs",
-    "ci": "npm run typecheck && npm run test"
+    "ci": "npm run lint && npm run typecheck && npm run test"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
-    "typescript": "^5.4.0"
+    "typescript": "^5.4.0",
+    "eslint": "^8.57.0",
+    "prettier": "^3.0.0",
+    "stylelint": "^16.0.0",
+    "stylelint-config-standard": "^36.0.0",
+    "size-limit": "^11.0.0",
+    "@size-limit/file": "^11.0.0"
   }
 }

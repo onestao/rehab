@@ -1,0 +1,14 @@
+{
+  "nav": { "today": "Today", "workout": "Workout", "records": "Records", "ai": "AI", "profile": "Me" },
+  "workout": { "ready": "READY", "start": "Start", "pause": "Pause", "stop": "Stop" },
+  "sync": { "local": "Local only", "syncing": "Syncing…", "cloud": "Cloud OK" },
+  "errors": { "boot": "Startup failed: {message}", "network": "Network error, try again" },
+  "advice": {
+    "scrollToLatest": "Jump to latest · {n} lines",
+    "pauseRender": "Pause rendering",
+    "resumeRender": "Resume rendering",
+    "flushAll": "Show all",
+    "bufferedChars": "Buffered {n} chars",
+    "stopGenerate": "Stop generating"
+  }
+}

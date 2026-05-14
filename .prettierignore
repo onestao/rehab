@@ -1,0 +1,5 @@
+build/
+*.bak
+assets/
+storage/**/*.bak
+i18n/*.json

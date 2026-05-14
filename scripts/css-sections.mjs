@@ -39,6 +39,7 @@ export const cssSections = [
   { file: '36-responsive.css', marker: { type: 'pair', line: '/* ============================================', nextIncludes: 'Responsive' } },
   { file: '37-dark-mode.css', marker: { type: 'pair', line: '/* ============================================', nextIncludes: 'Dark Mode' } },
   { file: '41-m3e-effects.css', marker: { type: 'exact', value: '/* === M3 Expressive Effects === */' } },
+  { file: '40-a11y.css', marker: { type: 'exact', value: '/* --- A11y --- */' } },
 ];
 
 export const cssFiles = [...cssSections.map(section => section.file), '99-custom-overrides.css'];
