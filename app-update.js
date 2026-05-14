@@ -6,7 +6,7 @@ const appUpdate = {
     async registerServiceWorker() {
         if (!('serviceWorker' in navigator)) return;
         try {
-            this.registration = await navigator.serviceWorker.register('sw.js?v=61');
+            this.registration = await navigator.serviceWorker.register('sw.js?v=81');
             this.bindRegistration(this.registration);
             this.registration.update?.();
             navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -35,7 +35,12 @@ const appUpdate = {
     },
 
     apply() {
-        if (!this.waitingWorker) return;
+        const worker = this.waitingWorker || this.registration?.waiting;
+        if (worker) {
+            try { worker.postMessage({ type: 'SKIP_WAITING' }); } catch {}
+            // controllerchange handler will reload once the new SW activates.
+            return;
+        }
         window.location.reload();
     },
 
@@ -45,3 +50,4 @@ const appUpdate = {
 };
 
 if (typeof window !== 'undefined') window.appUpdate = appUpdate;
+

@@ -482,6 +482,10 @@ const advicePanel = {
                 if (bubble) {
                     const contentEl = bubble.querySelector('.advice-bubble-content');
                     if (contentEl) {
+                        if (contentEl._renderer) {
+                            try { contentEl._renderer.destroy(); } catch {}
+                            contentEl._renderer = null;
+                        }
                         contentEl.innerHTML = this.renderAdviceMarkdown(full);
                         contentEl.querySelectorAll('p, li, h1, h2, h3').forEach(el => {
                             el.classList.add('m3e-token-in');

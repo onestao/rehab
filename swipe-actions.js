@@ -6,6 +6,7 @@ window.swipeActions = {
         document.addEventListener('touchend', this.onEnd, { passive: true });
     },
     onStart(e) {
+        if (document.querySelector('.page.active')?.id !== 'workout') return;
         const target = e.target.closest('.day-detail-item, .today-timeline-item, .list-item');
         if (!target) return;
         swipeActions._t = target;

@@ -37,10 +37,14 @@
         try {
             const s = document.querySelector('script[src*="i18n.js?v="]');
             const m = s?.getAttribute('src')?.match(/\?v=(\d+)/);
-            return m ? m[1] : '';
-        } catch {
-            return '';
-        }
+            if (m) return m[1];
+        } catch {}
+        try {
+            const css = document.querySelector('link[href*="generated.css?v="]');
+            const cm = css?.getAttribute('href')?.match(/\?v=(\d+)/);
+            if (cm) return cm[1];
+        } catch {}
+        return '';
     }
 
     async function loadPack(locale) {

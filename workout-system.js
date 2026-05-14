@@ -51,6 +51,7 @@ Object.assign(workout, {
     },
 
     async acquireWakeLock() {
+        if (window.workoutWakeLock?.request) return window.workoutWakeLock.request();
         if (!('wakeLock' in navigator)) return;
         try {
             this.wakeLock = await navigator.wakeLock.request('screen');
@@ -58,11 +59,15 @@ Object.assign(workout, {
     },
 
     releaseWakeLock() {
+        if (window.workoutWakeLock?.release) { window.workoutWakeLock.release(); return; }
         if (this.wakeLock) this.wakeLock.release().catch(() => {});
         this.wakeLock = null;
     },
 
     setupMediaSession() {
+        // Delegated to workout-media-session.js when available; keep a minimal fallback
+        // so older deploys still surface a play/pause action handler.
+        if (window.workoutMediaSession) return;
         if (!('mediaSession' in navigator)) return;
         navigator.mediaSession.metadata = new MediaMetadata({ title: '训练中', artist: '训练助手' });
         navigator.mediaSession.playbackState = this.isPaused ? 'paused' : 'playing';
