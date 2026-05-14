@@ -7,8 +7,8 @@
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#0061a4">
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&icon_names=accessibility_new,add,add_circle,auto_awesome,backup,badge,balance,block,bookmark_add,bookmark_border,bookmarks,brightness_auto,calendar_month,check,check_circle,chevron_left,chevron_right,clinical_notes,close,close_fullscreen,cloud_alert,cloud_done,cloud_off,cloud_sync,content_copy,dark_mode,delete,directions_bike,directions_run,directions_walk,done_all,download,download_for_offline,edit,edit_note,egg_alt,error,event,event_note,exercise,expand_less,expand_more,fitness_center,flag,format_color_fill,forum,health_and_safety,help,history,info,inventory_2,keyboard_arrow_down,keyboard_arrow_left,keyboard_arrow_right,keyboard_arrow_up,library_books,light_mode,local_fire_department,lock,lock_open,mic,mic_off,monitor_heart,monitor_weight,monitoring,more_vert,no_food,notifications,notifications_active,palette,pause,pedal_bike,person,picture_in_picture_alt,play_arrow,playlist_add,pool,psychology,refresh,remove,replay,restart_alt,restaurant,rowing,save,schedule,search,search_off,self_improvement,send,settings,shield,show_chart,skip_next,skip_previous,speed,sports,sports_gymnastics,stop,swap_horiz,sync,sync_problem,system_update,timeline,timer,today,trending_down,trending_up,tune,upload,upload_file,visibility,visibility_off,volume_off,volume_up,warning,waterfall_chart" rel="stylesheet" />
-    <link rel="stylesheet" href="build/generated.css?v=82">
-    <link rel="stylesheet" href="css-src/42-health-profile.css?v=82">
+    <link rel="stylesheet" href="build/generated.css?v=83">
+    <link rel="stylesheet" href="css-src/42-health-profile.css?v=83">
 </head>
 <body>
     <div id="appUpdateBanner" class="app-update-banner hidden">
@@ -243,7 +243,7 @@
                         <label>AI 服务</label>
                     </div>
                     <div class="md-field"><input type="text" id="aiBaseUrl" placeholder=" "><label>Base URL</label></div>
-                    <div class="md-field"><input type="password" id="aiApiKey" placeholder=" "><label>API Key</label></div>
+                    <div class="md-field"><input type="password" id="aiApiKey" placeholder=" " autocomplete="new-password" data-lpignore="true" data-form-type="other"><label>API Key</label></div>
                     <button class="md-btn md-btn-tonal" onclick="ai.fetchModels()"><span class="material-symbols-rounded">refresh</span> 获取可用模型</button>
                     <div id="aiFetchStatus" class="food-ai-status"></div>
                     <div id="aiModelList" class="ai-model-list hidden"></div>
@@ -253,13 +253,13 @@
                     <div class="ai-encrypt-section">
                         <div class="ai-encrypt-title"><span class="material-symbols-rounded">lock</span> 加密同步 AI 配置</div>
                         <small>设置密码后会将所有 AI 配置档案一起加密写入同步数据，和训练记录同文件备份</small>
-                        <div class="md-field"><input type="password" id="aiEncryptPass" placeholder=" "><label>加密密码</label></div>
+                        <div class="md-field"><input type="password" id="aiEncryptPass" placeholder=" " autocomplete="new-password" data-lpignore="true" data-form-type="other"><label>加密密码</label></div>
                         <button class="md-btn md-btn-tonal" onclick="ai.exportToSync()"><span class="material-symbols-rounded">upload</span> 加密并写入同步数据</button>
                     </div>
                     <div id="aiDecryptSection" class="ai-encrypt-section hidden">
                         <div class="ai-encrypt-title"><span class="material-symbols-rounded">lock_open</span> 恢复 AI 配置</div>
                         <small>检测到同步中的加密 AI 配置，输入密码恢复所有档案</small>
-                        <div class="md-field"><input type="password" id="aiDecryptPass" placeholder=" "><label>解密密码</label></div>
+                        <div class="md-field"><input type="password" id="aiDecryptPass" placeholder=" " autocomplete="new-password" data-lpignore="true" data-form-type="other"><label>解密密码</label></div>
                         <button class="md-btn md-btn-tonal" onclick="ai.importFromSync()"><span class="material-symbols-rounded">download</span> 解密恢复</button>
                     </div>
                 </div>
@@ -277,12 +277,12 @@
                         <div class="md-field"><input type="text" id="s3Region" placeholder=" "><label>Region (如 us-east-1)</label></div>
                         <div class="md-field"><input type="text" id="s3Bucket" placeholder=" "><label>Bucket</label></div>
                         <div class="md-field"><input type="text" id="s3Key" placeholder=" "><label>Access Key</label></div>
-                        <div class="md-field"><input type="password" id="s3Secret" placeholder=" "><label>Secret Key</label></div>
+                        <div class="md-field"><input type="password" id="s3Secret" placeholder=" " autocomplete="new-password" data-lpignore="true" data-form-type="other"><label>Secret Key</label></div>
                     </div>
                     <div id="webdavFields" class="hidden">
                         <div class="md-field"><input type="text" id="davUrl" placeholder=" "><label>WebDAV 地址</label></div>
                         <div class="md-field"><input type="text" id="davUser" placeholder=" "><label>用户名</label></div>
-                        <div class="md-field"><input type="password" id="davPass" placeholder=" "><label>密码 / App Password</label></div>
+                        <div class="md-field"><input type="password" id="davPass" placeholder=" " autocomplete="new-password" data-lpignore="true" data-form-type="other"><label>密码 / App Password</label></div>
                         <div class="md-field"><input type="text" id="davPath" placeholder=" "><label>备份文件路径</label></div>
                     </div>
                     <div class="sync-actions">
@@ -333,22 +333,22 @@
         </button>
     </nav>
 
-    <script src="toast.js?v=82"></script>
-    <script src="error-bus.js?v=82"></script>
-    <script src="i18n.js?v=82"></script>
-    <script src="a11y-focus-trap.js?v=82"></script>
-    <script src="theme.js?v=82"></script>
-    <script src="fooddb.js?v=82"></script>
-    <script src="data-utils.js?v=82"></script>
-    <script src="storage/idb.js?v=82"></script>
-    <script src="storage/migrate.js?v=82"></script>
-    <script src="data-store.js?v=82"></script>
-    <script src="data-ui-state.js?v=82"></script>
-    <script src="onboarding.js?v=82"></script>
-    <script src="data-views.js?v=82"></script>
-    <script src="data.js?v=82"></script>
-    <script src="sync-status.js?v=82"></script>
-    <script src="app-update.js?v=82"></script>
+    <script src="toast.js?v=83"></script>
+    <script src="error-bus.js?v=83"></script>
+    <script src="i18n.js?v=83"></script>
+    <script src="a11y-focus-trap.js?v=83"></script>
+    <script src="theme.js?v=83"></script>
+    <script src="fooddb.js?v=83"></script>
+    <script src="data-utils.js?v=83"></script>
+    <script src="storage/idb.js?v=83"></script>
+    <script src="storage/migrate.js?v=83"></script>
+    <script src="data-store.js?v=83"></script>
+    <script src="data-ui-state.js?v=83"></script>
+    <script src="onboarding.js?v=83"></script>
+    <script src="data-views.js?v=83"></script>
+    <script src="data.js?v=83"></script>
+    <script src="sync-status.js?v=83"></script>
+    <script src="app-update.js?v=83"></script>
     <div id="weightModal" class="md-modal md-modal-sheet hidden" aria-hidden="true">
         <div class="md-modal-backdrop" onclick="data.closeWeightModal()"></div>
         <div class="md-modal-card md-modal-sheet-card">
@@ -463,7 +463,7 @@
             if (_loaded.has(name)) return Promise.resolve();
             return new Promise((res, rej) => {
                 const s = document.createElement('script');
-                s.src = `${name}.js?v=82`;
+                s.src = `${name}.js?v=83`;
                 s.onload = () => { _loaded.add(name); res(); };
                 s.onerror = rej;
                 document.head.appendChild(s);
