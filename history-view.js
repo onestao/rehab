@@ -314,7 +314,9 @@
         },
 
         renderContextAiCard(context) {
-            if (!window.ai || !ai.cfg?.enabled) return '';
+            const hasRuntimeAi = !!(window.ai && ai.cfg?.enabled);
+            const hasStoredAi = !!(this.db?.aiProfiles?.length && (this.db.aiActiveId || this.db.aiProfiles[0]?.id));
+            if (!hasRuntimeAi && !hasStoredAi) return '';
             const prompts = this.contextAiPrompts(context);
             return '<div class="md-card context-ai-card"><div class="context-ai-head"><div><span class="cardio-kicker">AI 建议</span><h3>' + this.contextAiTitle(context) + '</h3><small>' + this.contextAiDescription(context) + '</small></div><span class="context-ai-icon material-symbols-rounded">psychology</span></div><div class="context-ai-actions">' + prompts.map(p => '<button class="md-btn md-btn-tonal context-ai-btn" onclick="data.askContextAi(\'' + context + '\',\'' + this.escapeHtml(p.prompt) + '\')">' + p.label + '</button>').join('') + '</div></div>';
         },
@@ -335,12 +337,14 @@
             }[context] || [{ label: '分析今天', prompt: '请分析我今天的记录' }];
         },
 
-        askContextAi(context, prompt) {
-            if (!window.ai || !ai.cfg?.enabled) return alert('请先在设置中配置 AI');
+        async askContextAi(context, prompt) {
+            const hasStoredAi = !!(this.db?.aiProfiles?.length && (this.db.aiActiveId || this.db.aiProfiles[0]?.id));
+            if (!hasStoredAi && !(window.ai && ai.cfg?.enabled)) return alert('请先在设置中配置 AI');
             if (context === 'weight') this.adviceRange = 'month';
             this.routineView = 'advice';
             const nav = document.querySelectorAll('.nav-item')[3];
-            ui.tab('ai-coach', nav);
+            await ui.tab('ai-coach', nav);
+            if (!window.ai || !ai.cfg?.enabled) return alert('请先在设置中配置 AI');
             requestAnimationFrame(() => {
                 const input = document.getElementById('advicePrompt');
                 if (input) { input.value = prompt; this.onAdvicePromptInput?.(input); this.sendAiAdvice(prompt); }
