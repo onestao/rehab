@@ -1,8 +1,23 @@
 const data = {
     DB_KEY: 'rehab_pro_universal_db',
     CFG_KEY: 'rehab_pro_universal_cfg',
-    SCHEMA_VERSION: 2,
-    db: { actions: [], routines: [], history: [], rate: 1.1, cardio: { weight: 70, target: 30, type: 'walk' }, health: { weights: [], foodLogs: [], exerciseLogs: [], goalType: 'loss', bodyPlan: null, weightPlan: null, dietGoal: null, aiAdviceChat: [] }, aiProfiles: [], aiActiveId: '', aiModels: [] },
+    SCHEMA_VERSION: 3,
+    db: {
+        actions: [],
+        routines: [],
+        history: [],
+        rate: 1.1,
+        cardio: { weight: 70, target: 30, type: 'walk' },
+        health: { weights: [], foodLogs: [], exerciseLogs: [], goalType: 'loss', bodyPlan: null, weightPlan: null, dietGoal: null, aiAdviceChat: [] },
+        aiProfiles: [],
+        aiActiveId: '',
+        aiModels: [],
+        aiTemplates: [],
+        aiTemplateActiveId: '',
+        aiTrash: [],
+        aiCipher: null,
+        cache: { prByAction: {}, prUpdatedAt: 0 }
+    },
     cfg: { mode: 'none', s3: {}, dav: {} },
     historyMonthOffset: 0,
     routineView: 'library',
@@ -27,7 +42,8 @@ Object.assign(
     window.dataRoutineLibrary || {},
     window.dataHistoryView || {},
     window.dataWeeklySummary || {},
-    window.dataViews || {}
+    window.dataViews || {},
+    window.dataAiTemplates || {}
 );
 
 data.refreshModules = function () {
@@ -43,7 +59,8 @@ data.refreshModules = function () {
         window.dataRoutineLibrary || {},
         window.dataHistoryView || {},
         window.dataWeeklySummary || {},
-        window.dataViews || {}
+        window.dataViews || {},
+        window.dataAiTemplates || {}
     );
 };
 

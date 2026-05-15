@@ -10,6 +10,8 @@ const ASSETS = [
     'ai-profile.js?v=83',
     'ai-models.js?v=83',
     'ai-api.js?v=83',
+    'ai-pricing.js?v=83',
+    'ai-templates.js?v=83',
     'data-utils.js?v=83',
     'storage/idb.js?v=83',
     'storage/migrate.js?v=83',
@@ -62,6 +64,7 @@ const ASSETS = [
     'assets/model-icons/glm.svg',
     'assets/model-icons/generic.svg',
     'manifest.json'
+    , 'favicon.ico'
 ];
 
 self.addEventListener('install', (e) => {
@@ -133,4 +136,3 @@ self.addEventListener('fetch', (event) => {
         }
     })());
 });
-

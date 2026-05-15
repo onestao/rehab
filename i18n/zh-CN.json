@@ -10,5 +10,15 @@
     "flushAll": "一次性显示全部",
     "bufferedChars": "已缓冲 {n} 字",
     "stopGenerate": "停止生成"
+  },
+  "records": {
+    "ai": {
+      "title": "AI 用量",
+      "today": "今日",
+      "week": "本周",
+      "month": "本月",
+      "tokens": "Tokens",
+      "cost": "成本"
+    }
   }
 }

@@ -63,6 +63,9 @@
             const localCfg = await Promise.resolve(storage.read(this.CFG_KEY));
             if (localDb) this.db = localDb;
             else await this.migrateLegacy();
+            if (window.storageMigrate?.migrateAdviceToVersioned) {
+                this.db = window.storageMigrate.migrateAdviceToVersioned(this.db);
+            }
             if (localCfg) this.cfg = localCfg;
             this.normalizeDb();
             this.bindFlushHooks();
@@ -104,6 +107,13 @@
             this.db.health.foodLogs = (this.db.health.foodLogs || []).map(item => this.ensureRecordMeta(item, 'food', nowTs));
             this.db.health.exerciseLogs = (this.db.health.exerciseLogs || []).map(item => this.ensureRecordMeta(item, 'exercise', nowTs));
             this.db.health.aiAdviceChat = (this.db.health.aiAdviceChat || []).map(item => this.ensureRecordMeta(item, 'advice', nowTs));
+            this.db.aiTemplates = Array.isArray(this.db.aiTemplates) ? this.db.aiTemplates : [];
+            this.db.aiTemplateActiveId = this.db.aiTemplateActiveId || '';
+            this.db.aiTrash = Array.isArray(this.db.aiTrash) ? this.db.aiTrash : [];
+            this.db.aiCipher = this.db.aiCipher && typeof this.db.aiCipher === 'object' ? this.db.aiCipher : null;
+            this.db.cache = this.db.cache && typeof this.db.cache === 'object' ? this.db.cache : {};
+            this.db.cache.prByAction = this.db.cache.prByAction && typeof this.db.cache.prByAction === 'object' ? this.db.cache.prByAction : {};
+            this.db.cache.prUpdatedAt = Number(this.db.cache.prUpdatedAt || 0);
             this.db.health.dietInputMode = this.db.health.dietInputMode || 'ai';
             this.db.health.profile = this.ensureRecordMeta(this.db.health.profile || {}, 'profile', nowTs);
             this.db.health.profile.gender = this.db.health.profile.gender || 'male';
@@ -129,6 +139,9 @@
             this.db.syncMeta.pendingQueue = Array.isArray(this.db.syncMeta.pendingQueue) ? this.db.syncMeta.pendingQueue : [];
             this.db.actions.forEach(a => { if (!a.phase) a.phase = 'main'; });
             this.db.routines.forEach(r => (r.actions || []).forEach(a => { if (!a.phase) a.phase = 'main'; }));
+            if (window.dataAiTemplates && typeof window.dataAiTemplates.ensureDefaultTemplates === 'function') {
+                window.dataAiTemplates.ensureDefaultTemplates(this.db);
+            }
         },
 
         generateRecordId(prefix = 'rec') {

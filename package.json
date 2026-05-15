@@ -6,6 +6,7 @@
     "build:css": "node scripts/build-css.mjs",
     "icons": "node scripts/collect-icons.mjs",
     "bump": "node scripts/bump-version.js",
+    "version": "node scripts/bump-version.js && git add index.html sw.js scripts/ build/",
     "lhci": "lhci autorun",
     "lint:js": "eslint -c .eslintrc.cjs --quiet .",
     "lint:css": "stylelint \"css-src/**/*.css\" --allow-empty-input",

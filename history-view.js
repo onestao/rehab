@@ -39,6 +39,17 @@
                 else if (remaining >= 0) { status = '接近目标'; hint = '已接近目标，控制油脂和零食'; }
                 else { status = '已超出目标'; hint = '已超出 ' + Math.abs(remaining) + ' kcal，可增加散步或低强度活动'; }
             }
+
+            const usage = this.summarizeAiUsage?.() || { today: { in: 0, out: 0, costUsd: 0 }, week: { in: 0, out: 0, costUsd: 0 }, month: { in: 0, out: 0, costUsd: 0 } };
+            const fmtCost = (v) => (v && v > 0 ? '$' + Number(v).toFixed(4) : '$0.0000');
+            const aiUsageCard = `<div class="md-card" style="padding:14px">
+                <div class="today-timeline-header" style="margin:0 0 10px"><span class="material-symbols-rounded">psychology</span><strong>${(window.i18n ? i18n.t('records.ai.title') : 'AI 用量')}</strong></div>
+                <div class="record-overview-stats" style="grid-template-columns: repeat(3, 1fr)">
+                    <div class="record-overview-stat"><b>${usage.today.in + usage.today.out}</b><small>${(window.i18n ? i18n.t('records.ai.today') : '今日')} tok</small><small>${fmtCost(usage.today.costUsd)}</small></div>
+                    <div class="record-overview-stat"><b>${usage.week.in + usage.week.out}</b><small>${(window.i18n ? i18n.t('records.ai.week') : '本周')} tok</small><small>${fmtCost(usage.week.costUsd)}</small></div>
+                    <div class="record-overview-stat"><b>${usage.month.in + usage.month.out}</b><small>${(window.i18n ? i18n.t('records.ai.month') : '本月')} tok</small><small>${fmtCost(usage.month.costUsd)}</small></div>
+                </div>
+            </div>`;
             return `<div class="md-card hero-card record-overview-card">
             <div class="record-overview-top">
                 <div class="record-overview-date">
@@ -54,7 +65,48 @@
                 <div class="record-overview-stat"><b>${macros.pro.toFixed(0)}/${goals.pro}</b><small>蛋白 g</small></div>
             </div>
             ${goalCal ? `<div class="today-focus-hint"><b>${status}</b><p>${hint}</p></div>` : ''}
-        </div>`;
+        </div>${aiUsageCard}`;
+        },
+
+        summarizeAiUsage() {
+            const messages = this.activeRecords(this.db.health?.aiAdviceChat || []);
+            const now = new Date();
+            const dayKey = this.logicalDateKey(now);
+            const dayStart = this.dateFromKey(dayKey).getTime();
+            const weekStart = (() => {
+                const d = new Date(dayStart);
+                const dow = (d.getDay() + 6) % 7; // monday=0
+                d.setDate(d.getDate() - dow);
+                return d.getTime();
+            })();
+            const monthStart = (() => {
+                const d = new Date(dayStart);
+                d.setDate(1);
+                return d.getTime();
+            })();
+            const acc = {
+                today: { in: 0, out: 0, costUsd: 0 },
+                week: { in: 0, out: 0, costUsd: 0 },
+                month: { in: 0, out: 0, costUsd: 0 }
+            };
+            for (const m of messages) {
+                if (!m || m.role !== 'assistant') continue;
+                const ts = this.parseHistoryDate(m.at).getTime();
+                const u = m.tokenUsage || null;
+                const cost = Number(m.costUsd || 0);
+                const vin = Number(u?.in || 0);
+                const vout = Number(u?.out || 0);
+                if (ts >= dayStart) {
+                    acc.today.in += vin; acc.today.out += vout; acc.today.costUsd += cost;
+                }
+                if (ts >= weekStart) {
+                    acc.week.in += vin; acc.week.out += vout; acc.week.costUsd += cost;
+                }
+                if (ts >= monthStart) {
+                    acc.month.in += vin; acc.month.out += vout; acc.month.costUsd += cost;
+                }
+            }
+            return acc;
         },
 
         renderRecordQuickActions() {

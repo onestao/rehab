@@ -58,6 +58,9 @@ const backup = {
             if (!nextDb || typeof nextDb !== 'object') throw new Error('文件格式不正确');
             if (!confirm('导入后会覆盖当前本地数据，是否继续？')) return;
             data.db = nextDb;
+            if (window.storageMigrate?.migrateAdviceToVersioned) {
+                data.db = window.storageMigrate.migrateAdviceToVersioned(data.db);
+            }
             data.normalizeDb();
             data.save({ render: false });
             await data.flush();

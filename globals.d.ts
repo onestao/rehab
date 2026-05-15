@@ -50,4 +50,6 @@ interface Window {
   dataHistoryView: any;
   dataWeeklySummary: any;
   dataViews: any;
+  dataAiTemplates: any;
+  aiPricing: any;
 }

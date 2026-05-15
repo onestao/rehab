@@ -1621,6 +1621,85 @@ mark.ai-hit {
     display: grid;
     gap: 8px;
 }
+
+.advice-template-row {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    padding-bottom: 2px;
+    scrollbar-width: none;
+}
+
+.advice-template-row::-webkit-scrollbar { display: none; }
+
+.advice-version-switcher {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 2px 4px;
+    border-radius: var(--md-sys-shape-full);
+    background: color-mix(in srgb, var(--md-sys-surface-container-highest) 70%, transparent);
+    color: var(--md-sys-on-surface-variant);
+    margin-left: 4px;
+}
+.advice-version-switcher .advice-version-btn {
+    width: 22px;
+    height: 22px;
+    border: none;
+    border-radius: var(--md-sys-shape-full);
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    -webkit-tap-highlight-color: transparent;
+}
+.advice-version-switcher .advice-version-btn .material-symbols-rounded { font-size: 16px; }
+.advice-version-switcher .advice-version-btn.active {
+    background: var(--md-sys-primary-container);
+    color: var(--md-sys-on-primary-container);
+}
+.advice-version-label {
+    font-size: 11px;
+    font-weight: 800;
+    color: var(--md-sys-on-surface-variant);
+    min-width: 28px;
+    text-align: center;
+}
+
+.advice-status-line {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+.advice-status-text { flex: 1 1 auto; min-width: 0; }
+.advice-stream-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 12px;
+    border-radius: var(--md-sys-shape-full);
+    border: none;
+    background: var(--md-sys-primary-container);
+    color: var(--md-sys-on-primary-container);
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 700;
+    -webkit-tap-highlight-color: transparent;
+    transition: background-color .18s ease, transform .12s ease;
+}
+.advice-stream-toggle .material-symbols-rounded {
+    font-size: 16px;
+    font-variation-settings: 'FILL' 1;
+}
+.advice-stream-toggle.advice-stream-toggle-secondary {
+    background: var(--md-sys-surface-container-highest);
+    color: var(--md-sys-on-surface-variant);
+}
+.advice-stream-toggle:active { transform: scale(0.96); }
+.advice-stream-toggle.hidden { display: none; }
 .advice-filter-row {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
@@ -2505,6 +2584,36 @@ mark.ai-hit {
 .weight-grid-line { stroke: var(--md-sys-outline-variant); stroke-width: 1; fill: none; opacity: 0.7; }
 .weight-line { stroke: var(--md-sys-primary); stroke-width: 4; stroke-linecap: round; stroke-linejoin: round; fill: none; }
 .weight-dot { fill: var(--md-sys-primary-container); stroke: var(--md-sys-primary); stroke-width: 2; }
+.weight-dot-label {
+    font-size: 10px;
+    fill: var(--md-sys-on-surface);
+    font-weight: 600;
+    pointer-events: none;
+}
+.weight-dot {
+    cursor: pointer;
+    transition: r 0.15s;
+}
+.weight-dot:hover, .weight-dot:active {
+    r: 7;
+}
+.weight-chart-wrap {
+    position: relative;
+}
+.weight-chart-tip {
+    position: absolute;
+    top: 6px;
+    background: var(--md-sys-surface-container-high, #2a2a2a);
+    color: var(--md-sys-on-surface, #fff);
+    padding: 4px 10px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    pointer-events: none;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+    white-space: nowrap;
+    z-index: 2;
+}
 .weight-chart-labels,
 .weight-analysis,
 .weight-list-item {
@@ -4137,6 +4246,21 @@ body.is-training .md-fab.fab-play {
 
 /* TASK-24: 每周总结卡片 */
 .weekly-summary-card { animation: m3e-card-rise .42s var(--md-expressive-spring) both; }
+/* --- A11y --- */
+
+:focus-visible {
+    outline: 2px solid var(--md-sys-color-primary);
+    outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.001ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.001ms !important;
+        scroll-behavior: auto !important;
+    }
+}
 /* Migration branch custom overrides live here.
    Keep this file for branch-only additions that are not yet merged into styles.css snapshot. */
 

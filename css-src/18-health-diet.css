@@ -377,6 +377,85 @@
     display: grid;
     gap: 8px;
 }
+
+.advice-template-row {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    padding-bottom: 2px;
+    scrollbar-width: none;
+}
+
+.advice-template-row::-webkit-scrollbar { display: none; }
+
+.advice-version-switcher {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 2px 4px;
+    border-radius: var(--md-sys-shape-full);
+    background: color-mix(in srgb, var(--md-sys-surface-container-highest) 70%, transparent);
+    color: var(--md-sys-on-surface-variant);
+    margin-left: 4px;
+}
+.advice-version-switcher .advice-version-btn {
+    width: 22px;
+    height: 22px;
+    border: none;
+    border-radius: var(--md-sys-shape-full);
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    -webkit-tap-highlight-color: transparent;
+}
+.advice-version-switcher .advice-version-btn .material-symbols-rounded { font-size: 16px; }
+.advice-version-switcher .advice-version-btn.active {
+    background: var(--md-sys-primary-container);
+    color: var(--md-sys-on-primary-container);
+}
+.advice-version-label {
+    font-size: 11px;
+    font-weight: 800;
+    color: var(--md-sys-on-surface-variant);
+    min-width: 28px;
+    text-align: center;
+}
+
+.advice-status-line {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+.advice-status-text { flex: 1 1 auto; min-width: 0; }
+.advice-stream-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 12px;
+    border-radius: var(--md-sys-shape-full);
+    border: none;
+    background: var(--md-sys-primary-container);
+    color: var(--md-sys-on-primary-container);
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 700;
+    -webkit-tap-highlight-color: transparent;
+    transition: background-color .18s ease, transform .12s ease;
+}
+.advice-stream-toggle .material-symbols-rounded {
+    font-size: 16px;
+    font-variation-settings: 'FILL' 1;
+}
+.advice-stream-toggle.advice-stream-toggle-secondary {
+    background: var(--md-sys-surface-container-highest);
+    color: var(--md-sys-on-surface-variant);
+}
+.advice-stream-toggle:active { transform: scale(0.96); }
+.advice-stream-toggle.hidden { display: none; }
 .advice-filter-row {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;

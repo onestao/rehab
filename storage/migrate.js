@@ -1,5 +1,49 @@
 // @ts-nocheck
 (function () {
+    function generateId(prefix) {
+        return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    }
+
+    function ensureVersionMeta(version, fallbackTs) {
+        const next = version && typeof version === 'object' ? { ...version } : {};
+        if (!next.id) next.id = generateId('advice-ver');
+        const created = Number(next.createdAt || fallbackTs);
+        next.createdAt = Number.isFinite(created) ? created : fallbackTs;
+        if (!next.status) next.status = 'done';
+        return next;
+    }
+
+    function migrateAdviceToVersioned(db) {
+        const next = db && typeof db === 'object' ? db : {};
+        next.health = next.health && typeof next.health === 'object' ? next.health : {};
+        const list = Array.isArray(next.health.aiAdviceChat) ? next.health.aiAdviceChat : [];
+        const migrated = list.map(entry => {
+            if (!entry || typeof entry !== 'object') return entry;
+            if (Array.isArray(entry.versions)) return entry;
+            const createdAt = Number(entry.createdAt || entry.updatedAt || Date.now());
+            const version = ensureVersionMeta({
+                createdAt,
+                model: entry.model,
+                promptSnapshot: entry.promptSnapshot,
+                content: entry.content || '',
+                status: entry.error ? 'error' : (entry.pending ? 'streaming' : 'done'),
+                tokenUsage: entry.tokenUsage,
+                costUsd: entry.costUsd,
+                error: entry.error ? String(entry.errorMessage || entry.error || '') : undefined
+            }, createdAt);
+            const activeVersionId = entry.activeVersionId || version.id;
+            return {
+                ...entry,
+                versions: [version],
+                activeVersionId,
+                updatedAt: Number(entry.updatedAt || createdAt),
+                deletedAt: entry.deletedAt || null
+            };
+        });
+        next.health.aiAdviceChat = migrated;
+        next.schemaVersion = Math.max(Number(next.schemaVersion || 0), 3);
+        return next;
+    }
     function safeParse(raw, keyName) {
         if (!raw) return null;
         try {
@@ -76,6 +120,7 @@
     }
 
     const storageMigrate = {
+        migrateAdviceToVersioned: migrateAdviceToVersioned,
         createLocalAdapter: createLocalAdapter,
 
         async createAdapter(options) {

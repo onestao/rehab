@@ -4,6 +4,7 @@ const advicePanel = {
     SETTINGS_KEY: 'rehab_advice_settings',
     SCROLL_KEY: 'rehab_advice_scroll_top',
     PAGE_SCROLL_KEY: 'rehab_advice_page_scroll_offset',
+    TEMPLATE_MANAGE_KEY: 'rehab_ai_template_manage',
     attach(target) {
         Object.assign(target, {
             DRAFT_KEY: this.DRAFT_KEY,
@@ -38,6 +39,15 @@ const advicePanel = {
             toggleAdviceSearch: this.toggleAdviceSearch,
             onAdviceSearchInput: this.onAdviceSearchInput,
             clearAdviceSearch: this.clearAdviceSearch,
+            selectAdviceTemplate: this.selectAdviceTemplate,
+            toggleTemplateManager: this.toggleTemplateManager,
+            resetTemplateEditor: this.resetTemplateEditor,
+            saveTemplateEditor: this.saveTemplateEditor,
+            deleteTemplateById: this.deleteTemplateById,
+            exportTemplates: this.exportTemplates,
+            importTemplates: this.importTemplates,
+            openTemplateImport: this.openTemplateImport,
+            handleTemplateImport: this.handleTemplateImport,
             useAdvicePrompt: this.useAdvicePrompt,
             scrollAdviceToLatest: this.scrollAdviceToLatest,
             scheduleAdviceStreamScroll: this.scheduleAdviceStreamScroll,
@@ -63,7 +73,19 @@ const advicePanel = {
             renderAdviceMarkdown: this.renderAdviceMarkdown,
             renderAdviceMessages: this.renderAdviceMessages,
             renderAdviceMessage: this.renderAdviceMessage,
-            renderAdvicePanel: this.renderAdvicePanel
+            renderAdvicePanel: this.renderAdvicePanel,
+            setAdviceStreamUiState: this.setAdviceStreamUiState,
+            toggleAdviceStreamRender: this.toggleAdviceStreamRender,
+            flushAdviceStreamRender: this.flushAdviceStreamRender,
+            pauseStreamForScroll: this.pauseStreamForScroll,
+            resumeStreamFromScroll: this.resumeStreamFromScroll,
+            _handleAdviceStreamScroll: this._handleAdviceStreamScroll,
+            getAdviceVersionGroup: this.getAdviceVersionGroup,
+            setActiveAdviceVersion: this.setActiveAdviceVersion,
+            cycleAdviceVersion: this.cycleAdviceVersion,
+            _isVersionActive: this._isVersionActive,
+            pinAdviceVersion: this.pinAdviceVersion,
+            deleteAdviceVersion: this.deleteAdviceVersion
         });
 
         target.loadAdviceSettings?.();
@@ -112,6 +134,9 @@ const advicePanel = {
             if (typeof parsed.model === 'string' && parsed.model.trim()) {
                 this.adviceModel = parsed.model;
             }
+            if (typeof parsed.templateId === 'string') {
+                this.db.aiTemplateActiveId = parsed.templateId;
+            }
         } catch {
             // ignore
         }
@@ -128,12 +153,197 @@ const advicePanel = {
                     weight: !!contexts.weight,
                     goal: !!contexts.goal
                 },
-                model: this.adviceModel || '__current__'
+                model: this.adviceModel || '__current__',
+                templateId: this.db.aiTemplateActiveId || ''
             };
             localStorage.setItem(this.SETTINGS_KEY, JSON.stringify(payload));
         } catch {
             // ignore
         }
+    },
+
+    getAdviceTemplates() {
+        return Array.isArray(this.db.aiTemplates) ? this.db.aiTemplates : [];
+    },
+
+    getActiveAdviceTemplate() {
+        const templates = this.getAdviceTemplates();
+        if (!templates.length) return null;
+        const activeId = this.db.aiTemplateActiveId || '';
+        return templates.find(t => t.id === activeId) || templates[0] || null;
+    },
+
+    selectAdviceTemplate(id) {
+        this.db.aiTemplateActiveId = id || '';
+        this.saveAdviceSettings();
+        this.captureAdviceDraft();
+        this.renderAiCoachPage?.() || this.renderRoutines?.();
+    },
+
+    toggleTemplateManager() {
+        this._templateManagerOpen = !this._templateManagerOpen;
+        this.renderProfilePage?.();
+    },
+
+    resetTemplateEditor() {
+        this._templateEditor = null;
+        this.renderProfilePage?.();
+    },
+
+    saveTemplateEditor() {
+        const form = this._templateEditor || {};
+        const template = window.dataAiTemplates?.sanitizeTemplate(form) || form;
+        const list = this.getAdviceTemplates();
+        const idx = list.findIndex(t => t.id === template.id);
+        if (idx >= 0) list[idx] = template;
+        else list.push(template);
+        this.db.aiTemplates = list;
+        if (!this.db.aiTemplateActiveId) this.db.aiTemplateActiveId = template.id;
+        this._templateEditor = null;
+        this.save();
+        this.renderProfilePage?.();
+    },
+
+    deleteTemplateById(id) {
+        if (!id) return;
+        const list = this.getAdviceTemplates().filter(t => t.id !== id);
+        this.db.aiTemplates = list;
+        if (this.db.aiTemplateActiveId === id) {
+            this.db.aiTemplateActiveId = list[0]?.id || '';
+        }
+        this.save();
+        this.renderProfilePage?.();
+    },
+
+    exportTemplates() {
+        const payload = JSON.stringify({ templates: this.getAdviceTemplates() }, null, 2);
+        const blob = new Blob([payload], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `rehab-ai-templates-${this.logicalDateKey()}.json`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+    },
+
+    openTemplateImport() {
+        document.getElementById('aiTemplateImportInput')?.click();
+    },
+
+    async handleTemplateImport(event) {
+        const file = event?.target?.files?.[0];
+        if (!file) return;
+        try {
+            const text = await file.text();
+            const json = JSON.parse(text);
+            const list = Array.isArray(json?.templates) ? json.templates : Array.isArray(json) ? json : [];
+            const normalized = window.dataAiTemplates?.normalizeTemplates(list) || list;
+            this.db.aiTemplates = normalized;
+            this.db.aiTemplateActiveId = normalized[0]?.id || '';
+            this.save();
+        } catch (e) {
+            alert('模板导入失败: ' + (e?.message || e));
+        } finally {
+            if (event?.target) event.target.value = '';
+            this.renderProfilePage?.();
+        }
+    },
+
+    importTemplates() {
+        this.openTemplateImport();
+    },
+
+    buildAdviceTemplateVars(context = {}) {
+        const profile = this.db.health?.profile || {};
+        const weight = this.sortedWeights?.().slice(-1)[0]?.weight || '';
+        const height = this.db.health?.height || '';
+        const age = profile.age || '';
+        const gender = profile.gender === 'female' ? '女' : profile.gender === 'male' ? '男' : '';
+        const recentRecords = (context.blocks || []).join('\n\n');
+        return {
+            prompt: context.prompt || '',
+            weight,
+            height,
+            age,
+            gender,
+            recentRecords
+        };
+    },
+
+    applyAdviceTemplate(text, vars) {
+        return String(text || '').replace(/\{(\w+)\}/g, (_, key) => (key in vars ? String(vars[key] ?? '') : `{${key}}`));
+    },
+
+    setAdviceStreamUiState(state) {
+        this._adviceStreamUi = state || 'idle';
+        const toggle = document.getElementById('adviceStreamToggle');
+        const flush = document.getElementById('adviceStreamFlush');
+        const isActive = state && state !== 'idle' && this._adviceSending;
+        if (toggle) {
+            toggle.classList.toggle('hidden', !isActive);
+            toggle.setAttribute('aria-hidden', isActive ? 'false' : 'true');
+            const icon = toggle.querySelector('.material-symbols-rounded');
+            const label = toggle.querySelector('.advice-stream-toggle-label');
+            const isPaused = state === 'paused' || state === 'user-paused';
+            if (icon) icon.textContent = isPaused ? 'play_arrow' : 'pause';
+            const t = window.i18n?.t?.bind(window.i18n);
+            if (label) {
+                label.textContent = isPaused
+                    ? (t ? t('advice.resumeRender') : '继续渲染')
+                    : (t ? t('advice.pauseRender') : '暂停渲染');
+            }
+            toggle.dataset.state = state;
+        }
+        if (flush) {
+            flush.classList.toggle('hidden', !isActive);
+            flush.setAttribute('aria-hidden', isActive ? 'false' : 'true');
+            const t = window.i18n?.t?.bind(window.i18n);
+            const label = flush.querySelector('.advice-stream-toggle-label');
+            if (label) label.textContent = t ? t('advice.flushAll') : '显示全部';
+        }
+    },
+
+    toggleAdviceStreamRender() {
+        const renderer = this._activeStreamRenderer;
+        if (!renderer) return;
+        const next = (this._adviceStreamUi === 'paused' || this._adviceStreamUi === 'user-paused') ? 'live' : 'user-paused';
+        if (next === 'live') {
+            renderer.resume();
+            this._adviceUserScrollPaused = false;
+            this.setAdviceStreamUiState('streaming');
+        } else {
+            renderer.pause('manual');
+            this.setAdviceStreamUiState('user-paused');
+        }
+    },
+
+    flushAdviceStreamRender() {
+        const renderer = this._activeStreamRenderer;
+        if (!renderer) return;
+        renderer.flushAll();
+        this.setAdviceStreamUiState('streaming');
+    },
+
+    pauseStreamForScroll() {
+        if (!this._adviceSending) return;
+        const renderer = this._activeStreamRenderer;
+        if (!renderer) return;
+        if (this._adviceStreamUi === 'paused' || this._adviceStreamUi === 'user-paused') return;
+        renderer.pause('scroll');
+        this._adviceUserScrollPaused = true;
+        this.setAdviceStreamUiState('paused');
+    },
+
+    resumeStreamFromScroll() {
+        if (!this._adviceSending) return;
+        if (!this._adviceUserScrollPaused) return;
+        const renderer = this._activeStreamRenderer;
+        if (!renderer) return;
+        renderer.resume();
+        this._adviceUserScrollPaused = false;
+        this.setAdviceStreamUiState('streaming');
     },
 
     captureAdviceDraft() {
@@ -222,9 +432,40 @@ const advicePanel = {
         if (this._adviceScrollEl && this._adviceOnScroll) {
             this._adviceScrollEl.removeEventListener('scroll', this._adviceOnScroll);
         }
-        this._adviceOnScroll = () => this.captureAdviceScroll();
+        if (this._adviceScrollEl && this._adviceOnUserIntent) {
+            this._adviceScrollEl.removeEventListener('wheel', this._adviceOnUserIntent);
+            this._adviceScrollEl.removeEventListener('touchstart', this._adviceOnUserIntent);
+            this._adviceScrollEl.removeEventListener('keydown', this._adviceOnUserIntent);
+        }
+        this._adviceOnScroll = () => {
+            this.captureAdviceScroll();
+            this._handleAdviceStreamScroll(list);
+        };
+        this._adviceOnUserIntent = () => {
+            this._adviceUserScrollIntent = true;
+            clearTimeout(this._adviceUserScrollIntentTimer);
+            this._adviceUserScrollIntentTimer = setTimeout(() => {
+                this._adviceUserScrollIntent = false;
+            }, 600);
+        };
         list.addEventListener('scroll', this._adviceOnScroll, { passive: true });
+        list.addEventListener('wheel', this._adviceOnUserIntent, { passive: true });
+        list.addEventListener('touchstart', this._adviceOnUserIntent, { passive: true });
+        list.addEventListener('keydown', this._adviceOnUserIntent, { passive: true });
         this._adviceScrollEl = list;
+    },
+
+    _handleAdviceStreamScroll(list) {
+        if (!this._adviceSending) return;
+        const distance = list.scrollHeight - list.clientHeight - list.scrollTop;
+        const atBottom = distance < 24;
+        if (atBottom) {
+            if (this._adviceUserScrollPaused) this.resumeStreamFromScroll();
+            return;
+        }
+        if (this._adviceUserScrollIntent && !this._adviceUserScrollPaused) {
+            this.pauseStreamForScroll();
+        }
     },
 
     isMobileAdviceInput() {
@@ -356,7 +597,28 @@ const advicePanel = {
     },
 
     visibleAdviceMessages(messages = []) {
-        const withIndex = messages.map((msg, idx) => ({ ...msg, idx }));
+        const groups = new Map();
+        messages.forEach(msg => {
+            if (!msg) return;
+            if (msg.role !== 'assistant') return;
+            const root = msg.replyToId || msg.id;
+            if (!groups.has(root)) groups.set(root, []);
+            groups.get(root).push(msg);
+        });
+        const filtered = messages.filter(msg => {
+            if (!msg) return false;
+            if (msg.role !== 'assistant') return true;
+            const root = msg.replyToId || msg.id;
+            const group = groups.get(root) || [];
+            if (group.length <= 1) return true;
+            return this._isVersionActive(msg, group);
+        });
+        const withIndex = filtered.map((msg, idx) => {
+            const root = msg.role === 'assistant' ? (msg.replyToId || msg.id) : '';
+            const group = root ? (groups.get(root) || []) : [];
+            const versionGroup = group.length > 1 ? group : null;
+            return { ...msg, idx, versionGroup };
+        });
         const start = this.adviceRangeStart();
         const ranged = start ? withIndex.filter(msg => this.parseHistoryDate(msg.at) >= start) : withIndex;
         const query = String(this.adviceSearchQuery || '').trim().toLowerCase();
@@ -411,7 +673,7 @@ const advicePanel = {
         });
     },
 
-    async sendAiAdvice(promptOverride = '') {
+    async sendAiAdvice(promptOverride = '', options = {}) {
         if (!ai.cfg.enabled) return alert('请先在设置中配置 AI');
         if (this._adviceSending) return;
         const input = document.getElementById('advicePrompt');
@@ -419,17 +681,37 @@ const advicePanel = {
         if (!prompt) return;
         const list = document.querySelector('.advice-chat-list');
         this._adviceFollowStream = !list || (list.scrollHeight - list.clientHeight - list.scrollTop) < 180;
+        this._adviceUserScrollPaused = false;
         const selected = document.getElementById('adviceModel')?.value || this.adviceModel || '__current__';
         const model = selected === '__current__' ? ai.cfg.model : selected;
         const now = new Date().toISOString();
         const pendingId = this.generateRecordId('advice-pending');
+        const replyToId = options?.replyToId || '';
+        const baseVersionIdx = Number(options?.versionIdx || 0);
         this._adviceSending = true;
-        this.db.health.aiAdviceChat.push({ id: this.generateRecordId('advice-user'), role: 'user', content: prompt, at: now, updatedAt: Date.now(), deleted: false });
-        this.db.health.aiAdviceChat.push({ id: pendingId, role: 'assistant', content: '', at: now, model, pending: true, updatedAt: Date.now(), deleted: false });
+        if (!options?.skipUserMessage) {
+            this.db.health.aiAdviceChat.push({ id: this.generateRecordId('advice-user'), role: 'user', content: prompt, at: now, updatedAt: Date.now(), deleted: false });
+        }
+        this.db.health.aiAdviceChat.push({
+            id: pendingId,
+            role: 'assistant',
+            content: '',
+            at: now,
+            model,
+            pending: true,
+            updatedAt: Date.now(),
+            deleted: false,
+            replyToId,
+            versionIdx: baseVersionIdx,
+            versionActive: options?.versionActive !== false,
+            versionPinned: !!options?.versionPinned
+        });
         if (input) input.value = '';
         this.clearAdviceDraft();
         this.save();
         requestAnimationFrame(() => this.scrollAdviceToLatest(true));
+        this._activeStreamRenderer = null;
+        this.setAdviceStreamUiState('streaming');
         try {
             const messages = this.buildAdviceMessages(prompt, model);
             const oldModel = ai.cfg.model;
@@ -438,11 +720,23 @@ const advicePanel = {
             let _lastRender = 0;
             let _pendingFrame = 0;
             try {
-                full = await ai.callStream(messages, 2400, (delta, accumulated) => {
+                /** @type {{ in: number, out: number }|null} */
+                let lastUsage = null;
+                full = await ai.callStream(messages, 2400, (delta, accumulated, meta) => {
                     const idx = this.db.health.aiAdviceChat.findIndex(msg => msg.id === pendingId);
                     if (idx < 0) return;
                     this.db.health.aiAdviceChat[idx].content = accumulated;
                     if (this.db.health.aiAdviceChat[idx].pending && accumulated) this.db.health.aiAdviceChat[idx].pending = false;
+                    if (meta?.usage) {
+                        lastUsage = meta.usage;
+                        this.db.health.aiAdviceChat[idx].tokenUsage = meta.usage;
+                        const provider = ai.cfg.provider || 'openai';
+                        const modelName = model || ai.cfg.model || '';
+                        if (window.aiPricing?.estimate) {
+                            const est = window.aiPricing.estimate(meta.usage, provider, modelName);
+                            this.db.health.aiAdviceChat[idx].costUsd = est.costUsd;
+                        }
+                    }
                     this.db.health.aiAdviceChat[idx].updatedAt = Date.now();
                     const bubble = document.querySelector(`[data-advice-id="${pendingId}"]`);
                     if (!bubble || !accumulated) return;
@@ -450,6 +744,7 @@ const advicePanel = {
                     if (!contentEl) return;
                     if (!contentEl._renderer && window.adviceStreamRenderer) {
                         contentEl._renderer = adviceStreamRenderer.create(contentEl, { chunkPerFrame: 8 });
+                        this._activeStreamRenderer = contentEl._renderer;
                     }
                     if (contentEl._renderer) {
                         contentEl._renderer.enqueue(delta);
@@ -460,7 +755,7 @@ const advicePanel = {
                     bubble.classList.remove('pending');
                     const dots = bubble.querySelector('.advice-typing-dot');
                     if (dots) dots.remove();
-                    this.scheduleAdviceStreamScroll();
+                    if (!this._adviceUserScrollPaused) this.scheduleAdviceStreamScroll();
                 });
             } finally {
                 ai.cfg.model = oldModel;
@@ -504,6 +799,9 @@ const advicePanel = {
         } finally {
             this._adviceSending = false;
             this._adviceFollowStream = false;
+            this._activeStreamRenderer = null;
+            this._adviceUserScrollPaused = false;
+            this.setAdviceStreamUiState('idle');
             const send = document.getElementById('adviceSendBtn');
             if (send) send.disabled = true;
         }
@@ -529,21 +827,108 @@ const advicePanel = {
     retryAdviceFrom(idx) {
         const messages = this.activeRecords(this.db.health.aiAdviceChat || []);
         const msg = messages[idx];
+        if (!msg) return;
         const prompt = msg?.retryPrompt || messages.slice(0, idx).reverse().find(m => m.role === 'user')?.content;
-        if (prompt) this.sendAiAdvice(prompt);
+        if (!prompt) return;
+        if (msg.role === 'assistant') {
+            const rootId = msg.replyToId || msg.id;
+            const siblings = this.getAdviceVersionGroup(rootId);
+            const nextIdx = siblings.length;
+            const nextActive = !siblings.length || !siblings.some(s => s.versionActive);
+            siblings.forEach(s => {
+                if (s.versionActive && nextActive) {
+                    s.versionActive = false;
+                    s.updatedAt = Date.now();
+                }
+            });
+            this.sendAiAdvice(prompt, {
+                replyToId: rootId,
+                versionIdx: nextIdx,
+                skipUserMessage: true,
+                versionActive: nextActive
+            });
+            return;
+        }
+        this.sendAiAdvice(prompt);
     },
 
     regenerateAdvice() {
         const messages = this.activeRecords(this.db.health.aiAdviceChat || []);
         for (let i = messages.length - 1; i >= 0; i--) {
             if (messages[i].role === 'assistant') {
-                const prompt = messages[i].retryPrompt || messages.slice(0, i).reverse().find(m => m.role === 'user')?.content;
-                this.softDeleteById(this.db.health.aiAdviceChat, messages[i].id);
-                this.save();
-                if (prompt) this.sendAiAdvice(prompt);
+                this.retryAdviceFrom(i);
                 return;
             }
         }
+    },
+
+    getAdviceVersionGroup(rootId) {
+        if (!rootId) return [];
+        const all = this.db.health?.aiAdviceChat || [];
+        return all.filter(m => m && !m.deleted && m.role === 'assistant' && (m.id === rootId || m.replyToId === rootId));
+    },
+
+    setActiveAdviceVersion(rootId, versionId) {
+        if (!rootId || !versionId) return;
+        const group = this.getAdviceVersionGroup(rootId);
+        const now = Date.now();
+        group.forEach(m => {
+            const wasActive = !!m.versionActive;
+            const nextActive = m.id === versionId;
+            if (wasActive !== nextActive) {
+                m.versionActive = nextActive;
+                m.updatedAt = now;
+            }
+        });
+        this.save();
+    },
+
+    cycleAdviceVersion(rootId, delta) {
+        const group = this.getAdviceVersionGroup(rootId).sort((a, b) => Number(a.versionIdx || 0) - Number(b.versionIdx || 0));
+        if (group.length < 2) return;
+        const activeIdx = group.findIndex(m => this._isVersionActive(m, group));
+        const safeIdx = activeIdx < 0 ? group.length - 1 : activeIdx;
+        const next = group[(safeIdx + delta + group.length) % group.length];
+        this.setActiveAdviceVersion(rootId, next.id);
+    },
+
+    _isVersionActive(message, group) {
+        if (!message) return false;
+        if (message.versionActive === true) return true;
+        if (message.versionActive === false) return false;
+        const hasActive = (group || this.getAdviceVersionGroup(message.replyToId || message.id)).some(m => m.versionActive === true);
+        if (hasActive) return false;
+        const list = group || this.getAdviceVersionGroup(message.replyToId || message.id);
+        return message === list[list.length - 1];
+    },
+
+    pinAdviceVersion(rootId, versionId) {
+        const group = this.getAdviceVersionGroup(rootId);
+        const target = group.find(m => m.id === versionId);
+        if (!target) return;
+        target.versionPinned = !target.versionPinned;
+        target.updatedAt = Date.now();
+        this.save();
+    },
+
+    deleteAdviceVersion(rootId, versionId) {
+        const group = this.getAdviceVersionGroup(rootId);
+        if (group.length <= 1) {
+            this.softDeleteById(this.db.health.aiAdviceChat, versionId);
+        } else {
+            const target = group.find(m => m.id === versionId);
+            if (!target) return;
+            const wasActive = this._isVersionActive(target, group);
+            this.softDeleteById(this.db.health.aiAdviceChat, versionId);
+            if (wasActive) {
+                const remaining = this.getAdviceVersionGroup(rootId);
+                const next = remaining[remaining.length - 1];
+                if (next) {
+                    remaining.forEach(m => { m.versionActive = m.id === next.id; });
+                }
+            }
+        }
+        this.save();
     },
 
     renderAdvicePanel() {
@@ -582,6 +967,12 @@ const advicePanel = {
                     <span class="material-symbols-rounded advice-chat-icon">psychology</span>
                 </div>
                 <div class="advice-context-bar">
+                    ${(() => {
+                        const templates = Array.isArray(this.db.aiTemplates) ? this.db.aiTemplates : [];
+                        if (!templates.length) return '';
+                        const activeId = this.db.aiTemplateActiveId || templates[0]?.id || '';
+                        return `<div class="advice-template-row">${templates.map(t => `<button class="advice-pill ${t.id === activeId ? 'active' : ''}" onclick="data.selectAdviceTemplate('${this.escapeHtml(t.id)}')" type="button">${this.escapeHtml(t.name)}</button>`).join('')}</div>`;
+                    })()}
                     <div class="advice-filter-row">
                         <div class="advice-range-tabs">${[['today','今日'],['week','7天'],['month','30天'],['all','全部']].map(([key, label]) => `<button class="advice-pill ${range === key ? 'active' : ''}" onclick="data.setAdviceRange('${key}')" type="button">${label}</button>`).join('')}</div>
                         <div class="advice-filter-actions">
@@ -618,7 +1009,17 @@ const advicePanel = {
                         <textarea id="advicePrompt" class="advice-composer-input" rows="1" placeholder="向 AI 提问…" oninput="data.onAdvicePromptInput(this)" onkeydown="data.onAdvicePromptKeydown(event)">${draft}</textarea>
                         <button id="adviceSendBtn" class="advice-send-btn" onclick="data.sendAiAdvice()" type="button" ${draft.trim() ? '' : 'disabled'} aria-label="发送问题"><span class="material-symbols-rounded">send</span></button>
                     </div>
-                    <div id="adviceStatus" class="food-ai-status advice-status-line">${sendHint}</div>
+                    <div id="adviceStatus" class="food-ai-status advice-status-line">
+                        <span class="advice-status-text">${sendHint}</span>
+                        <button id="adviceStreamToggle" class="advice-stream-toggle hidden" type="button" aria-hidden="true" onclick="data.toggleAdviceStreamRender?.()">
+                            <span class="material-symbols-rounded">pause</span>
+                            <span class="advice-stream-toggle-label">暂停渲染</span>
+                        </button>
+                        <button id="adviceStreamFlush" class="advice-stream-toggle advice-stream-toggle-secondary hidden" type="button" aria-hidden="true" onclick="data.flushAdviceStreamRender?.()">
+                            <span class="material-symbols-rounded">done_all</span>
+                            <span class="advice-stream-toggle-label">显示全部</span>
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>`;

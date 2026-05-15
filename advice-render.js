@@ -234,10 +234,12 @@ Object.assign(advicePanel, {
         return out.join('');
     },
     scheduleAdviceStreamScroll(force = false) {
+        if (this._adviceUserScrollPaused) return;
         if (!force && !this._adviceFollowStream) return;
         if (this._adviceScrollRaf) return;
         this._adviceScrollRaf = requestAnimationFrame(() => {
             this._adviceScrollRaf = 0;
+            if (this._adviceUserScrollPaused) return;
             this.scrollAdviceToLatest(force || !!this._adviceFollowStream, 'auto');
         });
     },
@@ -247,6 +249,7 @@ Object.assign(advicePanel, {
         if (list) {
             const distance = list.scrollHeight - list.clientHeight - list.scrollTop;
             if (force || distance < 180 || this._adviceFollowStream) {
+                if (!force && this._adviceUserScrollPaused) return;
                 const scrollable = getComputedStyle(list).overflowY !== 'visible' && list.scrollHeight > list.clientHeight + 2;
                 if (scrollable) {
                     list.scrollTo({ top: list.scrollHeight, behavior });
@@ -297,21 +300,45 @@ Object.assign(advicePanel, {
             currentKeyword
         );
         const model = msg.model ? ` · ${highlightKeyword(msg.model, currentKeyword)}` : '';
+        const usage = msg.tokenUsage && (msg.tokenUsage.in || msg.tokenUsage.out)
+            ? ` · ${highlightKeyword(String(msg.tokenUsage.in || 0), currentKeyword)}→${highlightKeyword(String(msg.tokenUsage.out || 0), currentKeyword)} tok`
+            : '';
+        const cost = typeof msg.costUsd === 'number' && msg.costUsd > 0
+            ? ` · $${highlightKeyword(msg.costUsd.toFixed(4), currentKeyword)}`
+            : '';
         const rawContent = String(msg.content || '');
         const content = msg.role === 'assistant'
             ? (rawContent ? highlightRenderedHtml(this.renderAdviceMarkdown(rawContent), currentKeyword) : '')
             : `<p>${highlightKeyword(rawContent, currentKeyword).replace(/\n/g, '<br>')}</p>`;
         const state = msg.pending ? ' pending' : msg.error ? ' error' : '';
+        const versionGroup = Array.isArray(msg.versionGroup) ? msg.versionGroup : null;
+        let versionSwitcher = '';
+        if (versionGroup && versionGroup.length > 1) {
+            const sorted = versionGroup.slice().sort((a, b) => Number(a.versionIdx || 0) - Number(b.versionIdx || 0));
+            const activeIdx = sorted.findIndex(v => v.id === msg.id);
+            const safeActive = activeIdx < 0 ? sorted.length - 1 : activeIdx;
+            const rootId = msg.replyToId || msg.id;
+            const pinIcon = msg.versionPinned ? 'bookmark_add' : 'bookmark_border';
+            versionSwitcher = `<div class="advice-version-switcher" data-advice-version-root="${rootId}">
+                <button class="advice-version-btn" onclick="data.cycleAdviceVersion('${rootId}', -1)" type="button" aria-label="上一个版本"><span class="material-symbols-rounded">chevron_left</span></button>
+                <span class="advice-version-label">${safeActive + 1}/${sorted.length}</span>
+                <button class="advice-version-btn" onclick="data.cycleAdviceVersion('${rootId}', 1)" type="button" aria-label="下一个版本"><span class="material-symbols-rounded">chevron_right</span></button>
+                <button class="advice-version-btn ${msg.versionPinned ? 'active' : ''}" onclick="data.pinAdviceVersion('${rootId}', '${msg.id}')" type="button" aria-label="星标版本" title="星标版本"><span class="material-symbols-rounded">${pinIcon}</span></button>
+            </div>`;
+        }
         const actions = msg.role === 'assistant'
             ? `<div class="advice-bubble-actions">
                 <button onclick="data.copyAdviceMessage(${msg.idx})" type="button">复制</button>
                 ${(msg.error || !msg.pending) ? `<button onclick="data.retryAdviceFrom(${msg.idx})" type="button">重试</button>` : ''}
-                <button onclick="data.deleteAiAdviceMessage(${msg.idx})" type="button">删除</button>
+                ${versionGroup && versionGroup.length > 1
+                    ? `<button onclick="data.deleteAdviceVersion('${msg.replyToId || msg.id}', '${msg.id}')" type="button">删除版本</button>`
+                    : `<button onclick="data.deleteAiAdviceMessage(${msg.idx})" type="button">删除</button>`}
             </div>`
             : `<div class="advice-bubble-actions"><button onclick="data.deleteAiAdviceMessage(${msg.idx})" type="button">删除</button></div>`;
         return `<div class="advice-bubble ${msg.role}${state}" ${msg.id ? `data-advice-id="${msg.id}"` : ''} ${latest ? 'data-advice-latest="true"' : ''}>
             <div class="advice-bubble-head">
-                <b>${label}<small>${time}${model}</small></b>
+                <b>${label}<small>${time}${model}${usage}${cost}</small></b>
+                ${versionSwitcher}
                 ${msg.pending ? '<span class="advice-typing-dot"></span>' : ''}
             </div>
             <div class="advice-bubble-content">${msg.pending ? '<div class="skeleton-line skeleton" style="width:80%"></div><div class="skeleton-line skeleton" style="width:60%"></div><div class="skeleton-line skeleton" style="width:90%"></div>' : content}</div>

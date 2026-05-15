@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>训练助手</title>
     <link rel="manifest" href="manifest.json">
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230061a4'/%3E%3Cpath d='M22 22h6v20h-6zM36 22h6v20h-6z' fill='white'/%3E%3Cpath d='M16 28h8v8h-8zM40 28h8v8h-8z' fill='white' opacity='.9'/%3E%3C/svg%3E">
     <meta name="theme-color" content="#0061a4">
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&icon_names=accessibility_new,add,add_circle,auto_awesome,backup,badge,balance,block,bookmark_add,bookmark_border,bookmarks,brightness_auto,calendar_month,check,check_circle,chevron_left,chevron_right,clinical_notes,close,close_fullscreen,cloud_alert,cloud_done,cloud_off,cloud_sync,content_copy,dark_mode,delete,directions_bike,directions_run,directions_walk,done_all,download,download_for_offline,edit,edit_note,egg_alt,error,event,event_note,exercise,expand_less,expand_more,fitness_center,flag,format_color_fill,forum,health_and_safety,help,history,info,inventory_2,keyboard_arrow_down,keyboard_arrow_left,keyboard_arrow_right,keyboard_arrow_up,library_books,light_mode,local_fire_department,lock,lock_open,mic,mic_off,monitor_heart,monitor_weight,monitoring,more_vert,no_food,notifications,notifications_active,palette,pause,pedal_bike,person,picture_in_picture_alt,play_arrow,playlist_add,pool,psychology,refresh,remove,replay,restart_alt,restaurant,rowing,save,schedule,search,search_off,self_improvement,send,settings,shield,show_chart,skip_next,skip_previous,speed,sports,sports_gymnastics,stop,swap_horiz,sync,sync_problem,system_update,timeline,timer,today,trending_down,trending_up,tune,upload,upload_file,visibility,visibility_off,volume_off,volume_up,warning,waterfall_chart" rel="stylesheet" />
     <link rel="stylesheet" href="build/generated.css?v=83">
@@ -250,12 +251,23 @@
                     <div class="md-field"><input type="text" id="aiModel" placeholder=" " onfocus="ai.showCachedModels()"><label>模型名称</label></div>
                     <button class="md-btn md-btn-filled" onclick="ai.saveCurrentProfile()"><span class="material-symbols-rounded">save</span> 更新当前档案</button>
                     <div class="md-divider"></div>
-                    <div class="ai-encrypt-section">
-                        <div class="ai-encrypt-title"><span class="material-symbols-rounded">lock</span> 加密同步 AI 配置</div>
-                        <small>设置密码后会将所有 AI 配置档案一起加密写入同步数据，和训练记录同文件备份</small>
-                        <div class="md-field"><input type="password" id="aiEncryptPass" placeholder=" " autocomplete="new-password" data-lpignore="true" data-form-type="other"><label>加密密码</label></div>
-                        <button class="md-btn md-btn-tonal" onclick="ai.exportToSync()"><span class="material-symbols-rounded">upload</span> 加密并写入同步数据</button>
-                    </div>
+                         <div class="ai-encrypt-section">
+                             <div class="ai-encrypt-title"><span class="material-symbols-rounded">lock</span> 加密同步 AI 配置</div>
+                             <small>设置密码后会将所有 AI 配置档案一起加密写入同步数据，和训练记录同文件备份</small>
+                             <div class="md-field"><input type="password" id="aiEncryptPass" placeholder=" " autocomplete="new-password" data-lpignore="true" data-form-type="other"><label>加密密码</label></div>
+                             <button class="md-btn md-btn-tonal" onclick="ai.exportToSync()"><span class="material-symbols-rounded">upload</span> 加密并写入同步数据</button>
+                         </div>
+                         <div class="md-divider"></div>
+                         <div class="ai-encrypt-section">
+                             <div class="ai-encrypt-title"><span class="material-symbols-rounded">clinical_notes</span> AI Prompt 模板</div>
+                             <small>管理 AI 教练的 prompt 模板，可导入导出。模板会随同步数据一起备份。</small>
+                             <div class="md-row" style="gap:8px;flex-wrap:wrap">
+                                 <button class="md-btn md-btn-tonal" onclick="data.toggleTemplateManager?.()" type="button"><span class="material-symbols-rounded">edit_note</span> 管理模板</button>
+                                 <button class="md-btn md-btn-tonal" onclick="data.exportTemplates?.()" type="button"><span class="material-symbols-rounded">download</span> 导出模板</button>
+                                 <button class="md-btn md-btn-tonal" onclick="data.importTemplates?.()" type="button"><span class="material-symbols-rounded">upload</span> 导入模板</button>
+                                 <input id="aiTemplateImportInput" class="hidden" type="file" accept="application/json" onchange="data.handleTemplateImport?.(event)">
+                             </div>
+                         </div>
                     <div id="aiDecryptSection" class="ai-encrypt-section hidden">
                         <div class="ai-encrypt-title"><span class="material-symbols-rounded">lock_open</span> 恢复 AI 配置</div>
                         <small>检测到同步中的加密 AI 配置，输入密码恢复所有档案</small>
@@ -453,21 +465,33 @@
     <script>
         const PAGE_DEPS = {
             workout: ['workout-system','workout-pip','workout-core','workout-cardio','workout-engine','workout-state','swipe-actions','routine-library','workout-wakelock','workout-media-session'],
-            'ai-coach': ['ai-store','ai-profile','ai-models','ai-api','advice-panel','advice-render','advice-prompt','advice-stream-renderer'],
+            'ai-coach': ['ai-store','ai-profile','ai-models','ai-api','ai-pricing','ai-templates','advice-panel','advice-render','advice-prompt','advice-stream-renderer'],
             profile: ['backup','sync','routine-library','goal-plan','weekly-summary'],
             records: ['history-view','weekly-summary','health-diet','health-weight','health-profile','health-exercise','goal-plan','routine-library','food-log'],
             today: ['health-diet','health-weight','health-exercise','food-log','history-view']
         };
         const _loaded = new Set();
+        const _loadingPromises = new Map();
+        const SCRIPT_PREREQUISITES = {
+            'advice-render': ['advice-panel'],
+            'advice-prompt': ['advice-panel'],
+            'advice-stream-renderer': ['advice-panel']
+        };
         function loadScript(name) {
             if (_loaded.has(name)) return Promise.resolve();
-            return new Promise((res, rej) => {
+            if (_loadingPromises.has(name)) return _loadingPromises.get(name);
+            const prereqs = SCRIPT_PREREQUISITES[name] || [];
+            const wait = prereqs.length ? Promise.all(prereqs.map(loadScript)) : Promise.resolve();
+            const p = wait.then(() => new Promise((res, rej) => {
+                if (_loaded.has(name)) return res();
                 const s = document.createElement('script');
                 s.src = `${name}.js?v=83`;
                 s.onload = () => { _loaded.add(name); res(); };
                 s.onerror = rej;
                 document.head.appendChild(s);
-            });
+            }));
+            _loadingPromises.set(name, p);
+            return p;
         }
         async function ensureDeps(page) {
             const deps = PAGE_DEPS[page] || [];

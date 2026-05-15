@@ -58,9 +58,10 @@ Object.assign(ai, {
                 throw new Error('AI 返回格式异常');
             }
         }
-        return this._readSSE(res, onChunk, (json) =>
-            json.choices?.[0]?.delta?.content ?? json.choices?.[0]?.message?.content ?? ''
-        );
+         return this._readSSE(res, onChunk,
+             (json) => json.choices?.[0]?.delta?.content ?? json.choices?.[0]?.message?.content ?? '',
+             (json) => (json.usage ? { in: Number(json.usage.prompt_tokens || 0), out: Number(json.usage.completion_tokens || 0) } : null)
+         );
     },
 
     // ---------- OpenAI Responses API（最新 /v1/responses） ----------
@@ -100,10 +101,16 @@ Object.assign(ai, {
             }
             return txt;
         }
-        return this._readSSE(res, onChunk, (json) => {
-            if (json.type === 'response.output_text.delta') return json.delta || '';
-            return '';
-        });
+         return this._readSSE(res, onChunk, (json) => {
+             if (json.type === 'response.output_text.delta') return json.delta || '';
+             return '';
+         }, (json) => {
+             if (json.type === 'response.completed' && json.response?.usage) {
+                 const u = json.response.usage;
+                 return { in: Number(u.input_tokens || 0), out: Number(u.output_tokens || 0) };
+             }
+             return null;
+         });
     },
 
     // ---------- Anthropic Claude Messages API ----------
@@ -141,12 +148,17 @@ Object.assign(ai, {
             const d = await res.json();
             return (d.content || []).filter(c => c.type === 'text').map(c => c.text).join('');
         }
-        return this._readSSE(res, onChunk, (json) => {
-            if (json.type === 'content_block_delta' && json.delta?.type === 'text_delta') {
-                return json.delta.text || '';
-            }
-            return '';
-        });
+         return this._readSSE(res, onChunk, (json) => {
+             if (json.type === 'content_block_delta' && json.delta?.type === 'text_delta') {
+                 return json.delta.text || '';
+             }
+             return '';
+         }, (json) => {
+             if (json.type === 'message_delta' && json.usage) {
+                 return { in: Number(json.usage.input_tokens || 0), out: Number(json.usage.output_tokens || 0) };
+             }
+             return null;
+         });
     },
 
     // ---------- Gemini ----------
@@ -176,13 +188,21 @@ Object.assign(ai, {
             const d = await res.json();
             return d.candidates?.[0]?.content?.parts?.map(p => p.text).join('') || '';
         }
-        return this._readSSE(res, onChunk, (json) =>
-            json.candidates?.[0]?.content?.parts?.map(p => p.text).join('') || ''
-        );
+         return this._readSSE(res, onChunk,
+             (json) => json.candidates?.[0]?.content?.parts?.map(p => p.text).join('') || '',
+             (json) => {
+                 const meta = json.usageMetadata || null;
+                 if (!meta) return null;
+                 return {
+                     in: Number(meta.promptTokenCount || 0),
+                     out: Number(meta.candidatesTokenCount || meta.totalTokenCount || 0)
+                 };
+             }
+         );
     },
 
     // ---------- 通用 SSE 读取 ----------
-    async _readSSE(res, onChunk, extract) {
+    async _readSSE(res, onChunk, extract, extractUsage = null) {
         if (!res.body) {
             const text = await res.text();
             try {
@@ -192,24 +212,32 @@ Object.assign(ai, {
                 return t;
             } catch { return ''; }
         }
-        const reader = res.body.getReader();
-        const decoder = new TextDecoder('utf-8');
-        let buffer = '', full = '';
-        const flush = (chunk) => {
-            const parts = chunk.split(/\r?\n/).filter(Boolean);
-            for (const part of parts) {
-                if (!part.startsWith('data:')) continue;
-                const payload = part.slice(5).trim();
-                if (!payload || payload === '[DONE]') continue;
-                try {
-                    const json = JSON.parse(payload);
-                    const delta = extract(json);
-                    if (!delta) continue;
-                    full += delta;
-                    onChunk(delta, full);
-                } catch {}
-            }
-        };
+         const reader = res.body.getReader();
+         const decoder = new TextDecoder('utf-8');
+         let buffer = '', full = '';
+         let lastUsage = null;
+         const flush = (chunk) => {
+             const parts = chunk.split(/\r?\n/).filter(Boolean);
+             for (const part of parts) {
+                 if (!part.startsWith('data:')) continue;
+                 const payload = part.slice(5).trim();
+                 if (!payload || payload === '[DONE]') continue;
+                 try {
+                     const json = JSON.parse(payload);
+                     if (extractUsage) {
+                         const usage = extractUsage(json);
+                         if (usage && (usage.in || usage.out)) {
+                             lastUsage = usage;
+                             onChunk('', full, { usage });
+                         }
+                     }
+                     const delta = extract(json);
+                     if (!delta) continue;
+                     full += delta;
+                     onChunk(delta, full, lastUsage ? { usage: lastUsage } : undefined);
+                 } catch {}
+             }
+         };
         while (true) {
             const { value, done } = await reader.read();
             if (done) break;
@@ -218,8 +246,11 @@ Object.assign(ai, {
             buffer = events.pop() || '';
             for (const event of events) flush(event);
         }
-        if (buffer) flush(buffer);
-        return full;
+         if (buffer) flush(buffer);
+         if (lastUsage && (lastUsage.in || lastUsage.out)) {
+             try { onChunk('', full, { usage: lastUsage, done: true }); } catch {}
+         }
+         return full;
     },
 
     async parseFood(text) {

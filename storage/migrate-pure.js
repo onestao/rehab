@@ -4,6 +4,7 @@
  */
 export function migrateLegacyState(db, fallbackTs = Date.now()) {
     const next = JSON.parse(JSON.stringify(db || {}));
+    next.schemaVersion = Number(next.schemaVersion || 0);
     next.actions = Array.isArray(next.actions) ? next.actions : [];
     next.routines = Array.isArray(next.routines) ? next.routines : [];
     next.history = Array.isArray(next.history) ? next.history : [];
@@ -13,6 +14,14 @@ export function migrateLegacyState(db, fallbackTs = Date.now()) {
     next.health.exerciseLogs = Array.isArray(next.health.exerciseLogs) ? next.health.exerciseLogs : [];
     next.health.aiAdviceChat = Array.isArray(next.health.aiAdviceChat) ? next.health.aiAdviceChat : [];
     next.health.profile = next.health.profile && typeof next.health.profile === 'object' ? next.health.profile : {};
+    next.aiTemplates = Array.isArray(next.aiTemplates) ? next.aiTemplates : [];
+    next.aiTemplateActiveId = next.aiTemplateActiveId || '';
+    next.aiTrash = Array.isArray(next.aiTrash) ? next.aiTrash : [];
+    next.aiCipher = next.aiCipher && typeof next.aiCipher === 'object' ? next.aiCipher : null;
+    next.cache = next.cache && typeof next.cache === 'object' ? next.cache : {};
+    next.cache.prByAction = next.cache.prByAction && typeof next.cache.prByAction === 'object' ? next.cache.prByAction : {};
+    next.cache.prUpdatedAt = Number(next.cache.prUpdatedAt || 0);
+    next.schemaVersion = Math.max(next.schemaVersion || 0, 3);
     next.syncMeta = next.syncMeta && typeof next.syncMeta === 'object' ? next.syncMeta : {};
     const patch = (item, prefix) => ({
         id: item.id || `${prefix}-${fallbackTs}`,
