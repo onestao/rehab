@@ -159,8 +159,9 @@ export function compareCounts(remoteCounts, localDb, dropRatio = 0.5) {
 }
 
 if (typeof window !== 'undefined') {
-    window.syncPure = window.syncPure || {};
-    Object.assign(window.syncPure, {
+    const win = /** @type {any} */ (window);
+    win.syncPure = win.syncPure || {};
+    Object.assign(win.syncPure, {
         mergeIncremental, computeRetryDelay, isRetryableError,
         mergeRecordsFieldwise, takeQueueBatch,
         mergeAdviceVersions, mergeAdviceRecord,
