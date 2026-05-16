@@ -14,6 +14,7 @@ Current synchronized entities:
 - `exerciseLogs`
 - `healthProfile`
 - `aiAdviceChat`
+- `aiCipher`
 
 ## Merge Algorithm
 
@@ -34,6 +35,17 @@ __fieldUpdatedAt: { fieldName: ISOString }
 ```
 
 If either side lacks `__fieldUpdatedAt`, merge falls back to record-level LWW.
+
+### Advice version append-only merge
+
+For versioned AI replies, the merge strategy is hybrid:
+
+- advice record shell still uses record-level LWW by `updatedAt`
+- `versions[]` uses append-only union by `version.id`
+- merged versions are sorted by `createdAt`
+- `activeVersionId` and `pinnedVersionId` follow LWW using the parent record `updatedAt`
+
+This allows both devices to keep independently generated retry versions without losing history.
 
 ## Tombstones
 
@@ -80,6 +92,15 @@ AI profiles are synchronized inside app data using encrypted payloads.
 - key derivation: `PBKDF2`
 - cipher: `AES-GCM`
 - IV/salt: random per encryption
+
+### AI cipher conflict handling
+
+Encrypted AI config is synchronized as `aiCipher` and also mirrored into legacy `encryptedAi` for compatibility.
+
+- sync entity: `aiCipher`
+- conflict rule: LWW by `updatedAt`
+- local queue: failed writes enter `pendingQueue`
+- product goal: when both ends changed before sync, the app should allow user choice between local / remote / backup export
 
 ## Example Conflicts
 

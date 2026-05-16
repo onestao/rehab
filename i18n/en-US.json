@@ -20,5 +20,29 @@
       "tokens": "Tokens",
       "cost": "Cost"
     }
+  },
+  "profile": {
+    "identityKeepWeeks": "Training for {weeks} weeks",
+    "identityStart": "Start your journey",
+    "identityTotalSessions": "{n} sessions total",
+    "weekTraining": "Week sessions",
+    "weekWeight": "Week weight",
+    "goalUnset": "No goal set",
+    "adjustGoal": "Adjust goal",
+    "themeColor": "Theme color",
+    "darkMode": "Dark mode",
+    "language": "Language",
+    "personalization": "Personalization",
+    "library": {
+      "actions": "Actions",
+      "routines": "Routines",
+      "rename": "Rename",
+      "edit": "Edit",
+      "duplicate": "Duplicate",
+      "delete": "Delete",
+      "deriveNew": "Derive routine",
+      "emptyActions": "No actions yet",
+      "emptyRoutines": "No routines yet"
+    }
   }
 }

@@ -29,8 +29,188 @@
                 if (nav) ui.tab('ai-coach', nav);
                 return;
             }
-            this.routineView = view;
+            const previous = this.normalizeRoutineView(this.routineView);
+            const next = this.normalizeRoutineView(view);
+            const order = this.routineViewOrder();
+            const previousIndex = order.indexOf(previous);
+            const nextIndex = order.indexOf(next);
+            this._routineSwipeDirection = previous !== next
+                ? (nextIndex > previousIndex ? 'next' : 'prev')
+                : '';
+            this.routineView = next;
             this.renderRoutines();
+        },
+
+        routineViewOrder() {
+            return ['library', 'weightloss', 'ai', 'sync'];
+        },
+
+        normalizeRoutineView(view) {
+            if (view === 'settings') return 'ai';
+            const order = this.routineViewOrder();
+            return order.includes(view) ? view : 'library';
+        },
+
+        shiftRoutineView(delta) {
+            const order = this.routineViewOrder();
+            const current = this.normalizeRoutineView(this.routineView);
+            const currentIndex = Math.max(0, order.indexOf(current));
+            const nextIndex = Math.max(0, Math.min(order.length - 1, currentIndex + delta));
+            if (nextIndex === currentIndex) return;
+            this.setRoutineView(order[nextIndex]);
+        },
+
+        libraryViewOrder() {
+            return ['actions', 'routines'];
+        },
+
+        normalizeLibraryView(view) {
+            return this.libraryViewOrder().includes(view) ? view : 'actions';
+        },
+
+        setLibraryView(view, opts = {}) {
+            const next = this.normalizeLibraryView(view);
+            const prev = this.normalizeLibraryView(this.db?.libraryView);
+            if (!this.db) this.db = {};
+            this.db.libraryView = next;
+            this.save?.();
+            if (this.routineView !== 'library') {
+                this.setRoutineView('library');
+                return;
+            }
+            this.updateLibraryTabActive?.();
+            this.syncLibraryDeckPosition?.(opts.smooth !== false);
+            if (next !== prev) {
+                this._libraryViewDirection = next === 'routines' ? 'next' : 'prev';
+                this.renderRoutines();
+            }
+        },
+
+        setLibraryFilterTag(tag) {
+            if (!this.db) this.db = {};
+            this.db.libraryFilterTag = String(tag || '');
+            this.save?.();
+            if (this.routineView === 'library') this.renderRoutines();
+        },
+
+        shiftLibraryView(delta) {
+            const order = this.libraryViewOrder();
+            const current = this.normalizeLibraryView(this.db?.libraryView);
+            const idx = Math.max(0, order.indexOf(current));
+            const next = Math.max(0, Math.min(order.length - 1, idx + delta));
+            if (next === idx) return;
+            this.setLibraryView(order[next]);
+        },
+
+        syncLibraryDeckPosition(smooth = false) {
+            const deck = document.getElementById('librarySwipeDeck');
+            if (!deck) return;
+            const order = this.libraryViewOrder();
+            const index = Math.max(0, order.indexOf(this.normalizeLibraryView(this.db?.libraryView)));
+            const left = index * deck.clientWidth;
+            if (smooth) deck.scrollTo({ left, behavior: 'smooth' });
+            else deck.scrollLeft = left;
+        },
+
+        onLibraryDeckScroll(deck) {
+            this.updateLibrarySwipeEffects?.(deck);
+            clearTimeout(this._libraryDeckScrollTimer);
+            this._libraryDeckScrollTimer = setTimeout(() => {
+                if (!deck?.clientWidth) return;
+                const order = this.libraryViewOrder();
+                const index = Math.max(0, Math.min(order.length - 1, Math.round(deck.scrollLeft / deck.clientWidth)));
+                const nextView = order[index];
+                if (!nextView) return;
+                if (!this.db) this.db = {};
+                if (this.db.libraryView !== nextView) this.db.libraryView = nextView;
+                this.updateLibraryTabActive?.();
+            }, 80);
+        },
+
+        updateLibrarySwipeEffects(deck = document.getElementById('librarySwipeDeck')) {
+            if (!deck) return;
+            if (!deck.clientWidth) {
+                deck.querySelectorAll('.library-swipe-page').forEach(page => {
+                    page.style.transform = '';
+                    page.style.opacity = '';
+                });
+                return;
+            }
+            const progress = deck.scrollLeft / deck.clientWidth;
+            deck.querySelectorAll('.library-swipe-page').forEach((page, index) => {
+                const distance = Math.min(1, Math.abs(progress - index));
+                const scale = 1 - distance * 0.02;
+                const opacity = 1 - distance * 0.12;
+                const translateY = distance * 3;
+                page.style.transform = `scale(${scale}) translateY(${translateY}px)`;
+                page.style.opacity = String(opacity);
+            });
+        },
+
+        updateLibraryTabActive() {
+            const current = this.normalizeLibraryView(this.db?.libraryView);
+            document.querySelectorAll('[data-library-view]').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.libraryView === current);
+            });
+            const indicator = document.querySelector('.library-segment-indicator');
+            if (indicator) {
+                indicator.classList.toggle('is-actions', current === 'actions');
+                indicator.classList.toggle('is-routines', current === 'routines');
+            }
+        },
+
+        bindProfileSwipe(container) {
+            if (!container || container.dataset.profileSwipeBound) return;
+            container.dataset.profileSwipeBound = '1';
+            container.addEventListener('pointerdown', e => this.onProfileSwipeStart(e));
+            container.addEventListener('pointermove', e => this.onProfileSwipeMove(e));
+            container.addEventListener('pointerup', e => this.onProfileSwipeEnd(e));
+            container.addEventListener('pointercancel', () => this.resetProfileSwipe());
+        },
+
+        onProfileSwipeStart(e) {
+            if (e.pointerType === 'mouse' && e.button !== 0) return;
+            if (e.target?.closest?.('#librarySwipeDeck, .library-swipe-deck, [data-library-view]')) return;
+            if (e.target?.closest?.('button,input,select,textarea,label,a,.routine-card-head,[contenteditable="true"]')) return;
+            this._profileSwipe = { x: e.clientX, y: e.clientY, active: true, tracking: false };
+        },
+
+        onProfileSwipeMove(e) {
+            const swipe = this._profileSwipe;
+            if (!swipe?.active) return;
+            const dx = e.clientX - swipe.x;
+            const dy = e.clientY - swipe.y;
+            if (!swipe.tracking) {
+                if (Math.abs(dx) < 14 && Math.abs(dy) < 14) return;
+                if (Math.abs(dy) > Math.abs(dx) * 0.9) {
+                    this.resetProfileSwipe();
+                    return;
+                }
+                swipe.tracking = true;
+            }
+            const content = document.getElementById('profileContent');
+            if (content) {
+                content.style.setProperty('--profile-swipe-x', `${Math.max(-28, Math.min(28, dx * 0.18))}px`);
+                content.classList.add('profile-view-dragging');
+            }
+        },
+
+        onProfileSwipeEnd(e) {
+            const swipe = this._profileSwipe;
+            if (!swipe?.active) return;
+            const dx = e.clientX - swipe.x;
+            const dy = e.clientY - swipe.y;
+            this.resetProfileSwipe();
+            if (Math.abs(dx) < 64 || Math.abs(dx) < Math.abs(dy) * 1.2) return;
+            this.shiftRoutineView(dx < 0 ? 1 : -1);
+        },
+
+        resetProfileSwipe() {
+            this._profileSwipe = null;
+            const content = document.getElementById('profileContent');
+            if (!content) return;
+            content.classList.remove('profile-view-dragging');
+            content.style.removeProperty('--profile-swipe-x');
         },
 
         toggleCollapse(id) {

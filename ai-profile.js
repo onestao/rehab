@@ -186,8 +186,30 @@ Object.assign(ai, {
         const profiles = this.cfg.profiles.map(p => ({ ...p, apiKey: this.apiKeyFor(p.id) }));
         const payload = JSON.stringify({ activeProfileId: this.cfg.activeProfileId, profiles, models: this.models });
         try {
-            data.db.encryptedAi = await this.encryptData(payload, password);
+            const cipher = await this.encryptData(payload, password);
+            data.db.encryptedAi = cipher;
+            data.db.aiCipher = {
+                id: 'ai-cipher',
+                payload: cipher,
+                updatedAt: Date.now(),
+                deleted: false
+            };
             data.save();
+            try {
+                const meta = window.sync?.getSyncMeta?.();
+                if (meta) {
+                    meta.pendingQueue = Array.isArray(meta.pendingQueue) ? meta.pendingQueue : [];
+                    meta.pendingQueue.push({
+                        remotePath: `${sync.REMOTE_INCREMENTAL_DIR}/aiCipher/${sync.incrementalWindowTs(Date.now())}.json`,
+                        payload: { ts: sync.incrementalWindowTs(Date.now()), entity: 'aiCipher', records: [data.db.aiCipher] },
+                        etagKey: `${sync.REMOTE_INCREMENTAL_DIR}/aiCipher/${sync.incrementalWindowTs(Date.now())}.json`,
+                        queuedAt: Date.now(),
+                        reason: 'ai_cipher_local_change',
+                        attempts: 0
+                    });
+                    sync.saveSyncMeta?.();
+                }
+            } catch {}
             document.getElementById('aiEncryptPass').value = '';
             alert('所有 AI 配置档案已加密并存入同步数据');
         } catch (e) { alert('加密失败: ' + (window.toast ? toast.sanitize(e) : e.message)); }
@@ -196,9 +218,10 @@ Object.assign(ai, {
     async importFromSync() {
         const password = document.getElementById('aiDecryptPass')?.value;
         if (!password) return alert('请输入解密密码');
-        if (!data.db?.encryptedAi) return alert('未找到加密的 AI 配置');
+        const encrypted = data.db?.aiCipher?.payload || data.db?.encryptedAi;
+        if (!encrypted) return alert('未找到加密的 AI 配置');
         try {
-            const plaintext = await this.decryptData(data.db.encryptedAi, password);
+            const plaintext = await this.decryptData(encrypted, password);
             const cfg = JSON.parse(plaintext);
             this.cfg.profiles = (cfg.profiles || []).map(p => ({ id: p.id, name: p.name, provider: p.provider, baseUrl: p.baseUrl, model: p.model }));
             this.cfg.activeProfileId = cfg.activeProfileId || this.cfg.profiles[0]?.id || '';

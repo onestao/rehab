@@ -109,6 +109,45 @@
             return acc;
         },
 
+        renderPrLeaderboard(limit = 8) {
+            const entries = window.prTracker?.topEntries?.(this.db, limit) || [];
+            if (!entries.length) return '';
+            return `<div class="md-card pr-board-card">
+                <div class="today-timeline-header" style="margin:0 0 10px"><span class="material-symbols-rounded">military_tech</span><strong>PR 排行</strong><small>${entries.length} 个动作</small></div>
+                <div class="pr-board-list">${entries.map((item, idx) => {
+                    const safeKey = this.escapeHtml(item.action);
+                    const collapsed = this.isCollapsed(`pr_action_${safeKey}`, idx > 2);
+                    return `<div class="pr-board-item ${collapsed ? 'collapsed' : ''}">
+                        <button class="history-month-head" onclick="data.toggleCollapse('pr_action_${safeKey}')" type="button">
+                            <strong>${safeKey}</strong>
+                            <small>1RM ${Number(item.oneRm || 0).toFixed(1)} · 重量 ${Number(item.maxWeight || 0).toFixed(1)}kg · 次数 ${Number(item.maxReps || 0)}</small>
+                            <span class="material-symbols-rounded">${collapsed ? 'expand_more' : 'expand_less'}</span>
+                        </button>
+                        <div class="history-month-content pr-board-history">
+                            ${item.history.slice(-6).reverse().map(point => `<div class="day-detail-item"><span class="record-icon material-symbols-rounded">fitness_center</span><span>${point.date}</span><small>${point.weightKg}kg × ${point.repsPerSet}${point.oneRm ? ` · 1RM ${point.oneRm.toFixed(1)}` : ''}</small></div>`).join('')}
+                        </div>
+                    </div>`;
+                }).join('')}</div>
+            </div>`;
+        },
+
+        renderVolumeHeatmap() {
+            const collapsed = this.isCollapsed('volumeHeatmapCard', true);
+            const body = window.volumeHeatmap?.render?.(this, 26) || '';
+            if (!body) return '';
+            return `<div class="md-card collapsible-card ${collapsed ? 'collapsed' : ''}">
+                <button class="panel-head collapsible-head-btn" onclick="data.toggleCollapse('volumeHeatmapCard')" type="button" aria-expanded="${!collapsed}">
+                    <div>
+                        <span class="cardio-kicker">训练热力图</span>
+                        <h3>最近 26 周</h3>
+                        <small>点击展开查看按日训练量分布</small>
+                    </div>
+                    <span class="collapse-btn"><span class="material-symbols-rounded">${collapsed ? 'expand_more' : 'expand_less'}</span></span>
+                </button>
+                <div class="collapse-content">${body}</div>
+            </div>`;
+        },
+
         renderRecordQuickActions() {
             const aiPrompt = this.isGainMode()
                 ? '请以增肌目标为前提，分析我今天的饮食、训练和体重记录，并给出今晚或明天的调整建议'

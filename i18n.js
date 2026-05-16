@@ -3,6 +3,56 @@
     /** @type {Record<string, any>} */
     const packs = {};
     const STORAGE_KEY = 'rehab_locale';
+    const FALLBACK_PACKS = {
+        'zh-CN': {
+            nav: { today: '今日', workout: '训练', records: '记录', ai: 'AI', profile: '我的' },
+            workout: { ready: 'READY', start: '开始训练', pause: '暂停', stop: '停止' },
+            sync: { local: '仅本地', syncing: '同步中…', cloud: '云端同步正常' },
+            errors: { boot: '启动失败：{message}', network: '网络异常，请稍后再试' },
+            advice: {
+                scrollToLatest: '跳到最新 · {n} 行',
+                pauseRender: '暂停渲染',
+                resumeRender: '继续渲染',
+                flushAll: '一次性显示全部',
+                bufferedChars: '已缓冲 {n} 字',
+                stopGenerate: '停止生成'
+            },
+            records: {
+                ai: {
+                    title: 'AI 用量',
+                    today: '今日',
+                    week: '本周',
+                    month: '本月',
+                    tokens: 'Tokens',
+                    cost: '成本'
+                }
+            }
+        },
+        'en-US': {
+            nav: { today: 'Today', workout: 'Workout', records: 'Records', ai: 'AI', profile: 'Me' },
+            workout: { ready: 'READY', start: 'Start', pause: 'Pause', stop: 'Stop' },
+            sync: { local: 'Local only', syncing: 'Syncing…', cloud: 'Cloud OK' },
+            errors: { boot: 'Startup failed: {message}', network: 'Network error, try again' },
+            advice: {
+                scrollToLatest: 'Jump to latest · {n} lines',
+                pauseRender: 'Pause rendering',
+                resumeRender: 'Resume rendering',
+                flushAll: 'Show all',
+                bufferedChars: 'Buffered {n} chars',
+                stopGenerate: 'Stop generating'
+            },
+            records: {
+                ai: {
+                    title: 'AI Usage',
+                    today: 'Today',
+                    week: 'This week',
+                    month: 'This month',
+                    tokens: 'Tokens',
+                    cost: 'Cost'
+                }
+            }
+        }
+    };
 
     function normalizeLocale(value) {
         if (!value || value === 'auto') return 'auto';
@@ -50,14 +100,18 @@
     async function loadPack(locale) {
         if (packs[locale]) return packs[locale];
         try {
+            if (location.protocol === 'file:') {
+                packs[locale] = FALLBACK_PACKS[locale] || {};
+                return packs[locale];
+            }
             const v = detectVersionParam();
             const res = await fetch(`i18n/${locale}.json?v=${v || ''}`);
             const json = await res.json();
             packs[locale] = json;
             return json;
         } catch (e) {
-            // Offline: rely on SW precache; if still fails, keep empty pack.
-            packs[locale] = packs[locale] || {};
+            // Offline/file fallback.
+            packs[locale] = packs[locale] || FALLBACK_PACKS[locale] || {};
             return packs[locale];
         }
     }

@@ -16,6 +16,7 @@ const theme = {
         this.applyColorMode(this.cfg.colorMode || 'auto');
         this.apply(this.cfg.seed);
         this.syncUI();
+        this._syncDot();
         if (window.matchMedia) {
             window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
                 if (this.cfg.colorMode === 'auto') this.apply(this.cfg.seed);
@@ -29,6 +30,7 @@ const theme = {
         this.applyColorMode(colorMode);
         this.apply(this.cfg.seed);
         this.syncUI();
+        this._syncDot();
     },
 
     applyColorMode(colorMode) {
@@ -49,6 +51,7 @@ const theme = {
         this.persist();
         this.apply(seed);
         this.syncUI();
+        this._syncDot();
     },
 
     setCustom(seed) {
@@ -56,6 +59,7 @@ const theme = {
         this.persist();
         this.apply(seed);
         this.syncUI();
+        this._syncDot();
     },
 
     useMonet() {
@@ -64,6 +68,7 @@ const theme = {
         this.persist();
         this.apply(seed);
         this.syncUI();
+        this._syncDot();
     },
 
     pickMonetSeed() {
@@ -132,8 +137,10 @@ const theme = {
     },
 
     syncUI() {
-        const color = document.getElementById('themeColor');
+        const color = document.getElementById('themeColor') || document.getElementById('themeColorSheet');
         if (color) color.value = this.cfg.seed;
+        const colorSheet = document.getElementById('themeColorSheet');
+        if (colorSheet) colorSheet.value = this.cfg.seed;
         document.querySelectorAll('.theme-swatch').forEach(btn => {
             const active = btn.dataset.theme === this.cfg.mode;
             btn.classList.toggle('active', active);
@@ -141,6 +148,7 @@ const theme = {
         });
         const colorMode = this.cfg.colorMode || 'auto';
         document.querySelectorAll('.theme-mode-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.colorMode === colorMode));
+        this._syncDot();
     },
 
     persist() { localStorage.setItem(this.KEY, JSON.stringify(this.cfg)); },
@@ -187,5 +195,48 @@ const theme = {
     hexToRgba(hex, alpha) {
         const rgb = this.hexToRgb(hex);
         return `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${alpha})`;
+    },
+
+    openSheet() {
+        const sheet = document.getElementById('themeSheet');
+        if (!sheet) return;
+        const computed = getComputedStyle(document.documentElement)
+            .getPropertyValue('--md-sys-primary').trim() || '#0061a4';
+        const picker = document.getElementById('themeColorSheet');
+        if (picker) picker.value = computed.startsWith('#') ? computed : '#0061a4';
+        const locale = document.getElementById('localeSelectSheet');
+        if (locale && window.i18n) locale.value = i18n.currentLocale || 'auto';
+        sheet.classList.remove('hidden');
+        sheet.setAttribute('aria-hidden', 'false');
+        // focusTrap (when available) handles Escape via [data-modal-close] and
+        // restores focus to the previously active element on release.
+        if (window.focusTrap?.trap) {
+            window.focusTrap.trap(sheet);
+        } else {
+            sheet.querySelector('[data-modal-close]')?.focus?.();
+            document.addEventListener('keydown', this._onSheetKey);
+        }
+    },
+
+    closeSheet() {
+        const sheet = document.getElementById('themeSheet');
+        if (!sheet) return;
+        sheet.classList.add('hidden');
+        sheet.setAttribute('aria-hidden', 'true');
+        if (window.focusTrap?.release) {
+            window.focusTrap.release();
+        } else {
+            document.removeEventListener('keydown', this._onSheetKey);
+        }
+    },
+
+    _onSheetKey(e) {
+        if (e.key === 'Escape') theme.closeSheet();
+    },
+
+    _syncDot() {
+        const dot = document.querySelector('.theme-trigger .theme-dot');
+        if (!dot) return;
+        dot.style.background = 'var(--md-sys-primary)';
     }
 };

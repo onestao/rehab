@@ -52,4 +52,6 @@ interface Window {
   dataViews: any;
   dataAiTemplates: any;
   aiPricing: any;
+  prTracker: any;
+  volumeHeatmap: any;
 }

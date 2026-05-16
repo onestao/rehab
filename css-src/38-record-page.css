@@ -324,3 +324,40 @@
     text-overflow: ellipsis;
     white-space: nowrap;
 }
+
+.pr-board-card,
+.volume-heatmap-card {
+    display: grid;
+    gap: 10px;
+}
+
+.pr-board-list {
+    display: grid;
+    gap: 8px;
+}
+
+.pr-board-item.collapsed .pr-board-history {
+    display: none;
+}
+
+.volume-heatmap-svg {
+    width: 100%;
+    height: auto;
+    display: block;
+}
+
+.volume-heatmap-label {
+    font-size: 9px;
+    fill: var(--md-sys-on-surface-variant);
+}
+
+.volume-heatmap-cell {
+    cursor: pointer;
+    transition: transform .12s ease, opacity .12s ease;
+}
+
+.volume-heatmap-cell:hover,
+.volume-heatmap-cell:active {
+    transform: scale(1.06);
+    opacity: 0.92;
+}

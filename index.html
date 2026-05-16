@@ -190,40 +190,19 @@
         <!-- 我的页 -->
         <section id="profile" class="page">
             <header class="md-top-app-bar">
-                <div class="bar-leading"><span class="material-symbols-rounded app-icon">person</span><span class="app-title">我的</span></div>
+                <div class="bar-leading"><span class="material-symbols-rounded app-icon">person</span><span class="app-title" data-i18n="nav.profile">我的</span></div>
+                <button class="theme-trigger"
+                        onclick="theme.openSheet()"
+                        aria-label="个性化"
+                        aria-haspopup="dialog">
+                    <span class="material-symbols-rounded">palette</span>
+                    <span class="theme-dot" aria-hidden="true"></span>
+                </button>
             </header>
             <div id="profileOverview"></div>
             <div id="profileContent"></div>
             <div id="profileSettings" class="hidden">
-                <div class="md-card theme-card">
-                    <div class="theme-panel">
-                        <div class="theme-panel-title"><span class="material-symbols-rounded">palette</span> 主题颜色</div>
-                        <div class="md-field" style="margin:10px 0 2px">
-                            <select id="localeSelect" onchange="i18n.setLocale(this.value)">
-                                <option value="auto">Auto</option>
-                                <option value="zh-CN">zh-CN</option>
-                                <option value="en-US">en-US</option>
-                            </select>
-                            <label>Language</label>
-                        </div>
-                        <div class="theme-actions">
-                            <button class="theme-swatch theme-blue active" data-theme="blue" aria-pressed="true" onclick="theme.setPreset('blue')" aria-label="蓝色主题"></button>
-                            <button class="theme-swatch theme-purple" data-theme="purple" aria-pressed="false" onclick="theme.setPreset('purple')" aria-label="紫色主题"></button>
-                            <button class="theme-swatch theme-green" data-theme="green" aria-pressed="false" onclick="theme.setPreset('green')" aria-label="绿色主题"></button>
-                            <button class="theme-swatch theme-orange" data-theme="orange" aria-pressed="false" onclick="theme.setPreset('orange')" aria-label="橙色主题"></button>
-                            <button class="theme-swatch theme-rose" data-theme="rose" aria-pressed="false" onclick="theme.setPreset('rose')" aria-label="玫红主题"></button>
-                            <button class="md-btn md-btn-tonal theme-monet" data-theme="monet" onclick="theme.useMonet()" aria-label="莫奈取色"><span class="material-symbols-rounded">auto_awesome</span></button>
-                            <label class="color-picker"><input type="color" id="themeColor" value="#0061a4" oninput="theme.setCustom(this.value)"><span class="material-symbols-rounded">format_color_fill</span></label>
-                        </div>
-                        <div class="theme-panel-title" style="margin-top:8px"><span class="material-symbols-rounded">dark_mode</span> 深色模式</div>
-                        <div class="theme-actions">
-                            <button class="md-btn md-btn-tonal theme-mode-btn" data-color-mode="auto" onclick="theme.setMode('auto')" aria-label="跟随系统"><span class="material-symbols-rounded">brightness_auto</span> 自动</button>
-                            <button class="md-btn md-btn-tonal theme-mode-btn" data-color-mode="light" onclick="theme.setMode('light')" aria-label="浅色模式"><span class="material-symbols-rounded">light_mode</span> 浅色</button>
-                            <button class="md-btn md-btn-tonal theme-mode-btn" data-color-mode="dark" onclick="theme.setMode('dark')" aria-label="深色模式"><span class="material-symbols-rounded">dark_mode</span> 深色</button>
-                        </div>
-                    </div>
-                </div>
-                <div class="md-card sync-card">
+                <div class="md-card sync-card" data-settings="ai">
                     <div class="ai-card-header"><span class="material-symbols-rounded">psychology</span><strong>AI 配置</strong><span id="aiStatus" class="ai-status ai-off">未配置</span></div>
                     <div class="md-field">
                         <select id="aiProfileSelect" onchange="ai.selectProfile(this.value)"></select>
@@ -261,10 +240,17 @@
                          <div class="ai-encrypt-section">
                              <div class="ai-encrypt-title"><span class="material-symbols-rounded">clinical_notes</span> AI Prompt 模板</div>
                              <small>管理 AI 教练的 prompt 模板，可导入导出。模板会随同步数据一起备份。</small>
-                             <div class="md-row" style="gap:8px;flex-wrap:wrap">
-                                 <button class="md-btn md-btn-tonal" onclick="data.toggleTemplateManager?.()" type="button"><span class="material-symbols-rounded">edit_note</span> 管理模板</button>
-                                 <button class="md-btn md-btn-tonal" onclick="data.exportTemplates?.()" type="button"><span class="material-symbols-rounded">download</span> 导出模板</button>
-                                 <button class="md-btn md-btn-tonal" onclick="data.importTemplates?.()" type="button"><span class="material-symbols-rounded">upload</span> 导入模板</button>
+                             <div class="md-field" style="margin-top:10px">
+                                 <select id="aiRetryMode" onchange="data.db.aiRetryMode=this.value;data.saveAdviceSettings?.()">
+                                     <option value="versioned">重试保留旧版本</option>
+                                     <option value="replace">重试替换旧版本</option>
+                                 </select>
+                                 <label>重试模式</label>
+                             </div>
+                              <div class="md-row ai-template-actions">
+                                  <button class="md-btn md-btn-tonal" onclick="data.toggleTemplateManager?.()" type="button"><span class="material-symbols-rounded">edit_note</span> 管理</button>
+                                  <button class="md-btn md-btn-tonal" onclick="data.exportTemplates?.()" type="button"><span class="material-symbols-rounded">download</span> 导出</button>
+                                  <button class="md-btn md-btn-tonal" onclick="data.importTemplates?.()" type="button"><span class="material-symbols-rounded">upload</span> 导入</button>
                                  <input id="aiTemplateImportInput" class="hidden" type="file" accept="application/json" onchange="data.handleTemplateImport?.(event)">
                              </div>
                          </div>
@@ -275,7 +261,7 @@
                         <button class="md-btn md-btn-tonal" onclick="ai.importFromSync()"><span class="material-symbols-rounded">download</span> 解密恢复</button>
                     </div>
                 </div>
-                <div class="md-card sync-card">
+                <div class="md-card sync-card" data-settings="sync">
                     <div class="md-field">
                         <select id="syncMode" onchange="sync.toggleFields(this.value)">
                             <option value="none">关闭同步</option>
@@ -351,6 +337,7 @@
     <script src="a11y-focus-trap.js?v=83"></script>
     <script src="theme.js?v=83"></script>
     <script src="fooddb.js?v=83"></script>
+    <script type="module" src="data-utils-pure.js?v=83"></script>
     <script src="data-utils.js?v=83"></script>
     <script src="storage/idb.js?v=83"></script>
     <script src="storage/migrate.js?v=83"></script>
@@ -359,6 +346,7 @@
     <script src="onboarding.js?v=83"></script>
     <script src="data-views.js?v=83"></script>
     <script src="data.js?v=83"></script>
+    <script type="module" src="sync-pure.js?v=83"></script>
     <script src="sync-status.js?v=83"></script>
     <script src="app-update.js?v=83"></script>
     <div id="weightModal" class="md-modal md-modal-sheet hidden" aria-hidden="true">
@@ -462,12 +450,75 @@
             <div id="workoutLibraryContent"></div>
         </div>
     </div>
+    <div id="aiTemplateManagerSheet" class="md-modal md-modal-sheet hidden" aria-hidden="true">
+        <div class="md-modal-backdrop" onclick="data.closeTemplateManager?.()"></div>
+        <div class="md-modal-card md-modal-sheet-card">
+            <div class="md-modal-head">
+                <strong>管理 AI Prompt 模板</strong>
+                <button class="icon-btn" onclick="data.closeTemplateManager?.()" aria-label="关闭"><span class="material-symbols-rounded">close</span></button>
+            </div>
+            <div id="aiTemplateManagerContent"></div>
+        </div>
+    </div>
+    <div id="themeSheet" class="md-modal md-modal-sheet hidden" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="themeSheetTitle">
+        <div class="md-modal-backdrop" onclick="theme.closeSheet()"></div>
+        <div class="md-modal-card md-modal-sheet-card theme-sheet-card">
+            <div class="md-modal-head">
+                <strong id="themeSheetTitle">个性化</strong>
+                <button class="icon-btn" data-modal-close onclick="theme.closeSheet()" aria-label="关闭">
+                    <span class="material-symbols-rounded">close</span>
+                </button>
+            </div>
+            <div class="theme-sheet-section">
+                <div class="theme-panel-title">
+                    <span class="material-symbols-rounded">palette</span> 主题颜色
+                </div>
+                <div class="theme-actions">
+                    <button class="theme-swatch theme-blue active" data-theme="blue" aria-pressed="true" onclick="theme.setPreset('blue')" aria-label="蓝色主题"></button>
+                    <button class="theme-swatch theme-purple" data-theme="purple" aria-pressed="false" onclick="theme.setPreset('purple')" aria-label="紫色主题"></button>
+                    <button class="theme-swatch theme-green" data-theme="green" aria-pressed="false" onclick="theme.setPreset('green')" aria-label="绿色主题"></button>
+                    <button class="theme-swatch theme-orange" data-theme="orange" aria-pressed="false" onclick="theme.setPreset('orange')" aria-label="橙色主题"></button>
+                    <button class="theme-swatch theme-rose" data-theme="rose" aria-pressed="false" onclick="theme.setPreset('rose')" aria-label="玫红主题"></button>
+                    <button class="md-btn md-btn-tonal theme-monet" data-theme="monet" onclick="theme.useMonet()" aria-label="莫奈取色">
+                        <span class="material-symbols-rounded">auto_awesome</span>
+                    </button>
+                    <label class="color-picker">
+                        <input type="color" id="themeColorSheet" value="#0061a4" oninput="theme.setCustom(this.value)">
+                        <span class="material-symbols-rounded">format_color_fill</span>
+                    </label>
+                </div>
+            </div>
+            <div class="theme-sheet-section">
+                <div class="theme-panel-title">
+                    <span class="material-symbols-rounded">dark_mode</span> 深色模式
+                </div>
+                <div class="theme-actions">
+                    <button class="md-btn md-btn-tonal theme-mode-btn" data-color-mode="auto" onclick="theme.setMode('auto')"><span class="material-symbols-rounded">brightness_auto</span> 自动</button>
+                    <button class="md-btn md-btn-tonal theme-mode-btn" data-color-mode="light" onclick="theme.setMode('light')"><span class="material-symbols-rounded">light_mode</span> 浅色</button>
+                    <button class="md-btn md-btn-tonal theme-mode-btn" data-color-mode="dark" onclick="theme.setMode('dark')"><span class="material-symbols-rounded">dark_mode</span> 深色</button>
+                </div>
+            </div>
+            <div class="theme-sheet-section">
+                <div class="theme-panel-title">
+                    <span class="theme-language-mark" aria-hidden="true">A/文</span> Language
+                </div>
+                <div class="md-field theme-language-field">
+                    <select id="localeSelectSheet" onchange="i18n.setLocale(this.value)">
+                        <option value="auto">Auto</option>
+                        <option value="zh-CN">中文</option>
+                        <option value="en-US">en-US</option>
+                    </select>
+                    <label>Language</label>
+                </div>
+            </div>
+        </div>
+    </div>
     <script>
         const PAGE_DEPS = {
             workout: ['workout-system','workout-pip','workout-core','workout-cardio','workout-engine','workout-state','swipe-actions','routine-library','workout-wakelock','workout-media-session'],
             'ai-coach': ['ai-store','ai-profile','ai-models','ai-api','ai-pricing','ai-templates','advice-panel','advice-render','advice-prompt','advice-stream-renderer'],
             profile: ['backup','sync','routine-library','goal-plan','weekly-summary'],
-            records: ['history-view','weekly-summary','health-diet','health-weight','health-profile','health-exercise','goal-plan','routine-library','food-log'],
+            records: ['history-view','weekly-summary','health-diet','health-weight','health-profile','health-exercise','goal-plan','routine-library','food-log','pr-tracker','volume-heatmap'],
             today: ['health-diet','health-weight','health-exercise','food-log','history-view']
         };
         const _loaded = new Set();
@@ -475,7 +526,8 @@
         const SCRIPT_PREREQUISITES = {
             'advice-render': ['advice-panel'],
             'advice-prompt': ['advice-panel'],
-            'advice-stream-renderer': ['advice-panel']
+            'advice-stream-renderer': ['advice-panel'],
+            'sync': ['backup']
         };
         function loadScript(name) {
             if (_loaded.has(name)) return Promise.resolve();
@@ -564,7 +616,7 @@
             }
             if (window.syncStatus) syncStatus.init();
             if (window.onboarding) onboarding.show();
-            try { document.getElementById('localeSelect') && (document.getElementById('localeSelect').value = i18n.currentLocale || 'auto'); } catch {}
+            try { document.getElementById('localeSelectSheet') && (document.getElementById('localeSelectSheet').value = i18n.currentLocale || 'auto'); } catch {}
             ui.syncSwitchAria(document.getElementById('isAlt'));
             window.addEventListener('scroll', () => {
                 document.querySelector('.md-top-app-bar')?.classList.toggle('scrolled', window.scrollY > 8);

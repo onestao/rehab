@@ -39,15 +39,24 @@ const advicePanel = {
             toggleAdviceSearch: this.toggleAdviceSearch,
             onAdviceSearchInput: this.onAdviceSearchInput,
             clearAdviceSearch: this.clearAdviceSearch,
+            getAdviceTemplates: this.getAdviceTemplates,
+            getActiveAdviceTemplate: this.getActiveAdviceTemplate,
             selectAdviceTemplate: this.selectAdviceTemplate,
             toggleTemplateManager: this.toggleTemplateManager,
+            closeTemplateManager: this.closeTemplateManager,
+            setTemplateEditorField: this.setTemplateEditorField,
             resetTemplateEditor: this.resetTemplateEditor,
             saveTemplateEditor: this.saveTemplateEditor,
             deleteTemplateById: this.deleteTemplateById,
+            editTemplateById: this.editTemplateById,
+            createTemplateDraft: this.createTemplateDraft,
+            renderTemplateManagerContent: this.renderTemplateManagerContent,
             exportTemplates: this.exportTemplates,
             importTemplates: this.importTemplates,
             openTemplateImport: this.openTemplateImport,
             handleTemplateImport: this.handleTemplateImport,
+            buildAdviceTemplateVars: this.buildAdviceTemplateVars,
+            applyAdviceTemplate: this.applyAdviceTemplate,
             useAdvicePrompt: this.useAdvicePrompt,
             scrollAdviceToLatest: this.scrollAdviceToLatest,
             scheduleAdviceStreamScroll: this.scheduleAdviceStreamScroll,
@@ -85,11 +94,16 @@ const advicePanel = {
             cycleAdviceVersion: this.cycleAdviceVersion,
             _isVersionActive: this._isVersionActive,
             pinAdviceVersion: this.pinAdviceVersion,
-            deleteAdviceVersion: this.deleteAdviceVersion
+            deleteAdviceVersion: this.deleteAdviceVersion,
+            shareAdviceMessage: this.shareAdviceMessage
         });
 
         target.loadAdviceSettings?.();
         this.listenThemeChanges();
+        requestAnimationFrame(() => {
+            const retry = document.getElementById('aiRetryMode');
+            if (retry) retry.value = this.db?.aiRetryMode || 'versioned';
+        });
     },
 
     listenThemeChanges() {
@@ -137,6 +151,9 @@ const advicePanel = {
             if (typeof parsed.templateId === 'string') {
                 this.db.aiTemplateActiveId = parsed.templateId;
             }
+            if (parsed.retryMode === 'replace' || parsed.retryMode === 'versioned') {
+                this.db.aiRetryMode = parsed.retryMode;
+            }
         } catch {
             // ignore
         }
@@ -154,11 +171,32 @@ const advicePanel = {
                     goal: !!contexts.goal
                 },
                 model: this.adviceModel || '__current__',
-                templateId: this.db.aiTemplateActiveId || ''
+                templateId: this.db.aiTemplateActiveId || '',
+                retryMode: this.db.aiRetryMode || 'versioned'
             };
             localStorage.setItem(this.SETTINGS_KEY, JSON.stringify(payload));
         } catch {
             // ignore
+        }
+    },
+
+    pruneAdviceVersionGroup(rootId, maxVersions = 10) {
+        const group = this.getAdviceVersionGroup(rootId).sort((a, b) => Number(a.versionIdx || 0) - Number(b.versionIdx || 0));
+        if (group.length <= maxVersions) return;
+        const active = group.find(item => this._isVersionActive(item, group));
+        const removable = group
+            .filter(item => !item.versionPinned && item.id !== active?.id)
+            .sort((a, b) => Number(a.lastViewedAt || a.updatedAt || 0) - Number(b.lastViewedAt || b.updatedAt || 0));
+        while (group.length > maxVersions && removable.length) {
+            const target = removable.shift();
+            const idx = group.findIndex(item => item.id === target.id);
+            if (idx >= 0) group.splice(idx, 1);
+            this.softDeleteById(this.db.health.aiAdviceChat, target.id);
+            this.db.aiTrash.push({
+                id: target.id,
+                deletedAt: Date.now(),
+                payload: { ...target }
+            });
         }
     },
 
@@ -182,12 +220,59 @@ const advicePanel = {
 
     toggleTemplateManager() {
         this._templateManagerOpen = !this._templateManagerOpen;
-        this.renderProfilePage?.();
+        const sheet = document.getElementById('aiTemplateManagerSheet');
+        const content = document.getElementById('aiTemplateManagerContent');
+        if (!sheet || !content) return;
+        content.innerHTML = this.renderTemplateManagerContent();
+        sheet.classList.toggle('hidden', !this._templateManagerOpen);
+        sheet.setAttribute('aria-hidden', this._templateManagerOpen ? 'false' : 'true');
+    },
+
+    closeTemplateManager() {
+        this._templateManagerOpen = false;
+        const sheet = document.getElementById('aiTemplateManagerSheet');
+        if (!sheet) return;
+        sheet.classList.add('hidden');
+        sheet.setAttribute('aria-hidden', 'true');
+    },
+
+    createTemplateDraft(template = null) {
+        return window.dataAiTemplates?.sanitizeTemplate(template || {
+            name: '新模板',
+            scenario: 'custom',
+            system: '',
+            user: '{prompt}',
+            vars: ['prompt']
+        }) || template;
+    },
+
+    editTemplateById(id) {
+        if (!id) {
+            this._templateEditor = this.createTemplateDraft();
+            const content = document.getElementById('aiTemplateManagerContent');
+            if (content) content.innerHTML = this.renderTemplateManagerContent();
+            return;
+        }
+        const template = this.getAdviceTemplates().find(item => item.id === id);
+        this._templateEditor = this.createTemplateDraft(template || null);
+        const content = document.getElementById('aiTemplateManagerContent');
+        if (content) content.innerHTML = this.renderTemplateManagerContent();
+    },
+
+    setTemplateEditorField(field, value) {
+        const draft = this._templateEditor || this.createTemplateDraft();
+        if (field === 'vars') {
+            draft.vars = String(value || '').split(/[,，\s]+/).map(v => v.trim()).filter(Boolean);
+        } else {
+            draft[field] = value;
+        }
+        this._templateEditor = draft;
     },
 
     resetTemplateEditor() {
         this._templateEditor = null;
-        this.renderProfilePage?.();
+        const content = document.getElementById('aiTemplateManagerContent');
+        if (content) content.innerHTML = this.renderTemplateManagerContent();
     },
 
     saveTemplateEditor() {
@@ -201,7 +286,8 @@ const advicePanel = {
         if (!this.db.aiTemplateActiveId) this.db.aiTemplateActiveId = template.id;
         this._templateEditor = null;
         this.save();
-        this.renderProfilePage?.();
+        const content = document.getElementById('aiTemplateManagerContent');
+        if (content) content.innerHTML = this.renderTemplateManagerContent();
     },
 
     deleteTemplateById(id) {
@@ -212,7 +298,45 @@ const advicePanel = {
             this.db.aiTemplateActiveId = list[0]?.id || '';
         }
         this.save();
-        this.renderProfilePage?.();
+        const content = document.getElementById('aiTemplateManagerContent');
+        if (content) content.innerHTML = this.renderTemplateManagerContent();
+    },
+
+    renderTemplateManagerContent() {
+        const templates = this.getAdviceTemplates();
+        const draft = this._templateEditor;
+        const activeId = this.db.aiTemplateActiveId || templates[0]?.id || '';
+        const draftVars = Array.isArray(draft?.vars) ? draft.vars.join(', ') : '';
+        return `<div class="template-manager-body">
+            <div class="template-manager-list">
+                ${templates.map(t => `<button class="template-manager-item ${t.id === activeId ? 'active' : ''}" onclick="data.selectAdviceTemplate('${this.escapeHtml(t.id)}')" type="button">
+                    <div class="template-manager-item-main">
+                        <strong>${this.escapeHtml(t.name)}</strong>
+                        <small>${this.escapeHtml(t.scenario)}</small>
+                    </div>
+                    <span class="template-manager-item-actions">
+                        <span class="material-symbols-rounded" onclick="event.stopPropagation();data.editTemplateById('${this.escapeHtml(t.id)}')">edit</span>
+                        <span class="material-symbols-rounded" onclick="event.stopPropagation();data.deleteTemplateById('${this.escapeHtml(t.id)}')">delete</span>
+                    </span>
+                </button>`).join('')}
+            </div>
+            <div class="template-manager-toolbar">
+                <button class="md-btn md-btn-tonal" onclick="data.editTemplateById('')" type="button"><span class="material-symbols-rounded">add</span> 新建</button>
+            </div>
+            ${draft ? `<div class="template-editor-card">
+                <div class="md-grid modal-grid">
+                    <div class="md-field span-full"><input type="text" value="${this.escapeHtml(draft.name || '')}" oninput="data.setTemplateEditorField('name', this.value)" placeholder=" "><label>模板名称</label></div>
+                    <div class="md-field span-full"><input type="text" value="${this.escapeHtml(draft.scenario || '')}" oninput="data.setTemplateEditorField('scenario', this.value)" placeholder=" "><label>场景</label></div>
+                    <div class="md-field span-full"><input type="text" value="${this.escapeHtml(draftVars)}" oninput="data.setTemplateEditorField('vars', this.value)" placeholder=" "><label>变量（逗号分隔）</label></div>
+                    <div class="md-field span-full"><textarea rows="3" oninput="data.setTemplateEditorField('system', this.value)" placeholder=" ">${this.escapeHtml(draft.system || '')}</textarea><label>System Prompt</label></div>
+                    <div class="md-field span-full"><textarea rows="6" oninput="data.setTemplateEditorField('user', this.value)" placeholder=" ">${this.escapeHtml(draft.user || '')}</textarea><label>User Template</label></div>
+                </div>
+                <div class="md-row modal-actions">
+                    <button class="md-btn md-btn-tonal" onclick="data.resetTemplateEditor()" type="button">取消</button>
+                    <button class="md-btn md-btn-filled" onclick="data.saveTemplateEditor()" type="button"><span class="material-symbols-rounded">save</span> 保存</button>
+                </div>
+            </div>` : ''}
+        </div>`;
     },
 
     exportTemplates() {
@@ -489,6 +613,14 @@ const advicePanel = {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
             this.sendAiAdvice();
+            return;
+        }
+        if (e.key === '[' || e.key === ']') {
+            const messages = this.visibleAdviceMessages(this.activeRecords(this.db.health.aiAdviceChat || []));
+            const latestAssistant = [...messages].reverse().find(m => m.role === 'assistant' && m.versionGroup?.length > 1);
+            if (!latestAssistant) return;
+            e.preventDefault();
+            this.cycleAdviceVersion(latestAssistant.replyToId || latestAssistant.id, e.key === '[' ? -1 : 1);
         }
     },
 
@@ -711,6 +843,7 @@ const advicePanel = {
         this.save();
         requestAnimationFrame(() => this.scrollAdviceToLatest(true));
         this._activeStreamRenderer = null;
+        this._streamRenderers = this._streamRenderers || {};
         this.setAdviceStreamUiState('streaming');
         try {
             const messages = this.buildAdviceMessages(prompt, model);
@@ -745,6 +878,7 @@ const advicePanel = {
                     if (!contentEl._renderer && window.adviceStreamRenderer) {
                         contentEl._renderer = adviceStreamRenderer.create(contentEl, { chunkPerFrame: 8 });
                         this._activeStreamRenderer = contentEl._renderer;
+                        this._streamRenderers[pendingId] = contentEl._renderer;
                     }
                     if (contentEl._renderer) {
                         contentEl._renderer.enqueue(delta);
@@ -780,6 +914,7 @@ const advicePanel = {
                         if (contentEl._renderer) {
                             try { contentEl._renderer.destroy(); } catch {}
                             contentEl._renderer = null;
+                            delete this._streamRenderers[pendingId];
                         }
                         contentEl.innerHTML = this.renderAdviceMarkdown(full);
                         contentEl.querySelectorAll('p, li, h1, h2, h3').forEach(el => {
@@ -824,6 +959,28 @@ const advicePanel = {
         workout?.showToast?.('已复制 AI 回答');
     },
 
+    async shareAdviceMessage(idx) {
+        const msg = (this.activeRecords(this.db.health.aiAdviceChat || []))[idx];
+        if (!msg?.content) return;
+        const text = String(msg.content || '').trim();
+        if (!text) return;
+        try {
+            await navigator.clipboard.writeText(text);
+            workout?.showToast?.('已复制 Markdown');
+        } catch {
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            textarea.setAttribute('readonly', 'true');
+            textarea.style.position = 'fixed';
+            textarea.style.left = '-9999px';
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand('copy');
+            textarea.remove();
+            workout?.showToast?.('已复制 Markdown');
+        }
+    },
+
     retryAdviceFrom(idx) {
         const messages = this.activeRecords(this.db.health.aiAdviceChat || []);
         const msg = messages[idx];
@@ -831,6 +988,13 @@ const advicePanel = {
         const prompt = msg?.retryPrompt || messages.slice(0, idx).reverse().find(m => m.role === 'user')?.content;
         if (!prompt) return;
         if (msg.role === 'assistant') {
+            if ((this.db.aiRetryMode || 'versioned') === 'replace') {
+                this.softDeleteById(this.db.health.aiAdviceChat, msg.id);
+                this.db.aiTrash.push({ id: msg.id, deletedAt: Date.now(), payload: { ...msg } });
+                this.save();
+                this.sendAiAdvice(prompt, { skipUserMessage: true });
+                return;
+            }
             const rootId = msg.replyToId || msg.id;
             const siblings = this.getAdviceVersionGroup(rootId);
             const nextIdx = siblings.length;
@@ -847,6 +1011,7 @@ const advicePanel = {
                 skipUserMessage: true,
                 versionActive: nextActive
             });
+            this.pruneAdviceVersionGroup(rootId, 10);
             return;
         }
         this.sendAiAdvice(prompt);
@@ -872,6 +1037,7 @@ const advicePanel = {
         if (!rootId || !versionId) return;
         const group = this.getAdviceVersionGroup(rootId);
         const now = Date.now();
+        this._streamRenderers = this._streamRenderers || {};
         group.forEach(m => {
             const wasActive = !!m.versionActive;
             const nextActive = m.id === versionId;
@@ -879,7 +1045,15 @@ const advicePanel = {
                 m.versionActive = nextActive;
                 m.updatedAt = now;
             }
+            if (nextActive) m.lastViewedAt = now;
         });
+        const previous = group.find(m => m.id !== versionId && m.versionActive);
+        if (previous && this._streamRenderers[previous.id]) {
+            this._streamRenderers[previous.id].pause('switch');
+        }
+        if (this._streamRenderers[versionId]) {
+            this._streamRenderers[versionId].resume();
+        }
         this.save();
     },
 

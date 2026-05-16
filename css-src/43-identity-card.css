@@ -1,0 +1,223 @@
+/* --- Identity Card --- */
+#profileContent {
+    touch-action: pan-y;
+    transform: translateX(var(--profile-swipe-x, 0));
+    transition: transform 0.28s var(--md-expressive-spring, cubic-bezier(.34,1.56,.64,1));
+    will-change: transform;
+}
+#profileContent.profile-view-dragging {
+    transition: none;
+}
+.profile-tabs {
+    position: relative;
+    overflow: hidden;
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--md-sys-outline-variant) 55%, transparent);
+}
+.profile-tabs .record-tab {
+    position: relative;
+    overflow: hidden;
+    white-space: nowrap;
+    transition:
+        color var(--md-sys-motion-duration-medium, 300ms) var(--md-expressive-spring, cubic-bezier(.34,1.56,.64,1)),
+        transform var(--md-sys-motion-duration-short, 180ms) var(--md-expressive-spring, cubic-bezier(.34,1.56,.64,1)),
+        background-color var(--md-sys-motion-duration-medium, 300ms) ease;
+}
+.profile-tabs .record-tab::after {
+    content: '';
+    position: absolute;
+    inset: 4px;
+    border-radius: var(--md-sys-shape-full);
+    background: color-mix(in srgb, var(--md-sys-primary) 18%, transparent);
+    opacity: 0;
+    transform: scaleX(0.55) scaleY(0.86);
+    transition:
+        opacity var(--md-sys-motion-duration-medium, 300ms) ease,
+        transform 0.42s var(--md-expressive-spring, cubic-bezier(.34,1.56,.64,1));
+    pointer-events: none;
+}
+.profile-tabs .record-tab.active {
+    transform: translateY(-1px);
+    box-shadow: 0 3px 12px color-mix(in srgb, var(--md-sys-primary) 18%, transparent);
+}
+.profile-tabs .record-tab.active::after {
+    opacity: 1;
+    transform: scaleX(1) scaleY(1);
+}
+.profile-tabs .record-tab .material-symbols-rounded {
+    position: relative;
+    z-index: 1;
+    transition: transform 0.34s var(--md-expressive-spring, cubic-bezier(.34,1.56,.64,1));
+}
+.profile-tabs .record-tab.active .material-symbols-rounded {
+    transform: scale(1.08) rotate(-4deg);
+    font-variation-settings: 'FILL' 1;
+}
+.profile-tabs .record-tab:active {
+    transform: scale(0.96);
+}
+.profile-tabs .record-tab span,
+.profile-tabs .record-tab {
+    z-index: 1;
+}
+.profile-tab-label {
+    position: relative;
+    z-index: 1;
+}
+.profile-view-forward,
+.profile-view-back {
+    animation: profile-tab-slide 0.34s var(--md-expressive-spring, cubic-bezier(.34,1.56,.64,1)) both;
+}
+.profile-view-back {
+    animation-name: profile-tab-slide-back;
+}
+@keyframes profile-tab-slide {
+    from { opacity: 0.72; transform: translateX(18px) scale(0.985); }
+    to { opacity: 1; transform: translateX(0) scale(1); }
+}
+@keyframes profile-tab-slide-back {
+    from { opacity: 0.72; transform: translateX(-18px) scale(0.985); }
+    to { opacity: 1; transform: translateX(0) scale(1); }
+}
+.identity-card {
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+.identity-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+.identity-icon {
+    font-size: 28px;
+    padding: 10px;
+    border-radius: 50%;
+    background: var(--md-sys-primary-container);
+    color: var(--md-sys-on-primary-container);
+}
+.identity-text strong {
+    display: block;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--md-sys-on-surface);
+}
+.identity-text small {
+    color: var(--md-sys-on-surface-variant);
+    font-size: 12px;
+}
+.identity-text {
+    flex: 1;
+    min-width: 0;
+}
+.identity-metrics {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+.identity-metric {
+    padding: 10px 12px;
+    border-radius: var(--md-sys-shape-md, 12px);
+    background: var(--md-sys-surface-container-lowest);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.identity-metric-head {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    color: var(--md-sys-on-surface-variant);
+}
+.identity-metric-head .material-symbols-rounded {
+    font-size: 14px;
+}
+.identity-metric b {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--md-sys-on-surface);
+}
+.identity-metric small {
+    font-size: 11px;
+    opacity: 0.75;
+}
+.identity-training-split {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    font-size: 10px;
+    color: var(--md-sys-on-surface-variant);
+}
+.identity-training-split span {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 1px 6px;
+    border-radius: var(--md-sys-shape-full);
+    background: var(--md-sys-surface-container);
+    white-space: nowrap;
+}
+.identity-training-split strong {
+    color: var(--md-sys-primary);
+    font-size: 10px;
+}
+.identity-bar {
+    height: 5px;
+    border-radius: 3px;
+    margin-top: 4px;
+    background: rgba(0, 0, 0, 0.08);
+    overflow: hidden;
+}
+.identity-bar i {
+    display: block;
+    height: 100%;
+    background: var(--md-sys-primary);
+    transition: width 0.4s ease;
+}
+.identity-metric.weight-positive .identity-bar i { background: #2e7d32; }
+.identity-metric.weight-positive b { color: #2e7d32; }
+.identity-metric.weight-negative .identity-bar i { background: #c62828; }
+.identity-metric.weight-negative b { color: #c62828; }
+.identity-metric.weight-neutral .identity-bar i { background: var(--md-sys-outline); }
+.identity-action {
+    flex: none;
+    align-self: center;
+    min-width: max-content;
+    padding: 0 14px;
+    white-space: nowrap;
+}
+@media (max-width: 360px) {
+    .identity-card {
+        gap: 10px;
+    }
+    .identity-row {
+        gap: 8px;
+    }
+    .identity-icon {
+        font-size: 24px;
+        padding: 8px;
+    }
+    .identity-text strong {
+        font-size: 14px;
+    }
+    .identity-action {
+        height: 36px;
+        padding: 0 10px;
+        font-size: 12px;
+        gap: 4px;
+    }
+    .identity-action .material-symbols-rounded {
+        font-size: 16px;
+    }
+    .identity-metrics {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        gap: 6px;
+    }
+    .identity-metric {
+        padding: 8px;
+    }
+    .identity-metric b {
+        font-size: 15px;
+    }
+}

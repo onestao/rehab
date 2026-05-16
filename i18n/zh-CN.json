@@ -20,5 +20,29 @@
       "tokens": "Tokens",
       "cost": "成本"
     }
+  },
+  "profile": {
+    "identityKeepWeeks": "坚持训练 {weeks} 周",
+    "identityStart": "开启训练之旅",
+    "identityTotalSessions": "累计 {n} 次",
+    "weekTraining": "本周训练",
+    "weekWeight": "本周体重",
+    "goalUnset": "未设目标",
+    "adjustGoal": "调整目标",
+    "themeColor": "主题颜色",
+    "darkMode": "深色模式",
+    "language": "Language",
+    "personalization": "个性化",
+    "library": {
+      "actions": "动作库",
+      "routines": "方案库",
+      "rename": "重命名",
+      "edit": "编辑",
+      "duplicate": "复制",
+      "delete": "删除",
+      "deriveNew": "派生新方案",
+      "emptyActions": "暂无动作",
+      "emptyRoutines": "暂无方案"
+    }
   }
 }

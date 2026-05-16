@@ -13,6 +13,7 @@
                 switchRest: 3,
                 isAlt: document.getElementById('isAlt').checked,
                 phase: document.getElementById('actionPhase')?.value || 'main',
+                tags: [],
                 id: this.generateRecordId('action'),
                 updatedAt: Date.now(),
                 deleted: false
@@ -40,7 +41,11 @@
             const tags = tagsInput ? tagsInput.value.split(/[,，]/).map(t => t.trim()).filter(Boolean) : [];
             const routine = {
                 name,
-                actions: JSON.parse(JSON.stringify(actions)).map(a => this.ensureRecordMeta(a, 'routine-action', Date.now())),
+                actions: JSON.parse(JSON.stringify(actions)).map(a => {
+                    const action = this.ensureRecordMeta(a, 'routine-action', Date.now());
+                    if (!action.sourceActionId) action.sourceActionId = a.id;
+                    return action;
+                }),
                 tags,
                 created: new Date().toLocaleDateString(),
                 id: this.generateRecordId('routine'),
@@ -237,16 +242,56 @@
             const sheet = document.getElementById('workoutLibrarySheet');
             if (!el || !sheet) return;
 
-            const routines = this.activeRecords(this.db.routines);
-            if (routines.length === 0) {
-                el.innerHTML = `
+            const routines = this.activeRecords(this.db.routines || []);
+            const actions = this.activeRecords(this.db.actions || []);
+            const libraryView = this.normalizeLibraryView?.(this.db.libraryView) || 'actions';
+            const segment = `<div class="library-segment-wrap" style="margin:0 0 8px">
+                <div class="library-segment" role="tablist" aria-label="训练页导入视图">
+                    <button class="library-segment-btn ${libraryView === 'actions' ? 'active' : ''}" onclick="data.showWorkoutLibraryPane('actions')" type="button"><span class="material-symbols-rounded">fitness_center</span><span class="library-segment-label">动作库</span></button>
+                    <button class="library-segment-btn ${libraryView === 'routines' ? 'active' : ''}" onclick="data.showWorkoutLibraryPane('routines')" type="button"><span class="material-symbols-rounded">bookmark_border</span><span class="library-segment-label">方案库</span></button>
+                    <span class="library-segment-indicator ${libraryView === 'routines' ? 'is-routines' : 'is-actions'}" aria-hidden="true"></span>
+                </div>
+            </div>`;
+
+            if (libraryView === 'actions') {
+                if (!actions.length) {
+                    el.innerHTML = segment + `
+                    <div class="empty-state" style="padding:24px 16px">
+                        <span class="material-symbols-rounded">fitness_center</span>
+                        <p>动作库为空</p>
+                        <small>先在训练页添加动作，或从方案库中保存单个动作</small>
+                    </div>`;
+                } else {
+                    el.innerHTML = segment + `
+                    <div class="workout-lib-list">
+                        ${actions.map(a => `<div class="workout-lib-item">
+                            <div class="workout-lib-item-main" onclick="data.addActionFromLibrary('${a.id}')">
+                                <div class="workout-lib-item-info">
+                                    <strong>${this.escapeHtml(a.name || '未命名动作')}</strong>
+                                    <small>${a.sets || 1}组 · ${a.reps || 1}次 · ${a.work || 5}s${a.isAlt ? ' · 双侧' : ''}</small>
+                                </div>
+                                <span class="material-symbols-rounded">add</span>
+                            </div>
+                            <div class="workout-lib-item-actions">
+                                <button class="md-btn md-btn-tonal" onclick="event.stopPropagation();data.duplicateActionFromLibrary('${a.id}')" aria-label="复制动作" title="复制动作" style="padding:0;height:28px;min-width:28px">
+                                    <span class="material-symbols-rounded" style="font-size:16px">content_copy</span>
+                                </button>
+                                <button class="delete-btn" onclick="event.stopPropagation();data.deleteActionFromLibrary('${a.id}')" aria-label="删除动作">
+                                    <span class="material-symbols-rounded">delete</span>
+                                </button>
+                            </div>
+                        </div>`).join('')}
+                    </div>`;
+                }
+            } else if (!routines.length) {
+                el.innerHTML = segment + `
                 <div class="empty-state" style="padding:24px 16px">
                     <span class="material-symbols-rounded">bookmark_border</span>
-                    <p>运动库为空</p>
+                    <p>方案库为空</p>
                     <small>先在训练页添加动作并存入方案库</small>
                 </div>`;
             } else {
-                el.innerHTML = `
+                el.innerHTML = segment + `
                 <div class="workout-lib-list">
                     ${routines.map((r, i) => {
                         const totalSets = r.actions.reduce((s, a) => s + (a.sets || 1), 0);
@@ -280,6 +325,42 @@
             sheet.setAttribute('aria-hidden', 'false');
         },
 
+        showWorkoutLibraryPane(view) {
+            if (!this.db) this.db = {};
+            this.db.libraryView = ['actions', 'routines'].includes(view) ? view : 'actions';
+            this.showWorkoutLibrary();
+        },
+
+        addActionFromLibrary(actionId) {
+            const action = this.findActionById(actionId);
+            if (!action || action.deleted) return;
+            const copy = JSON.parse(JSON.stringify(action));
+            copy.id = this.generateRecordId('action');
+            copy.deleted = false;
+            copy.updatedAt = Date.now();
+            this.db.actions.push(copy);
+            this.save();
+            this.closeWorkoutLibrary();
+            ui.tab('workout', document.querySelector('.nav-item'));
+        },
+
+        saveActionFromRoutine(routineId, actionIndex) {
+            const routine = this.findRoutineById(routineId);
+            if (!routine || routine.deleted) return;
+            const source = (routine.actions || [])[actionIndex];
+            if (!source) return;
+            const copy = JSON.parse(JSON.stringify(source));
+            copy.id = this.generateRecordId('action');
+            copy.sourceActionId = source.sourceActionId || source.id;
+            copy.deleted = false;
+            copy.updatedAt = Date.now();
+            if (!Array.isArray(copy.tags)) copy.tags = [];
+            this.db.actions.push(copy);
+            this.save();
+            if (window.toast?.show) toast.show(`已保存动作：${copy.name || '未命名动作'}`, 'success');
+            this.renderRoutines();
+        },
+
         closeWorkoutLibrary() {
             const sheet = document.getElementById('workoutLibrarySheet');
             if (sheet) {
@@ -302,99 +383,494 @@
             this.renderWorkoutPlanCard();
         },
 
+        renderProfileIdentityCard() {
+            const history = this.activeRecords(this.db.history || []);
+            const totalSessions = history.length;
+
+            let firstDate = null;
+            for (const h of history) {
+                const d = this.parseHistoryDate(h.date);
+                if (d && (!firstDate || d < firstDate)) firstDate = d;
+            }
+            const weeksTraining = firstDate
+                ? Math.max(1, Math.floor((Date.now() - firstDate.getTime()) / (7 * 86400000)))
+                : 0;
+
+            const monday = new Date();
+            monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
+            monday.setHours(0, 0, 0, 0);
+
+            const weekHistory = history.filter(h => {
+                const d = this.parseHistoryDate(h.date);
+                return d && d >= monday;
+            });
+            const weekExerciseLogs = this.activeRecords(this.db.health?.exerciseLogs || []).filter(e => {
+                const d = e.date ? this.dateFromKey(e.date) : null;
+                return d && d >= monday;
+            });
+            const cardioTypes = new Set(['walk', 'brisk_walk', 'jog', 'run', 'cycling', 'swim', 'elliptical', 'rowing', 'battle_rope', 'spin_bike', 'cardio']);
+            const cardioSessions = weekHistory.filter(h => h.type === 'cardio').length
+                + weekExerciseLogs.filter(e => cardioTypes.has(e.type || '')).length;
+            const strengthSessions = weekHistory.filter(h => h.type !== 'cardio').length
+                + weekExerciseLogs.filter(e => !cardioTypes.has(e.type || '')).length;
+            const weekDone = cardioSessions + strengthSessions;
+            const weekGoal = Number(this.db.health?.weeklyGoalSessions) || 5;
+            const trainPct = Math.min(100, Math.round((weekDone / weekGoal) * 100));
+
+            const goal = this.db.health?.dietGoal;
+            const isGain = goal?.goalType === 'gain';
+            // weeklyChange/weeklyLoss is stored as magnitude (positive); goalType conveys direction.
+            const target = Math.abs(Number(goal?.weeklyChange || goal?.weeklyLoss || 0));
+            const targetSigned = isGain ? target : -target;
+
+            // sortedWeights() returns weights sorted ascending (oldest -> newest); enforce explicitly
+            // so identity-card weight deltas don't silently flip sign if the helper sort order changes.
+            const sortedW = (this.sortedWeights?.() || []).slice().sort(
+                (a, b) => this.dateFromKey(a.date) - this.dateFromKey(b.date)
+            );
+            const weekWeights = sortedW.filter(w => {
+                const d = this.dateFromKey(w.date);
+                return d && d >= monday;
+            });
+            let weightDelta = null;
+            if (weekWeights.length >= 2) {
+                weightDelta = weekWeights[weekWeights.length - 1].weight - weekWeights[0].weight;
+            } else if (weekWeights.length === 1) {
+                const prev = sortedW.filter(w => this.dateFromKey(w.date) < monday).slice(-1)[0];
+                if (prev) weightDelta = weekWeights[0].weight - prev.weight;
+            }
+
+            let weightPct = null;
+            if (weightDelta !== null && target > 0 && targetSigned !== 0) {
+                const towards = Math.max(0, weightDelta / targetSigned);
+                weightPct = Math.min(100, Math.round(towards * 100));
+            }
+
+            let weightColor = 'neutral';
+            if (weightDelta !== null && target > 0) {
+                weightColor = (weightDelta * targetSigned >= 0) ? 'positive' : 'negative';
+            }
+
+            const weightArrow = weightDelta === null ? ''
+                : (weightDelta > 0.05 ? '↑' : weightDelta < -0.05 ? '↓' : '→');
+            const weightText = weightDelta === null ? '--'
+                : `${weightDelta > 0 ? '+' : ''}${weightDelta.toFixed(1)} kg ${weightArrow}`;
+            const goalText = !goal ? '未设目标'
+                : `目标 ${isGain ? '+' : '-'}${Math.abs(target).toFixed(1)}/周`;
+
+            const titleText = weeksTraining
+                ? `坚持训练 ${weeksTraining} 周`
+                : '开启训练之旅';
+
+            return `<div class="md-card identity-card">
+                <div class="identity-row">
+                    <span class="material-symbols-rounded identity-icon">fitness_center</span>
+                    <div class="identity-text">
+                        <strong>${titleText}</strong>
+                        <small>累计 ${totalSessions} 次</small>
+                    </div>
+                    <button class="md-btn md-btn-tonal identity-action"
+                            onclick="data.setRoutineView('weightloss')" type="button">
+                        <span class="material-symbols-rounded">tune</span>
+                        调整目标
+                    </button>
+                </div>
+                <div class="identity-metrics">
+                    <div class="identity-metric">
+                        <div class="identity-metric-head">
+                            <span class="material-symbols-rounded">exercise</span>
+                            <span>本周训练</span>
+                        </div>
+                        <b>${weekDone}/${weekGoal} 次</b>
+                        <div class="identity-training-split">
+                            <span>有氧 <strong>${cardioSessions}</strong></span>
+                            <span>无氧/康复 <strong>${strengthSessions}</strong></span>
+                        </div>
+                        <div class="identity-bar" role="progressbar"
+                             aria-valuenow="${trainPct}" aria-valuemin="0" aria-valuemax="100">
+                            <i style="width:${trainPct}%"></i>
+                        </div>
+                    </div>
+                    <div class="identity-metric weight-${weightColor}">
+                        <div class="identity-metric-head">
+                            <span class="material-symbols-rounded">monitor_weight</span>
+                            <span>本周体重</span>
+                        </div>
+                        <b>${weightText}</b>
+                        <small>${goalText}</small>
+                        ${weightPct !== null
+                            ? `<div class="identity-bar" role="progressbar"
+                                    aria-valuenow="${weightPct}" aria-valuemin="0" aria-valuemax="100">
+                                    <i style="width:${weightPct}%"></i>
+                                </div>`
+                            : ''}
+                    </div>
+                </div>
+            </div>`;
+        },
+
         renderProfilePage() {
             const overview = document.getElementById('profileOverview');
-            const content = document.getElementById('profileContent');
+            const content  = document.getElementById('profileContent');
             const settings = document.getElementById('profileSettings');
-            if (overview) overview.innerHTML = (this.renderWeeklySummaryCard?.() || '') + this.renderRoutineOverview();
-            if (content) {
-                const isSettings = this.routineView === 'settings';
-                if (settings) settings.classList.toggle('hidden', !isSettings);
-                if (!isSettings) {
-                    content.classList.remove('hidden');
-                    content.innerHTML = `
-                    <div class="record-tabs" role="tablist" aria-label="我的视图">
-                        <button class="record-tab ${this.routineView === 'library' ? 'active' : ''}" onclick="data.setRoutineView('library')"><span class="material-symbols-rounded">bookmarks</span>动作组库</button>
-                        <button class="record-tab ${this.routineView === 'weightloss' ? 'active' : ''}" onclick="data.setRoutineView('weightloss')"><span class="material-symbols-rounded">trending_down</span>目标指导</button>
-                        <button class="record-tab ${this.routineView === 'settings' ? 'active' : ''}" onclick="data.setRoutineView('settings')"><span class="material-symbols-rounded">settings</span>设置</button>
-                    </div>
-                    ${this.routineView === 'library' ? this.renderRoutineLibrary() : this.renderWeightLossPlanCard()}`;
-                } else {
-                    content.innerHTML = `
-                    <div class="record-tabs" role="tablist" aria-label="我的视图">
-                        <button class="record-tab" onclick="data.setRoutineView('library')"><span class="material-symbols-rounded">bookmarks</span>动作组库</button>
-                        <button class="record-tab" onclick="data.setRoutineView('weightloss')"><span class="material-symbols-rounded">trending_down</span>目标指导</button>
-                        <button class="record-tab active" onclick="data.setRoutineView('settings')"><span class="material-symbols-rounded">settings</span>设置</button>
-                    </div>`;
-                    content.classList.remove('hidden');
-                }
+
+            if (overview) overview.innerHTML = this.renderProfileIdentityCard();
+
+            this.routineView = this.normalizeRoutineView?.(this.routineView) || 'library';
+            const view = this.routineView;
+            const direction = this._routineSwipeDirection || '';
+            this._routineSwipeDirection = '';
+
+            const tabs = [
+                ['library',    'bookmarks',     '库'],
+                ['weightloss', 'trending_down', '目标指导'],
+                ['ai',         'psychology',    'AI'],
+                ['sync',       'cloud_sync',    '同步'],
+            ];
+            const tabBar = `<div class="record-tabs profile-tabs" role="tablist" aria-label="我的视图">
+                ${tabs.map(([k, i, l]) => `<button class="record-tab ${view === k ? 'active' : ''}" data-routine-view="${k}" onclick="data.setRoutineView('${k}')" type="button" role="tab" aria-selected="${view === k}"><span class="material-symbols-rounded">${i}</span><span class="profile-tab-label">${l}</span></button>`).join('')}
+            </div>`;
+
+            if (!content) return;
+
+            const showSettings = view === 'ai' || view === 'sync';
+            if (settings) {
+                settings.classList.toggle('hidden', !showSettings);
+                settings.classList.toggle('profile-view-forward', direction === 'next');
+                settings.classList.toggle('profile-view-back', direction === 'prev');
+                const aiCard   = settings.querySelector('[data-settings="ai"]');
+                const syncCard = settings.querySelector('[data-settings="sync"]');
+                aiCard?.classList.toggle('hidden',   view !== 'ai');
+                syncCard?.classList.toggle('hidden', view !== 'sync');
             }
+
+            this.bindProfileSwipe?.(content);
+            content.classList.remove('hidden');
+            content.classList.toggle('profile-view-forward', direction === 'next');
+            content.classList.toggle('profile-view-back', direction === 'prev');
+            if (view === 'library') {
+                content.innerHTML = tabBar + this.renderLibrarySegment() + this.renderLibraryDeck();
+                requestAnimationFrame(() => {
+                    this.syncLibraryDeckPosition?.(false);
+                    this.updateLibraryTabActive?.();
+                    this.updateLibrarySwipeEffects?.();
+                });
+            } else if (view === 'weightloss') {
+                content.innerHTML = tabBar + this.renderWeightLossPlanCard();
+            } else {
+                content.innerHTML = tabBar;
+            }
+            clearTimeout(this._routineViewAnimationTimer);
+            this._routineViewAnimationTimer = setTimeout(() => {
+                content.classList.remove('profile-view-forward', 'profile-view-back');
+                settings?.classList.remove('profile-view-forward', 'profile-view-back');
+            }, 360);
         },
 
         renderRoutines() {
             this.renderProfilePage();
         },
 
-        renderRoutineOverview() {
-            const routineCount = this.activeRecords(this.db.routines).length;
-            const actionCount = this.activeRecords(this.db.actions).length;
-            const goal = this.db.health.dietGoal;
-            return `<div class="md-card hero-card routines-hero">
-            <div class="hero-kicker">方案总览</div>
-            <div class="hero-title-row">
-                <div>
-                    <h3>${routineCount} 个方案</h3>
-                    <p>${goal ? `当前${goal.goalType === 'gain' ? '增肌' : '减重'}方案：${goal.dailyCal} kcal / 日` : '可在此管理训练动作库与 AI 目标方案'}</p>
+        normalizeTagText(tag) {
+            return String(tag || '').trim();
+        },
+
+        collectLibraryTags() {
+            const actionTags = this.activeRecords(this.db.actions || []).flatMap(a => Array.isArray(a.tags) ? a.tags : []);
+            const routineTags = this.activeRecords(this.db.routines || []).flatMap(r => Array.isArray(r.tags) ? r.tags : []);
+            return [...new Set([...actionTags, ...routineTags].map(t => this.normalizeTagText(t)).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'zh-CN'));
+        },
+
+        renderLibraryTagChips(tags, activeTag) {
+            if (!tags.length) return '';
+            return `<div class="library-tag-chips">
+                <button class="routine-tag-chip md-btn md-btn-tonal${!activeTag ? ' active' : ''}" onclick="data.setLibraryFilterTag('')" type="button">全部</button>
+                ${tags.map(t => `<button class="routine-tag-chip md-btn md-btn-tonal${activeTag===t ? ' active' : ''}" onclick="data.setLibraryFilterTag('${this.escapeHtml(t)}')" type="button">${this.escapeHtml(t)}</button>`).join('')}
+            </div>`;
+        },
+
+        renderLibrarySegment() {
+            const view = this.normalizeLibraryView?.(this.db.libraryView) || 'actions';
+            return `<div class="library-segment-wrap">
+                <div class="library-segment" role="tablist" aria-label="库视图">
+                    <button class="library-segment-btn ${view === 'actions' ? 'active' : ''}" data-library-view="actions" role="tab" aria-selected="${view === 'actions'}" onclick="data.setLibraryView('actions')" type="button"><span class="material-symbols-rounded">fitness_center</span><span class="library-segment-label">动作库</span></button>
+                    <button class="library-segment-btn ${view === 'routines' ? 'active' : ''}" data-library-view="routines" role="tab" aria-selected="${view === 'routines'}" onclick="data.setLibraryView('routines')" type="button"><span class="material-symbols-rounded">bookmarks</span><span class="library-segment-label">方案库</span></button>
+                    <span class="library-segment-indicator ${view === 'routines' ? 'is-routines' : 'is-actions'}" aria-hidden="true"></span>
                 </div>
-                <span class="hero-icon material-symbols-rounded">inventory_2</span>
-            </div>
-            <div class="hero-stat-row">
-                <div class="hero-stat"><b>${actionCount}</b><small>当前动作</small></div>
-                <div class="hero-stat"><b>${routineCount}</b><small>已存方案</small></div>
-                <div class="hero-stat"><b>${goal?.weeklyChange || goal?.weeklyLoss || '--'}</b><small>目标 kg/周</small></div>
-            </div>
-        </div>`;
+            </div>`;
+        },
+
+        renderLibraryDeck() {
+            return `<div id="librarySwipeDeck" class="library-swipe-deck" onscroll="data.onLibraryDeckScroll(this)">
+                <section class="library-swipe-page" data-library-page="actions">${this.renderActionLibrary()}</section>
+                <section class="library-swipe-page" data-library-page="routines">${this.renderRoutineLibraryPane()}</section>
+            </div>`;
+        },
+
+        findActionById(actionId) {
+            return (this.db.actions || []).find(a => a && a.id === actionId);
+        },
+
+        renameActionFromLibrary(actionId) {
+            const action = this.findActionById(actionId);
+            if (!action || action.deleted) return;
+            const next = prompt('动作名称', action.name || '');
+            if (next == null) return;
+            const name = String(next).trim();
+            if (!name) return;
+            action.name = name;
+            this.touchRecord(action);
+            this.save();
+            this.renderRoutines();
+        },
+
+        editActionFromLibrary(actionId) {
+            const action = this.findActionById(actionId);
+            if (!action || action.deleted) return;
+            const sample = [action.sets || 1, action.reps || 1, action.work || 5, action.repRest || 2, action.actionRest || 10, action.groupRest || 15, action.phase || 'main', action.isAlt ? 1 : 0].join(',');
+            const raw = prompt('编辑动作参数：sets,reps,work,repRest,actionRest,groupRest,phase,isAlt(0/1)', sample);
+            if (raw == null) return;
+            const parts = String(raw).split(',').map(s => s.trim());
+            if (parts.length < 8) return alert('参数数量不足');
+            action.sets = Math.max(1, parseInt(parts[0], 10) || 1);
+            action.reps = Math.max(1, parseInt(parts[1], 10) || 1);
+            action.work = Math.max(1, parseInt(parts[2], 10) || 1);
+            action.repRest = Math.max(0, parseInt(parts[3], 10) || 0);
+            action.actionRest = Math.max(0, parseInt(parts[4], 10) || 0);
+            action.groupRest = Math.max(0, parseInt(parts[5], 10) || 0);
+            action.phase = ['warmup', 'main', 'cooldown'].includes(parts[6]) ? parts[6] : 'main';
+            action.isAlt = parts[7] === '1' || /^true$/i.test(parts[7]);
+            this.touchRecord(action);
+            this.save();
+            this.renderRoutines();
+        },
+
+        duplicateActionFromLibrary(actionId) {
+            const action = this.findActionById(actionId);
+            if (!action || action.deleted) return;
+            const copy = JSON.parse(JSON.stringify(action));
+            copy.id = this.generateRecordId('action');
+            copy.name = `${copy.name || '未命名'} (副本)`;
+            copy.deleted = false;
+            copy.updatedAt = Date.now();
+            this.db.actions.push(copy);
+            this.save();
+            this.renderRoutines();
+        },
+
+        deleteActionFromLibrary(actionId) {
+            const action = this.findActionById(actionId);
+            if (!action || action.deleted) return;
+            const refs = this.countActionReferences?.(actionId, this.activeRecords(this.db.routines || [])) || 0;
+            const msg = refs > 0
+                ? `${refs} 个方案在使用此动作，确认删除？删除后方案内快照仍保留。`
+                : `确定删除动作「${action.name || '未命名'}」？`;
+            if (!confirm(msg)) return;
+            this.deleteAction(actionId);
+            this.renderRoutines();
+        },
+
+        editActionTags(actionId) {
+            const action = this.findActionById(actionId);
+            if (!action || action.deleted) return;
+            const current = Array.isArray(action.tags) ? action.tags.join(', ') : '';
+            const raw = prompt('动作标签（逗号分隔）', current);
+            if (raw == null) return;
+            action.tags = [...new Set(String(raw).split(/[,，]/).map(t => this.normalizeTagText(t)).filter(Boolean))];
+            this.touchRecord(action);
+            this.save();
+            this.renderRoutines();
+        },
+
+        renderActionLibrary() {
+            const actions = this.activeRecords(this.db.actions || []);
+            const tags = this.collectLibraryTags();
+            const activeTag = this.normalizeTagText(this.db.libraryFilterTag || '');
+            const filtered = activeTag ? actions.filter(a => (a.tags || []).includes(activeTag)) : actions;
+            if (!actions.length) {
+                return `<div class="empty-state"><span class="material-symbols-rounded">fitness_center</span><p>暂无动作</p><small>在训练页添加动作后可在这里管理</small></div>`;
+            }
+            return `${this.renderLibraryTagChips(tags, activeTag)}
+                <div class="library-list action-library-list">
+                ${filtered.map(a => `<div class="library-card action-card">
+                    <div class="library-card-head">
+                        <div style="flex:1;min-width:0">
+                            <strong>${this.escapeHtml(a.name || '未命名动作')}</strong>
+                            <small>${a.sets || 1}组 × ${a.reps || 1}次 · ${a.work || 5}s · ${a.phase || 'main'}${a.isAlt ? ' · 双侧' : ''}</small>
+                            ${Array.isArray(a.tags) && a.tags.length ? `<div class="library-inline-tags">${a.tags.map(t => `<span>${this.escapeHtml(t)}</span>`).join('')}</div>` : ''}
+                        </div>
+                    </div>
+                    <div class="library-card-actions">
+                        <button class="md-btn md-btn-tonal" onclick="data.renameActionFromLibrary('${a.id}')" type="button"><span class="material-symbols-rounded">edit</span>改名</button>
+                        <button class="md-btn md-btn-tonal" onclick="data.editActionFromLibrary('${a.id}')" type="button"><span class="material-symbols-rounded">tune</span>编辑</button>
+                        <button class="md-btn md-btn-tonal" onclick="data.editActionTags('${a.id}')" type="button"><span class="material-symbols-rounded">bookmark_add</span>标签</button>
+                        <button class="md-btn md-btn-tonal" onclick="data.duplicateActionFromLibrary('${a.id}')" type="button"><span class="material-symbols-rounded">content_copy</span>复制</button>
+                        <button class="md-btn md-btn-tonal" onclick="data.deleteActionFromLibrary('${a.id}')" type="button"><span class="material-symbols-rounded">delete</span>删除</button>
+                    </div>
+                </div>`).join('')}
+                </div>`;
+        },
+
+        findRoutineById(routineId) {
+            return (this.db.routines || []).find(r => r && r.id === routineId);
+        },
+
+        renameRoutineFromLibrary(routineId) {
+            const routine = this.findRoutineById(routineId);
+            if (!routine || routine.deleted) return;
+            const next = prompt('方案名称', routine.name || '');
+            if (next == null) return;
+            const name = String(next).trim();
+            if (!name) return;
+            routine.name = name;
+            this.touchRecord(routine);
+            this.save();
+            this.renderRoutines();
+        },
+
+        editRoutineTags(routineId) {
+            const routine = this.findRoutineById(routineId);
+            if (!routine || routine.deleted) return;
+            const current = Array.isArray(routine.tags) ? routine.tags.join(', ') : '';
+            const raw = prompt('方案标签（逗号分隔）', current);
+            if (raw == null) return;
+            routine.tags = [...new Set(String(raw).split(/[,，]/).map(t => this.normalizeTagText(t)).filter(Boolean))];
+            this.touchRecord(routine);
+            this.save();
+            this.renderRoutines();
+        },
+
+        loadRoutineById(routineId) {
+            const routines = this.activeRecords(this.db.routines || []);
+            const idx = routines.findIndex(r => r.id === routineId);
+            if (idx < 0) return;
+            this.loadRoutine(idx);
+        },
+
+        duplicateRoutineById(routineId) {
+            const routines = this.activeRecords(this.db.routines || []);
+            const idx = routines.findIndex(r => r.id === routineId);
+            if (idx < 0) return;
+            this.duplicateRoutine(idx);
+            this.renderRoutines();
+        },
+
+        deleteRoutineById(routineId) {
+            const routines = this.activeRecords(this.db.routines || []);
+            const idx = routines.findIndex(r => r.id === routineId);
+            if (idx < 0) return;
+            if (!confirm(`确定删除方案 "${routines[idx].name}"？`)) return;
+            this.deleteRoutine(idx);
+            this.renderRoutines();
+        },
+
+        moveRoutineAction(routineId, actionIndex, delta) {
+            const routine = this.findRoutineById(routineId);
+            if (!routine || routine.deleted) return;
+            const list = routine.actions || [];
+            const next = actionIndex + delta;
+            if (next < 0 || next >= list.length) return;
+            [list[actionIndex], list[next]] = [list[next], list[actionIndex]];
+            this.touchRecord(routine);
+            this.save();
+            this.renderRoutines();
+        },
+
+        removeRoutineAction(routineId, actionIndex) {
+            const routine = this.findRoutineById(routineId);
+            if (!routine || routine.deleted) return;
+            if (!Array.isArray(routine.actions) || !routine.actions[actionIndex]) return;
+            routine.actions.splice(actionIndex, 1);
+            this.touchRecord(routine);
+            this.save();
+            this.renderRoutines();
+        },
+
+        replaceRoutineAction(routineId, actionIndex) {
+            const routine = this.findRoutineById(routineId);
+            if (!routine || routine.deleted) return;
+            const actions = this.activeRecords(this.db.actions || []);
+            if (!actions.length) return;
+            const options = actions.map((a, idx) => `${idx + 1}. ${a.name}`).join('\n');
+            const pick = prompt(`输入要替换成的动作序号：\n${options}`, '1');
+            if (pick == null) return;
+            const idx = Math.max(1, Math.min(actions.length, parseInt(pick, 10) || 1)) - 1;
+            const src = JSON.parse(JSON.stringify(actions[idx]));
+            src.sourceActionId = src.id;
+            routine.actions[actionIndex] = src;
+            this.touchRecord(routine);
+            this.save();
+            this.renderRoutines();
+        },
+
+        deriveRoutineFromLibrary(routineId) {
+            const routine = this.findRoutineById(routineId);
+            if (!routine || routine.deleted) return;
+            const name = prompt('新方案名称', `${routine.name || '方案'} (派生)`);
+            if (name == null) return;
+            const trimmed = String(name).trim();
+            if (!trimmed) return;
+            const copy = JSON.parse(JSON.stringify(routine));
+            copy.name = trimmed;
+            copy.id = this.generateRecordId('routine');
+            copy.created = new Date().toLocaleDateString();
+            copy.updatedAt = Date.now();
+            copy.deleted = false;
+            this.db.routines.push(copy);
+            this.save();
+            this.renderRoutines();
+        },
+
+        renderRoutineLibraryPane() {
+            const routines = this.activeRecords(this.db.routines || []);
+            const tags = this.collectLibraryTags();
+            const activeTag = this.normalizeTagText(this.db.libraryFilterTag || '');
+            const filtered = activeTag ? routines.filter(r => (r.tags || []).includes(activeTag)) : routines;
+            if (!routines.length) {
+                return `<div class="empty-state"><span class="material-symbols-rounded">bookmark_border</span><p>暂无方案</p><small>在训练页可保存当前计划到方案库</small></div>`;
+            }
+            return `${this.renderLibraryTagChips(tags, activeTag)}
+                <div class="library-list routine-library-list">
+                ${filtered.map(r => {
+                    const expanded = this.isCollapsed('routine_lib_' + r.id, true) === false;
+                    const rtTags = Array.isArray(r.tags) ? r.tags : [];
+                    return `<div class="routine-card library-card">
+                        <div class="routine-card-head" onclick="data.toggleCollapse('routine_lib_${r.id}')">
+                            <div style="flex:1;min-width:0">
+                                <strong>${this.escapeHtml(r.name || '未命名方案')}</strong>
+                                <small>${(r.actions || []).length}个动作 ${r.created ? '&middot; ' + this.escapeHtml(r.created) : ''}</small>
+                                ${rtTags.length ? `<div class="library-inline-tags">${rtTags.map(t => `<span>${this.escapeHtml(t)}</span>`).join('')}</div>` : ''}
+                            </div>
+                            <span class="routine-expand-icon material-symbols-rounded">${expanded ? 'expand_less' : 'expand_more'}</span>
+                        </div>
+                        ${expanded ? `<div class="routine-action-list">
+                            ${(r.actions || []).map((a, ai) => `<div class="routine-action-item">
+                                <span class="routine-action-idx">${ai + 1}</span>
+                                <span>${this.escapeHtml(a.name || '未命名动作')}</span>
+                                <small>${a.sets || 1}组×${a.reps || 1}次·${a.work || 5}s</small>
+                                <div class="routine-inline-actions">
+                                    <button class="icon-btn" onclick="event.stopPropagation();data.moveRoutineAction('${r.id}', ${ai}, -1)" type="button" aria-label="上移"><span class="material-symbols-rounded">expand_less</span></button>
+                                    <button class="icon-btn" onclick="event.stopPropagation();data.moveRoutineAction('${r.id}', ${ai}, 1)" type="button" aria-label="下移"><span class="material-symbols-rounded">expand_more</span></button>
+                                    <button class="icon-btn" onclick="event.stopPropagation();data.replaceRoutineAction('${r.id}', ${ai})" type="button" aria-label="替换"><span class="material-symbols-rounded">swap_horiz</span></button>
+                                    <button class="icon-btn" onclick="event.stopPropagation();data.saveActionFromRoutine('${r.id}', ${ai})" type="button" aria-label="保存到动作库"><span class="material-symbols-rounded">bookmark_add</span></button>
+                                    <button class="icon-btn" onclick="event.stopPropagation();data.removeRoutineAction('${r.id}', ${ai})" type="button" aria-label="删除"><span class="material-symbols-rounded">delete</span></button>
+                                </div>
+                            </div>`).join('')}
+                            <div class="library-card-actions">
+                                <button class="md-btn md-btn-tonal" onclick="event.stopPropagation();data.loadRoutineById('${r.id}')" type="button"><span class="material-symbols-rounded">upload</span>载入</button>
+                                <button class="md-btn md-btn-tonal" onclick="event.stopPropagation();data.renameRoutineFromLibrary('${r.id}')" type="button"><span class="material-symbols-rounded">edit</span>改名</button>
+                                <button class="md-btn md-btn-tonal" onclick="event.stopPropagation();data.editRoutineTags('${r.id}')" type="button"><span class="material-symbols-rounded">bookmark_add</span>标签</button>
+                                <button class="md-btn md-btn-tonal" onclick="event.stopPropagation();data.deriveRoutineFromLibrary('${r.id}')" type="button"><span class="material-symbols-rounded">add_circle</span>派生</button>
+                                <button class="md-btn md-btn-tonal" onclick="event.stopPropagation();data.deleteRoutineById('${r.id}')" type="button"><span class="material-symbols-rounded">delete</span>删除</button>
+                            </div>
+                        </div>` : ''}
+                    </div>`;
+                }).join('')}
+                </div>`;
         },
 
         renderRoutineLibrary() {
-            const routines = this.activeRecords(this.db.routines);
-            if (routines.length === 0) {
-                return `<div class="empty-state"><span class="material-symbols-rounded">bookmark_border</span><p>暂无保存的方案</p></div>`;
-            }
-            const allTags = [...new Set(routines.flatMap(r => r.tags || []))];
-            const filterTag = this._routineFilterTag || '';
-            const filtered = filterTag ? routines.filter(r => (r.tags || []).includes(filterTag)) : routines;
-            return `${allTags.length ? `<div class="routine-tag-chips" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
-                <button class="routine-tag-chip md-btn md-btn-tonal${!filterTag ? ' active' : ''}" onclick="data._routineFilterTag='';data.renderRoutines()" type="button" style="font-size:12px;padding:2px 10px">全部</button>
-                ${allTags.map(t => `<button class="routine-tag-chip md-btn md-btn-tonal${filterTag===t ? ' active' : ''}" onclick="data._routineFilterTag='${this.escapeHtml(t)}';data.renderRoutines()" type="button" style="font-size:12px;padding:2px 10px">${this.escapeHtml(t)}</button>`).join('')}
-            </div>` : ''}
-            ${filtered.map((r, ri) => {
-                const i = routines.indexOf(r);
-                const expanded = this.isCollapsed('routine_' + i, true) === false;
-                const tags = r.tags || [];
-                return `<div class="routine-card">
-                <div class="routine-card-head" onclick="data.toggleCollapse('routine_${i}')">
-                    <div style="flex:1;min-width:0">
-                        <strong>${r.name}</strong>
-                        <small>${r.actions.length}个动作 &middot; ${r.created}</small>
-                        ${tags.length ? `<div style="margin-top:2px">${tags.map(t => `<span style="display:inline-block;font-size:10px;padding:1px 6px;border-radius:8px;background:var(--md-sys-secondary-container);color:var(--md-sys-on-secondary-container);margin-right:4px">${this.escapeHtml(t)}</span>`).join('')}</div>` : ''}
-                    </div>
-                    <span class="routine-expand-icon material-symbols-rounded">${expanded ? 'expand_less' : 'expand_more'}</span>
-                </div>
-                ${expanded ? `<div class="routine-action-list">
-                    ${r.actions.map((a, ai) => `<div class="routine-action-item">
-                        <span class="routine-action-idx">${ai + 1}</span>
-                        <span>${a.name}</span>
-                        <small>${a.sets}组×${a.reps}次·${a.work}s</small>
-                    </div>`).join('')}
-                    <div class="routine-card-actions">
-                        <button class="md-btn md-btn-tonal" style="padding:0 14px;height:32px;font-size:12px" onclick="event.stopPropagation();data.loadRoutine(${i})"><span class="material-symbols-rounded" style="font-size:16px">upload</span> 载入</button>
-                        <button class="md-btn md-btn-tonal" style="padding:0 14px;height:32px;font-size:12px" onclick="event.stopPropagation();data.duplicateRoutine(${i})"><span class="material-symbols-rounded" style="font-size:16px">content_copy</span> 复制</button>
-                        <button class="delete-btn" onclick="event.stopPropagation();data.deleteRoutine(${i})"><span class="material-symbols-rounded">delete</span></button>
-                    </div>
-                </div>` : ''}
-            </div>`;
-            }).join('')}`;
+            return this.renderRoutineLibraryPane();
         },
 
         move(i, d) {

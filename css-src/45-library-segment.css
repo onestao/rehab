@@ -1,0 +1,201 @@
+/* --- Library Segment --- */
+.library-segment-wrap {
+    margin: 8px 12px 4px;
+}
+.library-segment {
+    position: relative;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px;
+    padding: 4px;
+    border-radius: var(--md-sys-shape-full);
+    background: var(--md-sys-surface-container);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--md-sys-outline-variant) 55%, transparent);
+}
+.library-segment-btn {
+    position: relative;
+    z-index: 1;
+    border: none;
+    border-radius: var(--md-sys-shape-full);
+    min-height: 36px;
+    padding: 0 8px;
+    background: transparent;
+    color: var(--md-sys-on-surface-variant);
+    font-weight: 700;
+    font-size: clamp(11px, 3.4vw, 14px);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: clip;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    transition:
+        color var(--md-sys-motion-duration-medium, 300ms) ease,
+        transform var(--md-sys-motion-duration-short, 180ms) var(--md-expressive-spring, cubic-bezier(.34,1.56,.64,1));
+}
+.library-segment-btn.active {
+    color: var(--md-sys-on-primary-container);
+}
+.library-segment-btn .material-symbols-rounded {
+    font-size: 18px;
+    transition: transform .28s var(--md-expressive-spring, cubic-bezier(.34,1.56,.64,1));
+}
+.library-segment-btn.active .material-symbols-rounded {
+    transform: scale(1.08);
+    font-variation-settings: 'FILL' 1;
+}
+.library-segment-btn:active {
+    transform: scale(.96);
+}
+.library-segment-indicator {
+    position: absolute;
+    top: 4px;
+    bottom: 4px;
+    left: 4px;
+    width: calc(50% - 2px);
+    border-radius: var(--md-sys-shape-full);
+    background: var(--md-sys-primary-container);
+    transition: transform .32s var(--md-expressive-spring, cubic-bezier(.34,1.56,.64,1));
+    pointer-events: none;
+}
+.library-segment-indicator.is-routines {
+    transform: translateX(calc(100% + 4px));
+}
+.library-swipe-deck {
+    display: flex;
+    width: 100%;
+    overflow-x: auto;
+    overflow-y: visible;
+    scroll-snap-type: x mandatory;
+    scroll-behavior: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    overscroll-behavior-x: contain;
+    touch-action: pan-x pan-y;
+    padding: 0;
+}
+.library-swipe-deck::-webkit-scrollbar {
+    display: none;
+}
+.library-swipe-page {
+    flex: 0 0 100%;
+    min-width: 0;
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
+    transform-origin: center top;
+    transition:
+        transform var(--md-sys-motion-duration-medium, 300ms) var(--md-sys-motion-emphasized-decelerate, cubic-bezier(.2,0,0,1)),
+        opacity var(--md-sys-motion-duration-short, 180ms) var(--md-sys-motion-emphasized, cubic-bezier(.2,0,0,1));
+    will-change: transform, opacity;
+    padding-bottom: 4px;
+}
+.library-list {
+    display: grid;
+    gap: 8px;
+}
+.library-card {
+    margin: 0 8px;
+}
+.library-card-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.library-inline-tags {
+    margin-top: 4px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+.library-inline-tags span {
+    display: inline-block;
+    font-size: 10px;
+    padding: 1px 6px;
+    border-radius: 8px;
+    background: var(--md-sys-secondary-container);
+    color: var(--md-sys-on-secondary-container);
+}
+.library-card-actions {
+    margin-top: 8px;
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+.library-card-actions .md-btn {
+    min-width: 0;
+    white-space: nowrap;
+    padding: 0 10px;
+    height: 34px;
+    flex: none;
+}
+.library-tag-chips {
+    display: flex;
+    gap: 6px;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    margin: 0 8px 8px;
+    padding-bottom: 2px;
+}
+.library-tag-chips::-webkit-scrollbar {
+    display: none;
+}
+.library-tag-chips .md-btn {
+    flex: none;
+    height: 28px;
+    padding: 0 10px;
+    font-size: 12px;
+    white-space: nowrap;
+}
+.routine-inline-actions {
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+}
+.routine-inline-actions .icon-btn {
+    width: 28px;
+    height: 28px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+.routine-inline-actions .icon-btn .material-symbols-rounded {
+    font-size: 16px;
+}
+@media (max-width: 480px) {
+    .library-segment-wrap {
+        margin: 6px 8px 4px;
+    }
+    .library-segment-btn {
+        gap: 4px;
+        padding: 0 4px;
+        min-height: 34px;
+    }
+    .library-card-actions .md-btn {
+        padding: 0 8px;
+        font-size: 12px;
+        gap: 4px;
+    }
+}
+@media (max-width: 360px) {
+    .library-segment-btn {
+        min-height: 32px;
+        padding: 0 2px;
+    }
+    .library-segment-btn .library-segment-label {
+        display: none;
+    }
+    .library-card-actions {
+        gap: 4px;
+    }
+    .library-card-actions .md-btn {
+        height: 32px;
+        padding: 0 6px;
+        font-size: 11px;
+    }
+    .library-card-actions .md-btn span:last-child {
+        display: none;
+    }
+}

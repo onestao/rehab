@@ -132,6 +132,21 @@
             return name.length > 4 ? name.slice(0, 4) : name;
         },
 
+        countActionReferences(actionId, routines = []) {
+            if (!actionId) return 0;
+            return (routines || []).reduce((count, routine) => {
+                const refs = (routine?.actions || []).filter(a => a && a.sourceActionId === actionId).length;
+                return count + refs;
+            }, 0);
+        },
+
+        mergeLibraryTags(actions = [], routines = []) {
+            const actionTags = (actions || []).flatMap(a => Array.isArray(a?.tags) ? a.tags : []);
+            const routineTags = (routines || []).flatMap(r => Array.isArray(r?.tags) ? r.tags : []);
+            return [...new Set([...actionTags, ...routineTags].map(t => String(t || '').trim()).filter(Boolean))]
+                .sort((a, b) => a.localeCompare(b, 'zh-CN'));
+        },
+
         bmiCategory(bmi) {
             if (bmi < 18.5) return { label: '偏瘦', color: '#0891b2', range: '< 18.5' };
             if (bmi < 24) return { label: '正常', color: '#059669', range: '18.5 - 24' };

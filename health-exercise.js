@@ -33,7 +33,12 @@
             ['slName','slWeight','slSets','slReps','slMinutes','slNote'].forEach(id => {
                 const el = document.getElementById(id); if (el) el.value = '';
             });
+            const prDiff = window.prTracker?.refresh?.(this.db)?.diff || [];
             this.saveAndBackup();
+            const actionDiff = prDiff.find(item => item.action === name);
+            if (actionDiff && window.toast?.show) {
+                toast.show(`💪 新 PR：${name} ${weightKg}kg × ${repsPerSet}`, 'success', 3200);
+            }
         },
         todayTrainingCalories() {
             const today = this.logicalDateKey();

@@ -38,6 +38,9 @@ export const cssSections = [
   { file: '39-workout-plan.css', marker: { type: 'exact', value: '/* ============================================\n   Workout Plan Card' } },
   { file: '36-responsive.css', marker: { type: 'pair', line: '/* ============================================', nextIncludes: 'Responsive' } },
   { file: '37-dark-mode.css', marker: { type: 'pair', line: '/* ============================================', nextIncludes: 'Dark Mode' } },
+  { file: '43-identity-card.css', marker: { type: 'exact', value: '/* --- Identity Card --- */' } },
+  { file: '44-theme-sheet.css',   marker: { type: 'exact', value: '/* --- Theme Sheet --- */' } },
+  { file: '45-library-segment.css', marker: { type: 'exact', value: '/* --- Library Segment --- */' } },
   { file: '41-m3e-effects.css', marker: { type: 'exact', value: '/* === M3 Expressive Effects === */' } },
   { file: '40-a11y.css', marker: { type: 'exact', value: '/* --- A11y --- */' } },
 ];

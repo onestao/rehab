@@ -68,6 +68,18 @@
 }
 .ai-encrypt-title .material-symbols-rounded { font-size: 18px; color: var(--md-sys-tertiary); }
 .ai-encrypt-section small { color: var(--md-sys-on-surface-variant); font-size: 11px; line-height: 1.4; }
+.ai-template-actions {
+    gap: 8px;
+    flex-wrap: nowrap;
+}
+.ai-template-actions .md-btn {
+    min-width: 0;
+    padding: 0 12px;
+    white-space: nowrap;
+}
+.ai-template-actions .material-symbols-rounded {
+    font-size: 18px;
+}
 .weight-chart-wrap {
     background: var(--md-sys-surface-container-lowest);
     border: 1px solid var(--md-sys-outline-variant);
@@ -134,4 +146,4 @@
 .weight-empty-chart .material-symbols-rounded { font-size: 34px; }
 .weight-list { display: grid; gap: 6px; }
 .weight-list-item { padding: 8px 10px; border-radius: var(--md-sys-shape-md); background: var(--md-sys-surface-container-lowest); }
-
+

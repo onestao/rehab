@@ -329,6 +329,7 @@ Object.assign(advicePanel, {
         const actions = msg.role === 'assistant'
             ? `<div class="advice-bubble-actions">
                 <button onclick="data.copyAdviceMessage(${msg.idx})" type="button">复制</button>
+                <button onclick="data.shareAdviceMessage(${msg.idx})" type="button">分享</button>
                 ${(msg.error || !msg.pending) ? `<button onclick="data.retryAdviceFrom(${msg.idx})" type="button">重试</button>` : ''}
                 ${versionGroup && versionGroup.length > 1
                     ? `<button onclick="data.deleteAdviceVersion('${msg.replyToId || msg.id}', '${msg.id}')" type="button">删除版本</button>`

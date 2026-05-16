@@ -70,3 +70,100 @@ export function takeQueueBatch(queue, limit = 20) {
     const q = Array.isArray(queue) ? queue : [];
     return { batch: q.slice(0, limit), tail: q.slice(limit) };
 }
+
+/**
+ * @param {Array<{id?: string, createdAt?: number}>} localVersions
+ * @param {Array<{id?: string, createdAt?: number}>} remoteVersions
+ */
+export function mergeAdviceVersions(localVersions, remoteVersions) {
+    const map = new Map();
+    for (const item of localVersions || []) {
+        if (!item?.id) continue;
+        map.set(item.id, item);
+    }
+    for (const item of remoteVersions || []) {
+        if (!item?.id) continue;
+        const current = map.get(item.id);
+        if (!current) {
+            map.set(item.id, item);
+            continue;
+        }
+        const currentTs = Number(current.createdAt || 0);
+        const nextTs = Number(item.createdAt || 0);
+        if (nextTs >= currentTs) map.set(item.id, item);
+    }
+    return Array.from(map.values()).sort((a, b) => Number(a.createdAt || 0) - Number(b.createdAt || 0));
+}
+
+/**
+ * @param {{id?: string, updatedAt?: number, versions?: Array<any>, activeVersionId?: string, pinnedVersionId?: string}} local
+ * @param {{id?: string, updatedAt?: number, versions?: Array<any>, activeVersionId?: string, pinnedVersionId?: string}} remote
+ */
+export function mergeAdviceRecord(local, remote) {
+    const lTs = Number(local?.updatedAt || 0);
+    const rTs = Number(remote?.updatedAt || 0);
+    const base = rTs >= lTs ? { ...local, ...remote } : { ...remote, ...local };
+    base.versions = mergeAdviceVersions(local?.versions || [], remote?.versions || []);
+    if (rTs >= lTs) {
+        base.activeVersionId = remote?.activeVersionId || base.activeVersionId || '';
+        base.pinnedVersionId = remote?.pinnedVersionId || base.pinnedVersionId || '';
+    } else {
+        base.activeVersionId = local?.activeVersionId || base.activeVersionId || '';
+        base.pinnedVersionId = local?.pinnedVersionId || base.pinnedVersionId || '';
+    }
+    base.updatedAt = Math.max(lTs, rTs);
+    return base;
+}
+
+/**
+ * @param {any} json
+ * @param {number} localSchemaVer
+ * @returns {{ ok: boolean, reason?: string, code?: string, db?: any }}
+ */
+export function validatePayload(json, localSchemaVer = 1) {
+    if (!json || typeof json !== 'object') return { ok: false, reason: '结构非法' };
+    const db = json.db || (json.actions ? json : null);
+    if (!db || typeof db !== 'object') return { ok: false, reason: '缺少 db 字段' };
+    if (json.checksum && typeof json.checksum !== 'string') return { ok: false, reason: 'checksum 类型错误' };
+    if ((json.schemaVersion || 1) > Number(localSchemaVer || 1)) {
+        return { ok: false, reason: 'schemaVersion 高于本地', code: 'SCHEMA_HIGHER' };
+    }
+    return { ok: true, db };
+}
+
+/**
+ * @param {Record<string, number>} remoteCounts
+ * @param {any} localDb
+ * @param {number} dropRatio
+ * @returns {Array<{ entity: string, remote: number, local: number }>}
+ */
+export function compareCounts(remoteCounts, localDb, dropRatio = 0.5) {
+    const warns = [];
+    if (!remoteCounts || typeof remoteCounts !== 'object') return warns;
+    const map = {
+        actions:  () => localDb?.actions?.length || 0,
+        routines: () => localDb?.routines?.length || 0,
+        history:  () => localDb?.history?.length || 0,
+        food:     () => localDb?.health?.foodLogs?.length || 0,
+        exercise: () => localDb?.health?.exerciseLogs?.length || 0,
+        weight:   () => localDb?.health?.weights?.length || 0
+    };
+    for (const k of Object.keys(remoteCounts)) {
+        const r = Number(remoteCounts[k] || 0);
+        const lFn = map[k];
+        if (!lFn) continue;
+        const l = lFn();
+        if (l > 0 && r < l * dropRatio) warns.push({ entity: k, remote: r, local: l });
+    }
+    return warns;
+}
+
+if (typeof window !== 'undefined') {
+    window.syncPure = window.syncPure || {};
+    Object.assign(window.syncPure, {
+        mergeIncremental, computeRetryDelay, isRetryableError,
+        mergeRecordsFieldwise, takeQueueBatch,
+        mergeAdviceVersions, mergeAdviceRecord,
+        validatePayload, compareCounts
+    });
+}

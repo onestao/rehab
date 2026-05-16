@@ -63,10 +63,15 @@
         return items.map(sanitizeTemplate);
     }
 
+    function applyTemplate(text, vars) {
+        return String(text || '').replace(/\{(\w+)\}/g, (_, key) => (key in vars ? String(vars[key] ?? '') : `{${key}}`));
+    }
+
     window.dataAiTemplates = {
         DEFAULT_TEMPLATES,
         ensureDefaultTemplates,
         sanitizeTemplate,
-        normalizeTemplates
+        normalizeTemplates,
+        applyTemplate
     };
 })();

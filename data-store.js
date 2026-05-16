@@ -75,6 +75,12 @@
             this.restoreActionDraft();
             if (window.cardio) cardio.initUI();
             if (window.onboarding && !this.db.onboarded) onboarding.show();
+
+            setTimeout(() => {
+                if (window.sync) {
+                    sync.processRetryQueue?.().catch(() => {});
+                }
+            }, 3000);
         },
 
         restoreActionDraft() {
@@ -91,11 +97,15 @@
             const nowTs = Date.now();
             this.db.schemaVersion = Math.max(Number(this.db.schemaVersion) || 0, this.SCHEMA_VERSION);
             this.db.cardio = { weight: 70, target: 30, type: 'walk', ...(this.db.cardio || {}) };
-            this.db.health = { weights: [], foodLogs: [], exerciseLogs: [], goalType: 'loss', bodyPlan: null, weightPlan: null, dietGoal: null, aiAdviceChat: [], ...(this.db.health || {}) };
+            this.db.health = { weights: [], foodLogs: [], exerciseLogs: [], goalType: 'loss', bodyPlan: null, weightPlan: null, dietGoal: null, aiAdviceChat: [], weeklyGoalSessions: 5, ...(this.db.health || {}) };
             this.db.actions = (this.db.actions || []).map(a => this.ensureRecordMeta(a, 'action', nowTs));
             this.db.routines = (this.db.routines || []).map(r => {
                 this.ensureRecordMeta(r, 'routine', nowTs);
-                r.actions = (r.actions || []).map(a => this.ensureRecordMeta(a, 'routine-action', Number(r.updatedAt || nowTs)));
+                r.actions = (r.actions || []).map(a => {
+                    const action = this.ensureRecordMeta(a, 'routine-action', Number(r.updatedAt || nowTs));
+                    if (!action.sourceActionId && action.id) action.sourceActionId = action.id;
+                    return action;
+                });
                 return r;
             });
             this.db.history = (this.db.history || []).map(h => {
@@ -107,10 +117,21 @@
             this.db.health.foodLogs = (this.db.health.foodLogs || []).map(item => this.ensureRecordMeta(item, 'food', nowTs));
             this.db.health.exerciseLogs = (this.db.health.exerciseLogs || []).map(item => this.ensureRecordMeta(item, 'exercise', nowTs));
             this.db.health.aiAdviceChat = (this.db.health.aiAdviceChat || []).map(item => this.ensureRecordMeta(item, 'advice', nowTs));
+            this.db.actions = this.db.actions.map(a => {
+                a.tags = Array.isArray(a.tags) ? a.tags.filter(Boolean) : [];
+                return a;
+            });
             this.db.aiTemplates = Array.isArray(this.db.aiTemplates) ? this.db.aiTemplates : [];
             this.db.aiTemplateActiveId = this.db.aiTemplateActiveId || '';
             this.db.aiTrash = Array.isArray(this.db.aiTrash) ? this.db.aiTrash : [];
+            const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
+            this.db.aiTrash = this.db.aiTrash.filter(item => Number(item?.deletedAt || 0) >= cutoff);
+            this.db.aiRetryMode = this.db.aiRetryMode || 'versioned';
             this.db.aiCipher = this.db.aiCipher && typeof this.db.aiCipher === 'object' ? this.db.aiCipher : null;
+            if (!this.db.aiCipher && this.db.encryptedAi && typeof this.db.encryptedAi === 'object') {
+                this.db.aiCipher = { id: 'ai-cipher', payload: this.db.encryptedAi, updatedAt: nowTs, deleted: false };
+            }
+            if (this.db.aiCipher?.payload) this.db.encryptedAi = this.db.aiCipher.payload;
             this.db.cache = this.db.cache && typeof this.db.cache === 'object' ? this.db.cache : {};
             this.db.cache.prByAction = this.db.cache.prByAction && typeof this.db.cache.prByAction === 'object' ? this.db.cache.prByAction : {};
             this.db.cache.prUpdatedAt = Number(this.db.cache.prUpdatedAt || 0);
@@ -132,11 +153,16 @@
             this.db.aiProfiles = this.db.aiProfiles || [];
             this.db.aiActiveId = this.db.aiActiveId || '';
             this.db.aiModels = this.db.aiModels || [];
+            this.db.libraryView = ['actions', 'routines'].includes(this.db.libraryView) ? this.db.libraryView : 'actions';
+            this.db.libraryFilterTag = typeof this.db.libraryFilterTag === 'string' ? this.db.libraryFilterTag : '';
             this.db.syncMeta = this.db.syncMeta || {};
             this.db.syncMeta.lastSyncAt = Number(this.db.syncMeta.lastSyncAt || 0);
             this.db.syncMeta.lastIncrementalTs = Number(this.db.syncMeta.lastIncrementalTs || 0);
             this.db.syncMeta.etags = this.db.syncMeta.etags || {};
             this.db.syncMeta.pendingQueue = Array.isArray(this.db.syncMeta.pendingQueue) ? this.db.syncMeta.pendingQueue : [];
+            this.db.syncMeta.lastArchiveDate = this.db.syncMeta.lastArchiveDate || '';
+            this.db.syncMeta.lastArchiveChecksum = this.db.syncMeta.lastArchiveChecksum || '';
+            this.db.syncMeta.conflictLog = Array.isArray(this.db.syncMeta.conflictLog) ? this.db.syncMeta.conflictLog : [];
             this.db.actions.forEach(a => { if (!a.phase) a.phase = 'main'; });
             this.db.routines.forEach(r => (r.actions || []).forEach(a => { if (!a.phase) a.phase = 'main'; }));
             if (window.dataAiTemplates && typeof window.dataAiTemplates.ensureDefaultTemplates === 'function') {
@@ -157,11 +183,17 @@
             return record;
         },
 
-        touchRecord(record) {
+        touchRecord(record, changedFields = null) {
             if (!record || typeof record !== 'object') return;
             if (!record.id) record.id = this.generateRecordId('rec');
-            record.updatedAt = Date.now();
+            const now = Date.now();
+            record.updatedAt = now;
             if (typeof record.deleted !== 'boolean') record.deleted = false;
+            if (Array.isArray(changedFields) && changedFields.length) {
+                record.__fieldUpdatedAt = record.__fieldUpdatedAt || {};
+                const iso = new Date(now).toISOString();
+                changedFields.forEach(k => { record.__fieldUpdatedAt[k] = iso; });
+            }
         },
 
         activeRecords(list) {
@@ -275,6 +307,9 @@
             this._dbDirty = true;
             this.schedulePersist();
             if (shouldRender) this.render();
+            if (options.sync !== false && window.sync && typeof sync.scheduleAutoPush === 'function') {
+                try { sync.scheduleAutoPush(); } catch (e) { console.warn('scheduleAutoPush failed', e); }
+            }
         },
 
         persistCfg() {
@@ -304,6 +339,9 @@
                 if (this._dbDirty) {
                     await Promise.resolve(this.resolveStorageAdapter().write(this.DB_KEY, this.db));
                     this._dbDirty = false;
+                    if (window.sync && typeof sync.scheduleAutoPush === 'function') {
+                        try { sync.scheduleAutoPush(); } catch {}
+                    }
                 }
                 this._resolvePersist?.();
             } catch (e) {
@@ -317,8 +355,8 @@
         async saveAndBackup() {
             this.save();
             await this.flush();
-            if (window.sync && typeof sync.autoBackup === 'function') {
-                try { await sync.autoBackup('history'); } catch (e) { console.warn('autoBackup skipped', e); }
+            if (window.sync && typeof sync.scheduleAutoPush === 'function') {
+                try { sync.scheduleAutoPush({ debounceMs: 0 }); } catch (e) { console.warn('scheduleAutoPush skipped', e); }
             }
         }
     };

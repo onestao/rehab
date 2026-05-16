@@ -9,6 +9,21 @@
     .record-quick-btn .material-symbols-rounded { font-size: 20px; }
     .record-tabs-scroll { margin: 4px 2px; padding: 3px 8px; }
     .record-tabs-scroll .record-tab { padding: 0 10px; font-size: 11px; }
+    #profile .record-tabs {
+        gap: 4px;
+        margin: 6px 8px;
+        padding: 3px;
+    }
+    #profile .record-tab {
+        gap: 3px;
+        min-height: 34px;
+        padding: 0 4px;
+        font-size: 11px;
+        white-space: nowrap;
+    }
+    #profile .record-tab .material-symbols-rounded {
+        font-size: 16px;
+    }
     .record-section-title { margin: 8px 12px 4px; }
     .record-overview-card { gap: 10px; }
     .record-overview-stats { gap: 6px; }
@@ -50,6 +65,22 @@
     .record-quick-actions { gap: 3px; margin: 0 6px 2px; }
     .record-quick-btn { padding: 6px 1px; font-size: 9px; }
     .record-quick-btn .material-symbols-rounded { font-size: 18px; }
+    #profile .record-tab {
+        gap: 2px;
+        padding: 0 2px;
+        font-size: 10px;
+    }
+    #profile .record-tab .material-symbols-rounded {
+        font-size: 14px;
+    }
+    .ai-template-actions .md-btn {
+        padding: 0 8px;
+        font-size: 12px;
+        gap: 4px;
+    }
+    .ai-template-actions .material-symbols-rounded {
+        font-size: 16px;
+    }
     .calendar-day { min-height: 40px; font-size: 10px; }
     .advice-bubble.assistant { max-width: 100%; }
     .advice-bubble-content { font-size: 13.5px; line-height: 1.64; }
