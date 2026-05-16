@@ -87,4 +87,20 @@
             }
         }
     };
+
+    document.addEventListener('click', function (e) {
+        var btn = e.target.closest('.context-ai-btn');
+        if (!btn) return;
+        var ctx = btn.dataset.aiCtx;
+        var idx = Number(btn.dataset.aiIdx);
+        if (!ctx || isNaN(idx)) return;
+        var list = data.contextAiPrompts?.(ctx);
+        if (list && list[idx]) data.askContextAi(ctx, list[idx].prompt);
+    }, { passive: true });
+
+    window.addEventListener('ai:ready', function () {
+        if (!window.data?.db) return;
+        var active = document.querySelector('.page.active')?.id;
+        if (active) window.dataViews.render(active);
+    });
 })();

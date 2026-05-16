@@ -3633,6 +3633,15 @@ body.is-training .fab-pip.active {
 }
 
 /* ============================================
+   Masked Input (disable Chrome password manager)
+   ============================================ */
+
+.masked-input {
+    -webkit-text-security: disc;
+    text-security: disc;
+}
+
+/* ============================================
    Responsive
    ============================================ */
 

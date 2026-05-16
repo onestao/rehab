@@ -155,6 +155,7 @@ Object.assign(ai, {
         }
         if (this.models.length) this.renderModels(this.models, true);
         this.checkEncrypted();
+        try { window.dispatchEvent(new CustomEvent('ai:ready')); } catch {}
     },
     // --- Encryption (AES-GCM + PBKDF2) ---
     async deriveKey(password, salt) {
@@ -240,5 +241,5 @@ Object.assign(ai, {
         } catch {
             alert('解密失败：密码错误或数据损坏');
         }
-    },
+    }
 });

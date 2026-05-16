@@ -149,14 +149,11 @@
         },
 
         renderRecordQuickActions() {
-            const aiPrompt = this.isGainMode()
-                ? '请以增肌目标为前提，分析我今天的饮食、训练和体重记录，并给出今晚或明天的调整建议'
-                : '请分析我今天的饮食、训练和体重记录，并给出今晚或明天的调整建议';
             return `<div class="record-quick-actions">
             <button class="record-quick-btn" onclick="data.openDietModal()"><span class="material-symbols-rounded">restaurant</span><span>记饮食</span></button>
             <button class="record-quick-btn" onclick="data.openExerciseModal()"><span class="material-symbols-rounded">fitness_center</span><span>记运动</span></button>
             <button class="record-quick-btn" onclick="data.openWeightModal()"><span class="material-symbols-rounded">monitor_weight</span><span>记体重</span></button>
-            <button class="record-quick-btn record-quick-btn-ai" onclick="data.askContextAi('today','${aiPrompt}')"><span class="material-symbols-rounded">psychology</span><span>问 AI</span></button>
+            <button class="record-quick-btn record-quick-btn-ai context-ai-btn" data-ai-ctx="today" data-ai-idx="0"><span class="material-symbols-rounded">psychology</span><span>问 AI</span></button>
         </div>`;
         },
 
@@ -405,11 +402,11 @@
         },
 
         renderContextAiCard(context) {
-            const hasRuntimeAi = !!(window.ai && ai.cfg?.enabled);
             const hasStoredAi = !!(this.db?.aiProfiles?.length && (this.db.aiActiveId || this.db.aiProfiles[0]?.id));
-            if (!hasRuntimeAi && !hasStoredAi) return '';
+            const hasRuntimeAi = !!(window.ai && ai.cfg?.enabled);
+            if (!hasStoredAi && !hasRuntimeAi) return '';
             const prompts = this.contextAiPrompts(context);
-            return '<div class="md-card context-ai-card"><div class="context-ai-head"><div><span class="cardio-kicker">AI 建议</span><h3>' + this.contextAiTitle(context) + '</h3><small>' + this.contextAiDescription(context) + '</small></div><span class="context-ai-icon material-symbols-rounded">psychology</span></div><div class="context-ai-actions">' + prompts.map(p => '<button class="md-btn md-btn-tonal context-ai-btn" onclick="data.askContextAi(\'' + context + '\',\'' + this.escapeHtml(p.prompt) + '\')">' + p.label + '</button>').join('') + '</div></div>';
+            return '<div class="md-card context-ai-card" data-ai-card="' + context + '"><div class="context-ai-head"><div><span class="cardio-kicker">AI 建议</span><h3>' + this.contextAiTitle(context) + '</h3><small>' + this.contextAiDescription(context) + '</small></div><span class="context-ai-icon material-symbols-rounded">psychology</span></div><div class="context-ai-actions">' + prompts.map(function (p, i) { return '<button class="md-btn md-btn-tonal context-ai-btn" data-ai-ctx="' + context + '" data-ai-idx="' + i + '">' + p.label + '</button>'; }).join('') + '</div></div>';
         },
 
         contextAiTitle(context) { return { today: '综合分析', diet: '饮食分析', exercise: '训练分析', weight: '体重分析', calendar: '日历分析' }[context] || 'AI 分析'; },
@@ -418,7 +415,9 @@
         contextAiPrompts(context) {
             const isGain = this.isGainMode();
             return {
-                today: [{ label: '分析今天', prompt: '请分析我今天的饮食、训练和体重记录，并给出今晚或明天的调整建议' }, { label: '晚餐建议', prompt: '根据今天已经摄入的饮食和目标，给我晚餐建议' }, { label: '明日调整', prompt: '根据今天记录，帮我安排明天的饮食和训练重点' }],
+                today: isGain
+                    ? [{ label: '分析今天', prompt: '请以增肌目标为前提，分析我今天的饮食、训练和体重记录，并给出今晚或明天的调整建议' }, { label: '晚餐建议', prompt: '根据今天已经摄入的饮食和增肌目标，给我晚餐建议' }, { label: '明日调整', prompt: '根据今天记录，帮我安排明天的饮食和训练重点（增肌方向）' }]
+                    : [{ label: '分析今天', prompt: '请分析我今天的饮食、训练和体重记录，并给出今晚或明天的调整建议' }, { label: '晚餐建议', prompt: '根据今天已经摄入的饮食和目标，给我晚餐建议' }, { label: '明日调整', prompt: '根据今天记录，帮我安排明天的饮食和训练重点' }],
                 diet: [{ label: '饮食分析', prompt: '请分析我今天和最近的饮食结构，重点看热量和蛋白质是否达标' }, { label: '补蛋白建议', prompt: '我今天蛋白质够不够？如果不够，建议怎么补' }, { label: '热量控制', prompt: '请根据我的饮食记录判断热量控制是否合理' }],
                 exercise: [{ label: '训练强度', prompt: '请分析我最近训练频率和强度是否合理' }, { label: '恢复建议', prompt: '根据最近训练记录，帮我安排一次恢复训练' }, { label: '训练调整', prompt: '我应该增加还是减少训练量？请结合记录判断' }],
                 weight: isGain

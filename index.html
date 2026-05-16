@@ -223,7 +223,7 @@
                         <label>AI 服务</label>
                     </div>
                     <div class="md-field"><input type="text" id="aiBaseUrl" placeholder=" "><label>Base URL</label></div>
-                    <div class="md-field"><input type="password" id="aiApiKey" placeholder=" " autocomplete="new-password" data-lpignore="true" data-form-type="other"><label>API Key</label></div>
+                    <div class="md-field"><input type="text" id="aiApiKey" class="masked-input" placeholder=" " autocomplete="off" spellcheck="false"><label>API Key</label></div>
                     <button class="md-btn md-btn-tonal" onclick="ai.fetchModels()"><span class="material-symbols-rounded">refresh</span> 获取可用模型</button>
                     <div id="aiFetchStatus" class="food-ai-status"></div>
                     <div id="aiModelList" class="ai-model-list hidden"></div>
@@ -233,7 +233,7 @@
                          <div class="ai-encrypt-section">
                              <div class="ai-encrypt-title"><span class="material-symbols-rounded">lock</span> 加密同步 AI 配置</div>
                              <small>设置密码后会将所有 AI 配置档案一起加密写入同步数据，和训练记录同文件备份</small>
-                             <div class="md-field"><input type="password" id="aiEncryptPass" placeholder=" " autocomplete="new-password" data-lpignore="true" data-form-type="other"><label>加密密码</label></div>
+                             <div class="md-field"><input type="text" id="aiEncryptPass" class="masked-input" placeholder=" " autocomplete="off" spellcheck="false"><label>加密密码</label></div>
                              <button class="md-btn md-btn-tonal" onclick="ai.exportToSync()"><span class="material-symbols-rounded">upload</span> 加密并写入同步数据</button>
                          </div>
                          <div class="md-divider"></div>
@@ -257,7 +257,7 @@
                     <div id="aiDecryptSection" class="ai-encrypt-section hidden">
                         <div class="ai-encrypt-title"><span class="material-symbols-rounded">lock_open</span> 恢复 AI 配置</div>
                         <small>检测到同步中的加密 AI 配置，输入密码恢复所有档案</small>
-                        <div class="md-field"><input type="password" id="aiDecryptPass" placeholder=" " autocomplete="new-password" data-lpignore="true" data-form-type="other"><label>解密密码</label></div>
+                        <div class="md-field"><input type="text" id="aiDecryptPass" class="masked-input" placeholder=" " autocomplete="off" spellcheck="false"><label>解密密码</label></div>
                         <button class="md-btn md-btn-tonal" onclick="ai.importFromSync()"><span class="material-symbols-rounded">download</span> 解密恢复</button>
                     </div>
                 </div>
@@ -275,12 +275,12 @@
                         <div class="md-field"><input type="text" id="s3Region" placeholder=" "><label>Region (如 us-east-1)</label></div>
                         <div class="md-field"><input type="text" id="s3Bucket" placeholder=" "><label>Bucket</label></div>
                         <div class="md-field"><input type="text" id="s3Key" placeholder=" "><label>Access Key</label></div>
-                        <div class="md-field"><input type="password" id="s3Secret" placeholder=" " autocomplete="new-password" data-lpignore="true" data-form-type="other"><label>Secret Key</label></div>
+                        <div class="md-field"><input type="text" id="s3Secret" class="masked-input" placeholder=" " autocomplete="off" spellcheck="false"><label>Secret Key</label></div>
                     </div>
                     <div id="webdavFields" class="hidden">
                         <div class="md-field"><input type="text" id="davUrl" placeholder=" "><label>WebDAV 地址</label></div>
                         <div class="md-field"><input type="text" id="davUser" placeholder=" "><label>用户名</label></div>
-                        <div class="md-field"><input type="password" id="davPass" placeholder=" " autocomplete="new-password" data-lpignore="true" data-form-type="other"><label>密码 / App Password</label></div>
+                        <div class="md-field"><input type="text" id="davPass" class="masked-input" placeholder=" " autocomplete="off" spellcheck="false"><label>密码 / App Password</label></div>
                         <div class="md-field"><input type="text" id="davPath" placeholder=" "><label>备份文件路径</label></div>
                     </div>
                     <div class="sync-actions">

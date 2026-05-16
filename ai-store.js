@@ -95,6 +95,7 @@ const ai = {
         if (saveData) this.persistDataDb(renderData);
         this.syncUI();
         this.checkEncrypted();
+        try { window.dispatchEvent(new CustomEvent('ai:ready')); } catch {}
     },
 
     // --- IndexedDB ---
