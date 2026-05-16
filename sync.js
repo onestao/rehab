@@ -452,9 +452,9 @@ const sync = {
                     throw new Error('用户拒绝远端覆盖');
                 }
                 try {
-                    if (window.backup && typeof backup.buildArchive === 'function') {
-                        const { blob, filename } = await backup.buildArchive();
-                        await backup.snapshotToRing(blob, filename, 'pre-downgrade');
+                    if (window.backup && typeof window.backup.buildArchive === 'function') {
+                        const { blob, filename } = await window.backup.buildArchive();
+                        await window.backup.snapshotToRing(blob, filename, 'pre-downgrade');
                     }
                 } catch {}
             }
@@ -464,9 +464,9 @@ const sync = {
         }
 
         try {
-            if (window.backup && typeof backup.buildArchive === 'function') {
-                const { blob, filename } = await backup.buildArchive();
-                await backup.snapshotToRing(blob, filename, 'pre-pull');
+            if (window.backup && typeof window.backup.buildArchive === 'function') {
+                const { blob, filename } = await window.backup.buildArchive();
+                await window.backup.snapshotToRing(blob, filename, 'pre-pull');
             }
         } catch (e) {
             console.warn('pre-pull snapshot failed', e);
@@ -735,7 +735,7 @@ const sync = {
                 const ymd = today.toISOString().slice(0, 10);
                 const meta2 = this.getSyncMeta();
                 if (meta2.lastArchiveDate !== ymd) {
-                    const { blob, filename, checksum } = await backup.buildArchive();
+                    const { blob, filename, checksum } = await window.backup.buildArchive();
                     const yyyy = ymd.slice(0, 4), mm = ymd.slice(5, 7), dd = ymd.slice(8, 10);
                     const remotePath = `backup/${yyyy}/${mm}/${dd}/${filename}`;
                     await this.withRetry(() => this.writeRawBlob(remotePath, blob, 'application/gzip'));
