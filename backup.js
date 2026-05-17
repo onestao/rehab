@@ -85,75 +85,73 @@ const backup = {
                     blob
                 });
                 tx.oncomplete = () => {
-                    const countReq = store.count();
-                    countReq.onsuccess = () => {
-                        const doPrune = async () => {
-                            let totalBytes = 0;
-                            const allItems = await new Promise((res, rej) => {
-                                const r = store.getAll();
-                                r.onsuccess = () => res(r.result || []);
-                                r.onerror = () => rej(r.error);
+                    const doPrune = async () => {
+                        let totalBytes = 0;
+                        const allItems = await new Promise((res, rej) => {
+                            const readTx = db.transaction('snapshots', 'readonly');
+                            const readStore = readTx.objectStore('snapshots');
+                            const r = readStore.getAll();
+                            r.onsuccess = () => res(r.result || []);
+                            r.onerror = () => rej(r.error);
+                        });
+
+                        let quotaLow = false;
+                        if (navigator.storage?.estimate) {
+                            try {
+                                const est = await navigator.storage.estimate();
+                                if (est.quota && est.usage > est.quota * 0.9) quotaLow = true;
+                            } catch {}
+                        }
+
+                        const targetCount = quotaLow ? 3 : MAX_RING_COUNT;
+                        allItems.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+
+                        const toDelete = [];
+                        const keptSources = new Set();
+
+                        for (const item of allItems) {
+                            if (toDelete.length >= allItems.length - targetCount) {
+                                toDelete.push(item);
+                                continue;
+                            }
+                            totalBytes += item.size || 0;
+                            if (totalBytes > MAX_RING_BYTES && toDelete.length < allItems.length - 3) {
+                                toDelete.push(item);
+                                continue;
+                            }
+                            if (CRITICAL_SOURCES.has(item.source)) {
+                                keptSources.add(item.source);
+                            }
+                        }
+
+                        const protectedItems = [];
+                        const deletable = [];
+                        for (const item of toDelete) {
+                            if (CRITICAL_SOURCES.has(item.source) && !keptSources.has(item.source)) {
+                                keptSources.add(item.source);
+                                protectedItems.push(item);
+                            } else {
+                                deletable.push(item);
+                            }
+                        }
+
+                        const finalDelete = [...protectedItems.length ? [] : toDelete.filter(i => !CRITICAL_SOURCES.has(i.source)), ...deletable];
+
+                        if (finalDelete.length > 0) {
+                            const delTx = db.transaction('snapshots', 'readwrite');
+                            const delStore = delTx.objectStore('snapshots');
+                            for (const item of finalDelete) {
+                                delStore.delete(item.id);
+                            }
+                            await new Promise((res, rej) => {
+                                delTx.oncomplete = () => res();
+                                delTx.onerror = () => rej(delTx.error);
                             });
-
-                            let quotaLow = false;
-                            if (navigator.storage?.estimate) {
-                                try {
-                                    const est = await navigator.storage.estimate();
-                                    if (est.quota && est.usage > est.quota * 0.9) quotaLow = true;
-                                } catch {}
-                            }
-
-                            const targetCount = quotaLow ? 3 : MAX_RING_COUNT;
-                            allItems.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
-
-                            const toDelete = [];
-                            const keptSources = new Set();
-
-                            for (const item of allItems) {
-                                if (toDelete.length >= allItems.length - targetCount) {
-                                    toDelete.push(item);
-                                    continue;
-                                }
-                                totalBytes += item.size || 0;
-                                if (totalBytes > MAX_RING_BYTES && toDelete.length < allItems.length - 3) {
-                                    toDelete.push(item);
-                                    continue;
-                                }
-                                if (CRITICAL_SOURCES.has(item.source)) {
-                                    keptSources.add(item.source);
-                                }
-                            }
-
-                            const protectedItems = [];
-                            const deletable = [];
-                            for (const item of toDelete) {
-                                if (CRITICAL_SOURCES.has(item.source) && !keptSources.has(item.source)) {
-                                    keptSources.add(item.source);
-                                    protectedItems.push(item);
-                                } else {
-                                    deletable.push(item);
-                                }
-                            }
-
-                            const finalDelete = [...protectedItems.length ? [] : toDelete.filter(i => !CRITICAL_SOURCES.has(i.source)), ...deletable];
-
-                            if (finalDelete.length > 0) {
-                                const delTx = db.transaction('snapshots', 'readwrite');
-                                const delStore = delTx.objectStore('snapshots');
-                                for (const item of finalDelete) {
-                                    delStore.delete(item.id);
-                                }
-                                await new Promise((res, rej) => {
-                                    delTx.oncomplete = () => res();
-                                    delTx.onerror = () => rej(delTx.error);
-                                });
-                            }
-                            db.close();
-                        };
-
-                        doPrune().then(resolve).catch((err) => { db.close(); resolve(); });
+                        }
+                        db.close();
                     };
-                    countReq.onerror = () => { db.close(); resolve(); };
+
+                    doPrune().then(resolve).catch((err) => { db.close(); resolve(); });
                 };
                 tx.onerror = () => { db.close(); reject(tx.error); };
             };
