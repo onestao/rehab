@@ -17,14 +17,15 @@
         },
 
         renderTodayPage() {
+            const ctx = window.data || this;
             const overview = document.getElementById('todayOverview');
             const quickActions = document.getElementById('todayQuickActions');
             const timeline = document.getElementById('todayTimeline');
             const aiCard = document.getElementById('todayAiCard');
-            if (overview) overview.innerHTML = this.renderRecordOverview();
-            if (quickActions) quickActions.innerHTML = this.renderRecordQuickActions();
-            if (timeline) timeline.innerHTML = this.renderTodayTimeline();
-            if (aiCard) aiCard.innerHTML = this.renderContextAiCard?.('today') || '';
+            if (overview) overview.innerHTML = ctx.renderRecordOverview?.() || '';
+            if (quickActions) quickActions.innerHTML = ctx.renderRecordQuickActions?.() || '';
+            if (timeline) timeline.innerHTML = ctx.renderTodayTimeline?.() || '';
+            if (aiCard) aiCard.innerHTML = ctx.renderContextAiCard?.('today') || '';
         },
 
         renderDietPage() {
@@ -89,8 +90,11 @@
     };
 
     document.addEventListener('click', function (e) {
-        var btn = e.target.closest('.context-ai-btn');
+        var target = e.target;
+        if (!(target instanceof Element)) return;
+        var btn = target.closest('.context-ai-btn');
         if (!btn) return;
+        if (!(btn instanceof HTMLElement)) return;
         var ctx = btn.dataset.aiCtx;
         var idx = Number(btn.dataset.aiIdx);
         if (!ctx || isNaN(idx)) return;

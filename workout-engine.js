@@ -4,7 +4,7 @@ const workoutEngine = {
     skipOverride: null,
 
     currentActions() {
-        return data.activeRecords(data.db.actions || []);
+        return (data._planActions ? data._planActions() : data.activeRecords(data.db.actions || [])).filter(a => !a.libOnly);
     },
 
     createInitialState() {

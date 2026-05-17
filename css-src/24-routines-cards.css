@@ -38,6 +38,7 @@
     border-radius: var(--md-sys-shape-sm);
     background: var(--md-sys-surface-container-lowest);
     font-size: 13px;
+    flex-wrap: wrap;
 }
 .routine-action-item span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .routine-action-item small { color: var(--md-sys-on-surface-variant); white-space: nowrap; font-size: 11px; }
@@ -62,4 +63,81 @@
     padding-top: 10px;
     border-top: 1px solid var(--md-sys-outline-variant);
 }
-
+.routine-inline-actions {
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    flex: none;
+}
+.routine-inline-actions .icon-btn {
+    width: 28px;
+    height: 28px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+.routine-inline-actions .icon-btn .material-symbols-rounded {
+    font-size: 16px;
+}
+@media (max-width: 480px) {
+    .library-segment-wrap {
+        margin: 6px 8px 4px;
+    }
+    .library-segment-btn {
+        gap: 4px;
+        padding: 0 4px;
+        min-height: 34px;
+    }
+    .library-card-actions .md-btn {
+        padding: 0 8px;
+        font-size: 12px;
+        gap: 4px;
+    }
+    .routine-action-item {
+        gap: 6px;
+        padding: 6px 8px;
+    }
+    .routine-inline-actions {
+        margin-left: auto;
+        gap: 1px;
+    }
+    .routine-inline-actions .icon-btn {
+        width: 26px;
+        height: 26px;
+    }
+    .routine-inline-actions .icon-btn .material-symbols-rounded {
+        font-size: 15px;
+    }
+}
+@media (max-width: 360px) {
+    .library-segment-btn {
+        min-height: 32px;
+        padding: 0 2px;
+    }
+    .library-segment-btn .library-segment-label {
+        display: none;
+    }
+    .library-card-actions {
+        gap: 4px;
+    }
+    .library-card-actions .md-btn {
+        height: 32px;
+        padding: 0 6px;
+        font-size: 11px;
+    }
+    .library-card-actions .md-btn span:last-child {
+        display: none;
+    }
+    .routine-inline-actions .icon-btn[aria-label="上移"],
+    .routine-inline-actions .icon-btn[aria-label="下移"] {
+        display: none;
+    }
+    .routine-inline-actions .icon-btn {
+        width: 24px;
+        height: 24px;
+    }
+    .routine-inline-actions .icon-btn .material-symbols-rounded {
+        font-size: 14px;
+    }
+}

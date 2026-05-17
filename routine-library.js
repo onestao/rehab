@@ -1,8 +1,108 @@
 // @ts-nocheck
 (function () {
     window.dataRoutineLibrary = {
-        addAction() {
-            const a = {
+        // ---- M3E modal helpers (avoid native prompt/confirm) ----
+        _activeModalEl: null,
+        _closeActiveModal() {
+            const el = this._activeModalEl || document.querySelector('.md-modal[data-rl-modal="1"]');
+            if (el) el.remove();
+            this._activeModalEl = null;
+            if (window.focusTrap?.release) window.focusTrap.release();
+        },
+
+        _openModal({ title, icon, bodyHtml, actionsHtml, onMount }) {
+            this._closeActiveModal();
+            const modal = document.createElement('div');
+            modal.className = 'md-modal';
+            modal.setAttribute('data-rl-modal', '1');
+            modal.setAttribute('role', 'dialog');
+            modal.setAttribute('aria-modal', 'true');
+            modal.innerHTML = `
+                <div class="md-modal-backdrop" data-modal-close></div>
+                <div class="md-modal-card">
+                    <div class="md-modal-head">
+                        <strong>${icon ? `<span class="material-symbols-rounded" style="font-size:20px;vertical-align:-4px;margin-right:6px">${this.escapeHtml(icon)}</span>` : ''}${this.escapeHtml(title || '')}</strong>
+                        <button class="md-icon-btn" type="button" data-modal-close aria-label="关闭" style="width:40px;height:40px;border:0;border-radius:999px;display:inline-grid;place-items:center;background:var(--md-sys-surface-container-high);color:var(--md-sys-on-surface-variant)">
+                            <span class="material-symbols-rounded">close</span>
+                        </button>
+                    </div>
+                    <div class="md-modal-body">${bodyHtml || ''}</div>
+                    <div class="md-row modal-actions">${actionsHtml || ''}</div>
+                </div>`;
+
+            const close = () => this._closeActiveModal();
+            modal.querySelectorAll('[data-modal-close]').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    // backdrop and explicit close button
+                    e.preventDefault();
+                    close();
+                });
+            });
+
+            document.body.appendChild(modal);
+            this._activeModalEl = modal;
+            if (window.focusTrap?.trap) window.focusTrap.trap(modal);
+            try { onMount?.(modal, close); } catch {}
+        },
+
+        _confirmModal({ title, icon, message, okText, cancelText, danger, onOk }) {
+            const msg = this.escapeHtml(message || '').replace(/\n/g, '<br>');
+            const showCancel = (cancelText !== '');
+            this._openModal({
+                title,
+                icon,
+                bodyHtml: `<div style="color:var(--md-sys-on-surface-variant);font-size:13px;line-height:1.45">${msg}</div>`,
+                actionsHtml: `
+                    ${showCancel ? `<button class=\"md-btn\" type=\"button\" data-modal-close>${this.escapeHtml(cancelText || '取消')}</button>` : ''}
+                    <button class="md-btn md-btn-filled" type="button" data-rl-ok style="${danger ? 'background:var(--md-sys-error);color:var(--md-sys-on-error)' : ''}">${this.escapeHtml(okText || '确定')}</button>
+                `,
+                onMount: (root, close) => {
+                    root.querySelector('[data-rl-ok]')?.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        try { onOk?.(); } finally { close(); }
+                    });
+                }
+            });
+        },
+
+        _textPromptModal({ title, icon, label, placeholder, initialValue, okText, cancelText, onOk }) {
+            const escVal = v => this.escapeHtml(v || '');
+            this._openModal({
+                title,
+                icon,
+                bodyHtml: `
+                    <div class="md-field" style="margin:0">
+                        <input id="rlPromptInput" type="text" placeholder=" " autocomplete="off" value="${escVal(initialValue)}">
+                        <label>${this.escapeHtml(label || '')}</label>
+                    </div>
+                    ${placeholder ? `<div style="margin-top:6px;color:var(--md-sys-on-surface-variant);font-size:12px">${this.escapeHtml(placeholder)}</div>` : ''}
+                `,
+                actionsHtml: `
+                    <button class="md-btn" type="button" data-modal-close>${this.escapeHtml(cancelText || '取消')}</button>
+                    <button class="md-btn md-btn-filled" type="button" data-rl-ok>${this.escapeHtml(okText || '保存')}</button>
+                `,
+                onMount: (root, close) => {
+                    const input = root.querySelector('#rlPromptInput');
+                    input?.focus?.();
+                    const commit = () => {
+                        const val = String(input?.value ?? '').trim();
+                        if (!val) return;
+                        try { onOk?.(val); } finally { close(); }
+                    };
+                    root.querySelector('[data-rl-ok]')?.addEventListener('click', (e) => { e.preventDefault(); commit(); });
+                    input?.addEventListener('keydown', (e) => {
+                        if (e.key === 'Enter') { e.preventDefault(); commit(); }
+                    });
+                }
+            });
+        },
+
+        _planActions() {
+            return this.activeRecords(this.db.actions).filter(a => !a.libOnly);
+        },
+
+        _readActionForm() {
+            return {
                 name: document.getElementById('name').value || '未命名',
                 sets: parseInt(document.getElementById('sets').value) || 1,
                 reps: parseInt(document.getElementById('reps').value) || 1,
@@ -13,7 +113,13 @@
                 switchRest: 3,
                 isAlt: document.getElementById('isAlt').checked,
                 phase: document.getElementById('actionPhase')?.value || 'main',
-                tags: [],
+                tags: []
+            };
+        },
+
+        addAction() {
+            const a = {
+                ...this._readActionForm(),
                 id: this.generateRecordId('action'),
                 updatedAt: Date.now(),
                 deleted: false
@@ -31,12 +137,59 @@
             document.getElementById('name').value = '';
         },
 
+        saveCurrentActionToLibrary() {
+            const name = document.getElementById('name').value.trim();
+            if (!name) {
+                this._confirmModal({
+                    title: '缺少名称',
+                    icon: 'info',
+                    message: '请先输入动作名称。',
+                    okText: '知道了',
+                    cancelText: '',
+                    onOk: () => { try { document.getElementById('name')?.focus?.(); } catch {} }
+                });
+                return;
+            }
+            const a = {
+                ...this._readActionForm(),
+                name,
+                libOnly: true,
+                id: this.generateRecordId('action'),
+                updatedAt: Date.now(),
+                deleted: false
+            };
+            this.db.actions.push(a);
+            this.save();
+            if (window.toast?.show) toast.show(`"${name}" 已存入动作库`, 'success');
+        },
+
         saveRoutine() {
             const nameInput = document.getElementById('newRoutineName');
             const name = nameInput.value.trim();
-            if (!name) return alert('请输入方案名称');
-            const actions = this.activeRecords(this.db.actions);
-            if (actions.length === 0) return alert('请先添加训练动作');
+            if (!name) {
+                this._confirmModal({
+                    title: '缺少名称',
+                    icon: 'info',
+                    message: '请输入方案名称。',
+                    okText: '知道了',
+                    cancelText: '',
+                    onOk: () => {
+                        try { nameInput?.focus?.(); } catch {}
+                    }
+                });
+                return;
+            }
+            const actions = this._planActions();
+            if (actions.length === 0) {
+                this._confirmModal({
+                    title: '暂无动作',
+                    icon: 'fitness_center',
+                    message: '请先添加训练动作。',
+                    okText: '知道了',
+                    cancelText: ''
+                });
+                return;
+            }
             const tagsInput = document.getElementById('routineTagsInput');
             const tags = tagsInput ? tagsInput.value.split(/[,，]/).map(t => t.trim()).filter(Boolean) : [];
             const routine = {
@@ -56,28 +209,64 @@
             nameInput.value = '';
             if (tagsInput) tagsInput.value = '';
             this.save();
-            alert('方案 "' + name + '" 已保存');
+            if (window.toast?.show) {
+                toast.show(`方案 "${name}" 已保存`, 'success');
+            } else {
+                this._confirmModal({
+                    title: '已保存',
+                    icon: 'check_circle',
+                    message: `方案 "${name}" 已保存。`,
+                    okText: '好的',
+                    cancelText: ''
+                });
+            }
         },
 
         loadRoutine(idx) {
             const routines = this.activeRecords(this.db.routines);
             const r = routines[idx];
             if (!r) return;
-            const hasActions = this.activeRecords(this.db.actions).length > 0;
+            const hasActions = this._planActions().length > 0;
             if (!hasActions) {
                 this.db.actions = JSON.parse(JSON.stringify(r.actions));
                 this.save();
                 ui.tab('workout', document.querySelector('.nav-item'));
                 return;
             }
-            const choice = confirm(`当前已有 ${this.activeRecords(this.db.actions).length} 个动作。\n点"确定"=替换，点"取消"=追加`);
-            if (choice) {
-                this.db.actions = JSON.parse(JSON.stringify(r.actions));
-            } else {
-                this.db.actions = this.db.actions.concat(JSON.parse(JSON.stringify(r.actions)));
-            }
-            this.save();
-            ui.tab('workout', document.querySelector('.nav-item'));
+            const currentCount = this._planActions().length;
+            this._openModal({
+                title: '导入方案',
+                icon: 'library_books',
+                bodyHtml: `
+                    <div style="color:var(--md-sys-on-surface-variant);font-size:13px;line-height:1.45">
+                        当前已有 <b style="color:var(--md-sys-on-surface)">${currentCount}</b> 个动作。<br>
+                        选择导入方式：
+                    </div>
+                    <div style="margin-top:10px;display:grid;gap:8px">
+                        <button class="md-btn md-btn-tonal" type="button" data-rl-import="append">
+                            <span class="material-symbols-rounded">add</span> 追加到当前计划
+                        </button>
+                        <button class="md-btn md-btn-filled" type="button" data-rl-import="replace">
+                            <span class="material-symbols-rounded">swap_horiz</span> 替换当前计划
+                        </button>
+                    </div>
+                `,
+                actionsHtml: `<button class="md-btn" type="button" data-modal-close>取消</button>`,
+                onMount: (root, close) => {
+                    const commit = (mode) => {
+                        if (mode === 'replace') {
+                            this.db.actions = JSON.parse(JSON.stringify(r.actions));
+                        } else {
+                            this.db.actions = this.db.actions.concat(JSON.parse(JSON.stringify(r.actions)));
+                        }
+                        this.save();
+                        close();
+                        ui.tab('workout', document.querySelector('.nav-item'));
+                    };
+                    root.querySelector('[data-rl-import="append"]')?.addEventListener('click', (e) => { e.preventDefault(); commit('append'); });
+                    root.querySelector('[data-rl-import="replace"]')?.addEventListener('click', (e) => { e.preventDefault(); commit('replace'); });
+                }
+            });
         },
 
         deleteRoutine(idx) {
@@ -108,10 +297,24 @@
             this.save();
         },
 
+        savePlanActionToLibrary(id) {
+            const action = this.db.actions.find(a => a.id === id && !a.deleted && !a.libOnly);
+            if (!action) return;
+            const copy = JSON.parse(JSON.stringify(action));
+            copy.id = this.generateRecordId('action');
+            copy.libOnly = true;
+            copy.updatedAt = Date.now();
+            copy.deleted = false;
+            this.db.actions.push(copy);
+            this.save();
+            if (window.toast?.show) toast.show(`"${copy.name || '未命名动作'}" 已存入动作库`, 'success');
+        },
+
         renderActions() {
             const list = document.getElementById('currentActionList');
             if (!list) return;
-            if (!this.activeRecords(this.db.actions).length) {
+            const planActions = this._planActions();
+            if (!planActions.length) {
                 list.innerHTML = `
                 <div class="empty-state">
                     <span class="material-symbols-rounded">playlist_add</span>
@@ -121,7 +324,7 @@
             }
             const phases = [['warmup','暖身'],['main','正式'],['cooldown','放松']];
             list.innerHTML = phases.map(([key, label]) => {
-                const items = this.db.actions.map((a, i) => ({ a, i })).filter(x => !x.a.deleted && (x.a.phase || 'main') === key);
+                const items = this.db.actions.map((a, i) => ({ a, i })).filter(x => !x.a.deleted && !x.a.libOnly && (x.a.phase || 'main') === key);
                 if (!items.length) return '';
                 return `<div class="action-phase-group"><div class="action-phase-head">${label} · ${items.length}个</div>${items.map(({a, i}) => `
                 <div class="list-item">
@@ -134,6 +337,7 @@
                         <small>${a.sets}组 &middot; ${a.reps}次 &middot; ${a.work}s</small>
                         <div class="item-chip">组休${a.actionRest}s &middot; 项休${a.groupRest}s${a.isAlt ? ' &middot; 双侧' : ''}</div>
                     </div>
+                    <button class="save-lib-btn" onclick="data.savePlanActionToLibrary('${a.id}')" title="存入动作库" aria-label="存入动作库"><span class="material-symbols-rounded">bookmark_add</span></button>
                     <button class="delete-btn" onclick="data.deleteAction('${a.id}')"><span class="material-symbols-rounded">delete</span></button>
                 </div>`).join('')}</div>`;
             }).join('');
@@ -142,7 +346,7 @@
         renderWorkoutPlanCard() {
             const el = document.getElementById('workoutPlanCard');
             if (!el) return;
-            const actions = this.activeRecords(this.db.actions);
+            const actions = this._planActions();
             const routines = this.activeRecords(this.db.routines);
             const recentRoutines = routines.slice(-3).reverse();
             const actionCount = actions.length;
@@ -377,10 +581,19 @@
         deleteRoutineFromLib(idx) {
             const routine = this.activeRecords(this.db.routines)[idx];
             if (!routine) return;
-            if (!confirm('确定删除方案 "' + routine.name + '"？')) return;
-            this.deleteRoutine(idx);
-            this.showWorkoutLibrary();
-            this.renderWorkoutPlanCard();
+            this._confirmModal({
+                title: '删除方案',
+                icon: 'delete',
+                message: `确定删除方案 "${routine.name || '未命名方案'}"？`,
+                okText: '删除',
+                cancelText: '取消',
+                danger: true,
+                onOk: () => {
+                    this.deleteRoutine(idx);
+                    this.showWorkoutLibrary();
+                    this.renderWorkoutPlanCard();
+                }
+            });
         },
 
         renderProfileIdentityCard() {
@@ -614,35 +827,77 @@
         renameActionFromLibrary(actionId) {
             const action = this.findActionById(actionId);
             if (!action || action.deleted) return;
-            const next = prompt('动作名称', action.name || '');
-            if (next == null) return;
-            const name = String(next).trim();
-            if (!name) return;
-            action.name = name;
-            this.touchRecord(action);
-            this.save();
-            this.renderRoutines();
+            this._textPromptModal({
+                title: '修改动作名称',
+                icon: 'edit',
+                label: '动作名称',
+                initialValue: action.name || '',
+                okText: '保存',
+                cancelText: '取消',
+                onOk: (name) => {
+                    action.name = name;
+                    this.touchRecord(action);
+                    this.save();
+                    this.renderRoutines();
+                }
+            });
         },
 
         editActionFromLibrary(actionId) {
             const action = this.findActionById(actionId);
             if (!action || action.deleted) return;
-            const sample = [action.sets || 1, action.reps || 1, action.work || 5, action.repRest || 2, action.actionRest || 10, action.groupRest || 15, action.phase || 'main', action.isAlt ? 1 : 0].join(',');
-            const raw = prompt('编辑动作参数：sets,reps,work,repRest,actionRest,groupRest,phase,isAlt(0/1)', sample);
-            if (raw == null) return;
-            const parts = String(raw).split(',').map(s => s.trim());
-            if (parts.length < 8) return alert('参数数量不足');
-            action.sets = Math.max(1, parseInt(parts[0], 10) || 1);
-            action.reps = Math.max(1, parseInt(parts[1], 10) || 1);
-            action.work = Math.max(1, parseInt(parts[2], 10) || 1);
-            action.repRest = Math.max(0, parseInt(parts[3], 10) || 0);
-            action.actionRest = Math.max(0, parseInt(parts[4], 10) || 0);
-            action.groupRest = Math.max(0, parseInt(parts[5], 10) || 0);
-            action.phase = ['warmup', 'main', 'cooldown'].includes(parts[6]) ? parts[6] : 'main';
-            action.isAlt = parts[7] === '1' || /^true$/i.test(parts[7]);
-            this.touchRecord(action);
-            this.save();
-            this.renderRoutines();
+            const esc = v => this.escapeHtml ? this.escapeHtml(v || '') : String(v || '');
+            this._openModal({
+                title: '编辑动作',
+                icon: 'tune',
+                bodyHtml: `
+                    <div class="md-grid modal-grid" style="gap:10px">
+                        <div class="md-field"><input id="rlAeSets" type="number" min="1" placeholder=" " value="${esc(String(action.sets || 1))}"><label>组数</label></div>
+                        <div class="md-field"><input id="rlAeReps" type="number" min="1" placeholder=" " value="${esc(String(action.reps || 1))}"><label>次数</label></div>
+                        <div class="md-field"><input id="rlAeWork" type="number" min="1" placeholder=" " value="${esc(String(action.work || 5))}"><label>单次秒数</label></div>
+                        <div class="md-field"><input id="rlAeRepRest" type="number" min="0" placeholder=" " value="${esc(String(action.repRest ?? 2))}"><label>次休秒数</label></div>
+                        <div class="md-field"><input id="rlAeActionRest" type="number" min="0" placeholder=" " value="${esc(String(action.actionRest ?? 10))}"><label>组休秒数</label></div>
+                        <div class="md-field"><input id="rlAeGroupRest" type="number" min="0" placeholder=" " value="${esc(String(action.groupRest ?? 15))}"><label>项休秒数</label></div>
+                        <div class="md-field">
+                            <select id="rlAePhase" required>
+                                <option value="warmup" ${((action.phase || 'main') === 'warmup') ? 'selected' : ''}>暖身</option>
+                                <option value="main" ${((action.phase || 'main') === 'main') ? 'selected' : ''}>正式</option>
+                                <option value="cooldown" ${((action.phase || 'main') === 'cooldown') ? 'selected' : ''}>放松</option>
+                            </select>
+                            <label>阶段</label>
+                        </div>
+                        <div style="grid-column:1/-1;display:flex;align-items:center;gap:10px;padding:4px 2px">
+                            <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
+                                <input id="rlAeIsAlt" type="checkbox" ${action.isAlt ? 'checked' : ''}>
+                                <span style="color:var(--md-sys-on-surface)">双侧交替</span>
+                            </label>
+                        </div>
+                    </div>
+                `,
+                actionsHtml: `
+                    <button class="md-btn" type="button" data-modal-close>取消</button>
+                    <button class="md-btn md-btn-filled" type="button" data-rl-save>保存</button>
+                `,
+                onMount: (root, close) => {
+                    const q = (sel) => root.querySelector(sel);
+                    q('#rlAeSets')?.focus?.();
+                    q('[data-rl-save]')?.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        action.sets = Math.max(1, parseInt(q('#rlAeSets')?.value, 10) || 1);
+                        action.reps = Math.max(1, parseInt(q('#rlAeReps')?.value, 10) || 1);
+                        action.work = Math.max(1, parseInt(q('#rlAeWork')?.value, 10) || 1);
+                        action.repRest = Math.max(0, parseInt(q('#rlAeRepRest')?.value, 10) || 0);
+                        action.actionRest = Math.max(0, parseInt(q('#rlAeActionRest')?.value, 10) || 0);
+                        action.groupRest = Math.max(0, parseInt(q('#rlAeGroupRest')?.value, 10) || 0);
+                        action.phase = ['warmup', 'main', 'cooldown'].includes(q('#rlAePhase')?.value) ? q('#rlAePhase').value : 'main';
+                        action.isAlt = !!q('#rlAeIsAlt')?.checked;
+                        this.touchRecord(action);
+                        this.save();
+                        close();
+                        this.renderRoutines();
+                    });
+                }
+            });
         },
 
         duplicateActionFromLibrary(actionId) {
@@ -665,21 +920,54 @@
             const msg = refs > 0
                 ? `${refs} 个方案在使用此动作，确认删除？删除后方案内快照仍保留。`
                 : `确定删除动作「${action.name || '未命名'}」？`;
-            if (!confirm(msg)) return;
-            this.deleteAction(actionId);
-            this.renderRoutines();
+            this._confirmModal({
+                title: '删除动作',
+                icon: 'delete',
+                message: msg,
+                okText: '删除',
+                cancelText: '取消',
+                danger: true,
+                onOk: () => {
+                    this.deleteAction(actionId);
+                    this.renderRoutines();
+                }
+            });
         },
 
         editActionTags(actionId) {
             const action = this.findActionById(actionId);
             if (!action || action.deleted) return;
             const current = Array.isArray(action.tags) ? action.tags.join(', ') : '';
-            const raw = prompt('动作标签（逗号分隔）', current);
-            if (raw == null) return;
-            action.tags = [...new Set(String(raw).split(/[,，]/).map(t => this.normalizeTagText(t)).filter(Boolean))];
-            this.touchRecord(action);
-            this.save();
-            this.renderRoutines();
+            this._openModal({
+                title: '编辑动作标签',
+                icon: 'bookmark_add',
+                bodyHtml: `
+                    <div class="md-field" style="margin:0">
+                        <input id="rlTagInput" type="text" placeholder=" " value="${this.escapeHtml(current)}" autocomplete="off">
+                        <label>标签（逗号分隔）</label>
+                    </div>
+                    <div style="margin-top:6px;color:var(--md-sys-on-surface-variant);font-size:12px">示例：上肢, 肩, 拉伸</div>
+                `,
+                actionsHtml: `
+                    <button class="md-btn" type="button" data-modal-close>取消</button>
+                    <button class="md-btn md-btn-filled" type="button" data-rl-save>保存</button>
+                `,
+                onMount: (root, close) => {
+                    const input = root.querySelector('#rlTagInput');
+                    input?.focus?.();
+                    const commit = () => {
+                        action.tags = [...new Set(String(input?.value || '').split(/[,，]/).map(t => this.normalizeTagText(t)).filter(Boolean))];
+                        this.touchRecord(action);
+                        this.save();
+                        close();
+                        this.renderRoutines();
+                    };
+                    root.querySelector('[data-rl-save]')?.addEventListener('click', (e) => { e.preventDefault(); commit(); });
+                    input?.addEventListener('keydown', (e) => {
+                        if (e.key === 'Enter') { e.preventDefault(); commit(); }
+                    });
+                }
+            });
         },
 
         renderActionLibrary() {
@@ -718,26 +1006,55 @@
         renameRoutineFromLibrary(routineId) {
             const routine = this.findRoutineById(routineId);
             if (!routine || routine.deleted) return;
-            const next = prompt('方案名称', routine.name || '');
-            if (next == null) return;
-            const name = String(next).trim();
-            if (!name) return;
-            routine.name = name;
-            this.touchRecord(routine);
-            this.save();
-            this.renderRoutines();
+            this._textPromptModal({
+                title: '修改方案名称',
+                icon: 'edit',
+                label: '方案名称',
+                initialValue: routine.name || '',
+                okText: '保存',
+                cancelText: '取消',
+                onOk: (name) => {
+                    routine.name = name;
+                    this.touchRecord(routine);
+                    this.save();
+                    this.renderRoutines();
+                }
+            });
         },
 
         editRoutineTags(routineId) {
             const routine = this.findRoutineById(routineId);
             if (!routine || routine.deleted) return;
             const current = Array.isArray(routine.tags) ? routine.tags.join(', ') : '';
-            const raw = prompt('方案标签（逗号分隔）', current);
-            if (raw == null) return;
-            routine.tags = [...new Set(String(raw).split(/[,，]/).map(t => this.normalizeTagText(t)).filter(Boolean))];
-            this.touchRecord(routine);
-            this.save();
-            this.renderRoutines();
+            this._openModal({
+                title: '编辑方案标签',
+                icon: 'bookmark_add',
+                bodyHtml: `
+                    <div class="md-field" style="margin:0">
+                        <input id="rlTagInput" type="text" placeholder=" " value="${this.escapeHtml(current)}" autocomplete="off">
+                        <label>标签（逗号分隔）</label>
+                    </div>
+                `,
+                actionsHtml: `
+                    <button class="md-btn" type="button" data-modal-close>取消</button>
+                    <button class="md-btn md-btn-filled" type="button" data-rl-save>保存</button>
+                `,
+                onMount: (root, close) => {
+                    const input = root.querySelector('#rlTagInput');
+                    input?.focus?.();
+                    const commit = () => {
+                        routine.tags = [...new Set(String(input?.value || '').split(/[,，]/).map(t => this.normalizeTagText(t)).filter(Boolean))];
+                        this.touchRecord(routine);
+                        this.save();
+                        close();
+                        this.renderRoutines();
+                    };
+                    root.querySelector('[data-rl-save]')?.addEventListener('click', (e) => { e.preventDefault(); commit(); });
+                    input?.addEventListener('keydown', (e) => {
+                        if (e.key === 'Enter') { e.preventDefault(); commit(); }
+                    });
+                }
+            });
         },
 
         loadRoutineById(routineId) {
@@ -759,9 +1076,18 @@
             const routines = this.activeRecords(this.db.routines || []);
             const idx = routines.findIndex(r => r.id === routineId);
             if (idx < 0) return;
-            if (!confirm(`确定删除方案 "${routines[idx].name}"？`)) return;
-            this.deleteRoutine(idx);
-            this.renderRoutines();
+            this._confirmModal({
+                title: '删除方案',
+                icon: 'delete',
+                message: `确定删除方案 "${routines[idx].name || '未命名方案'}"？`,
+                okText: '删除',
+                cancelText: '取消',
+                danger: true,
+                onOk: () => {
+                    this.deleteRoutine(idx);
+                    this.renderRoutines();
+                }
+            });
         },
 
         moveRoutineAction(routineId, actionIndex, delta) {
@@ -791,34 +1117,64 @@
             if (!routine || routine.deleted) return;
             const actions = this.activeRecords(this.db.actions || []);
             if (!actions.length) return;
-            const options = actions.map((a, idx) => `${idx + 1}. ${a.name}`).join('\n');
-            const pick = prompt(`输入要替换成的动作序号：\n${options}`, '1');
-            if (pick == null) return;
-            const idx = Math.max(1, Math.min(actions.length, parseInt(pick, 10) || 1)) - 1;
-            const src = JSON.parse(JSON.stringify(actions[idx]));
-            src.sourceActionId = src.id;
-            routine.actions[actionIndex] = src;
-            this.touchRecord(routine);
-            this.save();
-            this.renderRoutines();
+            const esc = v => this.escapeHtml ? this.escapeHtml(v || '') : String(v || '');
+            this._openModal({
+                title: '替换为…',
+                icon: 'swap_horiz',
+                bodyHtml: `
+                    <div style="display:grid;gap:8px;max-height:55vh;overflow:auto;padding-right:2px">
+                        ${actions.map((a, idx) => `
+                            <button class="template-manager-item" type="button" data-rl-pick="${idx}" style="justify-content:flex-start">
+                                <span class="material-symbols-rounded" style="font-size:20px;color:var(--md-sys-primary)">fitness_center</span>
+                                <span class="template-manager-item-main" style="text-align:left">
+                                    <strong>${esc(a.name || '未命名动作')}</strong>
+                                    <small>${(a.sets || 1)}组 · ${(a.reps || 1)}次 · ${(a.work || 5)}s${a.isAlt ? ' · 双侧' : ''}</small>
+                                </span>
+                            </button>
+                        `).join('')}
+                    </div>
+                `,
+                actionsHtml: `<button class="md-btn" type="button" data-modal-close>取消</button>`,
+                onMount: (root, close) => {
+                    root.querySelectorAll('[data-rl-pick]').forEach(btn => {
+                        btn.addEventListener('click', (e) => {
+                            e.preventDefault();
+                            const idx = parseInt(btn.getAttribute('data-rl-pick'), 10);
+                            const src = JSON.parse(JSON.stringify(actions[idx]));
+                            src.sourceActionId = src.id;
+                            routine.actions[actionIndex] = src;
+                            this.touchRecord(routine);
+                            this.save();
+                            close();
+                            this.renderRoutines();
+                        });
+                    });
+                }
+            });
         },
 
         deriveRoutineFromLibrary(routineId) {
             const routine = this.findRoutineById(routineId);
             if (!routine || routine.deleted) return;
-            const name = prompt('新方案名称', `${routine.name || '方案'} (派生)`);
-            if (name == null) return;
-            const trimmed = String(name).trim();
-            if (!trimmed) return;
-            const copy = JSON.parse(JSON.stringify(routine));
-            copy.name = trimmed;
-            copy.id = this.generateRecordId('routine');
-            copy.created = new Date().toLocaleDateString();
-            copy.updatedAt = Date.now();
-            copy.deleted = false;
-            this.db.routines.push(copy);
-            this.save();
-            this.renderRoutines();
+            this._textPromptModal({
+                title: '派生新方案',
+                icon: 'add_circle',
+                label: '新方案名称',
+                initialValue: `${routine.name || '方案'} (派生)`,
+                okText: '创建',
+                cancelText: '取消',
+                onOk: (trimmed) => {
+                    const copy = JSON.parse(JSON.stringify(routine));
+                    copy.name = trimmed;
+                    copy.id = this.generateRecordId('routine');
+                    copy.created = new Date().toLocaleDateString();
+                    copy.updatedAt = Date.now();
+                    copy.deleted = false;
+                    this.db.routines.push(copy);
+                    this.save();
+                    this.renderRoutines();
+                }
+            });
         },
 
         renderRoutineLibraryPane() {

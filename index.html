@@ -8,8 +8,8 @@
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230061a4'/%3E%3Cpath d='M22 22h6v20h-6zM36 22h6v20h-6z' fill='white'/%3E%3Cpath d='M16 28h8v8h-8zM40 28h8v8h-8z' fill='white' opacity='.9'/%3E%3C/svg%3E">
     <meta name="theme-color" content="#0061a4">
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&icon_names=accessibility_new,add,add_circle,auto_awesome,backup,badge,balance,block,bookmark_add,bookmark_border,bookmarks,brightness_auto,calendar_month,check,check_circle,chevron_left,chevron_right,clinical_notes,close,close_fullscreen,cloud_alert,cloud_done,cloud_off,cloud_sync,content_copy,dark_mode,delete,directions_bike,directions_run,directions_walk,done_all,download,download_for_offline,edit,edit_note,egg_alt,error,event,event_note,exercise,expand_less,expand_more,fitness_center,flag,format_color_fill,forum,health_and_safety,help,history,info,inventory_2,keyboard_arrow_down,keyboard_arrow_left,keyboard_arrow_right,keyboard_arrow_up,library_books,light_mode,local_fire_department,lock,lock_open,mic,mic_off,monitor_heart,monitor_weight,monitoring,more_vert,no_food,notifications,notifications_active,palette,pause,pedal_bike,person,picture_in_picture_alt,play_arrow,playlist_add,pool,psychology,refresh,remove,replay,restart_alt,restaurant,rowing,save,schedule,search,search_off,self_improvement,send,settings,shield,show_chart,skip_next,skip_previous,speed,sports,sports_gymnastics,stop,swap_horiz,sync,sync_problem,system_update,timeline,timer,today,trending_down,trending_up,tune,upload,upload_file,visibility,visibility_off,volume_off,volume_up,warning,waterfall_chart" rel="stylesheet" />
-    <link rel="stylesheet" href="build/generated.css?v=83">
-    <link rel="stylesheet" href="css-src/42-health-profile.css?v=83">
+    <link rel="stylesheet" href="build/generated.css?v=84">
+    <link rel="stylesheet" href="css-src/42-health-profile.css?v=84">
 </head>
 <body>
     <div id="appUpdateBanner" class="app-update-banner hidden">
@@ -93,9 +93,14 @@
                         <label class="switch-track"><input type="checkbox" id="isAlt" onchange="ui.syncSwitchAria(this)"><span class="switch-thumb"></span></label>
                     </div>
                 </div>
-                <button class="md-btn md-btn-filled" onclick="data.addAction()">
-                    <span class="material-symbols-rounded">add</span> 添加到计划
-                </button>
+                <div class="input-card-actions">
+                    <button class="md-btn md-btn-filled" onclick="data.addAction()">
+                        <span class="material-symbols-rounded">add</span> 添加到计划
+                    </button>
+                    <button class="md-btn md-btn-tonal input-card-lib-btn" onclick="data.saveCurrentActionToLibrary()" title="存入动作库" aria-label="存入动作库">
+                        <span class="material-symbols-rounded">bookmark_add</span>
+                    </button>
+                </div>
             </div>
             <div class="workout-controls" aria-label="训练控制">
                 <button class="md-fab fab-stop hidden" id="stopBtn" onclick="workout.stop()" aria-label="停止训练" aria-keyshortcuts="Escape"><span class="material-symbols-rounded">stop</span></button>
@@ -524,6 +529,9 @@
         const _loaded = new Set();
         const _loadingPromises = new Map();
         const SCRIPT_PREREQUISITES = {
+            'ai-profile': ['ai-store'],
+            'ai-models': ['ai-store'],
+            'ai-api': ['ai-store'],
             'advice-render': ['advice-panel'],
             'advice-prompt': ['advice-panel'],
             'advice-stream-renderer': ['advice-panel'],

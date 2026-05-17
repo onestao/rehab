@@ -125,7 +125,7 @@ Object.assign(workout, {
         }
         if (this.mode === 'cardio') return cardio.toggle();
         if (!this.isPlaying) {
-            if (data.activeRecords(data.db.actions || []).length === 0) return;
+            if ((data._planActions ? data._planActions() : data.activeRecords(data.db.actions || []).filter(a => !a.libOnly)).length === 0) return;
             this.isPlaying = true; this.isPaused = false; this.totalSec = 0;
             if (window.workoutEngine) workoutEngine.state = workoutEngine.createInitialState();
             this.updateStateClasses();
@@ -251,7 +251,7 @@ Object.assign(workout, {
         data.db.history.unshift({
             id: data.generateRecordId('history'),
             date: new Date().toLocaleString(), dayKey: data.logicalDateKey(), duration,
-            actions: [...data.activeRecords(data.db.actions || [])],
+            actions: [...(data._planActions ? data._planActions() : data.activeRecords(data.db.actions || []).filter(a => !a.libOnly))],
             actualSets: data.db.actualSetsBuffer || [],
             updatedAt: Date.now(),
             deleted: false

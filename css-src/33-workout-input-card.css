@@ -1,4 +1,28 @@
 /* --- Input Card --- */
 .input-card .md-grid { margin: 8px 0 4px; }
 .input-card { padding: 14px; }
+.input-card-actions {
+    display: flex;
+    gap: 8px;
+    align-items: stretch;
+    margin-top: 12px;
+}
+.input-card-actions .md-btn-filled {
+    flex: 1;
+    margin-top: 0;
+    min-width: 0;
+}
+.input-card-lib-btn {
+    flex: none;
+    width: 48px;
+    min-width: 48px;
+    padding: 0;
+    margin-top: 0;
+    height: 48px;
+}
+@media (max-width: 360px) {
+    .input-card-actions { gap: 6px; }
+    .input-card-lib-btn { width: 44px; min-width: 44px; height: 44px; }
+    .input-card-actions .md-btn-filled { height: 44px; font-size: 14px; }
+}
 

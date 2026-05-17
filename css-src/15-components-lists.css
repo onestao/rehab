@@ -77,6 +77,18 @@
     opacity: 0.7;
 }
 .delete-btn:active { opacity: 1; background: var(--md-sys-error-container); }
+.save-lib-btn {
+    border: none;
+    background: none;
+    color: var(--md-sys-primary);
+    cursor: pointer;
+    padding: 4px;
+    border-radius: var(--md-sys-shape-sm);
+    transition: background var(--md-sys-motion-duration-short);
+    opacity: 0.7;
+}
+.save-lib-btn .material-symbols-rounded { font-size: 20px; }
+.save-lib-btn:active { opacity: 1; background: var(--md-sys-primary-container); }
 
 /* --- Collapsible month / weight history groups --- */
 .history-month-group { display: grid; gap: 4px; margin-bottom: 6px; }

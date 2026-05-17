@@ -54,6 +54,7 @@
     justify-content: center;
     gap: 4px;
     padding: 12px 4px;
+    min-height: 64px;
     border: none;
     border-radius: var(--md-sys-shape-lg);
     background: var(--md-sys-surface-container-low);
@@ -229,7 +230,10 @@
 /* Context AI Card */
 .context-ai-card {
     display: grid;
+    align-content: start;
     gap: 14px;
+    min-height: 148px;
+    padding: 16px;
     background: linear-gradient(180deg, color-mix(in srgb, var(--md-sys-surface-container-lowest) 78%, transparent), var(--md-sys-surface-container-low));
     border-color: color-mix(in srgb, var(--md-sys-tertiary) 18%, var(--md-sys-outline-variant));
 }
@@ -268,6 +272,7 @@
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 8px;
+    margin-top: auto;
 }
 .context-ai-btn {
     min-width: 0;
