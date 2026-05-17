@@ -1202,12 +1202,11 @@
                         ${expanded ? `<div class="routine-action-list">
                             ${(r.actions || []).map((a, ai) => `<div class="routine-action-item">
                                 <span class="routine-action-idx">${ai + 1}</span>
-                                <span>${this.escapeHtml(a.name || '未命名动作')}</span>
+                                <span class="routine-action-name">${this.escapeHtml(a.name || '未命名动作')}</span>
                                 <small>${a.sets || 1}组×${a.reps || 1}次·${a.work || 5}s</small>
                                 <div class="routine-inline-actions">
                                     <button class="icon-btn" onclick="event.stopPropagation();data.moveRoutineAction('${r.id}', ${ai}, -1)" type="button" aria-label="上移"><span class="material-symbols-rounded">expand_less</span></button>
                                     <button class="icon-btn" onclick="event.stopPropagation();data.moveRoutineAction('${r.id}', ${ai}, 1)" type="button" aria-label="下移"><span class="material-symbols-rounded">expand_more</span></button>
-                                    <button class="icon-btn" onclick="event.stopPropagation();data.replaceRoutineAction('${r.id}', ${ai})" type="button" aria-label="替换"><span class="material-symbols-rounded">swap_horiz</span></button>
                                     <button class="icon-btn" onclick="event.stopPropagation();data.saveActionFromRoutine('${r.id}', ${ai})" type="button" aria-label="保存到动作库"><span class="material-symbols-rounded">bookmark_add</span></button>
                                     <button class="icon-btn" onclick="event.stopPropagation();data.removeRoutineAction('${r.id}', ${ai})" type="button" aria-label="删除"><span class="material-symbols-rounded">delete</span></button>
                                 </div>

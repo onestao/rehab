@@ -40,7 +40,7 @@
     font-size: 13px;
     flex-wrap: wrap;
 }
-.routine-action-item span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.routine-action-item .routine-action-name { flex: 1; min-width: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; white-space: normal; word-break: break-word; }
 .routine-action-item small { color: var(--md-sys-on-surface-variant); white-space: nowrap; font-size: 11px; }
 .routine-action-idx {
     width: 22px;
@@ -115,9 +115,7 @@
         min-height: 32px;
         padding: 0 2px;
     }
-    .library-segment-btn .library-segment-label {
-        display: none;
-    }
+    /* Removed .library-segment-btn .library-segment-label display:none to restore missing text */
     .library-card-actions {
         gap: 4px;
     }
@@ -129,10 +127,7 @@
     .library-card-actions .md-btn span:last-child {
         display: none;
     }
-    .routine-inline-actions .icon-btn[aria-label="上移"],
-    .routine-inline-actions .icon-btn[aria-label="下移"] {
-        display: none;
-    }
+    /* Removed display: none for up/down buttons */
     .routine-inline-actions .icon-btn {
         width: 24px;
         height: 24px;

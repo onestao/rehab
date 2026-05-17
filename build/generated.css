@@ -1,11 +1,11 @@
 /* ============================================
-   Material 3 Expressive — 训练助手
+   Material 3 Expressive �?训练助手
    CSS snapshot for rollback / current-branch parity
    ============================================ */
 
 /* --- Design Tokens --- */
 :root {
-    /* Primary — Default Blue */
+    /* Primary �?Default Blue */
     --md-sys-primary: #0061a4;
     --md-sys-on-primary: #ffffff;
     --md-sys-primary-container: #d1e4ff;
@@ -17,13 +17,13 @@
     --md-sys-secondary-container: #d7e3f8;
     --md-sys-on-secondary-container: #101c2b;
 
-    /* Tertiary — Warm Accent */
+    /* Tertiary �?Warm Accent */
     --md-sys-tertiary: #6b5778;
     --md-sys-on-tertiary: #ffffff;
     --md-sys-tertiary-container: #f2daff;
     --md-sys-on-tertiary-container: #251431;
 
-    /* Session Timer Accent — Amber */
+    /* Session Timer Accent �?Amber */
     --md-sys-amber: #f59e0b;
     --md-sys-amber-container: #fef3c7;
     --md-sys-on-amber-container: #78350f;
@@ -80,7 +80,7 @@
     --md-state-press: 0.14;
     --md-expressive-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 }
-
+
 /* --- Reset & Base --- */
 *, *::before, *::after { box-sizing: border-box; margin: 0; }
 
@@ -93,7 +93,7 @@ body {
     -webkit-tap-highlight-color: transparent;
     line-height: 1.5;
 }
-
+
 .app-update-banner {
     position: sticky;
     top: 0;
@@ -112,7 +112,7 @@ body {
 .app-update-banner strong { display: block; font-size: 13px; }
 .app-update-banner small { display: block; font-size: 11px; opacity: 0.85; }
 .app-update-banner .material-symbols-rounded { color: var(--md-sys-primary); }
-
+
 /* --- Top App Bar --- */
 .md-top-app-bar {
     height: 64px;
@@ -146,7 +146,7 @@ body {
     align-items: center;
     gap: 6px;
 }
-
+
 /* --- Chip --- */
 .md-chip {
     display: flex;
@@ -160,7 +160,7 @@ body {
     color: var(--md-sys-on-surface-variant);
     letter-spacing: 0.3px;
 }
-
+
 /* --- Page --- */
 .page { display: none; padding-bottom: 108px; min-height: calc(100vh - 64px); }
 .page.active { display: block; animation: fadeSlideIn var(--md-sys-motion-duration-medium) var(--md-sys-motion-emphasized-decelerate); }
@@ -170,7 +170,7 @@ body {
     from { opacity: 0; transform: translateY(8px); }
     to { opacity: 1; transform: translateY(0); }
 }
-
+
 /* --- Page Header --- */
 .page-header {
     display: flex;
@@ -188,7 +188,7 @@ body {
     font-weight: 700;
     color: var(--md-sys-on-surface);
 }
-
+
 /* --- Cards --- */
 .md-card {
     background: var(--md-sys-surface-container-low);
@@ -224,7 +224,6 @@ mark.ai-hit {
         color: #1a1200;
     }
 }
-
 
 /* --- Timer Panel (Expressive) --- */
 .timer-panel {
@@ -307,12 +306,12 @@ mark.ai-hit {
     font-weight: 700;
     color: rgba(255,255,255,0.9);
 }
-/* Session time — warm amber accent */
+/* Session time �?warm amber accent */
 .session-time {
     color: var(--md-sys-amber) !important;
     text-shadow: 0 0 12px rgba(245,158,11,0.35);
 }
-
+
 /* --- Floating Label Input Fields --- */
 .md-field {
     position: relative;
@@ -366,7 +365,7 @@ mark.ai-hit {
 }
 .md-field input::placeholder { color: transparent; }
 .md-field select { cursor: pointer; padding-right: 32px; }
-
+
 /* --- Grid --- */
 .md-grid {
     display: grid;
@@ -375,7 +374,7 @@ mark.ai-hit {
     margin: 8px 0;
 }
 .span-full { grid-column: 1 / -1; }
-
+
 /* --- Divider --- */
 .md-divider {
     height: 1px;
@@ -383,7 +382,7 @@ mark.ai-hit {
     margin: 12px 0;
     opacity: 0.6;
 }
-
+
 /* --- Switch (M3 Expressive) --- */
 .md-switch {
     display: flex;
@@ -434,7 +433,7 @@ mark.ai-hit {
     transform: translateY(-50%);
     background: var(--md-sys-on-primary);
 }
-
+
 /* --- Buttons --- */
 .md-btn {
     border: none;
@@ -497,7 +496,7 @@ mark.ai-hit {
 .md-btn-tonal:hover { box-shadow: var(--md-sys-elevation-1); }
 
 .md-row { display: flex; gap: 8px; margin-top: 8px; }
-
+
 /* --- List Items (Expressive) --- */
 .list-item {
     background: var(--md-sys-surface-container-lowest);
@@ -714,7 +713,7 @@ mark.ai-hit {
     background: var(--md-sys-surface-container);
     width: max-content;
 }
-
+
 /* --- Record Calendar --- */
 .record-section-title {
     margin: 14px 20px 6px;
@@ -1033,7 +1032,6 @@ mark.ai-hit {
     flex: none;
 }
 
-
 /* --- Record Tabs & Health --- */
 .record-tabs,
 .weight-range-tabs {
@@ -1275,7 +1273,6 @@ mark.ai-hit {
     color: var(--md-sys-on-secondary-container); white-space: nowrap; overflow: visible; text-overflow: unset;
 }
 
-
 /* --- Diet Card --- */
 .diet-card { display: grid; gap: 14px; }
 .diet-head {
@@ -1309,7 +1306,7 @@ mark.ai-hit {
 .diet-btn-row { display: flex; gap: 6px; grid-column: 1 / -1; }
 .diet-btn-row .md-btn-filled { flex: 1; margin-top: 0; }
 .diet-btn-row .md-btn-tonal { flex: none; width: 48px; padding: 0; margin-top: 0; }
-/* 编辑食物/运动行内操作按钮：统一两个按钮高度，去掉 filled 默认 margin-top */
+/* 编辑食物/运动行内操作按钮：统一两个按钮高度，去�?filled 默认 margin-top */
 .food-edit-actions { align-items: center; }
 .food-edit-actions .md-btn,
 .food-edit-actions .md-btn-tonal,
@@ -2339,7 +2336,6 @@ mark.ai-hit {
     z-index: 4;
 }
 
-
 /* --- Weight Loss Plan --- */
 .weightloss-card { display: grid; gap: 14px; }
 .weightloss-card,
@@ -2539,7 +2535,7 @@ mark.ai-hit {
     .weightloss-option-head b { font-size: 14px; }
     .weightloss-option-stats { font-size: 11px; }
 }
-
+
 /* --- AI Config --- */
 .ai-card-header {
     display: flex; align-items: center; gap: 8px; margin-bottom: 12px;
@@ -2689,7 +2685,6 @@ mark.ai-hit {
 .weight-list { display: grid; gap: 6px; }
 .weight-list-item { padding: 8px 10px; border-radius: var(--md-sys-shape-md); background: var(--md-sys-surface-container-lowest); }
 
-
 /* --- Rate Row --- */
 .rate-row {
     display: flex;
@@ -2706,7 +2701,7 @@ mark.ai-hit {
     border: none;
     height: 4px;
 }
-
+
 /* --- Mode Tabs --- */
 .mode-tabs {
     display: grid;
@@ -2777,7 +2772,7 @@ mark.ai-hit {
 
 .timer-tweak { display: flex; gap: 8px; justify-content: center; margin-top: 8px; }
 .timer-tweak .md-chip { font-weight: 800; }
-
+
 /* --- Routine Tool --- */
 .routine-tool {
     display: flex;
@@ -2786,7 +2781,7 @@ mark.ai-hit {
 }
 .routine-tool input { flex: 1; }
 .routine-tool .md-btn { flex: none; white-space: nowrap; margin-top: 0; width: auto; }
-
+
 /* --- Routine Card --- */
 .routine-card {
     background: var(--md-sys-surface-container-lowest);
@@ -2829,7 +2824,7 @@ mark.ai-hit {
     font-size: 13px;
     flex-wrap: wrap;
 }
-.routine-action-item span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.routine-action-item .routine-action-name { flex: 1; min-width: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; white-space: normal; word-break: break-word; }
 .routine-action-item small { color: var(--md-sys-on-surface-variant); white-space: nowrap; font-size: 11px; }
 .routine-action-idx {
     width: 22px;
@@ -2904,9 +2899,7 @@ mark.ai-hit {
         min-height: 32px;
         padding: 0 2px;
     }
-    .library-segment-btn .library-segment-label {
-        display: none;
-    }
+    /* Removed .library-segment-btn .library-segment-label display:none to restore missing text */
     .library-card-actions {
         gap: 4px;
     }
@@ -2918,10 +2911,7 @@ mark.ai-hit {
     .library-card-actions .md-btn span:last-child {
         display: none;
     }
-    .routine-inline-actions .icon-btn[aria-label="上移"],
-    .routine-inline-actions .icon-btn[aria-label="下移"] {
-        display: none;
-    }
+    /* Removed display: none for up/down buttons */
     .routine-inline-actions .icon-btn {
         width: 24px;
         height: 24px;
@@ -2978,7 +2968,7 @@ body.is-cardio .cardio-header > .material-symbols-rounded {
 body.is-cardio-paused .cardio-card {
     border-color: color-mix(in srgb, var(--md-sys-tertiary) 32%, var(--md-sys-outline-variant));
 }
-
+
 /* --- Sync Card --- */
 .sync-card { padding: 20px; }
 .theme-card { padding: 16px; }
@@ -3009,7 +2999,7 @@ body.is-cardio-paused .cardio-card {
 .sync-meta-item strong { font-size: 11px; color: var(--md-sys-on-surface-variant); }
 .sync-meta-item span { font-size: 12px; color: var(--md-sys-on-surface); }
 .sync-meta-wide { grid-column: 1 / -1; }
-
+
 /* --- Bottom Navigation Rail (M3 Expressive) --- */
 .md-nav-rail {
     position: fixed;
@@ -3097,7 +3087,7 @@ body.is-cardio-paused .cardio-card {
     border-radius: 24px;
 }
 .nav-item.active small { font-weight: 700; color: var(--md-sys-on-secondary-container); }
-
+
 /* --- FAB (Expressive) --- */
 .workout-controls {
     position: fixed;
@@ -3233,7 +3223,7 @@ body.is-training .fab-pip {
 body.is-training .fab-pip.active {
     border-radius: 28px;
 }
-
+
 /* --- Skip Button --- */
 .skip-btn {
     position: absolute;
@@ -3247,7 +3237,7 @@ body.is-training .fab-pip.active {
     transition: opacity var(--md-sys-motion-duration-short);
 }
 .skip-btn:active { opacity: 1; }
-
+
 /* --- Toast --- */
 .md-toast {
     position: fixed;
@@ -3274,7 +3264,7 @@ body.is-training .fab-pip.active {
     opacity: 1;
     transform: translate(-50%, 0);
 }
-
+
 /* --- Empty State --- */
 .empty-state {
     text-align: center;
@@ -3292,7 +3282,7 @@ body.is-training .fab-pip.active {
     font-size: 14px;
     font-weight: 500;
 }
-
+
 /* --- Hidden --- */
 .hidden { display: none !important; }
 .pip-video-source {
@@ -3304,7 +3294,7 @@ body.is-training .fab-pip.active {
     opacity: 0.01;
     pointer-events: none;
 }
-
+
 /* --- Input Card --- */
 .input-card .md-grid { margin: 8px 0 4px; }
 .input-card { padding: 14px; }
@@ -3332,7 +3322,7 @@ body.is-training .fab-pip.active {
     .input-card-lib-btn { width: 44px; min-width: 44px; height: 44px; }
     .input-card-actions .md-btn-filled { height: 44px; font-size: 14px; }
 }
-
+
 /* --- Theme Controls (Material You / Monet) --- */
 .theme-panel {
     display: grid;
@@ -3443,7 +3433,7 @@ body.is-training .fab-pip.active {
 }
 .theme-mode-btn .material-symbols-rounded { font-size: 18px; flex: none; }
 .theme-actions:has(.theme-mode-btn) { flex-wrap: nowrap; }
-
+
 /* --- Modal --- */
 .md-modal {
     position: fixed;
@@ -3632,7 +3622,6 @@ body.is-training .fab-pip.active {
     font-variant-numeric: tabular-nums;
 }
 
-
 /* ============================================
    Responsive
    ============================================ */
@@ -3736,7 +3725,6 @@ body.is-training .fab-pip.active {
         transition-duration: 1ms !important;
     }
 }
-
 
 /* ============================================
    Dark Mode (M3 Expressive)
@@ -3874,9 +3862,8 @@ body.is-training .fab-pip.active {
         background: var(--advice-model-mark-bg, color-mix(in srgb, var(--md-sys-surface-container-highest) 60%, transparent));
     }
 }
-
 /* ============================================
-   Record Page — Refactored Layout
+   Record Page �?Refactored Layout
    ============================================ */
 
 /* Record Overview Card (compact) */
@@ -4243,7 +4230,6 @@ body.is-training .fab-pip.active {
     transform: scale(1.06);
     opacity: 0.92;
 }
-
 /* ============================================
    Workout Plan Card & Library Sheet
    ============================================ */
@@ -4501,7 +4487,6 @@ body.is-training .fab-pip.active {
 .workout-lib-item-actions {
     flex: none;
 }
-
 /* --- A11y --- */
 
 :focus-visible {
@@ -4517,10 +4502,9 @@ body.is-training .fab-pip.active {
         scroll-behavior: auto !important;
     }
 }
-
 /* === M3 Expressive Effects === */
 
-/* TASK-16: 首屏进度环形变动画 */
+/* TASK-16: 首屏进度环形变动�?*/
 @keyframes m3e-ring-pulse {
     0%, 100% { transform: scale(1); filter: saturate(1) drop-shadow(0 0 0 transparent); }
     50% { transform: scale(1.03); filter: saturate(1.15) drop-shadow(0 6px 18px var(--md-sys-primary-container)); }
@@ -4574,7 +4558,7 @@ body.is-training .md-fab.fab-play {
 }
 .m3e-token-in { animation: m3e-token-in .26s var(--md-expressive-spring) both; }
 
-/* TASK-20: 主题切换液态过渡 */
+/* TASK-20: 主题切换液态过�?*/
 :root { transition: background-color .35s ease, color .35s ease; }
 .md-card, .md-btn, .md-chip, .md-fab, .nav-item, .calendar-day,
 .advice-bubble, .day-detail-item, .list-item {
@@ -4611,7 +4595,7 @@ body.is-training .md-fab.fab-play {
 @keyframes m3e-shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
 .skeleton-line { height: 12px; margin: 6px 0; }
 
-/* TASK-25: 训练总进度全局指示条 */
+/* TASK-25: 训练总进度全局指示�?*/
 .global-training-bar {
     position: fixed; top: 0; left: 0; right: 0; height: 3px;
     background: var(--md-sys-surface-container); z-index: 10000;
@@ -4653,9 +4637,8 @@ body.is-training .md-fab.fab-play {
 
 /* TASK-24: 每周总结卡片 */
 .weekly-summary-card { animation: m3e-card-rise .42s var(--md-expressive-spring) both; }
-
 /* ============================================
-   Health Profile Card — Material 3 Expressive
+   Health Profile Card �?Material 3 Expressive
    ============================================ */
 
 .health-profile-card {
@@ -5201,7 +5184,6 @@ body.is-training .md-fab.fab-play {
     .profile-sev.sev-severe { background: #4a1f23; color: #f8d7da; }
     .profile-form-section { box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 8%, transparent); }
 }
-
 /* --- Identity Card --- */
 #profileContent {
     touch-action: pan-y;
@@ -5425,7 +5407,6 @@ body.is-training .md-fab.fab-play {
         font-size: 15px;
     }
 }
-
 /* --- Theme Sheet --- */
 .theme-trigger {
     position: relative;
@@ -5501,7 +5482,6 @@ body.is-training .md-fab.fab-play {
     color: var(--md-sys-primary);
     font-weight: 600;
 }
-
 /* --- Library Segment --- */
 .library-segment-wrap {
     margin: 8px 12px 4px;
@@ -5652,7 +5632,6 @@ body.is-training .md-fab.fab-play {
     font-size: 12px;
     white-space: nowrap;
 }
-
 /* Migration branch custom overrides live here.
    Keep this file for branch-only additions that are not yet merged into styles.css snapshot. */
 
@@ -5742,4 +5721,3 @@ body.is-training .md-fab.fab-play {
 .weight-history-head small { position: relative; z-index: 1; color: var(--md-sys-on-surface-variant); font-size: 11px; font-weight: 700; white-space: nowrap; }
 .weight-history-content { display: grid; gap: 6px; }
 .weight-history-card.collapsed .weight-history-content { display: none; }
-
