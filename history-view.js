@@ -40,16 +40,6 @@
                 else { status = '已超出目标'; hint = '已超出 ' + Math.abs(remaining) + ' kcal，可增加散步或低强度活动'; }
             }
 
-            const usage = this.summarizeAiUsage?.() || { today: { in: 0, out: 0, costUsd: 0 }, week: { in: 0, out: 0, costUsd: 0 }, month: { in: 0, out: 0, costUsd: 0 } };
-            const fmtCost = (v) => (v && v > 0 ? '$' + Number(v).toFixed(4) : '$0.0000');
-            const aiUsageCard = `<div class="md-card" style="padding:14px">
-                <div class="today-timeline-header" style="margin:0 0 10px"><span class="material-symbols-rounded">psychology</span><strong>${(window.i18n ? i18n.t('records.ai.title') : 'AI 用量')}</strong></div>
-                <div class="record-overview-stats" style="grid-template-columns: repeat(3, 1fr)">
-                    <div class="record-overview-stat"><b>${usage.today.in + usage.today.out}</b><small>${(window.i18n ? i18n.t('records.ai.today') : '今日')} tok</small><small>${fmtCost(usage.today.costUsd)}</small></div>
-                    <div class="record-overview-stat"><b>${usage.week.in + usage.week.out}</b><small>${(window.i18n ? i18n.t('records.ai.week') : '本周')} tok</small><small>${fmtCost(usage.week.costUsd)}</small></div>
-                    <div class="record-overview-stat"><b>${usage.month.in + usage.month.out}</b><small>${(window.i18n ? i18n.t('records.ai.month') : '本月')} tok</small><small>${fmtCost(usage.month.costUsd)}</small></div>
-                </div>
-            </div>`;
             return `<div class="md-card hero-card record-overview-card">
             <div class="record-overview-top">
                 <div class="record-overview-date">
@@ -65,7 +55,7 @@
                 <div class="record-overview-stat"><b>${macros.pro.toFixed(0)}/${goals.pro}</b><small>蛋白 g</small></div>
             </div>
             ${goalCal ? `<div class="today-focus-hint"><b>${status}</b><p>${hint}</p></div>` : ''}
-        </div>${aiUsageCard}`;
+        </div>`;
         },
 
         summarizeAiUsage() {
@@ -107,6 +97,42 @@
                 }
             }
             return acc;
+        },
+
+        showAiUsageDialog() {
+            const usage = this.summarizeAiUsage?.() || { today: { in: 0, out: 0, costUsd: 0 }, week: { in: 0, out: 0, costUsd: 0 }, month: { in: 0, out: 0, costUsd: 0 } };
+            const fmtCost = (v) => (v && v > 0 ? '$' + Number(v).toFixed(4) : '$0.0000');
+            const fmtTok = (v) => v >= 10000 ? (v / 1000).toFixed(1) + 'k' : String(v);
+            const bodyHtml = `
+                <div class="ai-usage-grid">
+                    <div class="ai-usage-period">
+                        <div class="ai-usage-period-label">今日</div>
+                        <div class="ai-usage-metric"><b>${fmtTok(usage.today.in + usage.today.out)}</b><small>tokens</small></div>
+                        <div class="ai-usage-cost">${fmtCost(usage.today.costUsd)}</div>
+                    </div>
+                    <div class="ai-usage-period">
+                        <div class="ai-usage-period-label">本周</div>
+                        <div class="ai-usage-metric"><b>${fmtTok(usage.week.in + usage.week.out)}</b><small>tokens</small></div>
+                        <div class="ai-usage-cost">${fmtCost(usage.week.costUsd)}</div>
+                    </div>
+                    <div class="ai-usage-period">
+                        <div class="ai-usage-period-label">本月</div>
+                        <div class="ai-usage-metric"><b>${fmtTok(usage.month.in + usage.month.out)}</b><small>tokens</small></div>
+                        <div class="ai-usage-cost">${fmtCost(usage.month.costUsd)}</div>
+                    </div>
+                </div>
+                <div class="ai-usage-detail">
+                    <div class="ai-usage-detail-row"><span>今日输入</span><span>${fmtTok(usage.today.in)} tok</span></div>
+                    <div class="ai-usage-detail-row"><span>今日输出</span><span>${fmtTok(usage.today.out)} tok</span></div>
+                    <div class="ai-usage-detail-row"><span>本月输入</span><span>${fmtTok(usage.month.in)} tok</span></div>
+                    <div class="ai-usage-detail-row"><span>本月输出</span><span>${fmtTok(usage.month.out)} tok</span></div>
+                </div>`;
+            this._openModal({
+                title: 'AI 用量',
+                icon: 'monitoring',
+                bodyHtml,
+                actionsHtml: `<button class="md-btn md-btn-tonal" data-modal-close style="flex:1">关闭</button>`
+            });
         },
 
         renderPrLeaderboard(limit = 8) {

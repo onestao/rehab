@@ -26,4 +26,9 @@
     color: var(--md-sys-on-surface);
     letter-spacing: -0.2px;
 }
+.bar-trailing {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
 
