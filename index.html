@@ -8,14 +8,14 @@
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230061a4'/%3E%3Cpath d='M22 22h6v20h-6zM36 22h6v20h-6z' fill='white'/%3E%3Cpath d='M16 28h8v8h-8zM40 28h8v8h-8z' fill='white' opacity='.9'/%3E%3C/svg%3E">
     <meta name="theme-color" content="#0061a4">
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&icon_names=accessibility_new,add,add_circle,auto_awesome,backup,badge,balance,block,bookmark_add,bookmark_border,bookmarks,brightness_auto,calendar_month,check,check_circle,chevron_left,chevron_right,clinical_notes,close,close_fullscreen,cloud_alert,cloud_done,cloud_off,cloud_sync,content_copy,dark_mode,delete,directions_bike,directions_run,directions_walk,done_all,download,download_for_offline,edit,edit_note,egg_alt,error,event,event_note,exercise,expand_less,expand_more,fitness_center,flag,format_color_fill,forum,health_and_safety,help,history,info,inventory_2,keyboard_arrow_down,keyboard_arrow_left,keyboard_arrow_right,keyboard_arrow_up,library_books,light_mode,local_fire_department,lock,lock_open,mic,mic_off,monitor_heart,monitor_weight,monitoring,more_vert,no_food,notifications,notifications_active,palette,pause,pedal_bike,person,picture_in_picture_alt,play_arrow,playlist_add,pool,psychology,refresh,remove,replay,restart_alt,restaurant,rowing,save,schedule,search,search_off,self_improvement,send,settings,shield,show_chart,skip_next,skip_previous,speed,sports,sports_gymnastics,stop,swap_horiz,sync,sync_problem,system_update,timeline,timer,today,trending_down,trending_up,tune,upload,upload_file,visibility,visibility_off,volume_off,volume_up,warning,waterfall_chart" rel="stylesheet" />
-    <link rel="stylesheet" href="build/generated.css?v=85">
-    <link rel="stylesheet" href="css-src/42-health-profile.css?v=85">
+    <link rel="stylesheet" href="build/generated.css?v=86">
+    <link rel="stylesheet" href="css-src/42-health-profile.css?v=86">
 </head>
 <body>
     <div id="appUpdateBanner" class="app-update-banner hidden">
         <span class="material-symbols-rounded">system_update</span>
         <div>
-            <strong>发现新版本</strong>
+            <strong>发现新版�?/strong>
             <small>刷新后即可使用最新功能与修复</small>
         </div>
         <button class="md-btn md-btn-tonal" onclick="appUpdate.dismiss()">稍后</button>
@@ -26,7 +26,7 @@
 
     <div id="globalTrainingBar" class="global-training-bar hidden"><span></span></div>
     <main id="app">
-        <!-- 训练页 -->
+        <!-- 训练�?-->
         <section id="workout" class="page">
             <header class="md-top-app-bar workout-only-bar">
                 <div class="bar-leading"><span class="material-symbols-rounded app-icon">fitness_center</span><span class="app-title">训练助手</span></div>
@@ -38,7 +38,7 @@
                 <div id="subText">准备就绪</div>
                 <div class="timer-stats">
                     <div class="stat-item">
-                        <span class="stat-label">总用时</span>
+                        <span class="stat-label">总用�?/span>
                         <b id="sessionTime" class="session-time">00:00</b>
                     </div>
                     <div class="stat-item">
@@ -65,7 +65,7 @@
             <div class="md-card input-card" id="strengthCard">
                 <div class="rate-row">
                     <span class="material-symbols-rounded" style="font-size:18px">speed</span>
-                    <span>语速 <span id="rateLabel">1.1</span>x</span>
+                    <span>语�?<span id="rateLabel">1.1</span>x</span>
                     <input type="range" id="ttsRate" min="0.5" max="3" step="0.1" value="1.1" oninput="workout.updateRate(this.value)">
                 </div>
                 <div class="md-divider compact-divider"></div>
@@ -95,9 +95,9 @@
                 </div>
                 <div class="input-card-actions">
                     <button class="md-btn md-btn-filled" onclick="data.addAction()">
-                        <span class="material-symbols-rounded">add</span> 添加到计划
+                        <span class="material-symbols-rounded">add</span> 添加到计�?
                     </button>
-                    <button class="md-btn md-btn-tonal input-card-lib-btn" onclick="data.saveCurrentActionToLibrary()" title="存入动作库" aria-label="存入动作库">
+                    <button class="md-btn md-btn-tonal input-card-lib-btn" onclick="data.saveCurrentActionToLibrary()" title="存入动作�? aria-label="存入动作�?>
                         <span class="material-symbols-rounded">bookmark_add</span>
                     </button>
                 </div>
@@ -106,13 +106,13 @@
                 <button class="md-fab fab-stop hidden" id="stopBtn" onclick="workout.stop()" aria-label="停止训练" aria-keyshortcuts="Escape"><span class="material-symbols-rounded">stop</span></button>
                 <button class="md-fab fab-prev hidden" id="prevBtn" onclick="workout.prevAction?.()" aria-label="重置当前阶段" aria-keyshortcuts="ArrowLeft"><span class="material-symbols-rounded">restart_alt</span></button>
                 <button class="md-fab fab-play" id="playBtn" onclick="workout.toggle()" aria-label="开始或暂停训练" aria-keyshortcuts="Space"><span class="material-symbols-rounded" id="playIcon">play_arrow</span></button>
-                <button class="md-fab fab-pip" id="pipBtn" onclick="workout.togglePip()" aria-label="打开训练画中画"><span class="material-symbols-rounded" id="pipIcon">picture_in_picture_alt</span></button>
+                <button class="md-fab fab-pip" id="pipBtn" onclick="workout.togglePip()" aria-label="打开训练画中�?><span class="material-symbols-rounded" id="pipIcon">picture_in_picture_alt</span></button>
             </div>
             <div class="md-card cardio-card hidden">
                 <div class="cardio-header">
                     <div>
                         <span class="cardio-kicker">有氧模式</span>
-                        <h3>有氧计时与热量</h3>
+                        <h3>有氧计时与热�?/h3>
                     </div>
                     <span class="material-symbols-rounded">directions_run</span>
                 </div>
@@ -125,8 +125,8 @@
                             <option value="run">跑步 9.8 MET</option>
                             <option value="cycling">骑行 6.8 MET</option>
                             <option value="swim">游泳 7.0 MET</option>
-                            <option value="elliptical">椭圆机 5.0 MET</option>
-                            <option value="rowing">划船机 7.0 MET</option>
+                            <option value="elliptical">椭圆�?5.0 MET</option>
+                            <option value="rowing">划船�?7.0 MET</option>
                             <option value="battle_rope">战绳 8.0 MET</option>
                             <option value="spin_bike">动感单车 7.5 MET</option>
                         </select>
@@ -144,11 +144,11 @@
                     <div class="md-field"><input type="number" id="slWeight" step="0.5" placeholder=" "><label>重量 kg</label></div>
                     <div class="md-field"><input type="number" id="slSets" placeholder=" "><label>组数</label></div>
                     <div class="md-field"><input type="number" id="slReps" placeholder=" "><label>每组次数</label></div>
-                    <div class="md-field"><input type="number" id="slMinutes" placeholder=" "><label>总时长(分钟,可空)</label></div>
+                    <div class="md-field"><input type="number" id="slMinutes" placeholder=" "><label>总时�?分钟,可空)</label></div>
                     <div class="md-field span-full"><input type="text" id="slNote" placeholder=" "><label>备注</label></div>
                 </div>
                 <button class="md-btn md-btn-filled" onclick="data.addStrengthLog()">
-                    <span class="material-symbols-rounded">add</span> 保存到今日
+                    <span class="material-symbols-rounded">add</span> 保存到今�?
                 </button>
             </div>
             <div id="workoutPlanCard"></div>
@@ -156,11 +156,11 @@
             <div class="md-card routine-tool">
                 <div class="md-field" style="flex:1"><input type="text" id="newRoutineName" placeholder=" "><label>方案名称</label></div>
                 <div class="md-field" style="flex:1"><input type="text" id="routineTagsInput" placeholder=" "><label>标签 (逗号分隔)</label></div>
-                <button class="md-btn md-btn-tonal" onclick="data.saveRoutine()"><span class="material-symbols-rounded">bookmark_add</span> 存入方案库</button>
+                <button class="md-btn md-btn-tonal" onclick="data.saveRoutine()"><span class="material-symbols-rounded">bookmark_add</span> 存入方案�?/button>
             </div>
         </section>
 
-        <!-- 今日页 -->
+        <!-- 今日�?-->
         <section id="today" class="page active">
             <header class="md-top-app-bar">
                 <div class="bar-leading"><span class="material-symbols-rounded app-icon">today</span><span class="app-title">今日</span></div>
@@ -172,7 +172,7 @@
             <div id="todayAiCard"></div>
         </section>
 
-        <!-- 记录页 -->
+        <!-- 记录�?-->
         <section id="records" class="page">
             <header class="md-top-app-bar">
                 <div class="bar-leading"><span class="material-symbols-rounded app-icon">monitoring</span><span class="app-title">记录</span></div>
@@ -181,7 +181,7 @@
             <div id="recordsContent"></div>
         </section>
 
-        <!-- AI教练页 -->
+        <!-- AI教练�?-->
         <section id="ai-coach" class="page">
             <header class="md-top-app-bar">
                 <div class="bar-leading"><span class="material-symbols-rounded app-icon">psychology</span><span class="app-title">AI 教练</span></div>
@@ -197,7 +197,7 @@
             <div id="aiCoachContent"></div>
         </section>
 
-        <!-- 我的页 -->
+        <!-- 我的�?-->
         <section id="profile" class="page">
             <header class="md-top-app-bar">
                 <div class="bar-leading"><span class="material-symbols-rounded app-icon">person</span><span class="app-title" data-i18n="nav.profile">我的</span></div>
@@ -213,14 +213,14 @@
             <div id="profileContent"></div>
             <div id="profileSettings" class="hidden">
                 <div class="md-card sync-card" data-settings="ai">
-                    <div class="ai-card-header"><span class="material-symbols-rounded">psychology</span><strong>AI 配置</strong><span id="aiStatus" class="ai-status ai-off">未配置</span></div>
+                    <div class="ai-card-header"><span class="material-symbols-rounded">psychology</span><strong>AI 配置</strong><span id="aiStatus" class="ai-status ai-off">未配�?/span></div>
                     <div class="md-field">
                         <select id="aiProfileSelect" onchange="ai.selectProfile(this.value)"></select>
                         <label>配置档案</label>
                     </div>
                     <div class="md-row ai-profile-actions">
                         <div class="md-field" style="flex:1"><input type="text" id="aiProfileName" placeholder=" "><label>档案名称</label></div>
-                        <button class="md-btn md-btn-tonal" onclick="ai.saveAsNewProfile()"><span class="material-symbols-rounded">bookmark_add</span> 另存新档案</button>
+                        <button class="md-btn md-btn-tonal" onclick="ai.saveAsNewProfile()"><span class="material-symbols-rounded">bookmark_add</span> 另存新档�?/button>
                         <button class="md-btn md-btn-tonal" onclick="ai.deleteCurrentProfile()"><span class="material-symbols-rounded">delete</span> 删除</button>
                     </div>
                     <div class="md-field">
@@ -242,18 +242,18 @@
                     <div class="md-divider"></div>
                          <div class="ai-encrypt-section">
                              <div class="ai-encrypt-title"><span class="material-symbols-rounded">lock</span> 加密同步 AI 配置</div>
-                             <small>设置密码后会将所有 AI 配置档案一起加密写入同步数据，和训练记录同文件备份</small>
+                             <small>设置密码后会将所�?AI 配置档案一起加密写入同步数据，和训练记录同文件备份</small>
                              <div class="md-field"><input type="text" id="aiEncryptPass" class="masked-input" placeholder=" " autocomplete="off" spellcheck="false"><label>加密密码</label></div>
-                             <button class="md-btn md-btn-tonal" onclick="ai.exportToSync()"><span class="material-symbols-rounded">upload</span> 加密并写入同步数据</button>
+                             <button class="md-btn md-btn-tonal" onclick="ai.exportToSync()"><span class="material-symbols-rounded">upload</span> 加密并写入同步数�?/button>
                          </div>
                          <div class="md-divider"></div>
                          <div class="ai-encrypt-section">
                              <div class="ai-encrypt-title"><span class="material-symbols-rounded">clinical_notes</span> AI Prompt 模板</div>
-                             <small>管理 AI 教练的 prompt 模板，可导入导出。模板会随同步数据一起备份。</small>
+                             <small>管理 AI 教练�?prompt 模板，可导入导出。模板会随同步数据一起备份�?/small>
                              <div class="md-field" style="margin-top:10px">
                                  <select id="aiRetryMode" onchange="data.db.aiRetryMode=this.value;data.saveAdviceSettings?.()">
-                                     <option value="versioned">重试保留旧版本</option>
-                                     <option value="replace">重试替换旧版本</option>
+                                     <option value="versioned">重试保留旧版�?/option>
+                                     <option value="replace">重试替换旧版�?/option>
                                  </select>
                                  <label>重试模式</label>
                              </div>
@@ -266,7 +266,7 @@
                          </div>
                     <div id="aiDecryptSection" class="ai-encrypt-section hidden">
                         <div class="ai-encrypt-title"><span class="material-symbols-rounded">lock_open</span> 恢复 AI 配置</div>
-                        <small>检测到同步中的加密 AI 配置，输入密码恢复所有档案</small>
+                        <small>检测到同步中的加密 AI 配置，输入密码恢复所有档�?/small>
                         <div class="md-field"><input type="text" id="aiDecryptPass" class="masked-input" placeholder=" " autocomplete="off" spellcheck="false"><label>解密密码</label></div>
                         <button class="md-btn md-btn-tonal" onclick="ai.importFromSync()"><span class="material-symbols-rounded">download</span> 解密恢复</button>
                     </div>
@@ -282,14 +282,14 @@
                     </div>
                     <div id="s3Fields" class="hidden">
                         <div class="md-field"><input type="text" id="s3Endpoint" placeholder=" "><label>Endpoint URL</label></div>
-                        <div class="md-field"><input type="text" id="s3Region" placeholder=" "><label>Region (如 us-east-1)</label></div>
+                        <div class="md-field"><input type="text" id="s3Region" placeholder=" "><label>Region (�?us-east-1)</label></div>
                         <div class="md-field"><input type="text" id="s3Bucket" placeholder=" "><label>Bucket</label></div>
                         <div class="md-field"><input type="text" id="s3Key" placeholder=" "><label>Access Key</label></div>
                         <div class="md-field"><input type="text" id="s3Secret" class="masked-input" placeholder=" " autocomplete="off" spellcheck="false"><label>Secret Key</label></div>
                     </div>
                     <div id="webdavFields" class="hidden">
                         <div class="md-field"><input type="text" id="davUrl" placeholder=" "><label>WebDAV 地址</label></div>
-                        <div class="md-field"><input type="text" id="davUser" placeholder=" "><label>用户名</label></div>
+                        <div class="md-field"><input type="text" id="davUser" placeholder=" "><label>用户�?/label></div>
                         <div class="md-field"><input type="text" id="davPass" class="masked-input" placeholder=" " autocomplete="off" spellcheck="false"><label>密码 / App Password</label></div>
                         <div class="md-field"><input type="text" id="davPath" placeholder=" "><label>备份文件路径</label></div>
                     </div>
@@ -341,24 +341,24 @@
         </button>
     </nav>
 
-    <script src="toast.js?v=85"></script>
-    <script src="error-bus.js?v=85"></script>
-    <script src="i18n.js?v=85"></script>
-    <script src="a11y-focus-trap.js?v=85"></script>
-    <script src="theme.js?v=85"></script>
-    <script src="fooddb.js?v=85"></script>
-    <script type="module" src="data-utils-pure.js?v=85"></script>
-    <script src="data-utils.js?v=85"></script>
-    <script src="storage/idb.js?v=85"></script>
-    <script src="storage/migrate.js?v=85"></script>
-    <script src="data-store.js?v=85"></script>
-    <script src="data-ui-state.js?v=85"></script>
-    <script src="onboarding.js?v=85"></script>
-    <script src="data-views.js?v=85"></script>
-    <script src="data.js?v=85"></script>
-    <script type="module" src="sync-pure.js?v=85"></script>
-    <script src="sync-status.js?v=85"></script>
-    <script src="app-update.js?v=85"></script>
+    <script src="toast.js?v=86"></script>
+    <script src="error-bus.js?v=86"></script>
+    <script src="i18n.js?v=86"></script>
+    <script src="a11y-focus-trap.js?v=86"></script>
+    <script src="theme.js?v=86"></script>
+    <script src="fooddb.js?v=86"></script>
+    <script type="module" src="data-utils-pure.js?v=86"></script>
+    <script src="data-utils.js?v=86"></script>
+    <script src="storage/idb.js?v=86"></script>
+    <script src="storage/migrate.js?v=86"></script>
+    <script src="data-store.js?v=86"></script>
+    <script src="data-ui-state.js?v=86"></script>
+    <script src="onboarding.js?v=86"></script>
+    <script src="data-views.js?v=86"></script>
+    <script src="data.js?v=86"></script>
+    <script type="module" src="sync-pure.js?v=86"></script>
+    <script src="sync-status.js?v=86"></script>
+    <script src="app-update.js?v=86"></script>
     <div id="weightModal" class="md-modal md-modal-sheet hidden" aria-hidden="true">
         <div class="md-modal-backdrop" onclick="data.closeWeightModal()"></div>
         <div class="md-modal-card md-modal-sheet-card">
@@ -413,18 +413,18 @@
                         <option value="run">跑步 9.8 MET</option>
                         <option value="cycling">骑行 6.8 MET</option>
                         <option value="swim">游泳 7.0 MET</option>
-                        <option value="elliptical">椭圆机 5.0 MET</option>
-                        <option value="rowing">划船机 7.0 MET</option>
+                        <option value="elliptical">椭圆�?5.0 MET</option>
+                        <option value="rowing">划船�?7.0 MET</option>
                         <option value="battle_rope">战绳 8.0 MET</option>
                         <option value="spin_bike">动感单车 7.5 MET</option>
                     </select>
                     <label>有氧项目</label>
                 </div>
                 <div class="md-field"><input type="number" id="cardioEditMin" min="0" placeholder=" " oninput="cardio.updateEditCalories()"><label>分钟</label></div>
-                <div class="md-field"><input type="number" id="cardioEditSec" min="0" max="59" placeholder=" " oninput="cardio.updateEditCalories()"><label>秒</label></div>
+                <div class="md-field"><input type="number" id="cardioEditSec" min="0" max="59" placeholder=" " oninput="cardio.updateEditCalories()"><label>�?/label></div>
                 <div class="md-field"><input type="number" id="cardioEditWeight" step="0.1" placeholder=" " oninput="cardio.updateEditCalories()"><label>体重 kg</label></div>
                 <div class="md-field"><input type="number" id="cardioEditTarget" placeholder=" " oninput="cardio.updateEditCalories()"><label>目标分钟</label></div>
-                <div class="md-field span-full"><input type="number" id="cardioEditCal" placeholder=" "><label>热量 kcal（可手动修正）</label></div>
+                <div class="md-field span-full"><input type="number" id="cardioEditCal" placeholder=" "><label>热量 kcal（可手动修正�?/label></div>
             </div>
             <div class="md-row modal-actions">
                 <button class="md-btn md-btn-tonal" onclick="cardio.closeEditModal()">放弃</button>
@@ -510,7 +510,7 @@
             </div>
             <div class="theme-sheet-section">
                 <div class="theme-panel-title">
-                    <span class="theme-language-mark" aria-hidden="true">A/文</span> Language
+                    <span class="theme-language-mark" aria-hidden="true">A/�?/span> Language
                 </div>
                 <div class="md-field theme-language-field">
                     <select id="localeSelectSheet" onchange="i18n.setLocale(this.value)">
@@ -550,7 +550,7 @@
             const p = wait.then(() => new Promise((res, rej) => {
                 if (_loaded.has(name)) return res();
                 const s = document.createElement('script');
-                s.src = `${name}.js?v=85`;
+                s.src = `${name}.js?v=86`;
                 s.onload = () => { _loaded.add(name); res(); };
                 s.onerror = rej;
                 document.head.appendChild(s);
