@@ -3,50 +3,50 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>训练助手</title>
+    <title>&#35757;&#32451;&#21161;&#25163;</title>
     <link rel="manifest" href="manifest.json">
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230061a4'/%3E%3Cpath d='M22 22h6v20h-6zM36 22h6v20h-6z' fill='white'/%3E%3Cpath d='M16 28h8v8h-8zM40 28h8v8h-8z' fill='white' opacity='.9'/%3E%3C/svg%3E">
     <meta name="theme-color" content="#0061a4">
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&icon_names=accessibility_new,add,add_circle,auto_awesome,backup,badge,balance,block,bookmark_add,bookmark_border,bookmarks,brightness_auto,calendar_month,check,check_circle,chevron_left,chevron_right,clinical_notes,close,close_fullscreen,cloud_alert,cloud_done,cloud_off,cloud_sync,content_copy,dark_mode,delete,directions_bike,directions_run,directions_walk,done_all,download,download_for_offline,edit,edit_note,egg_alt,error,event,event_note,exercise,expand_less,expand_more,fitness_center,flag,format_color_fill,forum,health_and_safety,help,history,info,inventory_2,keyboard_arrow_down,keyboard_arrow_left,keyboard_arrow_right,keyboard_arrow_up,library_books,light_mode,local_fire_department,lock,lock_open,mic,mic_off,monitor_heart,monitor_weight,monitoring,more_vert,no_food,notifications,notifications_active,palette,pause,pedal_bike,person,picture_in_picture_alt,play_arrow,playlist_add,pool,psychology,refresh,remove,replay,restart_alt,restaurant,rowing,save,schedule,search,search_off,self_improvement,send,settings,shield,show_chart,skip_next,skip_previous,speed,sports,sports_gymnastics,stop,swap_horiz,sync,sync_problem,system_update,timeline,timer,today,trending_down,trending_up,tune,upload,upload_file,visibility,visibility_off,volume_off,volume_up,warning,waterfall_chart" rel="stylesheet" />
-    <link rel="stylesheet" href="build/generated.css?v=86">
-    <link rel="stylesheet" href="css-src/42-health-profile.css?v=86">
+    <link rel="stylesheet" href="build/generated.css?v=87">
+    <link rel="stylesheet" href="css-src/42-health-profile.css?v=87">
 </head>
 <body>
     <div id="appUpdateBanner" class="app-update-banner hidden">
         <span class="material-symbols-rounded">system_update</span>
         <div>
-            <strong>发现新版�?/strong>
-            <small>刷新后即可使用最新功能与修复</small>
+            <strong>&#21457;&#29616;&#26032;&#29256;&#26412;</strong>
+            <small>&#24050;&#19979;&#36733;&#26368;&#26032;&#36164;&#28304;&#65292;&#28857;&#20987;&#26356;&#26032;&#21518;&#23558;&#21047;&#26032;&#39029;&#38754;&#24182;&#21551;&#29992;&#26032;&#29256;&#26412;&#12290;</small>
         </div>
-        <button class="md-btn md-btn-tonal" onclick="appUpdate.dismiss()">稍后</button>
-        <button class="md-btn md-btn-filled" onclick="appUpdate.apply()">立即刷新</button>
+        <button class="md-btn md-btn-tonal" onclick="appUpdate.dismiss()">&#31245;&#21518;</button>
+        <button class="md-btn md-btn-filled" onclick="appUpdate.apply()">&#31435;&#21363;&#26356;&#26032;</button>
     </div>
     <audio id="silentAudio" loop preload="auto"><source src="data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAgD4AAAB9AAACABAAZGF0YQAAAAA=" type="audio/wav"></audio>
     <video id="pipVideo" class="pip-video-source" muted playsinline preload="auto" aria-hidden="true"></video>
 
     <div id="globalTrainingBar" class="global-training-bar hidden"><span></span></div>
     <main id="app">
-        <!-- 训练�?-->
+        <!-- Workout -->
         <section id="workout" class="page">
             <header class="md-top-app-bar workout-only-bar">
-                <div class="bar-leading"><span class="material-symbols-rounded app-icon">fitness_center</span><span class="app-title">训练助手</span></div>
+                <div class="bar-leading"><span class="material-symbols-rounded app-icon">fitness_center</span><span class="app-title">&#35757;&#32451;&#21161;&#25163;</span></div>
             </header>
             <div class="md-card timer-panel">
                 <span class="skip-btn" onclick="workout.skip()"><span class="material-symbols-rounded">skip_next</span></span>
                 <div id="statusText">READY</div>
                 <div id="mainTime">00</div>
-                <div id="subText">准备就绪</div>
+                <div id="subText">&#20934;&#22791;&#24320;&#22987;</div>
                 <div class="timer-stats">
                     <div class="stat-item">
-                        <span class="stat-label">总用�?/span>
+                        <span class="stat-label">&#24635;&#26102;&#38271;</span>
                         <b id="sessionTime" class="session-time">00:00</b>
                     </div>
                     <div class="stat-item">
-                        <span class="stat-label">组数</span>
+                        <span class="stat-label">&#32452;&#25968;</span>
                         <b><span id="curSet">0</span>/<span id="totalSet">0</span></b>
                     </div>
                     <div class="stat-item">
-                        <span class="stat-label">次数</span>
+                        <span class="stat-label">&#27425;&#25968;</span>
                         <b><span id="curRep">0</span>/<span id="totalRep">0</span></b>
                     </div>
                 </div>
@@ -56,115 +56,115 @@
                 </div>
             </div>
 
-            <div class="mode-tabs" role="tablist" aria-label="训练模式">
-                <button id="modeStrengthBtn" class="mode-tab active" role="tab" aria-selected="true" onclick="workout.setMode('strength')" type="button"><span class="material-symbols-rounded">exercise</span>动作</button>
-                <button id="modeCardioBtn" class="mode-tab" role="tab" aria-selected="false" onclick="workout.setMode('cardio')" type="button"><span class="material-symbols-rounded">directions_run</span>有氧</button>
-                <button id="modeStrengthLogBtn" class="mode-tab" role="tab" aria-selected="false" onclick="workout.setMode('strengthLog')" type="button"><span class="material-symbols-rounded">fitness_center</span>无氧记录</button>
+            <div class="mode-tabs" role="tablist" aria-label="&#35757;&#32451;&#27169;&#24335;">
+                <button id="modeStrengthBtn" class="mode-tab active" role="tab" aria-selected="true" onclick="workout.setMode('strength')" type="button"><span class="material-symbols-rounded">exercise</span>&#21147;&#37327;</button>
+                <button id="modeCardioBtn" class="mode-tab" role="tab" aria-selected="false" onclick="workout.setMode('cardio')" type="button"><span class="material-symbols-rounded">directions_run</span>&#26377;&#27687;</button>
+                <button id="modeStrengthLogBtn" class="mode-tab" role="tab" aria-selected="false" onclick="workout.setMode('strengthLog')" type="button"><span class="material-symbols-rounded">fitness_center</span>&#21147;&#37327;&#35760;&#24405;</button>
             </div>
 
             <div class="md-card input-card" id="strengthCard">
                 <div class="rate-row">
                     <span class="material-symbols-rounded" style="font-size:18px">speed</span>
-                    <span>语�?<span id="rateLabel">1.1</span>x</span>
+                    <span>&#35821;&#36895; <span id="rateLabel">1.1</span>x</span>
                     <input type="range" id="ttsRate" min="0.5" max="3" step="0.1" value="1.1" oninput="workout.updateRate(this.value)">
                 </div>
                 <div class="md-divider compact-divider"></div>
                 <div class="md-grid">
                     <div class="md-field span-full">
                         <input type="text" id="name" placeholder=" " autocomplete="off">
-                        <label>动作名称</label>
+                        <label>&#21160;&#20316;&#21517;&#31216;</label>
                     </div>
-                    <div class="md-field"><input type="number" id="sets" placeholder=" "><label>组数</label></div>
-                    <div class="md-field"><input type="number" id="reps" placeholder=" "><label>次数</label></div>
-                    <div class="md-field"><input type="number" id="work" placeholder=" "><label>单次秒数</label></div>
-                    <div class="md-field"><input type="number" id="repRest" placeholder=" "><label>次休秒数</label></div>
-                    <div class="md-field"><input type="number" id="actionRest" placeholder=" "><label>组休秒数</label></div>
-                    <div class="md-field"><input type="number" id="groupRest" placeholder=" "><label>项休秒数</label></div>
+                    <div class="md-field"><input type="number" id="sets" placeholder=" "><label>&#32452;&#25968;</label></div>
+                    <div class="md-field"><input type="number" id="reps" placeholder=" "><label>&#27425;&#25968;</label></div>
+                    <div class="md-field"><input type="number" id="work" placeholder=" "><label>&#21160;&#20316;&#26102;&#38271;&#65288;&#31186;&#65289;</label></div>
+                    <div class="md-field"><input type="number" id="repRest" placeholder=" "><label>&#27425;&#38388;&#20241;&#24687;&#65288;&#31186;&#65289;</label></div>
+                    <div class="md-field"><input type="number" id="actionRest" placeholder=" "><label>&#32452;&#38388;&#20241;&#24687;&#65288;&#31186;&#65289;</label></div>
+                    <div class="md-field"><input type="number" id="groupRest" placeholder=" "><label>&#38454;&#27573;&#20241;&#24687;&#65288;&#31186;&#65289;</label></div>
                     <div class="md-field">
                         <select id="actionPhase">
-                            <option value="warmup">暖身</option>
-                            <option value="main" selected>正式</option>
-                            <option value="cooldown">放松</option>
+                            <option value="warmup">&#28909;&#36523;</option>
+                            <option value="main" selected>&#20027;&#35757;&#32451;</option>
+                            <option value="cooldown">&#25918;&#26494;</option>
                         </select>
-                        <label>训练阶段</label>
+                        <label>&#35757;&#32451;&#38454;&#27573;</label>
                     </div>
                     <div class="md-switch span-full" role="switch" aria-checked="false">
-                        <span><span class="material-symbols-rounded" style="font-size:18px;vertical-align:middle;margin-right:6px">swap_horiz</span>双侧交替训练</span>
+                        <span><span class="material-symbols-rounded" style="font-size:18px;vertical-align:middle;margin-right:6px">swap_horiz</span>&#21452;&#20391;&#20132;&#26367;&#21160;&#20316;</span>
                         <label class="switch-track"><input type="checkbox" id="isAlt" onchange="ui.syncSwitchAria(this)"><span class="switch-thumb"></span></label>
                     </div>
                 </div>
                 <div class="input-card-actions">
                     <button class="md-btn md-btn-filled" onclick="data.addAction()">
-                        <span class="material-symbols-rounded">add</span> 添加到计�?
+                        <span class="material-symbols-rounded">add</span> &#28155;&#21152;&#21040;&#24403;&#21069;&#35745;&#21010;
                     </button>
-                    <button class="md-btn md-btn-tonal input-card-lib-btn" onclick="data.saveCurrentActionToLibrary()" title="存入动作�? aria-label="存入动作�?>
+                    <button class="md-btn md-btn-tonal input-card-lib-btn" onclick="data.saveCurrentActionToLibrary()" title="&#23384;&#20837;&#21160;&#20316;&#24211;" aria-label="&#23384;&#20837;&#21160;&#20316;&#24211;">
                         <span class="material-symbols-rounded">bookmark_add</span>
                     </button>
                 </div>
             </div>
-            <div class="workout-controls" aria-label="训练控制">
-                <button class="md-fab fab-stop hidden" id="stopBtn" onclick="workout.stop()" aria-label="停止训练" aria-keyshortcuts="Escape"><span class="material-symbols-rounded">stop</span></button>
-                <button class="md-fab fab-prev hidden" id="prevBtn" onclick="workout.prevAction?.()" aria-label="重置当前阶段" aria-keyshortcuts="ArrowLeft"><span class="material-symbols-rounded">restart_alt</span></button>
-                <button class="md-fab fab-play" id="playBtn" onclick="workout.toggle()" aria-label="开始或暂停训练" aria-keyshortcuts="Space"><span class="material-symbols-rounded" id="playIcon">play_arrow</span></button>
-                <button class="md-fab fab-pip" id="pipBtn" onclick="workout.togglePip()" aria-label="打开训练画中�?><span class="material-symbols-rounded" id="pipIcon">picture_in_picture_alt</span></button>
+            <div class="workout-controls" aria-label="&#35757;&#32451;&#25511;&#21046;">
+                <button class="md-fab fab-stop hidden" id="stopBtn" onclick="workout.stop()" aria-label="&#32467;&#26463;&#35757;&#32451;" aria-keyshortcuts="Escape"><span class="material-symbols-rounded">stop</span></button>
+                <button class="md-fab fab-prev hidden" id="prevBtn" onclick="workout.prevAction?.()" aria-label="&#22238;&#21040;&#19978;&#19968;&#38454;&#27573;" aria-keyshortcuts="ArrowLeft"><span class="material-symbols-rounded">restart_alt</span></button>
+                <button class="md-fab fab-play" id="playBtn" onclick="workout.toggle()" aria-label="&#24320;&#22987;&#25110;&#26242;&#20572;&#24403;&#21069;&#35745;&#26102;" aria-keyshortcuts="Space"><span class="material-symbols-rounded" id="playIcon">play_arrow</span></button>
+                <button class="md-fab fab-pip" id="pipBtn" onclick="workout.togglePip()" aria-label="&#25171;&#24320;&#30011;&#20013;&#30011;"><span class="material-symbols-rounded" id="pipIcon">picture_in_picture_alt</span></button>
             </div>
             <div class="md-card cardio-card hidden">
                 <div class="cardio-header">
                     <div>
-                        <span class="cardio-kicker">有氧模式</span>
-                        <h3>有氧计时与热�?/h3>
+                        <span class="cardio-kicker">&#26377;&#27687;&#27169;&#24335;</span>
+                        <h3>&#26377;&#27687;&#36816;&#21160;&#28909;&#37327;&#20272;&#31639;</h3>
                     </div>
                     <span class="material-symbols-rounded">directions_run</span>
                 </div>
                 <div class="md-grid cardio-grid">
                     <div class="md-field span-full">
                         <select id="cardioType" onchange="cardio.updatePlan()">
-                            <option value="walk">步行 3.5 MET</option>
-                            <option value="brisk_walk">快走 4.3 MET</option>
-                            <option value="jog">慢跑 7.0 MET</option>
-                            <option value="run">跑步 9.8 MET</option>
-                            <option value="cycling">骑行 6.8 MET</option>
-                            <option value="swim">游泳 7.0 MET</option>
-                            <option value="elliptical">椭圆�?5.0 MET</option>
-                            <option value="rowing">划船�?7.0 MET</option>
-                            <option value="battle_rope">战绳 8.0 MET</option>
-                            <option value="spin_bike">动感单车 7.5 MET</option>
+                            <option value="walk">&#27493;&#34892; 3.5 MET</option>
+                            <option value="brisk_walk">&#24555;&#36208; 4.3 MET</option>
+                            <option value="jog">&#24930;&#36305; 7.0 MET</option>
+                            <option value="run">&#36305;&#27493; 9.8 MET</option>
+                            <option value="cycling">&#39569;&#34892; 6.8 MET</option>
+                            <option value="swim">&#28216;&#27891; 7.0 MET</option>
+                            <option value="elliptical">&#26925;&#22278;&#26426; 5.0 MET</option>
+                            <option value="rowing">&#21010;&#33337;&#26426; 7.0 MET</option>
+                            <option value="battle_rope">&#25112;&#32483; 8.0 MET</option>
+                            <option value="spin_bike">&#21160;&#24863;&#21333;&#36710; 7.5 MET</option>
                         </select>
-                        <label>有氧项目</label>
+                        <label>&#26377;&#27687;&#39033;&#30446;</label>
                     </div>
-                    <div class="md-field"><input type="number" id="cardioWeight" placeholder=" " value="70" oninput="cardio.updatePlan()"><label>体重 kg</label></div>
-                    <div class="md-field"><input type="number" id="cardioTarget" placeholder=" " value="30" oninput="cardio.updatePlan()"><label>目标分钟</label></div>
+                    <div class="md-field"><input type="number" id="cardioWeight" placeholder=" " value="70" oninput="cardio.updatePlan()"><label>&#20307;&#37325; kg</label></div>
+                    <div class="md-field"><input type="number" id="cardioTarget" placeholder=" " value="30" oninput="cardio.updatePlan()"><label>&#30446;&#26631;&#20998;&#38047;</label></div>
                 </div>
             </div>
             <div class="md-card strength-log-card hidden" id="strengthLogCard">
                 <div class="md-grid">
                     <div class="md-field span-full">
-                        <input type="text" id="slName" placeholder=" "><label>动作名称</label>
+                        <input type="text" id="slName" placeholder=" "><label>&#21160;&#20316;&#21517;&#31216;</label>
                     </div>
-                    <div class="md-field"><input type="number" id="slWeight" step="0.5" placeholder=" "><label>重量 kg</label></div>
-                    <div class="md-field"><input type="number" id="slSets" placeholder=" "><label>组数</label></div>
-                    <div class="md-field"><input type="number" id="slReps" placeholder=" "><label>每组次数</label></div>
-                    <div class="md-field"><input type="number" id="slMinutes" placeholder=" "><label>总时�?分钟,可空)</label></div>
-                    <div class="md-field span-full"><input type="text" id="slNote" placeholder=" "><label>备注</label></div>
+                    <div class="md-field"><input type="number" id="slWeight" step="0.5" placeholder=" "><label>&#37325;&#37327; kg</label></div>
+                    <div class="md-field"><input type="number" id="slSets" placeholder=" "><label>&#32452;&#25968;</label></div>
+                    <div class="md-field"><input type="number" id="slReps" placeholder=" "><label>&#27599;&#32452;&#27425;&#25968;</label></div>
+                    <div class="md-field"><input type="number" id="slMinutes" placeholder=" "><label>&#24635;&#26102;&#38271;&#65288;&#20998;&#38047;&#65292;&#21487;&#31354;&#65289;</label></div>
+                    <div class="md-field span-full"><input type="text" id="slNote" placeholder=" "><label>&#22791;&#27880;</label></div>
                 </div>
                 <button class="md-btn md-btn-filled" onclick="data.addStrengthLog()">
-                    <span class="material-symbols-rounded">add</span> 保存到今�?
+                    <span class="material-symbols-rounded">add</span> &#20445;&#23384;&#21040;&#20170;&#26085;&#35760;&#24405;
                 </button>
             </div>
             <div id="workoutPlanCard"></div>
             <div id="currentActionList"></div>
             <div class="md-card routine-tool">
-                <div class="md-field" style="flex:1"><input type="text" id="newRoutineName" placeholder=" "><label>方案名称</label></div>
-                <div class="md-field" style="flex:1"><input type="text" id="routineTagsInput" placeholder=" "><label>标签 (逗号分隔)</label></div>
-                <button class="md-btn md-btn-tonal" onclick="data.saveRoutine()"><span class="material-symbols-rounded">bookmark_add</span> 存入方案�?/button>
+                <div class="md-field" style="flex:1"><input type="text" id="newRoutineName" placeholder=" "><label>&#26041;&#26696;&#21517;&#31216;</label></div>
+                <div class="md-field" style="flex:1"><input type="text" id="routineTagsInput" placeholder=" "><label>&#26631;&#31614;&#65288;&#36887;&#21495;&#20998;&#38548;&#65289;</label></div>
+                <button class="md-btn md-btn-tonal" onclick="data.saveRoutine()"><span class="material-symbols-rounded">bookmark_add</span> &#23384;&#20837;&#26041;&#26696;&#24211;</button>
             </div>
         </section>
 
         <!-- 今日�?-->
         <section id="today" class="page active">
             <header class="md-top-app-bar">
-                <div class="bar-leading"><span class="material-symbols-rounded app-icon">today</span><span class="app-title">今日</span></div>
-                <div id="syncStatus" class="md-chip"><span class="material-symbols-rounded" style="font-size:14px">cloud_off</span> 本地</div>
+                <div class="bar-leading"><span class="material-symbols-rounded app-icon">today</span><span class="app-title">&#20170;&#26085;</span></div>
+                <div id="syncStatus" class="md-chip"><span class="material-symbols-rounded" style="font-size:14px">cloud_off</span> &#26412;&#22320;</div>
             </header>
             <div id="todayOverview"></div>
             <div id="todayQuickActions"></div>
@@ -172,38 +172,38 @@
             <div id="todayAiCard"></div>
         </section>
 
-        <!-- 记录�?-->
+        <!-- 记�?��??-->
         <section id="records" class="page">
             <header class="md-top-app-bar">
-                <div class="bar-leading"><span class="material-symbols-rounded app-icon">monitoring</span><span class="app-title">记录</span></div>
+                <div class="bar-leading"><span class="material-symbols-rounded app-icon">monitoring</span><span class="app-title">&#35760;&#24405;</span></div>
             </header>
             <div id="recordsOverview"></div>
             <div id="recordsContent"></div>
         </section>
 
-        <!-- AI教练�?-->
+        <!-- AI??��??�?-->
         <section id="ai-coach" class="page">
             <header class="md-top-app-bar">
-                <div class="bar-leading"><span class="material-symbols-rounded app-icon">psychology</span><span class="app-title">AI 教练</span></div>
+                <div class="bar-leading"><span class="material-symbols-rounded app-icon">psychology</span><span class="app-title">AI &#25945;&#32451;</span></div>
                 <div class="bar-trailing">
-                    <button class="md-chip" onclick="data.showAiUsageDialog?.()" type="button" aria-label="AI 用量">
-                        <span class="material-symbols-rounded" style="font-size:14px">monitoring</span> 用量
+                    <button class="md-chip" onclick="data.showAiUsageDialog?.()" type="button" aria-label="AI &#29992;&#37327;">
+                        <span class="material-symbols-rounded" style="font-size:14px">monitoring</span> &#29992;&#37327;
                     </button>
                     <button class="md-chip" onclick="data.regenerateAdvice?.()" type="button">
-                        <span class="material-symbols-rounded" style="font-size:14px">refresh</span> 重新生成
+                        <span class="material-symbols-rounded" style="font-size:14px">refresh</span> &#37325;&#26032;&#29983;&#25104;
                     </button>
                 </div>
             </header>
             <div id="aiCoachContent"></div>
         </section>
 
-        <!-- 我的�?-->
+        <!-- ??��??�?-->
         <section id="profile" class="page">
             <header class="md-top-app-bar">
-                <div class="bar-leading"><span class="material-symbols-rounded app-icon">person</span><span class="app-title" data-i18n="nav.profile">我的</span></div>
+                <div class="bar-leading"><span class="material-symbols-rounded app-icon">person</span><span class="app-title" data-i18n="nav.profile">&#25105;&#30340;</span></div>
                 <button class="theme-trigger"
                         onclick="theme.openSheet()"
-                        aria-label="个性化"
+                        aria-label="&#20010;&#24615;&#21270;"
                         aria-haspopup="dialog">
                     <span class="material-symbols-rounded">palette</span>
                     <span class="theme-dot" aria-hidden="true"></span>
@@ -213,102 +213,102 @@
             <div id="profileContent"></div>
             <div id="profileSettings" class="hidden">
                 <div class="md-card sync-card" data-settings="ai">
-                    <div class="ai-card-header"><span class="material-symbols-rounded">psychology</span><strong>AI 配置</strong><span id="aiStatus" class="ai-status ai-off">未配�?/span></div>
+                    <div class="ai-card-header"><span class="material-symbols-rounded">psychology</span><strong>AI &#35774;&#32622;</strong><span id="aiStatus" class="ai-status ai-off">&#26410;&#37197;&#32622;</span></div>
                     <div class="md-field">
                         <select id="aiProfileSelect" onchange="ai.selectProfile(this.value)"></select>
-                        <label>配置档案</label>
+                        <label>&#37197;&#32622;&#26723;&#26696;</label>
                     </div>
                     <div class="md-row ai-profile-actions">
-                        <div class="md-field" style="flex:1"><input type="text" id="aiProfileName" placeholder=" "><label>档案名称</label></div>
-                        <button class="md-btn md-btn-tonal" onclick="ai.saveAsNewProfile()"><span class="material-symbols-rounded">bookmark_add</span> 另存新档�?/button>
-                        <button class="md-btn md-btn-tonal" onclick="ai.deleteCurrentProfile()"><span class="material-symbols-rounded">delete</span> 删除</button>
+                        <div class="md-field" style="flex:1"><input type="text" id="aiProfileName" placeholder=" "><label>&#26723;&#26696;&#21517;&#31216;</label></div>
+                        <button class="md-btn md-btn-tonal" onclick="ai.saveAsNewProfile()"><span class="material-symbols-rounded">bookmark_add</span> &#21478;&#23384;&#20026;&#26032;&#37197;&#32622;</button>
+                        <button class="md-btn md-btn-tonal" onclick="ai.deleteCurrentProfile()"><span class="material-symbols-rounded">delete</span> &#21024;&#38500;&#24403;&#21069;</button>
                     </div>
                     <div class="md-field">
                         <select id="aiProvider">
-                            <option value="openai">OpenAI 兼容 (Chat Completions)</option>
+                            <option value="openai">OpenAI &#20860;&#23481;&#25509;&#21475; (Chat Completions)</option>
                             <option value="openai-responses">OpenAI Responses API</option>
                             <option value="claude">Claude (Anthropic)</option>
                             <option value="gemini">Gemini</option>
                         </select>
-                        <label>AI 服务</label>
+                        <label>AI &#25552;&#20379;&#21830;</label>
                     </div>
                     <div class="md-field"><input type="text" id="aiBaseUrl" placeholder=" "><label>Base URL</label></div>
                     <div class="md-field"><input type="text" id="aiApiKey" class="masked-input" placeholder=" " autocomplete="off" spellcheck="false"><label>API Key</label></div>
-                    <button class="md-btn md-btn-tonal" onclick="ai.fetchModels()"><span class="material-symbols-rounded">refresh</span> 获取可用模型</button>
+                    <button class="md-btn md-btn-tonal" onclick="ai.fetchModels()"><span class="material-symbols-rounded">refresh</span> &#33719;&#21462;&#21487;&#29992;&#27169;&#22411;</button>
                     <div id="aiFetchStatus" class="food-ai-status"></div>
                     <div id="aiModelList" class="ai-model-list hidden"></div>
-                    <div class="md-field"><input type="text" id="aiModel" placeholder=" " onfocus="ai.showCachedModels()"><label>模型名称</label></div>
-                    <button class="md-btn md-btn-filled" onclick="ai.saveCurrentProfile()"><span class="material-symbols-rounded">save</span> 更新当前档案</button>
+                    <div class="md-field"><input type="text" id="aiModel" placeholder=" " onfocus="ai.showCachedModels()"><label>&#27169;&#22411;&#21517;&#31216;</label></div>
+                    <button class="md-btn md-btn-filled" onclick="ai.saveCurrentProfile()"><span class="material-symbols-rounded">save</span> &#20445;&#23384;&#24403;&#21069;&#37197;&#32622;</button>
                     <div class="md-divider"></div>
                          <div class="ai-encrypt-section">
-                             <div class="ai-encrypt-title"><span class="material-symbols-rounded">lock</span> 加密同步 AI 配置</div>
-                             <small>设置密码后会将所�?AI 配置档案一起加密写入同步数据，和训练记录同文件备份</small>
-                             <div class="md-field"><input type="text" id="aiEncryptPass" class="masked-input" placeholder=" " autocomplete="off" spellcheck="false"><label>加密密码</label></div>
-                             <button class="md-btn md-btn-tonal" onclick="ai.exportToSync()"><span class="material-symbols-rounded">upload</span> 加密并写入同步数�?/button>
+                             <div class="ai-encrypt-title"><span class="material-symbols-rounded">lock</span> &#21152;&#23494;&#21516;&#27493; AI &#37197;&#32622;</div>
+                             <small>&#25226;&#24403;&#21069; AI &#37197;&#32622;&#21152;&#23494;&#21518;&#19978;&#20256;&#21040;&#20113;&#31471;&#12290;&#21482;&#26377;&#36755;&#20837;&#27491;&#30830;&#23494;&#30721;&#65292;&#25165;&#33021;&#22312;&#20854;&#20182;&#35774;&#22791;&#19978;&#24674;&#22797;&#36825;&#20123;&#37197;&#32622;&#12290;</small>
+                             <div class="md-field"><input type="text" id="aiEncryptPass" class="masked-input" placeholder=" " autocomplete="off" spellcheck="false"><label>&#21152;&#23494;&#23494;&#30721;</label></div>
+                             <button class="md-btn md-btn-tonal" onclick="ai.exportToSync()"><span class="material-symbols-rounded">upload</span> &#21152;&#23494;&#24182;&#19978;&#20256;&#21040;&#20113;&#31471;</button>
                          </div>
                          <div class="md-divider"></div>
                          <div class="ai-encrypt-section">
-                             <div class="ai-encrypt-title"><span class="material-symbols-rounded">clinical_notes</span> AI Prompt 模板</div>
-                             <small>管理 AI 教练�?prompt 模板，可导入导出。模板会随同步数据一起备份�?/small>
+                             <div class="ai-encrypt-title"><span class="material-symbols-rounded">clinical_notes</span> AI Prompt &#27169;&#26495;</div>
+                             <small>&#31649;&#29702; AI &#20998;&#26512;&#26102;&#20351;&#29992;&#30340; prompt &#27169;&#26495;&#65292;&#21487;&#23548;&#20986;&#22791;&#20221;&#65292;&#20063;&#21487;&#23548;&#20837;&#20320;&#20445;&#23384;&#36807;&#30340;&#27169;&#26495;&#12290;</small>
                              <div class="md-field" style="margin-top:10px">
                                  <select id="aiRetryMode" onchange="data.db.aiRetryMode=this.value;data.saveAdviceSettings?.()">
-                                     <option value="versioned">重试保留旧版�?/option>
-                                     <option value="replace">重试替换旧版�?/option>
+                                     <option value="versioned">&#20445;&#30041;&#22810;&#29256;&#26412;&#22238;&#22797;</option>
+                                     <option value="replace">&#30452;&#25509;&#26367;&#25442;&#24403;&#21069;&#22238;&#22797;</option>
                                  </select>
-                                 <label>重试模式</label>
+                                 <label>&#37325;&#35797;&#31574;&#30053;</label>
                              </div>
-                              <div class="md-row ai-template-actions">
-                                  <button class="md-btn md-btn-tonal" onclick="data.toggleTemplateManager?.()" type="button"><span class="material-symbols-rounded">edit_note</span> 管理</button>
-                                  <button class="md-btn md-btn-tonal" onclick="data.exportTemplates?.()" type="button"><span class="material-symbols-rounded">download</span> 导出</button>
-                                  <button class="md-btn md-btn-tonal" onclick="data.importTemplates?.()" type="button"><span class="material-symbols-rounded">upload</span> 导入</button>
-                                 <input id="aiTemplateImportInput" class="hidden" type="file" accept="application/json" onchange="data.handleTemplateImport?.(event)">
-                             </div>
-                         </div>
+                               <div class="md-row ai-template-actions">
+                                   <button class="md-btn md-btn-tonal" onclick="data.toggleTemplateManager?.()" type="button"><span class="material-symbols-rounded">edit_note</span> &#32534;&#36753;</button>
+                                   <button class="md-btn md-btn-tonal" onclick="data.exportTemplates?.()" type="button"><span class="material-symbols-rounded">download</span> &#23548;&#20986;</button>
+                                   <button class="md-btn md-btn-tonal" onclick="data.importTemplates?.()" type="button"><span class="material-symbols-rounded">upload</span> &#23548;&#20837;</button>
+                                  <input id="aiTemplateImportInput" class="hidden" type="file" accept="application/json" onchange="data.handleTemplateImport?.(event)">
+                              </div>
+                          </div>
                     <div id="aiDecryptSection" class="ai-encrypt-section hidden">
-                        <div class="ai-encrypt-title"><span class="material-symbols-rounded">lock_open</span> 恢复 AI 配置</div>
-                        <small>检测到同步中的加密 AI 配置，输入密码恢复所有档�?/small>
-                        <div class="md-field"><input type="text" id="aiDecryptPass" class="masked-input" placeholder=" " autocomplete="off" spellcheck="false"><label>解密密码</label></div>
-                        <button class="md-btn md-btn-tonal" onclick="ai.importFromSync()"><span class="material-symbols-rounded">download</span> 解密恢复</button>
+                        <div class="ai-encrypt-title"><span class="material-symbols-rounded">lock_open</span> &#23548;&#20837; AI &#37197;&#32622;</div>
+                        <small>&#22914;&#26524;&#20113;&#31471;&#24050;&#32463;&#20445;&#23384;&#20102;&#21152;&#23494;&#30340; AI &#37197;&#32622;&#65292;&#22312;&#36825;&#37324;&#36755;&#20837;&#23494;&#30721;&#21518;&#21363;&#21487;&#19979;&#36733;&#24182;&#24674;&#22797;&#12290;</small>
+                        <div class="md-field"><input type="text" id="aiDecryptPass" class="masked-input" placeholder=" " autocomplete="off" spellcheck="false"><label>&#35299;&#23494;&#23494;&#30721;</label></div>
+                        <button class="md-btn md-btn-tonal" onclick="ai.importFromSync()"><span class="material-symbols-rounded">download</span> &#19979;&#36733;&#24182;&#23548;&#20837;</button>
                     </div>
                 </div>
                 <div class="md-card sync-card" data-settings="sync">
                     <div class="md-field">
                         <select id="syncMode" onchange="sync.toggleFields(this.value)">
-                            <option value="none">关闭同步</option>
-                            <option value="s3">S3 协议</option>
+                            <option value="none">&#20165;&#26412;&#22320;&#65292;&#19981;&#21516;&#27493;</option>
+                            <option value="s3">S3 &#23384;&#20648;</option>
                             <option value="webdav">WebDAV</option>
                         </select>
-                        <label>同步方式</label>
+                        <label>&#21516;&#27493;&#26041;&#24335;</label>
                     </div>
                     <div id="s3Fields" class="hidden">
                         <div class="md-field"><input type="text" id="s3Endpoint" placeholder=" "><label>Endpoint URL</label></div>
-                        <div class="md-field"><input type="text" id="s3Region" placeholder=" "><label>Region (�?us-east-1)</label></div>
+                        <div class="md-field"><input type="text" id="s3Region" placeholder=" "><label>Region (&#22914; us-east-1)</label></div>
                         <div class="md-field"><input type="text" id="s3Bucket" placeholder=" "><label>Bucket</label></div>
                         <div class="md-field"><input type="text" id="s3Key" placeholder=" "><label>Access Key</label></div>
                         <div class="md-field"><input type="text" id="s3Secret" class="masked-input" placeholder=" " autocomplete="off" spellcheck="false"><label>Secret Key</label></div>
                     </div>
                     <div id="webdavFields" class="hidden">
-                        <div class="md-field"><input type="text" id="davUrl" placeholder=" "><label>WebDAV 地址</label></div>
-                        <div class="md-field"><input type="text" id="davUser" placeholder=" "><label>用户�?/label></div>
-                        <div class="md-field"><input type="text" id="davPass" class="masked-input" placeholder=" " autocomplete="off" spellcheck="false"><label>密码 / App Password</label></div>
-                        <div class="md-field"><input type="text" id="davPath" placeholder=" "><label>备份文件路径</label></div>
+                        <div class="md-field"><input type="text" id="davUrl" placeholder=" "><label>WebDAV &#22320;&#22336;</label></div>
+                        <div class="md-field"><input type="text" id="davUser" placeholder=" "><label>&#29992;&#25143;&#21517;</label></div>
+                        <div class="md-field"><input type="text" id="davPass" class="masked-input" placeholder=" " autocomplete="off" spellcheck="false"><label>&#23494;&#30721; / App Password</label></div>
+                        <div class="md-field"><input type="text" id="davPath" placeholder=" "><label>&#36828;&#31243;&#30446;&#24405;</label></div>
                     </div>
                     <div class="sync-actions">
-                        <button class="md-btn md-btn-filled" onclick="sync.saveConfig()"><span class="material-symbols-rounded">save</span> 保存配置</button>
+                        <button class="md-btn md-btn-filled" onclick="sync.saveConfig()"><span class="material-symbols-rounded">save</span> &#20445;&#23384;&#21516;&#27493;&#37197;&#32622;</button>
                         <div class="md-row">
-                            <button class="md-btn md-btn-tonal" onclick="sync.pull()"><span class="material-symbols-rounded">download</span> 下载恢复</button>
-                            <button class="md-btn md-btn-tonal" onclick="sync.push()"><span class="material-symbols-rounded">backup</span> 备份上传</button>
+                            <button class="md-btn md-btn-tonal" onclick="sync.pull()"><span class="material-symbols-rounded">download</span> &#20174;&#20113;&#31471;&#19979;&#36733;</button>
+                            <button class="md-btn md-btn-tonal" onclick="sync.push()"><span class="material-symbols-rounded">backup</span> &#22791;&#20221;&#21040;&#20113;&#31471;</button>
                         </div>
                         <div class="md-row sync-backup-row">
-                            <button class="md-btn md-btn-tonal" onclick="backup.exportData()"><span class="material-symbols-rounded">download_for_offline</span> 导出备份</button>
-                            <button class="md-btn md-btn-tonal" onclick="backup.promptImport()"><span class="material-symbols-rounded">upload_file</span> 导入备份</button>
+                            <button class="md-btn md-btn-tonal" onclick="backup.exportData()"><span class="material-symbols-rounded">download_for_offline</span> &#23548;&#20986;&#22791;&#20221;</button>
+                            <button class="md-btn md-btn-tonal" onclick="backup.promptImport()"><span class="material-symbols-rounded">upload_file</span> &#23548;&#20837;&#22791;&#20221;</button>
                         </div>
                         <div class="md-row sync-backup-row">
-                            <button class="md-btn md-btn-tonal" onclick="backup.exportCSV('food')"><span class="material-symbols-rounded">restaurant</span> 导出饮食 CSV</button>
-                            <button class="md-btn md-btn-tonal" onclick="backup.exportCSV('exercise')"><span class="material-symbols-rounded">fitness_center</span> 导出运动 CSV</button>
+                            <button class="md-btn md-btn-tonal" onclick="backup.exportCSV('food')"><span class="material-symbols-rounded">restaurant</span> &#23548;&#20986;&#39278;&#39135; CSV</button>
+                            <button class="md-btn md-btn-tonal" onclick="backup.exportCSV('exercise')"><span class="material-symbols-rounded">fitness_center</span> &#23548;&#20986;&#35757;&#32451; CSV</button>
                         </div>
                         <div class="md-row sync-backup-row">
-                            <button class="md-btn md-btn-tonal" id="syncRetryBtn" onclick="sync.flushQueue?.()" aria-disabled="true" disabled><span class="material-symbols-rounded">sync</span> 立即重试队列</button>
+                            <button class="md-btn md-btn-tonal" id="syncRetryBtn" onclick="sync.flushQueue?.()" aria-disabled="true" disabled><span class="material-symbols-rounded">sync</span> &#37325;&#35797;&#22833;&#36133;&#38431;&#21015;</button>
                         </div>
                         <input id="backupImportInput" class="hidden" type="file" accept="application/json" onchange="backup.importFile(event)">
                         <div id="syncDetailStatus" class="sync-detail-status"></div>
@@ -321,15 +321,15 @@
     <nav class="md-nav-rail">
         <button class="nav-item active" onclick="ui.tab('today', this)">
             <div class="nav-indicator"></div>
-            <span class="nav-content"><span class="material-symbols-rounded">today</span><small>今日</small></span>
+            <span class="nav-content"><span class="material-symbols-rounded">today</span><small>&#20170;&#26085;</small></span>
         </button>
         <button class="nav-item" onclick="ui.tab('workout', this)">
             <div class="nav-indicator"></div>
-            <span class="nav-content"><span class="material-symbols-rounded">exercise</span><small>训练</small></span>
+            <span class="nav-content"><span class="material-symbols-rounded">exercise</span><small>&#35757;&#32451;</small></span>
         </button>
         <button class="nav-item" onclick="ui.tab('records', this)">
             <div class="nav-indicator"></div>
-            <span class="nav-content"><span class="material-symbols-rounded">monitoring</span><small>记录</small></span>
+            <span class="nav-content"><span class="material-symbols-rounded">monitoring</span><small>&#35760;&#24405;</small></span>
         </button>
         <button class="nav-item" onclick="ui.tab('ai-coach', this)">
             <div class="nav-indicator"></div>
@@ -337,44 +337,44 @@
         </button>
         <button class="nav-item" onclick="ui.tab('profile', this)">
             <div class="nav-indicator"></div>
-            <span class="nav-content"><span class="material-symbols-rounded">person</span><small>我的</small></span>
+            <span class="nav-content"><span class="material-symbols-rounded">person</span><small>&#25105;&#30340;</small></span>
         </button>
     </nav>
 
-    <script src="toast.js?v=86"></script>
-    <script src="error-bus.js?v=86"></script>
-    <script src="i18n.js?v=86"></script>
-    <script src="a11y-focus-trap.js?v=86"></script>
-    <script src="theme.js?v=86"></script>
-    <script src="fooddb.js?v=86"></script>
-    <script type="module" src="data-utils-pure.js?v=86"></script>
-    <script src="data-utils.js?v=86"></script>
-    <script src="storage/idb.js?v=86"></script>
-    <script src="storage/migrate.js?v=86"></script>
-    <script src="data-store.js?v=86"></script>
-    <script src="data-ui-state.js?v=86"></script>
-    <script src="onboarding.js?v=86"></script>
-    <script src="data-views.js?v=86"></script>
-    <script src="data.js?v=86"></script>
-    <script type="module" src="sync-pure.js?v=86"></script>
-    <script src="sync-status.js?v=86"></script>
-    <script src="app-update.js?v=86"></script>
+    <script src="toast.js?v=87"></script>
+    <script src="error-bus.js?v=87"></script>
+    <script src="i18n.js?v=87"></script>
+    <script src="a11y-focus-trap.js?v=87"></script>
+    <script src="theme.js?v=87"></script>
+    <script src="fooddb.js?v=87"></script>
+    <script type="module" src="data-utils-pure.js?v=87"></script>
+    <script src="data-utils.js?v=87"></script>
+    <script src="storage/idb.js?v=87"></script>
+    <script src="storage/migrate.js?v=87"></script>
+    <script src="data-store.js?v=87"></script>
+    <script src="data-ui-state.js?v=87"></script>
+    <script src="onboarding.js?v=87"></script>
+    <script src="data-views.js?v=87"></script>
+    <script src="data.js?v=87"></script>
+    <script type="module" src="sync-pure.js?v=87"></script>
+    <script src="sync-status.js?v=87"></script>
+    <script src="app-update.js?v=87"></script>
     <div id="weightModal" class="md-modal md-modal-sheet hidden" aria-hidden="true">
         <div class="md-modal-backdrop" onclick="data.closeWeightModal()"></div>
         <div class="md-modal-card md-modal-sheet-card">
             <div class="md-modal-head">
-                <strong>记录体重</strong>
-                <button class="icon-btn" onclick="data.closeWeightModal()" aria-label="关闭"><span class="material-symbols-rounded">close</span></button>
+                <strong>&#35760;&#24405;&#20307;&#37325;</strong>
+                <button class="icon-btn" onclick="data.closeWeightModal()" aria-label="&#20851;&#38381;"><span class="material-symbols-rounded">close</span></button>
             </div>
             <div class="md-grid modal-grid">
-                <div class="md-field"><input type="date" id="modalWeightDate" placeholder=" "><label>日期</label></div>
-                <div class="md-field"><input type="number" id="modalWeightValue" step="0.1" placeholder=" "><label>体重 kg</label></div>
-                <div class="md-field"><input type="number" id="modalHeight" step="1" placeholder=" "><label>身高 cm</label></div>
-                <div class="md-field span-full"><input type="text" id="modalWeightNote" placeholder=" "><label>备注</label></div>
+                <div class="md-field"><input type="date" id="modalWeightDate" placeholder=" "><label>���</label></div>
+                <div class="md-field"><input type="number" id="modalWeightValue" step="0.1" placeholder=" "><label>�^�� kg</label></div>
+                <div class="md-field"><input type="number" id="modalHeight" step="1" placeholder=" "><label>���� cm</label></div>
+                <div class="md-field span-full"><input type="text" id="modalWeightNote" placeholder=" "><label>�^�`</label></div>
             </div>
             <div class="md-row modal-actions">
-                <button class="md-btn md-btn-tonal" onclick="data.closeWeightModal()">取消</button>
-                <button class="md-btn md-btn-filled" onclick="data.addWeight()"><span class="material-symbols-rounded">save</span> 保存记录</button>
+                <button class="md-btn md-btn-tonal" onclick="data.closeWeightModal()">&#21462;&#28040;</button>
+                <button class="md-btn md-btn-filled" onclick="data.addWeight()"><span class="material-symbols-rounded">save</span> &#20445;&#23384;&#35760;&#24405;</button>
             </div>
         </div>
     </div>
@@ -382,8 +382,8 @@
         <div class="md-modal-backdrop" onclick="data.closeDietModal()"></div>
         <div class="md-modal-card md-modal-sheet-card">
             <div class="md-modal-head">
-                <strong>记录饮食</strong>
-                <button class="icon-btn" onclick="data.closeDietModal()" aria-label="关闭"><span class="material-symbols-rounded">close</span></button>
+                <strong>&#35760;&#24405;&#39278;&#39135;</strong>
+                <button class="icon-btn" onclick="data.closeDietModal()" aria-label="&#20851;&#38381;"><span class="material-symbols-rounded">close</span></button>
             </div>
             <div id="dietModalContent"></div>
         </div>
@@ -392,8 +392,8 @@
         <div class="md-modal-backdrop" onclick="data.closeExerciseModal()"></div>
         <div class="md-modal-card md-modal-sheet-card">
             <div class="md-modal-head">
-                <strong>记录运动</strong>
-                <button class="icon-btn" onclick="data.closeExerciseModal()" aria-label="关闭"><span class="material-symbols-rounded">close</span></button>
+                <strong>&#35760;&#24405;&#36816;&#21160;</strong>
+                <button class="icon-btn" onclick="data.closeExerciseModal()" aria-label="&#20851;&#38381;"><span class="material-symbols-rounded">close</span></button>
             </div>
             <div id="exerciseModalContent"></div>
         </div>
@@ -401,34 +401,34 @@
         <div class="md-modal-backdrop" onclick="cardio.closeEditModal()"></div>
         <div class="md-modal-card md-modal-sheet-card">
             <div class="md-modal-head">
-                <strong>校准有氧记录</strong>
-                <button class="icon-btn" onclick="cardio.closeEditModal()" aria-label="关闭"><span class="material-symbols-rounded">close</span></button>
+                <strong>&#26657;&#20934;&#26377;&#27687;&#35760;&#24405;</strong>
+                <button class="icon-btn" onclick="cardio.closeEditModal()" aria-label="&#20851;&#38381;"><span class="material-symbols-rounded">close</span></button>
             </div>
             <div class="md-grid modal-grid">
                 <div class="md-field span-full">
                     <select id="cardioEditType" onchange="cardio.updateEditCalories()">
-                        <option value="walk">步行 3.5 MET</option>
-                        <option value="brisk_walk">快走 4.3 MET</option>
-                        <option value="jog">慢跑 7.0 MET</option>
-                        <option value="run">跑步 9.8 MET</option>
-                        <option value="cycling">骑行 6.8 MET</option>
-                        <option value="swim">游泳 7.0 MET</option>
-                        <option value="elliptical">椭圆�?5.0 MET</option>
-                        <option value="rowing">划船�?7.0 MET</option>
-                        <option value="battle_rope">战绳 8.0 MET</option>
-                        <option value="spin_bike">动感单车 7.5 MET</option>
+                        <option value="walk">&#27493;&#34892; 3.5 MET</option>
+                        <option value="brisk_walk">&#24555;&#36208; 4.3 MET</option>
+                        <option value="jog">&#24930;&#36305; 7.0 MET</option>
+                        <option value="run">&#36305;&#27493; 9.8 MET</option>
+                        <option value="cycling">&#39569;&#34892; 6.8 MET</option>
+                        <option value="swim">&#28216;&#27891; 7.0 MET</option>
+                        <option value="elliptical">&#26925;&#22278;&#26426; 5.0 MET</option>
+                        <option value="rowing">&#21010;&#33337;&#26426; 7.0 MET</option>
+                        <option value="battle_rope">&#25112;&#32483; 8.0 MET</option>
+                        <option value="spin_bike">&#21160;&#24863;&#21333;&#36710; 7.5 MET</option>
                     </select>
-                    <label>有氧项目</label>
+                    <label>&#26377;&#27687;&#39033;&#30446;</label>
                 </div>
-                <div class="md-field"><input type="number" id="cardioEditMin" min="0" placeholder=" " oninput="cardio.updateEditCalories()"><label>分钟</label></div>
-                <div class="md-field"><input type="number" id="cardioEditSec" min="0" max="59" placeholder=" " oninput="cardio.updateEditCalories()"><label>�?/label></div>
-                <div class="md-field"><input type="number" id="cardioEditWeight" step="0.1" placeholder=" " oninput="cardio.updateEditCalories()"><label>体重 kg</label></div>
-                <div class="md-field"><input type="number" id="cardioEditTarget" placeholder=" " oninput="cardio.updateEditCalories()"><label>目标分钟</label></div>
-                <div class="md-field span-full"><input type="number" id="cardioEditCal" placeholder=" "><label>热量 kcal（可手动修正�?/label></div>
+                <div class="md-field"><input type="number" id="cardioEditMin" min="0" placeholder=" " oninput="cardio.updateEditCalories()"><label>&#20998;&#38047;</label></div>
+                <div class="md-field"><input type="number" id="cardioEditSec" min="0" max="59" placeholder=" " oninput="cardio.updateEditCalories()"><label>&#31186;</label></div>
+                <div class="md-field"><input type="number" id="cardioEditWeight" step="0.1" placeholder=" " oninput="cardio.updateEditCalories()"><label>&#20307;&#37325; kg</label></div>
+                <div class="md-field"><input type="number" id="cardioEditTarget" placeholder=" " oninput="cardio.updateEditCalories()"><label>&#30446;&#26631;&#20998;&#38047;</label></div>
+                <div class="md-field span-full"><input type="number" id="cardioEditCal" placeholder=" "><label>&#28909;&#37327; kcal&#65288;&#21487;&#25163;&#21160;&#20462;&#27491;&#65289;</label></div>
             </div>
             <div class="md-row modal-actions">
-                <button class="md-btn md-btn-tonal" onclick="cardio.closeEditModal()">放弃</button>
-                <button class="md-btn md-btn-filled" onclick="cardio.saveCardioEdit()"><span class="material-symbols-rounded">save</span> 保存记录</button>
+                <button class="md-btn md-btn-tonal" onclick="cardio.closeEditModal()">&#25918;&#24323;</button>
+                <button class="md-btn md-btn-filled" onclick="cardio.saveCardioEdit()"><span class="material-symbols-rounded">save</span> &#20445;&#23384;&#35760;&#24405;</button>
             </div>
         </div>
     </div>
@@ -436,17 +436,17 @@
         <div class="md-modal-backdrop" onclick="workout.closeSetReview()"></div>
         <div class="md-modal-card md-modal-sheet-card">
             <div class="md-modal-head">
-                <strong id="setReviewTitle">校准这组</strong>
+                <strong id="setReviewTitle">&#26657;&#20934;&#36825;&#32452;</strong>
                 <button class="icon-btn" onclick="workout.closeSetReview()"><span class="material-symbols-rounded">close</span></button>
             </div>
             <div class="md-grid modal-grid">
-                <div class="md-field"><input type="number" id="setReviewWeight" step="0.5" placeholder=" "><label>实际重量 kg</label></div>
-                <div class="md-field"><input type="number" id="setReviewReps" placeholder=" "><label>实际次数</label></div>
-                <div class="md-field span-full"><input type="text" id="setReviewNote" placeholder=" "><label>备注（可空）</label></div>
+                <div class="md-field"><input type="number" id="setReviewWeight" step="0.5" placeholder=" "><label>�b�̭��q kg</label></div>
+                <div class="md-field"><input type="number" id="setReviewReps" placeholder=" "><label>&#23454;&#38469;&#27425;&#25968;</label></div>
+                <div class="md-field span-full"><input type="text" id="setReviewNote" placeholder=" "><label>�^�`�]�i�š^</label></div>
             </div>
             <div class="md-row modal-actions">
-                <button class="md-btn md-btn-tonal" onclick="workout.closeSetReview()">跳过</button>
-                <button class="md-btn md-btn-filled" onclick="workout.saveSetReview()">保存</button>
+                <button class="md-btn md-btn-tonal" onclick="workout.closeSetReview()">&#36339;&#36807;</button>
+                <button class="md-btn md-btn-filled" onclick="workout.saveSetReview()">&#20445;&#23384;</button>
             </div>
         </div>
     </div>
@@ -454,8 +454,8 @@
         <div class="md-modal-backdrop" onclick="data.closeWorkoutLibrary()"></div>
         <div class="md-modal-card md-modal-sheet-card">
             <div class="md-modal-head">
-                <strong>选择训练方案</strong>
-                <button class="icon-btn" onclick="data.closeWorkoutLibrary()" aria-label="关闭"><span class="material-symbols-rounded">close</span></button>
+                <strong>&#36873;&#25321;&#35757;&#32451;&#26041;&#26696;</strong>
+                <button class="icon-btn" onclick="data.closeWorkoutLibrary()" aria-label="&#20851;&#38381;"><span class="material-symbols-rounded">close</span></button>
             </div>
             <div id="workoutLibraryContent"></div>
         </div>
@@ -464,8 +464,8 @@
         <div class="md-modal-backdrop" onclick="data.closeTemplateManager?.()"></div>
         <div class="md-modal-card md-modal-sheet-card">
             <div class="md-modal-head">
-                <strong>管理 AI Prompt 模板</strong>
-                <button class="icon-btn" onclick="data.closeTemplateManager?.()" aria-label="关闭"><span class="material-symbols-rounded">close</span></button>
+                <strong>&#31649;&#29702; AI Prompt &#27169;&#26495;</strong>
+                <button class="icon-btn" onclick="data.closeTemplateManager?.()" aria-label="&#20851;&#38381;"><span class="material-symbols-rounded">close</span></button>
             </div>
             <div id="aiTemplateManagerContent"></div>
         </div>
@@ -474,22 +474,22 @@
         <div class="md-modal-backdrop" onclick="theme.closeSheet()"></div>
         <div class="md-modal-card md-modal-sheet-card theme-sheet-card">
             <div class="md-modal-head">
-                <strong id="themeSheetTitle">个性化</strong>
-                <button class="icon-btn" data-modal-close onclick="theme.closeSheet()" aria-label="关闭">
+                <strong id="themeSheetTitle">&#20010;&#24615;&#21270;</strong>
+                <button class="icon-btn" data-modal-close onclick="theme.closeSheet()" aria-label="&#20851;&#38381;">
                     <span class="material-symbols-rounded">close</span>
                 </button>
             </div>
             <div class="theme-sheet-section">
                 <div class="theme-panel-title">
-                    <span class="material-symbols-rounded">palette</span> 主题颜色
+                    <span class="material-symbols-rounded">palette</span> &#20027;&#39064;&#39068;&#33394;
                 </div>
                 <div class="theme-actions">
-                    <button class="theme-swatch theme-blue active" data-theme="blue" aria-pressed="true" onclick="theme.setPreset('blue')" aria-label="蓝色主题"></button>
-                    <button class="theme-swatch theme-purple" data-theme="purple" aria-pressed="false" onclick="theme.setPreset('purple')" aria-label="紫色主题"></button>
-                    <button class="theme-swatch theme-green" data-theme="green" aria-pressed="false" onclick="theme.setPreset('green')" aria-label="绿色主题"></button>
-                    <button class="theme-swatch theme-orange" data-theme="orange" aria-pressed="false" onclick="theme.setPreset('orange')" aria-label="橙色主题"></button>
-                    <button class="theme-swatch theme-rose" data-theme="rose" aria-pressed="false" onclick="theme.setPreset('rose')" aria-label="玫红主题"></button>
-                    <button class="md-btn md-btn-tonal theme-monet" data-theme="monet" onclick="theme.useMonet()" aria-label="莫奈取色">
+                    <button class="theme-swatch theme-blue active" data-theme="blue" aria-pressed="true" onclick="theme.setPreset('blue')" aria-label="&#34013;&#33394;&#20027;&#39064;"></button>
+                    <button class="theme-swatch theme-purple" data-theme="purple" aria-pressed="false" onclick="theme.setPreset('purple')" aria-label="&#32043;&#33394;&#20027;&#39064;"></button>
+                    <button class="theme-swatch theme-green" data-theme="green" aria-pressed="false" onclick="theme.setPreset('green')" aria-label="&#32511;&#33394;&#20027;&#39064;"></button>
+                    <button class="theme-swatch theme-orange" data-theme="orange" aria-pressed="false" onclick="theme.setPreset('orange')" aria-label="&#27225;&#33394;&#20027;&#39064;"></button>
+                    <button class="theme-swatch theme-rose" data-theme="rose" aria-pressed="false" onclick="theme.setPreset('rose')" aria-label="&#29611;&#32418;&#20027;&#39064;"></button>
+                    <button class="md-btn md-btn-tonal theme-monet" data-theme="monet" onclick="theme.useMonet()" aria-label="&#33707;&#22856;&#21462;&#33394;">
                         <span class="material-symbols-rounded">auto_awesome</span>
                     </button>
                     <label class="color-picker">
@@ -500,22 +500,22 @@
             </div>
             <div class="theme-sheet-section">
                 <div class="theme-panel-title">
-                    <span class="material-symbols-rounded">dark_mode</span> 深色模式
+                    <span class="material-symbols-rounded">dark_mode</span> &#28145;&#33394;&#27169;&#24335;
                 </div>
                 <div class="theme-actions">
-                    <button class="md-btn md-btn-tonal theme-mode-btn" data-color-mode="auto" onclick="theme.setMode('auto')"><span class="material-symbols-rounded">brightness_auto</span> 自动</button>
-                    <button class="md-btn md-btn-tonal theme-mode-btn" data-color-mode="light" onclick="theme.setMode('light')"><span class="material-symbols-rounded">light_mode</span> 浅色</button>
-                    <button class="md-btn md-btn-tonal theme-mode-btn" data-color-mode="dark" onclick="theme.setMode('dark')"><span class="material-symbols-rounded">dark_mode</span> 深色</button>
+                    <button class="md-btn md-btn-tonal theme-mode-btn" data-color-mode="auto" onclick="theme.setMode('auto')"><span class="material-symbols-rounded">brightness_auto</span> &#33258;&#21160;</button>
+                    <button class="md-btn md-btn-tonal theme-mode-btn" data-color-mode="light" onclick="theme.setMode('light')"><span class="material-symbols-rounded">light_mode</span> &#27973;&#33394;</button>
+                    <button class="md-btn md-btn-tonal theme-mode-btn" data-color-mode="dark" onclick="theme.setMode('dark')"><span class="material-symbols-rounded">dark_mode</span> &#28145;&#33394;</button>
                 </div>
             </div>
             <div class="theme-sheet-section">
                 <div class="theme-panel-title">
-                    <span class="theme-language-mark" aria-hidden="true">A/�?/span> Language
+                    <span class="theme-language-mark" aria-hidden="true">A/&#20013;</span> Language
                 </div>
                 <div class="md-field theme-language-field">
                     <select id="localeSelectSheet" onchange="i18n.setLocale(this.value)">
                         <option value="auto">Auto</option>
-                        <option value="zh-CN">中文</option>
+                        <option value="zh-CN">&#20013;&#25991;</option>
                         <option value="en-US">en-US</option>
                     </select>
                     <label>Language</label>
@@ -550,7 +550,7 @@
             const p = wait.then(() => new Promise((res, rej) => {
                 if (_loaded.has(name)) return res();
                 const s = document.createElement('script');
-                s.src = `${name}.js?v=86`;
+                s.src = `${name}.js?v=87`;
                 s.onload = () => { _loaded.add(name); res(); };
                 s.onerror = rej;
                 document.head.appendChild(s);
@@ -625,7 +625,7 @@
             } catch (e) {
                 errorBus?.report?.('boot', e);
                 console.error('data.init failed', e);
-                if (window.toast) toast.show(`数据初始化失败：${toast.sanitize ? toast.sanitize(e) : e?.message || e}`, 'error');
+                if (window.toast) toast.show(`\u6570\u636e\u521d\u59cb\u5316\u5931\u8d25\uff1a${toast.sanitize ? toast.sanitize(e) : e?.message || e}`, 'error');
             }
             if (window.syncStatus) syncStatus.init();
             if (window.onboarding) onboarding.show();

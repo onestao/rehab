@@ -876,12 +876,20 @@ const advicePanel = {
                     const contentEl = bubble.querySelector('.advice-bubble-content');
                     if (!contentEl) return;
                     if (!contentEl._renderer && window.adviceStreamRenderer) {
-                        contentEl._renderer = adviceStreamRenderer.create(contentEl, { chunkPerFrame: 8 });
+                        contentEl._renderer = adviceStreamRenderer.create(contentEl, {
+                            chunkPerFrame: 8,
+                            renderMarkdown: (text) => this.renderAdviceMarkdown(text)
+                        });
+                        contentEl._renderer.seed(accumulated);
                         this._activeStreamRenderer = contentEl._renderer;
                         this._streamRenderers[pendingId] = contentEl._renderer;
                     }
                     if (contentEl._renderer) {
-                        contentEl._renderer.enqueue(delta);
+                        if (contentEl._renderer.getState?.().shown === accumulated) {
+                            contentEl._renderer.enqueue(delta);
+                        } else {
+                            contentEl._renderer.seed(accumulated);
+                        }
                     } else {
                         // fallback
                         contentEl.innerHTML = this.renderAdviceMarkdown(accumulated);
@@ -1185,14 +1193,6 @@ const advicePanel = {
                     </div>
                     <div id="adviceStatus" class="food-ai-status advice-status-line">
                         <span class="advice-status-text">${sendHint}</span>
-                        <button id="adviceStreamToggle" class="advice-stream-toggle hidden" type="button" aria-hidden="true" onclick="data.toggleAdviceStreamRender?.()">
-                            <span class="material-symbols-rounded">pause</span>
-                            <span class="advice-stream-toggle-label">暂停渲染</span>
-                        </button>
-                        <button id="adviceStreamFlush" class="advice-stream-toggle advice-stream-toggle-secondary hidden" type="button" aria-hidden="true" onclick="data.flushAdviceStreamRender?.()">
-                            <span class="material-symbols-rounded">done_all</span>
-                            <span class="advice-stream-toggle-label">显示全部</span>
-                        </button>
                     </div>
                 </div>
             </div>

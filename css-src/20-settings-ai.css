@@ -109,6 +109,8 @@
 .weight-chart-tip {
     position: absolute;
     top: 6px;
+    left: 8px;
+    max-width: calc(100% - 16px);
     background: var(--md-sys-surface-container-high, #2a2a2a);
     color: var(--md-sys-on-surface, #fff);
     padding: 4px 10px;
@@ -117,7 +119,8 @@
     font-weight: 600;
     pointer-events: none;
     box-shadow: 0 2px 8px rgba(0,0,0,0.25);
-    white-space: nowrap;
+    white-space: normal;
+    overflow-wrap: anywhere;
     z-index: 2;
 }
 .weight-chart-labels,

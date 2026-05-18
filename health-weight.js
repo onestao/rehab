@@ -161,10 +161,23 @@
             const tip = document.getElementById('weightChartTip');
             if (!wrap || !tip) return;
             const rect = wrap.getBoundingClientRect();
-            const x = (event.clientX || (event.touches && event.touches[0]?.clientX) || 0) - rect.left;
+            const clientX = event.clientX || (event.touches && event.touches[0]?.clientX) || 0;
+            const x = clientX - rect.left;
+            const viewportWidth = window.innerWidth || document.documentElement.clientWidth || rect.width;
+            const wrapRightInViewport = Math.min(rect.width, viewportWidth - rect.left);
+            const safeText = `${date}  ${Number(weight).toFixed(1)} kg`;
+
+            tip.textContent = safeText;
             tip.style.display = 'block';
-            tip.style.left = Math.max(8, Math.min(rect.width - 80, x - 40)) + 'px';
-            tip.textContent = `${date}  ${Number(weight).toFixed(1)} kg`;
+            tip.style.left = '8px';
+
+            // Measure the real tooltip width before clamping so mobile edge points stay in-bounds.
+            const tipWidth = tip.offsetWidth || 80;
+            const minLeft = 8;
+            const maxLeft = Math.max(minLeft, wrapRightInViewport - tipWidth - 8);
+            const desiredLeft = x - (tipWidth / 2);
+            tip.style.left = Math.max(minLeft, Math.min(maxLeft, desiredLeft)) + 'px';
+
             clearTimeout(this._weightTipTimer);
             this._weightTipTimer = setTimeout(() => { tip.style.display = 'none'; }, 2200);
         }

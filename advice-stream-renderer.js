@@ -1,5 +1,10 @@
 // @ts-nocheck
 (function () {
+    function renderPlainText(text = '') {
+        const safe = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        return safe(String(text || '')).replace(/\n/g, '<br>');
+    }
+
     function createScheduler() {
         let mode = 'live';
         let chunkPerFrame = 8;
@@ -23,6 +28,9 @@
 
     function create(target, opts = {}) {
         const scheduler = createScheduler();
+        const render = typeof opts.renderMarkdown === 'function'
+            ? (text) => String(opts.renderMarkdown(text) || '')
+            : renderPlainText;
         const state = {
             buffer: '',
             shown: '',
@@ -41,15 +49,7 @@
             const chunk = state.buffer.slice(0, n);
             state.buffer = state.buffer.slice(n);
             state.shown += chunk;
-            // Line-stable: only render complete lines; unfinished line stays text.
-            const lines = state.shown.split('\n');
-            const complete = lines.slice(0, -1).join('\n');
-            const tail = lines[lines.length - 1];
-            const safe = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-            const html = complete
-                ? safe(complete).replace(/\n/g, '<br>') + '<br>' + safe(tail)
-                : safe(tail);
-            target.innerHTML = html;
+            target.innerHTML = render(state.shown);
             if (state.autoScroll) {
                 target.scrollIntoView({ block: 'end' });
             }
@@ -60,6 +60,13 @@
             if (state.destroyed) return;
             state.buffer += String(chunk || '');
             scheduler.schedule(renderFrame);
+        }
+
+        function seed(text) {
+            if (state.destroyed) return;
+            state.shown = String(text || '');
+            state.buffer = '';
+            target.innerHTML = render(state.shown);
         }
 
         function pause(reason = 'manual') {
@@ -87,7 +94,7 @@
             state.destroyed = true;
         }
 
-        return { enqueue, pause, resume, flushAll, destroy, getState: () => ({ ...state, mode: scheduler.getMode() }) };
+        return { enqueue, seed, pause, resume, flushAll, destroy, getState: () => ({ ...state, mode: scheduler.getMode() }) };
     }
 
     window.adviceStreamRenderer = { create };
