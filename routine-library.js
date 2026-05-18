@@ -609,17 +609,17 @@
                 ? Math.max(1, Math.floor((Date.now() - firstDate.getTime()) / (7 * 86400000)))
                 : 0;
 
-            const monday = new Date();
-            monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
-            monday.setHours(0, 0, 0, 0);
+            const weekStart = new Date();
+            weekStart.setHours(0, 0, 0, 0);
+            weekStart.setDate(weekStart.getDate() - 6);
 
             const weekHistory = history.filter(h => {
                 const d = this.parseHistoryDate(h.date);
-                return d && d >= monday;
+                return d && d >= weekStart;
             });
             const weekExerciseLogs = this.activeRecords(this.db.health?.exerciseLogs || []).filter(e => {
                 const d = e.date ? this.dateFromKey(e.date) : null;
-                return d && d >= monday;
+                return d && d >= weekStart;
             });
             const cardioTypes = new Set(['walk', 'brisk_walk', 'jog', 'run', 'cycling', 'swim', 'elliptical', 'rowing', 'battle_rope', 'spin_bike', 'cardio']);
             const cardioSessions = weekHistory.filter(h => h.type === 'cardio').length
@@ -633,7 +633,7 @@
             const goal = this.db.health?.dietGoal;
             const isGain = goal?.goalType === 'gain';
             // weeklyChange/weeklyLoss is stored as magnitude (positive); goalType conveys direction.
-            const target = Math.abs(Number(goal?.weeklyChange || goal?.weeklyLoss || 0));
+            const target = Math.abs(Number(isGain ? goal?.weeklyChange : goal?.weeklyLoss) || 0);
             const targetSigned = isGain ? target : -target;
 
             // sortedWeights() returns weights sorted ascending (oldest -> newest); enforce explicitly
@@ -643,19 +643,32 @@
             );
             const weekWeights = sortedW.filter(w => {
                 const d = this.dateFromKey(w.date);
-                return d && d >= monday;
+                return d && d >= weekStart;
             });
             let weightDelta = null;
             if (weekWeights.length >= 2) {
-                weightDelta = weekWeights[weekWeights.length - 1].weight - weekWeights[0].weight;
+                const head = weekWeights.slice(0, 2);
+                const tail = weekWeights.slice(-2);
+                const avg = list => list.reduce((sum, w) => sum + w.weight, 0) / list.length;
+                weightDelta = avg(tail) - avg(head);
             } else if (weekWeights.length === 1) {
-                const prev = sortedW.filter(w => this.dateFromKey(w.date) < monday).slice(-1)[0];
+                const twoWeeksAgo = new Date(weekStart);
+                twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 7);
+                const prev = sortedW.find(w => {
+                    const d = this.dateFromKey(w.date);
+                    return d && d >= twoWeeksAgo && d < weekStart;
+                });
                 if (prev) weightDelta = weekWeights[0].weight - prev.weight;
             }
 
             let weightPct = null;
             if (weightDelta !== null && target > 0 && targetSigned !== 0) {
-                const towards = Math.max(0, weightDelta / targetSigned);
+                const earliestDate = weekWeights[0]?.date ? this.dateFromKey(weekWeights[0].date) : null;
+                const elapsedDays = earliestDate
+                    ? Math.min(7, Math.max(1, Math.ceil((Date.now() - earliestDate.getTime()) / 86400000)))
+                    : 7;
+                const proRatedTarget = targetSigned * (elapsedDays / 7);
+                const towards = Math.max(0, weightDelta / proRatedTarget);
                 weightPct = Math.min(100, Math.round(towards * 100));
             }
 
@@ -665,7 +678,7 @@
             }
 
             const weightArrow = weightDelta === null ? ''
-                : (weightDelta > 0.05 ? '↑' : weightDelta < -0.05 ? '↓' : '→');
+                : (weightDelta > 0.1 ? '↑' : weightDelta < -0.1 ? '↓' : '→');
             const weightText = weightDelta === null ? '--'
                 : `${weightDelta > 0 ? '+' : ''}${weightDelta.toFixed(1)} kg ${weightArrow}`;
             const goalText = !goal ? '未设目标'
@@ -707,7 +720,7 @@
                     <div class="identity-metric weight-${weightColor}">
                         <div class="identity-metric-head">
                             <span class="material-symbols-rounded">monitor_weight</span>
-                            <span>本周体重</span>
+                            <span>近 7 天体重</span>
                         </div>
                         <b>${weightText}</b>
                         <small>${goalText}</small>
