@@ -102,12 +102,33 @@
     }
 
     function createIdbAdapter() {
+        function readLocalSnapshot(key) {
+            try {
+                return safeParse(localStorage.getItem(key), key);
+            } catch (_) {
+                return null;
+            }
+        }
+
+        function isNewerSnapshot(localValue, idbValue) {
+            if (!localValue || Object.prototype.toString.call(localValue) !== '[object Object]') return false;
+            if (!idbValue || Object.prototype.toString.call(idbValue) !== '[object Object]') return true;
+            return Number(localValue.lastModified || 0) > Number(idbValue.lastModified || 0);
+        }
+
         return {
             mode: 'idb',
             async read(key) {
-                return window.storageIdb.get(key);
+                const idbValue = await window.storageIdb.get(key);
+                const localSnapshot = readLocalSnapshot(key);
+                if (isNewerSnapshot(localSnapshot, idbValue)) {
+                    await window.storageIdb.set(key, localSnapshot);
+                    return localSnapshot;
+                }
+                return idbValue;
             },
             async write(key, value) {
+                localStorage.setItem(key, JSON.stringify(value));
                 await window.storageIdb.set(key, value);
             },
             flushSync(key, value) {

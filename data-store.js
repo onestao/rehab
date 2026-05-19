@@ -302,9 +302,10 @@
 
         save(options = {}) {
             const shouldRender = options.render !== false;
-            this.db.lastModified = Date.now();
+            this.db.lastModified = Math.max(Date.now(), Number(this.db.lastModified || 0) + 1);
             this.db.deviceId = this.db.deviceId || `dev-${Math.random().toString(36).slice(2,10)}`;
             this._dbDirty = true;
+            this.flushSync();
             this.schedulePersist();
             if (shouldRender) this.render();
             if (options.sync !== false && window.sync && typeof sync.scheduleAutoPush === 'function') {
