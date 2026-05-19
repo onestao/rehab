@@ -135,7 +135,7 @@ const sync = {
 
     saveSyncMeta() {
         data.touchRecord(data.db.syncMeta);
-        data.save({ render: false });
+        data.save({ render: false, sync: false });
     },
 
     async _ensureWebdavDirs(remotePath) {
@@ -630,7 +630,7 @@ const sync = {
     async processRetryQueue() {
         const meta = this.getSyncMeta();
         const queue = meta.pendingQueue || [];
-        if (!queue.length) return;
+        if (!queue.length) return { attempted: 0, remaining: 0 };
         const limit = 20;
         const batch = queue.slice(0, limit);
         const tail = queue.slice(limit);
@@ -644,11 +644,12 @@ const sync = {
                 // stop the batch on first failure
                 meta.pendingQueue = remain.concat(batch.slice(i + 1)).concat(tail);
                 this.saveSyncMeta();
-                return;
+                return { attempted: i + 1, remaining: meta.pendingQueue.length, error: e };
             }
         }
         meta.pendingQueue = tail;
         this.saveSyncMeta();
+        return { attempted: batch.length, remaining: meta.pendingQueue.length };
     },
 
     diffChangesSince(ts) {
@@ -690,7 +691,7 @@ const sync = {
         this.setStatus('cloud', options.quiet ? '快照重建完成' : '全量备份完成');
     },
 
-    async pushChanges() {
+    async pushChanges(options = {}) {
         try {
             await data.flush();
             this.setStatus('syncing', '正在上传增量变更');
@@ -700,6 +701,14 @@ const sync = {
             const changes = this.diffChangesSince(sinceTs);
             const changedEntities = Object.keys(changes).filter(entity => (changes[entity] || []).length > 0);
             if (!changedEntities.length) {
+                const pending = Number(localMeta.pendingQueue?.length || 0);
+                if (pending > 0) {
+                    this.setStatus('syncing', `没有新增变更，正在重试 ${pending} 个失败上传`);
+                    const result = await this.processRetryQueue();
+                    const remaining = Number(result?.remaining ?? this.getSyncMeta().pendingQueue?.length ?? 0);
+                    this.setStatus(remaining > 0 ? 'error' : 'cloud', remaining > 0 ? `无新增变更，仍有 ${remaining} 个待重试上传` : '失败队列已上传，没有新的增量变更');
+                    return;
+                }
                 this.setStatus('cloud', '没有待上传的增量变更');
                 return;
             }
@@ -750,7 +759,8 @@ const sync = {
             this.setStatus('cloud', `增量上传完成（${changedEntities.length} 个实体）`);
         } catch (e) {
             this.setStatus('error', `增量上传失败: ${e.message}`);
-            alert(`增量上传失败: ${e.message}`);
+            if (!options.quiet) alert(`增量上传失败: ${e.message}`);
+            if (options.rethrow) throw e;
         }
     },
 
@@ -837,7 +847,7 @@ const sync = {
             if (!url) return;
         }
         try {
-            await this.pushChanges();
+            await this.pushChanges({ quiet: true, rethrow: true });
         } catch (e) {
             console.warn('Auto incremental backup failed', reason, e);
         }
