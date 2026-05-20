@@ -35,8 +35,11 @@ Object.assign(workout, {
         if (this._phaseLeft == null) return;
         const next = Math.max(0, this._phaseLeft + delta);
         this._phaseLeft = next;
+        if (window.workoutEngine?.state) workoutEngine.state.phaseLeft = next;
         const el = document.getElementById('mainTime');
         if (el) el.innerText = next;
+        this.renderPip();
+        if (window.workoutState) workoutState.markActive();
         if (next === 0 && this._countResolve) {
             this._countResolve();
             this._countResolve = null;
@@ -153,14 +156,13 @@ Object.assign(workout, {
 
     count(sec, sub, status) {
         return new Promise(resolve => {
-            let left = sec;
             this._phaseLeft = sec;
             this._phaseSub = sub;
             this._phaseStatus = status;
             this._countResolve = resolve;
             document.getElementById('subText').innerText = sub;
             document.getElementById('statusText').innerText = status;
-            document.getElementById('mainTime').innerText = left;
+            document.getElementById('mainTime').innerText = this._phaseLeft;
             if (window.workoutState) workoutState.markActive();
             if (sec > 12 && status !== 'HOLD') this.speak(`${sub}，${sec}秒`);
             this.timer = setInterval(() => {
@@ -170,13 +172,13 @@ Object.assign(workout, {
                     this._countResolve = null; resolve(); return;
                 }
                 if (this.isPaused) return;
-                left--;
-                this._phaseLeft = left;
-                document.getElementById('mainTime').innerText = left;
+                this._phaseLeft = Math.max(0, Number(this._phaseLeft || 0) - 1);
+                if (window.workoutEngine?.state) workoutEngine.state.phaseLeft = this._phaseLeft;
+                document.getElementById('mainTime').innerText = this._phaseLeft;
                 this.renderPip();
                 if (window.workoutState) workoutState.markActive();
-                if (left <= 3 && left > 0) this.speak(left.toString());
-                if (left <= 0) { clearInterval(this.timer); this._phaseLeft = null; this._countResolve = null; resolve(); }
+                if (this._phaseLeft <= 3 && this._phaseLeft > 0) this.speak(this._phaseLeft.toString());
+                if (this._phaseLeft <= 0) { clearInterval(this.timer); this._phaseLeft = null; this._countResolve = null; resolve(); }
             }, 1000);
         });
     },

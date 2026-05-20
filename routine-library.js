@@ -101,6 +101,20 @@
             return this.activeRecords(this.db.actions).filter(a => !a.libOnly);
         },
 
+        _cloneRoutineActionsForPlan(actions = []) {
+            return JSON.parse(JSON.stringify(actions || [])).map(a => ({
+                ...a,
+                libOnly: false,
+                deleted: false,
+                updatedAt: Date.now()
+            }));
+        },
+
+        _replacePlanActions(actions = []) {
+            const libraryActions = this.activeRecords(this.db.actions || []).filter(a => a.libOnly === true);
+            this.db.actions = libraryActions.concat(this._cloneRoutineActionsForPlan(actions));
+        },
+
         _readActionForm() {
             return {
                 name: document.getElementById('name').value || '未命名',
@@ -160,7 +174,8 @@
                 deleted: false
             };
             this.db.actions.push(a);
-            this.save();
+            this.db.libraryView = 'actions';
+            this.saveAndBackup?.() || this.save();
             if (window.toast?.show) toast.show(`"${name}" 已存入动作库`, 'success');
         },
 
@@ -229,7 +244,7 @@
             if (!r) return;
             const hasActions = this._planActions().length > 0;
             if (!hasActions) {
-                this.db.actions = JSON.parse(JSON.stringify(r.actions));
+                this._replacePlanActions(r.actions);
                 this.save();
                 ui.tab('workout', document.querySelector('.nav-item'));
                 return;
@@ -256,9 +271,9 @@
                 onMount: (root, close) => {
                     const commit = (mode) => {
                         if (mode === 'replace') {
-                            this.db.actions = JSON.parse(JSON.stringify(r.actions));
+                            this._replacePlanActions(r.actions);
                         } else {
-                            this.db.actions = this.db.actions.concat(JSON.parse(JSON.stringify(r.actions)));
+                            this.db.actions = this.db.actions.concat(this._cloneRoutineActionsForPlan(r.actions));
                         }
                         this.save();
                         close();
@@ -307,7 +322,8 @@
             copy.updatedAt = Date.now();
             copy.deleted = false;
             this.db.actions.push(copy);
-            this.save();
+            this.db.libraryView = 'actions';
+            this.saveAndBackup?.() || this.save();
             if (window.toast?.show) toast.show(`"${copy.name || '未命名动作'}" 已存入动作库`, 'success');
         },
 
@@ -563,7 +579,8 @@
             copy.updatedAt = Date.now();
             if (!Array.isArray(copy.tags)) copy.tags = [];
             this.db.actions.push(copy);
-            this.save();
+            this.db.libraryView = 'actions';
+            this.saveAndBackup?.() || this.save();
             if (window.toast?.show) toast.show(`已保存动作：${copy.name || '未命名动作'}`, 'success');
             this.renderRoutines();
         },
