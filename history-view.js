@@ -139,7 +139,7 @@
             const entries = window.prTracker?.topEntries?.(this.db, limit) || [];
             if (!entries.length) return '';
             return `<div class="md-card pr-board-card">
-                <div class="today-timeline-header" style="margin:0 0 10px"><span class="material-symbols-rounded">military_tech</span><strong>PR 排行</strong><small>${entries.length} 个动作</small></div>
+                <div class="today-timeline-header" style="margin:0 0 10px"><span class="material-symbols-rounded">trending_up</span><strong>PR 排行</strong><small>${entries.length} 个动作</small></div>
                 <div class="pr-board-list">${entries.map((item, idx) => {
                     const safeKey = this.escapeHtml(item.action);
                     const collapsed = this.isCollapsed(`pr_action_${safeKey}`, idx > 2);

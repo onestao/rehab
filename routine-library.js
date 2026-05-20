@@ -121,6 +121,7 @@
             const a = {
                 ...this._readActionForm(),
                 id: this.generateRecordId('action'),
+                libOnly: false,
                 updatedAt: Date.now(),
                 deleted: false
             };
@@ -540,6 +541,7 @@
             if (!action || action.deleted) return;
             const copy = JSON.parse(JSON.stringify(action));
             copy.id = this.generateRecordId('action');
+            copy.libOnly = false;
             copy.deleted = false;
             copy.updatedAt = Date.now();
             this.db.actions.push(copy);
@@ -984,7 +986,7 @@
         },
 
         renderActionLibrary() {
-            const actions = this.activeRecords(this.db.actions || []);
+            const actions = this.activeRecords(this.db.actions || []).filter(a => a.libOnly === true);
             const tags = this.collectLibraryTags();
             const activeTag = this.normalizeTagText(this.db.libraryFilterTag || '');
             const filtered = activeTag ? actions.filter(a => (a.tags || []).includes(activeTag)) : actions;

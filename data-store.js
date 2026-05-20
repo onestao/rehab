@@ -119,6 +119,7 @@
             this.db.health.aiAdviceChat = (this.db.health.aiAdviceChat || []).map(item => this.ensureRecordMeta(item, 'advice', nowTs));
             this.db.actions = this.db.actions.map(a => {
                 a.tags = Array.isArray(a.tags) ? a.tags.filter(Boolean) : [];
+                if (typeof a.libOnly !== 'boolean') a.libOnly = false;
                 return a;
             });
             this.db.aiTemplates = Array.isArray(this.db.aiTemplates) ? this.db.aiTemplates : [];
