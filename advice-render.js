@@ -319,31 +319,25 @@ Object.assign(advicePanel, {
             const safeActive = activeIdx < 0 ? sorted.length - 1 : activeIdx;
             const rootId = msg.replyToId || msg.id;
             const safeRootId = escapeHtml(rootId || '');
-            const jsArg = value => escapeHtml(JSON.stringify(String(value || '')));
-            const rootArg = jsArg(rootId);
-            const msgArg = jsArg(msg.id);
             const pinIcon = msg.versionPinned ? 'bookmark_add' : 'bookmark_border';
             versionSwitcher = `<div class="advice-version-switcher" data-advice-version-root="${safeRootId}">
-                <button class="advice-version-btn" onclick="data.cycleAdviceVersion(${rootArg}, -1)" type="button" aria-label="上一个版本"><span class="material-symbols-rounded">chevron_left</span></button>
+                <button class="advice-version-btn" onclick="data.cycleAdviceVersion(this.closest('.advice-version-switcher')?.dataset.adviceVersionRoot || '', -1)" type="button" aria-label="上一个版本"><span class="material-symbols-rounded">chevron_left</span></button>
                 <span class="advice-version-label">${safeActive + 1}/${sorted.length}</span>
-                <button class="advice-version-btn" onclick="data.cycleAdviceVersion(${rootArg}, 1)" type="button" aria-label="下一个版本"><span class="material-symbols-rounded">chevron_right</span></button>
-                <button class="advice-version-btn ${msg.versionPinned ? 'active' : ''}" onclick="data.pinAdviceVersion(${rootArg}, ${msgArg})" type="button" aria-label="星标版本" title="星标版本"><span class="material-symbols-rounded">${pinIcon}</span></button>
+                <button class="advice-version-btn" onclick="data.cycleAdviceVersion(this.closest('.advice-version-switcher')?.dataset.adviceVersionRoot || '', 1)" type="button" aria-label="下一个版本"><span class="material-symbols-rounded">chevron_right</span></button>
+                <button class="advice-version-btn ${msg.versionPinned ? 'active' : ''}" onclick="data.pinAdviceVersion(this.closest('.advice-version-switcher')?.dataset.adviceVersionRoot || '', this.closest('.advice-bubble')?.dataset.adviceId || '')" type="button" aria-label="星标版本" title="星标版本"><span class="material-symbols-rounded">${pinIcon}</span></button>
             </div>`;
         }
         const safeId = escapeHtml(msg.id || '');
-        const jsStringArg = value => escapeHtml(JSON.stringify(String(value || '')));
-        const idArg = jsStringArg(msg.id || '');
-        const rootArg = jsStringArg(msg.replyToId || msg.id);
         const actions = msg.role === 'assistant'
             ? `<div class="advice-bubble-actions">
-                <button onclick="data.copyAdviceMessage(${msg.idx}, ${idArg})" type="button">复制</button>
-                <button onclick="data.shareAdviceMessage(${msg.idx}, ${idArg})" type="button">分享</button>
-                ${(msg.error || !msg.pending) ? `<button onclick="data.retryAdviceFrom(${msg.idx}, ${idArg})" type="button">重试</button>` : ''}
+                <button onclick="data.copyAdviceMessage(${msg.idx}, this.closest('.advice-bubble')?.dataset.adviceId || '')" type="button">复制</button>
+                <button onclick="data.shareAdviceMessage(${msg.idx}, this.closest('.advice-bubble')?.dataset.adviceId || '')" type="button">分享</button>
+                ${(msg.error || !msg.pending) ? `<button onclick="data.retryAdviceFrom(${msg.idx}, this.closest('.advice-bubble')?.dataset.adviceId || '')" type="button">重试</button>` : ''}
                 ${versionGroup && versionGroup.length > 1
-                    ? `<button onclick="data.deleteAdviceVersion(${rootArg}, ${idArg})" type="button">删除版本</button>`
-                    : `<button onclick="data.deleteAiAdviceMessage(${msg.idx}, ${idArg})" type="button">删除</button>`}
+                    ? `<button onclick="data.deleteAdviceVersion(this.closest('.advice-bubble')?.querySelector('.advice-version-switcher')?.dataset.adviceVersionRoot || '', this.closest('.advice-bubble')?.dataset.adviceId || '')" type="button">删除版本</button>`
+                    : `<button onclick="data.deleteAiAdviceMessage(${msg.idx}, this.closest('.advice-bubble')?.dataset.adviceId || '')" type="button">删除</button>`}
             </div>`
-            : `<div class="advice-bubble-actions"><button onclick="data.deleteAiAdviceMessage(${msg.idx}, ${idArg})" type="button">删除</button></div>`;
+            : `<div class="advice-bubble-actions"><button onclick="data.deleteAiAdviceMessage(${msg.idx}, this.closest('.advice-bubble')?.dataset.adviceId || '')" type="button">删除</button></div>`;
         return `<div class="advice-bubble ${msg.role}${state}" ${safeId ? `data-advice-id="${safeId}"` : ''} ${latest ? 'data-advice-latest="true"' : ''}>
             <div class="advice-bubble-head">
                 <b>${label}<small>${time}${model}${usage}${cost}</small></b>
