@@ -27,6 +27,13 @@ const advicePanel = {
             captureAdviceScroll: this.captureAdviceScroll,
             restoreAdviceScroll: this.restoreAdviceScroll,
             bindAdviceScrollListener: this.bindAdviceScrollListener,
+            measureAdviceTopChrome: this.measureAdviceTopChrome,
+            applyAdviceTopChromeOffset: this.applyAdviceTopChromeOffset,
+            holdAdviceTopChrome: this.holdAdviceTopChrome,
+            rerenderAdvicePanel: this.rerenderAdvicePanel,
+            renderAdviceTopChromeInner: this.renderAdviceTopChromeInner,
+            _handleAdviceTopChromeScroll: this._handleAdviceTopChromeScroll,
+            _handleAdviceTopChromePull: this._handleAdviceTopChromePull,
             restoreAdviceDraft: this.restoreAdviceDraft,
             clearAdviceDraft: this.clearAdviceDraft,
             loadAdviceSettings: this.loadAdviceSettings,
@@ -217,7 +224,7 @@ const advicePanel = {
         this.db.aiTemplateActiveId = id || '';
         this.saveAdviceSettings();
         this.captureAdviceDraft();
-        this.renderAiCoachPage?.() || this.renderRoutines?.();
+        this.rerenderAdvicePanel({ refreshMessages: false });
     },
 
     toggleTemplateManager() {
@@ -563,22 +570,129 @@ const advicePanel = {
             this._adviceScrollEl.removeEventListener('touchstart', this._adviceOnUserIntent);
             this._adviceScrollEl.removeEventListener('keydown', this._adviceOnUserIntent);
         }
+        if (this._adviceScrollEl && this._adviceOnTopChromeTouchMove) {
+            this._adviceScrollEl.removeEventListener('touchmove', this._adviceOnTopChromeTouchMove);
+        }
+        if (this._adviceTopChromeEl && this._adviceOnTopChromePointerDown) {
+            this._adviceTopChromeEl.removeEventListener('pointerdown', this._adviceOnTopChromePointerDown);
+            this._adviceTopChromeEl.removeEventListener('click', this._adviceOnTopChromePointerDown);
+        }
         this._adviceOnScroll = () => {
             this.captureAdviceScroll();
+            this._handleAdviceTopChromeScroll(list);
             this._handleAdviceStreamScroll(list);
         };
-        this._adviceOnUserIntent = () => {
+        this._adviceOnUserIntent = event => {
             this._adviceUserScrollIntent = true;
+            this._handleAdviceTopChromePull(list, event);
             clearTimeout(this._adviceUserScrollIntentTimer);
             this._adviceUserScrollIntentTimer = setTimeout(() => {
                 this._adviceUserScrollIntent = false;
             }, 600);
         };
+        this._adviceOnTopChromeTouchMove = event => this._handleAdviceTopChromePull(list, event);
         list.addEventListener('scroll', this._adviceOnScroll, { passive: true });
         list.addEventListener('wheel', this._adviceOnUserIntent, { passive: true });
         list.addEventListener('touchstart', this._adviceOnUserIntent, { passive: true });
+        list.addEventListener('touchmove', this._adviceOnTopChromeTouchMove, { passive: true });
         list.addEventListener('keydown', this._adviceOnUserIntent, { passive: true });
         this._adviceScrollEl = list;
+        const chrome = list.closest('.advice-chat-shell')?.querySelector('.advice-top-chrome');
+        this._adviceOnTopChromePointerDown = () => this.holdAdviceTopChrome(list, false);
+        chrome?.addEventListener('pointerdown', this._adviceOnTopChromePointerDown, { passive: true });
+        chrome?.addEventListener('click', this._adviceOnTopChromePointerDown, { passive: true });
+        this._adviceTopChromeEl = chrome;
+        this._adviceTopChromeLastScrollTop = list.scrollTop || 0;
+        this.applyAdviceTopChromeOffset(list, this._adviceTopChromeOffset || 0);
+    },
+
+    measureAdviceTopChrome(list = document.querySelector('.advice-chat-list')) {
+        const chrome = list?.closest?.('.advice-chat-shell')?.querySelector?.('.advice-top-chrome');
+        const inner = chrome?.querySelector?.('.advice-top-chrome-inner');
+        if (!chrome || !inner) return 0;
+        const height = Math.ceil(inner.getBoundingClientRect().height || inner.scrollHeight || 0);
+        chrome.style.setProperty('--advice-top-chrome-full', `${height}px`);
+        return height;
+    },
+
+    applyAdviceTopChromeOffset(list = document.querySelector('.advice-chat-list'), offset = 0) {
+        const chrome = list?.closest?.('.advice-chat-shell')?.querySelector?.('.advice-top-chrome');
+        if (!chrome) return;
+        const maxOffset = this.measureAdviceTopChrome(list);
+        const next = Math.max(0, Math.min(Number(offset) || 0, maxOffset));
+        this._adviceTopChromeOffset = next;
+        chrome.style.setProperty('--advice-top-chrome-visible', `${Math.max(0, maxOffset - next)}px`);
+        chrome.style.setProperty('--advice-top-chrome-offset', `${-next}px`);
+        chrome.classList.toggle('is-collapsed', next >= maxOffset - 1);
+    },
+
+    holdAdviceTopChrome(list = document.querySelector('.advice-chat-list'), expand = true) {
+        this._adviceTopChromeHoldUntil = performance.now() + 900;
+        this._adviceTopChromeLastScrollTop = list?.scrollTop || 0;
+        this.applyAdviceTopChromeOffset(list, expand ? 0 : this._adviceTopChromeOffset || 0);
+    },
+
+    rerenderAdvicePanel(options = {}) {
+        const { expandChrome = false, focusSearch = false, refreshMessages = true } = options;
+        this._adviceTopChromeHoldUntil = performance.now() + 900;
+        const list = document.querySelector('.advice-chat-list');
+        const chromeInner = document.querySelector('.advice-top-chrome-inner');
+        if (!list || !chromeInner) {
+            this.renderAiCoachPage?.() || this.renderRoutines?.();
+            return;
+        }
+        const previousTop = list.scrollTop || 0;
+        chromeInner.innerHTML = this.renderAdviceTopChromeInner();
+        if (refreshMessages) {
+            this.refreshAdviceSearchResults();
+            list.scrollTop = Math.max(0, Math.min(previousTop, list.scrollHeight - list.clientHeight));
+        }
+        requestAnimationFrame(() => {
+            this.autoResizeAdvicePrompt?.();
+            this.holdAdviceTopChrome?.(list, expandChrome);
+            if (focusSearch) document.getElementById('adviceSearchInput')?.focus();
+        });
+    },
+
+    _handleAdviceTopChromeScroll(list) {
+        if (this._adviceTopChromeHoldUntil && performance.now() < this._adviceTopChromeHoldUntil) {
+            this._adviceTopChromeLastScrollTop = list.scrollTop || 0;
+            this.applyAdviceTopChromeOffset(list, 0);
+            return;
+        }
+        const top = list.scrollTop || 0;
+        const previous = Number.isFinite(this._adviceTopChromeLastScrollTop) ? this._adviceTopChromeLastScrollTop : top;
+        const delta = top - previous;
+        this._adviceTopChromeLastScrollTop = top;
+        if (Math.abs(delta) < 0.5) {
+            this.applyAdviceTopChromeOffset(list, this._adviceTopChromeOffset || 0);
+            return;
+        }
+        this.applyAdviceTopChromeOffset(list, (this._adviceTopChromeOffset || 0) + delta);
+    },
+
+    _handleAdviceTopChromePull(list, event) {
+        const currentOffset = this._adviceTopChromeOffset || 0;
+        if (!currentOffset) return;
+        if (event?.type === 'touchstart') {
+            this._adviceTopChromeLastTouchY = event.touches?.[0]?.clientY ?? null;
+            return;
+        }
+        if (event?.type === 'touchmove') {
+            const y = event.touches?.[0]?.clientY;
+            if (!Number.isFinite(y)) return;
+            const lastY = this._adviceTopChromeLastTouchY;
+            this._adviceTopChromeLastTouchY = y;
+            if (!Number.isFinite(lastY)) return;
+            const pullDistance = y - lastY;
+            if (pullDistance > 0 && (list.scrollTop || 0) <= 0) {
+                this.applyAdviceTopChromeOffset(list, currentOffset - pullDistance);
+            }
+            return;
+        }
+        if (event?.type === 'wheel' && event.deltaY < 0 && (list.scrollTop || 0) <= 0) {
+            this.applyAdviceTopChromeOffset(list, currentOffset + event.deltaY);
+        }
     },
 
     _handleAdviceStreamScroll(list) {
@@ -645,12 +759,7 @@ const advicePanel = {
         if (!shouldOpen) this.adviceSearchQuery = '';
         this.captureAdviceDraft();
         this.captureAdviceScroll();
-        this.renderAiCoachPage?.() || this.renderRoutines?.();
-        requestAnimationFrame(() => {
-            this.autoResizeAdvicePrompt();
-            const input = document.getElementById('adviceSearchInput');
-            if (this.adviceSearchOpen && input) input.focus();
-        });
+        this.rerenderAdvicePanel({ expandChrome: true, focusSearch: this.adviceSearchOpen });
     },
 
     onAdviceSearchInput(el) {
@@ -664,8 +773,7 @@ const advicePanel = {
         this.adviceSearchOpen = false;
         this.captureAdviceDraft();
         this.captureAdviceScroll();
-        this.renderAiCoachPage?.() || this.renderRoutines?.();
-        requestAnimationFrame(() => this.autoResizeAdvicePrompt());
+        this.rerenderAdvicePanel({ expandChrome: true });
     },
 
     refreshAdviceSearchResults() {
@@ -683,8 +791,7 @@ const advicePanel = {
         this.saveAdviceSettings();
         this.captureAdviceDraft();
         this.captureAdviceScroll();
-        this.renderAiCoachPage?.() || this.renderRoutines?.();
-        requestAnimationFrame(() => this.autoResizeAdvicePrompt());
+        this.rerenderAdvicePanel();
     },
 
     toggleAdviceContext(key) {
@@ -693,16 +800,14 @@ const advicePanel = {
         this.saveAdviceSettings();
         this.captureAdviceDraft();
         this.captureAdviceScroll();
-        this.renderAiCoachPage?.() || this.renderRoutines?.();
-        requestAnimationFrame(() => this.autoResizeAdvicePrompt());
+        this.rerenderAdvicePanel({ expandChrome: true, refreshMessages: false });
     },
 
     toggleAdviceContextPanel() {
         this.adviceContextOpen = !this.adviceContextOpen;
         this.captureAdviceDraft();
         this.captureAdviceScroll();
-        this.renderAiCoachPage?.() || this.renderRoutines?.();
-        requestAnimationFrame(() => this.autoResizeAdvicePrompt());
+        this.rerenderAdvicePanel({ expandChrome: this.adviceContextOpen, refreshMessages: false });
     },
 
     useAdvicePrompt(text) {
@@ -1125,6 +1230,57 @@ const advicePanel = {
         this.save();
     },
 
+    renderAdviceTopChromeInner() {
+        const messages = this.activeRecords(this.db.health.aiAdviceChat || []);
+        const visibleMessages = this.visibleAdviceMessages(messages);
+        const contexts = { diet: true, training: true, weight: true, goal: true, ...(this.adviceContexts || {}) };
+        const ctxOpen = !!this.adviceContextOpen;
+        const enabledCount = ['diet','training','weight','goal'].filter(k => contexts[k]).length;
+        const range = this.adviceRange || 'today';
+        const searchQuery = this.escapeHtml(this.adviceSearchQuery || '');
+        const searchOpen = !!this.adviceSearchOpen || !!this.adviceSearchQuery;
+        const messageSummary = this.adviceMessageSummary(messages, visibleMessages);
+        return `<div class="advice-chat-header">
+            <div>
+                <span class="cardio-kicker">AI 分析建议</span>
+                <h3>训练 / 饮食 / 体重分析</h3>
+                <small id="adviceMessageSummary">${this.escapeHtml(messageSummary)}</small>
+            </div>
+            <span class="material-symbols-rounded advice-chat-icon">psychology</span>
+        </div>
+        <div class="advice-context-bar">
+            ${(() => {
+                const templates = Array.isArray(this.db.aiTemplates) ? this.db.aiTemplates : [];
+                if (!templates.length) return '';
+                const activeId = this.db.aiTemplateActiveId || templates[0]?.id || '';
+                return `<div class="advice-template-row">${templates.map(t => `<button class="advice-pill ${t.id === activeId ? 'active' : ''}" onclick="data.selectAdviceTemplate('${this.escapeHtml(t.id)}')" type="button">${this.escapeHtml(t.name)}</button>`).join('')}</div>`;
+            })()}
+            <div class="advice-filter-row">
+                <div class="advice-range-tabs">${[['today','今日'],['week','7天'],['month','30天'],['all','全部']].map(([key, label]) => `<button class="advice-pill ${range === key ? 'active' : ''}" onclick="data.setAdviceRange('${key}')" type="button">${label}</button>`).join('')}</div>
+                <div class="advice-filter-actions">
+                    <button class="advice-search-toggle ${ctxOpen ? 'active' : ''}" onclick="data.toggleAdviceContextPanel()" type="button" aria-label="数据维度" title="数据维度">
+                        <span class="material-symbols-rounded">tune</span>
+                        ${enabledCount < 4 ? `<span class="advice-ctx-badge">${enabledCount}</span>` : ''}
+                    </button>
+                    <button class="advice-search-toggle ${searchOpen ? 'active' : ''}" onclick="data.toggleAdviceSearch()" type="button" aria-label="搜索聊天记录"><span class="material-symbols-rounded">search</span></button>
+                </div>
+            </div>
+            ${searchOpen ? `<div class="advice-search-row">
+                <span class="material-symbols-rounded">search</span>
+                <input id="adviceSearchInput" value="${searchQuery}" oninput="data.onAdviceSearchInput(this)" placeholder="搜索聊天记录、日期或模型" autocomplete="off">
+                ${searchQuery ? '<button onclick="data.clearAdviceSearch()" type="button" aria-label="清空搜索"><span class="material-symbols-rounded">close</span></button>' : ''}
+            </div>` : ''}
+            ${ctxOpen ? `<div class="advice-context-popover">
+                <div class="advice-context-popover-head">
+                    <span>选择给 AI 的数据维度</span>
+                    <button onclick="data.toggleAdviceContextPanel()" type="button" aria-label="关闭"><span class="material-symbols-rounded">close</span></button>
+                </div>
+                <div class="advice-context-toggles">${[['diet','饮食','restaurant'],['training','训练','fitness_center'],['weight','体重','monitor_weight'],['goal','目标','flag']].map(([key, label, icon]) => `<button class="advice-pill ${contexts[key] ? 'active' : ''}" onclick="data.toggleAdviceContext('${key}')" type="button"><span class="material-symbols-rounded">${icon}</span>${label}</button>`).join('')}</div>
+                <small class="advice-context-hint">关闭后该维度的记录不会发给 AI，回答会更聚焦</small>
+            </div>` : ''}
+        </div>`;
+    },
+
     renderAdvicePanel() {
         const messages = this.activeRecords(this.db.health.aiAdviceChat || []);
         const visibleMessages = this.visibleAdviceMessages(messages);
@@ -1138,58 +1294,17 @@ const advicePanel = {
         const modelThemeStyle = this.adviceModelThemeStyle(modelVisual);
         const modelMark = this.adviceModelIconHtml(modelVisual);
         const sendHint = this.isMobileAdviceInput() ? '回车换行，点击发送按钮提交' : 'Enter 发送，Shift + Enter 换行';
-        const contexts = { diet: true, training: true, weight: true, goal: true, ...(this.adviceContexts || {}) };
-        const ctxOpen = !!this.adviceContextOpen;
-        const enabledCount = ['diet','training','weight','goal'].filter(k => contexts[k]).length;
-        const range = this.adviceRange || 'today';
-        const searchQuery = this.escapeHtml(this.adviceSearchQuery || '');
-        const searchOpen = !!this.adviceSearchOpen || !!this.adviceSearchQuery;
         const goalType = this.db.health.dietGoal?.goalType || this.db.health.goalType || 'loss';
         const isGain = goalType === 'gain';
         const quicks = isGain
             ? ['分析我最近增肌进展是否正常', '根据今天饮食给我加餐建议', '帮我安排本周力量训练重点', '我今天蛋白质和碳水够不够？']
             : ['分析我最近减重停滞的原因', '根据今天饮食给我晚餐建议', '帮我调整本周训练强度', '我今天蛋白质够不够？'];
-        const messageSummary = this.adviceMessageSummary(messages, visibleMessages);
-        return `<div class="md-card advice-main-card">
+        return `<div class="md-card advice-main-card ${this._adviceSuppressCardAnimation ? 'advice-no-enter' : ''}">
             <div class="advice-chat-shell">
-                <div class="advice-chat-header">
-                    <div>
-                        <span class="cardio-kicker">AI 分析建议</span>
-                        <h3>训练 / 饮食 / 体重分析</h3>
-                        <small id="adviceMessageSummary">${this.escapeHtml(messageSummary)}</small>
+                <div class="advice-top-chrome">
+                    <div class="advice-top-chrome-inner">
+                        ${this.renderAdviceTopChromeInner()}
                     </div>
-                    <span class="material-symbols-rounded advice-chat-icon">psychology</span>
-                </div>
-                <div class="advice-context-bar">
-                    ${(() => {
-                        const templates = Array.isArray(this.db.aiTemplates) ? this.db.aiTemplates : [];
-                        if (!templates.length) return '';
-                        const activeId = this.db.aiTemplateActiveId || templates[0]?.id || '';
-                        return `<div class="advice-template-row">${templates.map(t => `<button class="advice-pill ${t.id === activeId ? 'active' : ''}" onclick="data.selectAdviceTemplate('${this.escapeHtml(t.id)}')" type="button">${this.escapeHtml(t.name)}</button>`).join('')}</div>`;
-                    })()}
-                    <div class="advice-filter-row">
-                        <div class="advice-range-tabs">${[['today','今日'],['week','7天'],['month','30天'],['all','全部']].map(([key, label]) => `<button class="advice-pill ${range === key ? 'active' : ''}" onclick="data.setAdviceRange('${key}')" type="button">${label}</button>`).join('')}</div>
-                        <div class="advice-filter-actions">
-                            <button class="advice-search-toggle ${ctxOpen ? 'active' : ''}" onclick="data.toggleAdviceContextPanel()" type="button" aria-label="数据维度" title="数据维度">
-                                <span class="material-symbols-rounded">tune</span>
-                                ${enabledCount < 4 ? `<span class="advice-ctx-badge">${enabledCount}</span>` : ''}
-                            </button>
-                            <button class="advice-search-toggle ${searchOpen ? 'active' : ''}" onclick="data.toggleAdviceSearch()" type="button" aria-label="搜索聊天记录"><span class="material-symbols-rounded">search</span></button>
-                        </div>
-                    </div>
-                    ${searchOpen ? `<div class="advice-search-row">
-                        <span class="material-symbols-rounded">search</span>
-                        <input id="adviceSearchInput" value="${searchQuery}" oninput="data.onAdviceSearchInput(this)" placeholder="搜索聊天记录、日期或模型" autocomplete="off">
-                        ${searchQuery ? '<button onclick="data.clearAdviceSearch()" type="button" aria-label="清空搜索"><span class="material-symbols-rounded">close</span></button>' : ''}
-                    </div>` : ''}
-                    ${ctxOpen ? `<div class="advice-context-popover">
-                        <div class="advice-context-popover-head">
-                            <span>选择给 AI 的数据维度</span>
-                            <button onclick="data.toggleAdviceContextPanel()" type="button" aria-label="关闭"><span class="material-symbols-rounded">close</span></button>
-                        </div>
-                        <div class="advice-context-toggles">${[['diet','饮食','restaurant'],['training','训练','fitness_center'],['weight','体重','monitor_weight'],['goal','目标','flag']].map(([key, label, icon]) => `<button class="advice-pill ${contexts[key] ? 'active' : ''}" onclick="data.toggleAdviceContext('${key}')" type="button"><span class="material-symbols-rounded">${icon}</span>${label}</button>`).join('')}</div>
-                        <small class="advice-context-hint">关闭后该维度的记录不会发给 AI，回答会更聚焦</small>
-                    </div>` : ''}
                 </div>
                 <div class="advice-chat-list">${this.renderAdviceMessages(visibleMessages)}</div>
                 <div class="advice-composer-tail">

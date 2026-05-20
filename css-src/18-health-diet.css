@@ -347,12 +347,34 @@
     box-shadow: none;
     background: transparent;
 }
+.advice-main-card.advice-no-enter {
+    animation: none;
+}
 .advice-chat-shell {
     flex: 1 1 auto;
     min-height: 0;
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 0;
+}
+.advice-top-chrome {
+    --advice-top-chrome-visible: var(--advice-top-chrome-full, auto);
+    --advice-top-chrome-offset: 0px;
+
+    flex: none;
+    height: var(--advice-top-chrome-visible);
+    margin-bottom: clamp(0px, var(--advice-top-chrome-visible, 0px), 12px);
+    overflow: hidden;
+    will-change: height;
+}
+.advice-top-chrome-inner {
+    display: grid;
+    gap: 8px;
+    transform: translateY(var(--advice-top-chrome-offset));
+    will-change: transform;
+}
+.advice-top-chrome.is-collapsed {
+    pointer-events: none;
 }
 .advice-chat-header {
     display: flex;
