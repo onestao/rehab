@@ -558,6 +558,7 @@
             const copy = JSON.parse(JSON.stringify(source));
             copy.id = this.generateRecordId('action');
             copy.sourceActionId = source.sourceActionId || source.id;
+            copy.libOnly = true;
             copy.deleted = false;
             copy.updatedAt = Date.now();
             if (!Array.isArray(copy.tags)) copy.tags = [];
