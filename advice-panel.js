@@ -950,25 +950,34 @@ const advicePanel = {
         }
     },
 
-    deleteAiAdviceMessage(idx) {
+    findAdviceMessage(idx, id = '') {
         const messages = this.activeRecords(this.db.health.aiAdviceChat || []);
-        if (idx < 0 || idx >= messages.length) return;
-        const targetId = messages[idx].id;
+        if (id) {
+            const byId = messages.find(msg => msg.id === id);
+            if (byId) return byId;
+        }
+        return idx >= 0 && idx < messages.length ? messages[idx] : null;
+    },
+
+    deleteAiAdviceMessage(idx, id = '') {
+        const target = this.findAdviceMessage(idx, id);
+        const targetId = target?.id;
+        if (!targetId) return;
         this.preserveAdviceScroll(() => {
             this.softDeleteById(this.db.health.aiAdviceChat, targetId);
             this.saveAndBackup();
         });
     },
 
-    copyAdviceMessage(idx) {
-        const msg = (this.activeRecords(this.db.health.aiAdviceChat || []))[idx];
+    copyAdviceMessage(idx, id = '') {
+        const msg = this.findAdviceMessage(idx, id);
         if (!msg?.content) return;
         navigator.clipboard?.writeText(msg.content).catch(() => {});
         workout?.showToast?.('已复制 AI 回答');
     },
 
-    async shareAdviceMessage(idx) {
-        const msg = (this.activeRecords(this.db.health.aiAdviceChat || []))[idx];
+    async shareAdviceMessage(idx, id = '') {
+        const msg = this.findAdviceMessage(idx, id);
         if (!msg?.content) return;
         const text = String(msg.content || '').trim();
         if (!text) return;
@@ -989,11 +998,12 @@ const advicePanel = {
         }
     },
 
-    retryAdviceFrom(idx) {
+    retryAdviceFrom(idx, id = '') {
         const messages = this.activeRecords(this.db.health.aiAdviceChat || []);
-        const msg = messages[idx];
+        const msg = this.findAdviceMessage(idx, id);
         if (!msg) return;
-        const prompt = msg?.retryPrompt || messages.slice(0, idx).reverse().find(m => m.role === 'user')?.content;
+        const msgIndex = messages.findIndex(m => m.id === msg.id);
+        const prompt = msg?.retryPrompt || messages.slice(0, Math.max(0, msgIndex)).reverse().find(m => m.role === 'user')?.content;
         if (!prompt) return;
         if (msg.role === 'assistant') {
             if ((this.db.aiRetryMode || 'versioned') === 'replace') {
