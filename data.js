@@ -65,6 +65,7 @@ data.refreshModules = function () {
         window.dataViews || {},
         window.dataAiTemplates || {}
     );
+    window.advicePanel?.attach?.(data);
 };
 
 if (typeof window !== 'undefined') window.data = data;

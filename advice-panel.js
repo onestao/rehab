@@ -1210,4 +1210,7 @@ const advicePanel = {
     }
 };
 
-if (typeof window !== 'undefined') window.advicePanel = advicePanel;
+if (typeof window !== 'undefined') {
+    window.advicePanel = advicePanel;
+    if (window.data) advicePanel.attach(window.data);
+}
