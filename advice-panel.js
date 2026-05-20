@@ -14,6 +14,8 @@ const advicePanel = {
             MODEL_ICONS: this.MODEL_ICONS,
             sendAiAdvice: this.sendAiAdvice,
             requestAiAdvice: this.requestAiAdvice,
+            findAdviceMessage: this.findAdviceMessage,
+            pruneAdviceVersionGroup: this.pruneAdviceVersionGroup,
             deleteAiAdviceMessage: this.deleteAiAdviceMessage,
             copyAdviceMessage: this.copyAdviceMessage,
             retryAdviceFrom: this.retryAdviceFrom,
