@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mergeIncremental, computeRetryDelay, isRetryableError } from '../sync-pure.js';
+import { mergeIncremental, computeRetryDelay, isRetryableError, buildS3ObjectKey, buildS3MigrationPlan } from '../sync-pure.js';
 
 test('mergeIncremental applies LWW by updatedAt', () => {
     const local = [{ id: 'a', value: 1, updatedAt: 10 }, { id: 'b', value: 2, updatedAt: 20 }];
@@ -23,4 +23,32 @@ test('retry helpers classify delays and errors', () => {
     assert.equal(isRetryableError({ status: 503 }), true);
     assert.equal(isRetryableError({ status: 404 }), false);
     assert.equal(isRetryableError(new Error('Failed to fetch')), true);
+});
+
+test('buildS3ObjectKey scopes remote files under rehab prefix', () => {
+    assert.equal(buildS3ObjectKey('rehab_pro_data.json'), 'rehab/rehab_pro_data.json');
+    assert.equal(buildS3ObjectKey('incremental/actions/1.json'), 'rehab/incremental/actions/1.json');
+    assert.equal(buildS3ObjectKey('backup/2026/05/22/file.json.gz'), 'rehab/backup/2026/05/22/file.json.gz');
+});
+
+test('buildS3ObjectKey does not duplicate existing prefix', () => {
+    assert.equal(buildS3ObjectKey('/rehab/manifest.json'), 'rehab/manifest.json');
+    assert.equal(buildS3ObjectKey('manifest.json', '/rehab/'), 'rehab/manifest.json');
+});
+
+test('buildS3MigrationPlan includes snapshot manifest and manifest windows', () => {
+    const plan = buildS3MigrationPlan({
+        entities: {
+            actions: { windows: [1000, '2000'] },
+            routines: { windows: ['bad', 3000] }
+        }
+    }, ['backup/2026/05/22/a.json.gz', 'rehab/manifest.json']);
+    assert.deepEqual(plan, [
+        'rehab_pro_data.json',
+        'manifest.json',
+        'incremental/actions/1000.json',
+        'incremental/actions/2000.json',
+        'incremental/routines/3000.json',
+        'backup/2026/05/22/a.json.gz'
+    ]);
 });

@@ -62,12 +62,14 @@ function mergeAdviceRecord(local, remote) {
 const sync = {
     INCREMENTAL_WINDOW_MS: 5 * 60 * 1000,
     COMPACTION_THRESHOLD: 50,
+    S3_PREFIX: 'rehab',
     REMOTE_SNAPSHOT: 'rehab_pro_data.json',
     REMOTE_MANIFEST: 'manifest.json',
     REMOTE_INCREMENTAL_DIR: 'incremental',
     RETRY_DEFAULTS: { retries: 3, baseDelay: 800, factor: 2, jitter: 0.2 },
     __pushTimer: null,
     __pushDebounceMs: 8000,
+    __s3MigrationPromise: null,
 
     scheduleAutoPush(opts = {}) {
         if (data.cfg.mode === 'none') return;
@@ -104,6 +106,8 @@ const sync = {
         data.db.syncMeta.aiCipherLastResolvedAt = Number(data.db.syncMeta.aiCipherLastResolvedAt || 0);
         data.db.syncMeta.lastArchiveDate = data.db.syncMeta.lastArchiveDate || '';
         data.db.syncMeta.lastArchiveChecksum = data.db.syncMeta.lastArchiveChecksum || '';
+        data.db.syncMeta.s3PrefixMigrationKey = data.db.syncMeta.s3PrefixMigrationKey || '';
+        data.db.syncMeta.s3PrefixMigrationAt = Number(data.db.syncMeta.s3PrefixMigrationAt || 0);
         data.db.syncMeta.conflictLog = Array.isArray(data.db.syncMeta.conflictLog) ? data.db.syncMeta.conflictLog : [];
         return data.db.syncMeta;
     },
@@ -181,7 +185,8 @@ const sync = {
         const { endpoint, region, bucket, key, secret } = data.cfg.s3 || {};
         if (!endpoint || !region || !bucket || !key || !secret) throw new Error('请完整填写 S3 参数');
         const host = new URL(endpoint).host;
-        const path = `/${bucket}/${remotePath}`;
+        const objectKey = this.s3ObjectKey(remotePath);
+        const path = `/${bucket}/${objectKey}`;
         const dt = new Date().toISOString().replace(/[:\-]|\.\d{3}/g, '');
         const date = dt.slice(0, 8);
         const buf = await blob.arrayBuffer();
@@ -206,6 +211,18 @@ const sync = {
             },
             body: buf
         });
+    },
+
+    s3Encode(value) {
+        return encodeURIComponent(String(value)).replace(/[!'()*]/g, ch => `%${ch.charCodeAt(0).toString(16).toUpperCase()}`);
+    },
+
+    s3CanonicalQuery(params = {}) {
+        return Object.keys(params)
+            .filter(key => params[key] !== undefined && params[key] !== null)
+            .sort()
+            .map(key => `${this.s3Encode(key)}=${this.s3Encode(params[key])}`)
+            .join('&');
     },
 
     remoteEntityMapFromDb(dbObj) {
@@ -485,17 +502,21 @@ const sync = {
         data.normalizeDb();
     },
 
-    async s3Req(method, remotePath, body = null, extraHeaders = {}) {
+    async s3Req(method, remotePath, body = null, extraHeaders = {}, options = {}) {
         const { endpoint, region, bucket, key, secret } = data.cfg.s3 || {};
         if (!endpoint || !region || !bucket || !key || !secret) throw new Error('请完整填写 S3 参数');
         const host = new URL(endpoint).host;
-        const path = `/${bucket}/${remotePath}`;
+        const objectKey = options.usePrefix === false
+            ? String(remotePath || '').trim().replace(/^\/+/, '')
+            : this.s3ObjectKey(remotePath);
+        const path = `/${bucket}/${objectKey}`;
+        const query = this.s3CanonicalQuery(options.queryParams || {});
         const dt = new Date().toISOString().replace(/[:\-]|\.\d{3}/g, '');
         const date = dt.slice(0, 8);
         const hash = body
             ? await this.sha256(body)
             : 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855';
-        const canon = `${method}\n${path}\n\nhost:${host}\nx-amz-content-sha256:${hash}\nx-amz-date:${dt}\n\nhost;x-amz-content-sha256;x-amz-date\n${hash}`;
+        const canon = `${method}\n${path}\n${query}\nhost:${host}\nx-amz-content-sha256:${hash}\nx-amz-date:${dt}\n\nhost;x-amz-content-sha256;x-amz-date\n${hash}`;
         const scope = `${date}/${region}/s3/aws4_request`;
         const stringToSign = `AWS4-HMAC-SHA256\n${dt}\n${scope}\n${await this.sha256(canon)}`;
         const kDate = await this.hmac('AWS4' + secret, date);
@@ -505,7 +526,7 @@ const sync = {
         const sig = Array.from(new Uint8Array(await this.hmac(kSigning, stringToSign)))
             .map(x => x.toString(16).padStart(2, '0')).join('');
 
-        return fetch(`${endpoint}${path}`, {
+        return fetch(`${endpoint}${path}${query ? `?${query}` : ''}`, {
             method,
             headers: {
                 Authorization: `AWS4-HMAC-SHA256 Credential=${key}/${scope}, SignedHeaders=host;x-amz-content-sha256;x-amz-date, Signature=${sig}`,
@@ -516,6 +537,157 @@ const sync = {
             },
             body
         });
+    },
+
+    async s3FetchRootJson(remotePath, allow404 = false) {
+        const res = await this.s3Req('GET', remotePath, null, {}, { usePrefix: false });
+        if (res.status === 404 && allow404) return null;
+        if (!res.ok) {
+            const err = new Error(`S3 root read failed(${remotePath}): ${res.status}`);
+            err.status = res.status;
+            throw err;
+        }
+        const text = await res.text();
+        return text ? JSON.parse(text) : null;
+    },
+
+    async s3ListRootObjects(prefix) {
+        const keys = [];
+        let token = '';
+        do {
+            const params = { 'list-type': '2', prefix, 'max-keys': '1000' };
+            if (token) params['continuation-token'] = token;
+            const res = await this.s3Req('GET', '', null, {}, { usePrefix: false, queryParams: params });
+            if (!res.ok) {
+                const err = new Error(`S3 list failed(${prefix}): ${res.status}`);
+                err.status = res.status;
+                throw err;
+            }
+            const text = await res.text();
+            const doc = new DOMParser().parseFromString(text, 'application/xml');
+            Array.from(doc.getElementsByTagName('Contents')).forEach(node => {
+                const key = node.getElementsByTagName('Key')[0]?.textContent || '';
+                if (key) keys.push(key);
+            });
+            token = doc.getElementsByTagName('NextContinuationToken')[0]?.textContent || '';
+        } while (token);
+        return keys;
+    },
+
+    async migrateS3RootObject(remotePath) {
+        const rootKey = String(remotePath || '').trim().replace(/^\/+/, '');
+        if (!rootKey || rootKey === this.S3_PREFIX || rootKey.startsWith(`${this.S3_PREFIX}/`)) return { skipped: true };
+
+        const sourceRes = await this.s3Req('GET', rootKey, null, {}, { usePrefix: false });
+        if (sourceRes.status === 404) return { missing: true };
+        if (!sourceRes.ok) {
+            const err = new Error(`S3 root object read failed(${rootKey}): ${sourceRes.status}`);
+            err.status = sourceRes.status;
+            throw err;
+        }
+
+        const targetRes = await this.s3Req('HEAD', rootKey);
+        if (targetRes.status === 404) {
+            const blob = await sourceRes.blob();
+            const contentType = sourceRes.headers.get('Content-Type') || (rootKey.endsWith('.gz') ? 'application/gzip' : 'application/json');
+            const putRes = await this._s3PutBlob(rootKey, blob, contentType);
+            if (!putRes.ok) {
+                const err = new Error(`S3 prefixed object write failed(${rootKey}): ${putRes.status}`);
+                err.status = putRes.status;
+                throw err;
+            }
+        } else if (!targetRes.ok) {
+            const err = new Error(`S3 prefixed object check failed(${rootKey}): ${targetRes.status}`);
+            err.status = targetRes.status;
+            throw err;
+        }
+
+        const deleteRes = await this.s3Req('DELETE', rootKey, null, {}, { usePrefix: false });
+        if (!deleteRes.ok && deleteRes.status !== 404) {
+            const err = new Error(`S3 root object delete failed(${rootKey}): ${deleteRes.status}`);
+            err.status = deleteRes.status;
+            throw err;
+        }
+        return { moved: targetRes.status === 404, deleted: true };
+    },
+
+    async migrateS3RootToPrefix() {
+        let legacyManifest = null;
+        try {
+            legacyManifest = await this.s3FetchRootJson(this.REMOTE_MANIFEST, true);
+        } catch (e) {
+            console.warn('S3 legacy manifest read failed', e);
+        }
+
+        const listedKeys = [];
+        for (const prefix of [`${this.REMOTE_INCREMENTAL_DIR}/`, 'backup/']) {
+            try {
+                listedKeys.push(...await this.s3ListRootObjects(prefix));
+            } catch (e) {
+                console.warn(`S3 legacy ${prefix} listing failed`, e);
+            }
+        }
+
+        const pure = window.syncPure || {};
+        const plan = typeof pure.buildS3MigrationPlan === 'function'
+            ? pure.buildS3MigrationPlan(legacyManifest, listedKeys, {
+                snapshotPath: this.REMOTE_SNAPSHOT,
+                manifestPath: this.REMOTE_MANIFEST,
+                incrementalDir: this.REMOTE_INCREMENTAL_DIR,
+                prefix: this.S3_PREFIX
+            })
+            : [this.REMOTE_SNAPSHOT, this.REMOTE_MANIFEST, ...listedKeys];
+        const result = { moved: 0, deleted: 0, missing: 0, failed: 0 };
+        for (const key of plan) {
+            try {
+                const r = await this.migrateS3RootObject(key);
+                if (r.moved) result.moved += 1;
+                if (r.deleted) result.deleted += 1;
+                if (r.missing) result.missing += 1;
+            } catch (e) {
+                result.failed += 1;
+                console.warn('S3 legacy object migration failed', key, e);
+            }
+        }
+        return result;
+    },
+
+    async ensureS3PrefixMigration() {
+        if (data.cfg.mode !== 's3') return;
+        const { endpoint, bucket } = data.cfg.s3 || {};
+        if (!endpoint || !bucket || !this.S3_PREFIX) return;
+        const meta = this.getSyncMeta();
+        const migrationKey = `${endpoint}|${bucket}|${this.S3_PREFIX}`;
+        if (meta.s3PrefixMigrationKey === migrationKey) return;
+        if (this.__s3MigrationPromise) return this.__s3MigrationPromise;
+
+        this.__s3MigrationPromise = (async () => {
+            this.setStatus('syncing', '正在迁移 S3 根目录旧数据到 rehab/');
+            const result = await this.migrateS3RootToPrefix();
+            meta.s3PrefixMigrationKey = migrationKey;
+            meta.s3PrefixMigrationAt = Date.now();
+            this.saveSyncMeta();
+            if (result.moved || result.deleted) {
+                this.setStatus('cloud', `S3 旧数据已迁移到 rehab/（移动 ${result.moved} 个，清理 ${result.deleted} 个）`);
+            }
+            return result;
+        })().finally(() => {
+            this.__s3MigrationPromise = null;
+        });
+        return this.__s3MigrationPromise;
+    },
+
+    s3ObjectKey(remotePath) {
+        const pure = window.syncPure || {};
+        if (typeof pure.buildS3ObjectKey === 'function') {
+            return pure.buildS3ObjectKey(remotePath, this.S3_PREFIX);
+        }
+        const cleanPath = String(remotePath || '').trim().replace(/^\/+/, '');
+        const cleanPrefix = String(this.S3_PREFIX || '').trim().replace(/^\/+|\/+$/g, '');
+        if (!cleanPrefix) return cleanPath;
+        if (!cleanPath) return `${cleanPrefix}/`;
+        if (cleanPath === cleanPrefix || cleanPath.startsWith(`${cleanPrefix}/`)) return cleanPath;
+        return `${cleanPrefix}/${cleanPath}`;
     },
 
     davRoot() {
@@ -668,6 +840,7 @@ const sync = {
 
     async fullBackup(options = {}) {
         await data.flush();
+        await this.ensureS3PrefixMigration();
         this.setStatus('syncing', options.quiet ? '正在重建快照' : '正在上传全量快照');
         const snapshotTs = Date.now();
         const snapshotBody = JSON.stringify(data.db);
@@ -694,6 +867,7 @@ const sync = {
     async pushChanges(options = {}) {
         try {
             await data.flush();
+            await this.ensureS3PrefixMigration();
             this.setStatus('syncing', '正在上传增量变更');
             const remoteManifest = this.ensureManifestShape((await this.fetchJson(this.REMOTE_MANIFEST, true)).data);
             const localMeta = this.getSyncMeta();
@@ -767,6 +941,7 @@ const sync = {
     async pullChanges() {
         try {
             await data.flush();
+            await this.ensureS3PrefixMigration();
             this.setStatus('syncing', '正在拉取远端变更');
             const snapshotRes = await this.withRetry(() => this.fetchJson(this.REMOTE_SNAPSHOT, true));
             if (snapshotRes.data) {
@@ -817,6 +992,7 @@ const sync = {
 
     async verifyRemote() {
         if (data.cfg.mode === 'none') return { ok: false, reason: '未配置同步' };
+        await this.ensureS3PrefixMigration();
         const res = await this.fetchJson(this.REMOTE_SNAPSHOT, true);
         if (!res.data) return { ok: false, reason: '远端无快照' };
         const localStr = JSON.stringify(res.data);

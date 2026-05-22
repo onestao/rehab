@@ -38,6 +38,50 @@ export function isRetryableError(error) {
 }
 
 /**
+ * @param {string} remotePath
+ * @param {string} prefix
+ */
+export function buildS3ObjectKey(remotePath, prefix = 'rehab') {
+    const cleanPath = String(remotePath || '').trim().replace(/^\/+/, '');
+    const cleanPrefix = String(prefix || '').trim().replace(/^\/+|\/+$/g, '');
+    if (!cleanPrefix) return cleanPath;
+    if (!cleanPath) return `${cleanPrefix}/`;
+    if (cleanPath === cleanPrefix || cleanPath.startsWith(`${cleanPrefix}/`)) return cleanPath;
+    return `${cleanPrefix}/${cleanPath}`;
+}
+
+/**
+ * @param {any} manifest
+ * @param {string[]} extraRootKeys
+ * @param {{snapshotPath?: string, manifestPath?: string, incrementalDir?: string, prefix?: string}=} opts
+ */
+export function buildS3MigrationPlan(manifest, extraRootKeys = [], opts = {}) {
+    const snapshotPath = opts.snapshotPath || 'rehab_pro_data.json';
+    const manifestPath = opts.manifestPath || 'manifest.json';
+    const incrementalDir = String(opts.incrementalDir || 'incremental').replace(/^\/+|\/+$/g, '');
+    const cleanPrefix = String(opts.prefix || 'rehab').trim().replace(/^\/+|\/+$/g, '');
+    const keys = [snapshotPath, manifestPath];
+    const entities = manifest && typeof manifest === 'object' && manifest.entities && typeof manifest.entities === 'object'
+        ? manifest.entities
+        : {};
+
+    for (const [entity, meta] of Object.entries(entities)) {
+        const windows = Array.isArray(meta?.windows) ? meta.windows : [];
+        for (const ts of windows) {
+            const n = Number(ts);
+            if (!Number.isFinite(n)) continue;
+            keys.push(`${incrementalDir}/${entity}/${n}.json`);
+        }
+    }
+
+    for (const key of extraRootKeys || []) keys.push(key);
+
+    return Array.from(new Set(keys
+        .map(key => String(key || '').trim().replace(/^\/+/, ''))
+        .filter(key => key && (!cleanPrefix || (key !== cleanPrefix && !key.startsWith(`${cleanPrefix}/`))))));
+}
+
+/**
  * Fieldwise merge: only uses per-field timestamps when present, otherwise falls back to LWW by record updatedAt.
  * @param {{updatedAt?: number, __fieldUpdatedAt?: Record<string, string>, [k: string]: any}} local
  * @param {{updatedAt?: number, __fieldUpdatedAt?: Record<string, string>, [k: string]: any}} remote
@@ -163,6 +207,7 @@ if (typeof window !== 'undefined') {
     win.syncPure = win.syncPure || {};
     Object.assign(win.syncPure, {
         mergeIncremental, computeRetryDelay, isRetryableError,
+        buildS3ObjectKey, buildS3MigrationPlan,
         mergeRecordsFieldwise, takeQueueBatch,
         mergeAdviceVersions, mergeAdviceRecord,
         validatePayload, compareCounts

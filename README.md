@@ -122,7 +122,7 @@ kcal = MET × 体重 kg × 时长 小时
 - Access Key
 - Secret Key
 
-备份文件默认写入 Bucket 下的 `rehab_pro_data.json`。
+备份文件默认写入 Bucket 下的 `rehab/` 目录，例如 `rehab/rehab_pro_data.json`、`rehab/manifest.json`、`rehab/incremental/` 和 `rehab/backup/`。
 
 ### WebDAV
 
