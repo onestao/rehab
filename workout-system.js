@@ -8,6 +8,7 @@ Object.assign(workout, {
     _countResolve: null, _speakResolve: null, _speechWatchdog: null,
     _audioListenerBound: false,
     _audioKeepAliveInt: null,
+    _cueAudioContext: null,
     _backGuardBound: false,
     _backToastTimer: null,
     wakeLock: null,
@@ -22,6 +23,39 @@ Object.assign(workout, {
     _phaseSub: '',
     _phaseStatus: '',
     _lastActiveAt: null,
+
+    playCue(type = 'normal') {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContextClass) return;
+        try {
+            this._cueAudioContext = this._cueAudioContext || new AudioContextClass();
+            const ctx = this._cueAudioContext;
+            if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+            const now = ctx.currentTime;
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            const compressor = ctx.createDynamicsCompressor();
+            const isCountdown = type === 'countdown';
+            const freq = isCountdown ? 1200 : 920;
+            const duration = isCountdown ? 0.14 : 0.2;
+
+            compressor.threshold.setValueAtTime(-24, now);
+            compressor.knee.setValueAtTime(20, now);
+            compressor.ratio.setValueAtTime(8, now);
+            compressor.attack.setValueAtTime(0.003, now);
+            compressor.release.setValueAtTime(0.08, now);
+            osc.type = isCountdown ? 'triangle' : 'sine';
+            osc.frequency.setValueAtTime(freq, now);
+            gain.gain.setValueAtTime(0.0001, now);
+            gain.gain.exponentialRampToValueAtTime(0.85, now + 0.02);
+            gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+            osc.connect(gain);
+            gain.connect(compressor);
+            compressor.connect(ctx.destination);
+            osc.start(now);
+            osc.stop(now + duration + 0.04);
+        } catch {}
+    },
 
     async speak(text) {
         if (!text) return;
@@ -39,6 +73,8 @@ Object.assign(workout, {
             window.speechSynthesis.cancel();
             const u = new SpeechSynthesisUtterance(text);
             u.lang = 'zh-CN'; u.rate = parseFloat(data.db.rate);
+            u.volume = 1;
+            u.pitch = 1.05;
             u.onend = done; u.onerror = done;
             this._speechWatchdog = setInterval(() => {
                 if (this.isPaused || this.skipFlag || !this.isPlaying) return;
@@ -46,6 +82,7 @@ Object.assign(workout, {
                 document.getElementById('silentAudio').play().catch(()=>{});
             }, 2500);
             setTimeout(done, text.length * 450 + 1200);
+            this.playCue?.(/^\d+$/.test(String(text)) ? 'countdown' : 'normal');
             window.speechSynthesis.speak(u);
         });
     },

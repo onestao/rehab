@@ -61,6 +61,11 @@ const workoutEngine = {
         }[phase] || null;
     },
 
+    restSeconds(action, key) {
+        const value = Number(action?.[key]);
+        return Number.isFinite(value) ? Math.max(0, value) : 0;
+    },
+
     skipTarget() {
         if (!this.state) return null;
         const action = this.state.activeAction || this.currentActions()[this.state.actionIndex];
@@ -185,6 +190,10 @@ const workoutEngine = {
             if (this.state.phase === 'restAfterRep') {
                 this.state.repIndex++;
                 if (this.state.repIndex < action.reps) {
+                    if (this.restSeconds(action, 'repRest') <= 0) {
+                        this.transition('announceRep');
+                        continue;
+                    }
                     await workout.speak('放松');
                     if (this.applySkipOverride()) continue;
                     this.transition('repRest');
@@ -199,6 +208,10 @@ const workoutEngine = {
             }
             if (this.state.phase === 'afterReps') {
                 if (action.isAlt && this.state.sideIndex === 0) {
+                    if (this.restSeconds(action, 'switchRest') <= 0) {
+                        this.transition('switchSide', { sideIndex: 1, repIndex: 0 });
+                        continue;
+                    }
                     await workout.speak('准备换边');
                     if (this.applySkipOverride()) continue;
                     this.transition('switchRest');
@@ -226,6 +239,10 @@ const workoutEngine = {
                     continue;
                 }
                 workout.openSetReview(action.name, this.state.setIndex, action.reps);
+                if (this.restSeconds(action, 'actionRest') <= 0) {
+                    this.transition('nextSet');
+                    continue;
+                }
                 await workout.speak('组间休息');
                 if (this.applySkipOverride()) continue;
                 await this.runCount(action.actionRest, '稍作休息', 'SET REST', 'nextSet');
@@ -239,6 +256,10 @@ const workoutEngine = {
             }
             if (this.state.phase === 'actionBreak') {
                 if (this.state.actionIndex < actions.length - 1) {
+                    if (this.restSeconds(action, 'groupRest') <= 0) {
+                        this.transition('completed');
+                        return;
+                    }
                     await workout.speak('更换动作');
                     if (this.applySkipOverride()) continue;
                     await this.runCount(action.groupRest, '下一项准备', 'BREAK', 'completed');
@@ -252,7 +273,12 @@ const workoutEngine = {
     },
 
     async runCount(sec, sub, status, nextPhase) {
-        const remaining = Number.isFinite(this.state.phaseLeft) ? this.state.phaseLeft : sec;
+        const fallback = Number(sec);
+        const remaining = Number.isFinite(this.state.phaseLeft) ? this.state.phaseLeft : (Number.isFinite(fallback) ? Math.max(0, fallback) : 0);
+        if (remaining <= 0) {
+            if (workout.isPlaying) this.transition(nextPhase, { phaseLeft: null, phaseSub: '', phaseStatus: '' });
+            return;
+        }
         this.state.phaseLeft = remaining;
         this.state.phaseSub = sub;
         this.state.phaseStatus = status;

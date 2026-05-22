@@ -116,14 +116,20 @@
         },
 
         _readActionForm() {
+            const readInt = (id, fallback) => {
+                const raw = document.getElementById(id)?.value;
+                if (raw === '' || raw == null) return fallback;
+                const parsed = parseInt(raw, 10);
+                return Number.isFinite(parsed) ? Math.max(0, parsed) : fallback;
+            };
             return {
                 name: document.getElementById('name').value || '未命名',
-                sets: parseInt(document.getElementById('sets').value) || 1,
-                reps: parseInt(document.getElementById('reps').value) || 1,
-                work: parseInt(document.getElementById('work').value) || 5,
-                repRest: parseInt(document.getElementById('repRest').value) || 2,
-                actionRest: parseInt(document.getElementById('actionRest').value) || 10,
-                groupRest: parseInt(document.getElementById('groupRest').value) || 15,
+                sets: Math.max(1, readInt('sets', 1)),
+                reps: Math.max(1, readInt('reps', 1)),
+                work: Math.max(1, readInt('work', 5)),
+                repRest: readInt('repRest', 2),
+                actionRest: readInt('actionRest', 10),
+                groupRest: readInt('groupRest', 15),
                 switchRest: 3,
                 isAlt: document.getElementById('isAlt').checked,
                 phase: document.getElementById('actionPhase')?.value || 'main',

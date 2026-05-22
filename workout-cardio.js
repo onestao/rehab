@@ -209,10 +209,13 @@ const cardio = {
     },
 
     speak(text) {
+        workout.playCue?.('normal');
         window.speechSynthesis.cancel();
         const u = new SpeechSynthesisUtterance(text);
         u.lang = 'zh-CN';
         u.rate = parseFloat(data.db.rate || 1.1);
+        u.volume = 1;
+        u.pitch = 1.05;
         window.speechSynthesis.speak(u);
     }
 };
