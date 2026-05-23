@@ -475,7 +475,11 @@
         <div class="md-modal-card md-modal-sheet-card voice-sheet-card">
             <div class="md-modal-head">
                 <strong id="voiceSettingsTitle"><span class="material-symbols-rounded">record_voice_over</span> TTS</strong>
-                <button class="icon-btn" onclick="workoutVoice.closeSettings()" type="button" aria-label="&#20851;&#38381;"><span class="material-symbols-rounded">close</span></button>
+                <button class="icon-btn" onclick="workoutVoice.closeSettings()" type="button" aria-label="&#20851;&#38381;" data-modal-close><span class="material-symbols-rounded">close</span></button>
+            </div>
+            <div class="voice-top-actions">
+                <button class="md-btn md-btn-filled" onclick="workoutVoice.openImportDialog()" type="button"><span class="material-symbols-rounded">upload</span> &#23548;&#20837; Legado &#28304;</button>
+                <button class="md-btn md-btn-tonal" onclick="workoutVoice.exportEngines()" type="button"><span class="material-symbols-rounded">download</span> &#23548;&#20986;</button>
             </div>
             <div id="voiceModeCard" class="voice-mode-card">
                 <span class="material-symbols-rounded">volume_up</span>
@@ -486,10 +490,10 @@
             </div>
             <div class="voice-section-title">&#20248;&#20808;&#32423;</div>
             <div class="voice-priority-group" role="radiogroup" aria-label="&#35821;&#38899;&#24341;&#25806;&#20248;&#20808;&#32423;">
-                <label><input type="radio" name="voicePriority" value="online-first" onchange="workoutVoice.saveSettings()">&#22312;&#32447;&#20248;&#20808;</label>
-                <label><input type="radio" name="voicePriority" value="local-first" onchange="workoutVoice.saveSettings()">&#26412;&#22320;&#20248;&#20808;</label>
-                <label><input type="radio" name="voicePriority" value="online-only" onchange="workoutVoice.saveSettings()">&#20165;&#22312;&#32447;</label>
-                <label><input type="radio" name="voicePriority" value="local-only" onchange="workoutVoice.saveSettings()">&#20165;&#26412;&#22320;</label>
+                <label class="voice-priority-option"><input type="radio" name="voicePriority" value="online-first" onchange="workoutVoice.saveSettings()"><span class="material-symbols-rounded">cloud_sync</span><strong>&#22312;&#32447;&#20248;&#20808;</strong></label>
+                <label class="voice-priority-option"><input type="radio" name="voicePriority" value="local-first" onchange="workoutVoice.saveSettings()"><span class="material-symbols-rounded">record_voice_over</span><strong>&#26412;&#22320;&#20248;&#20808;</strong></label>
+                <label class="voice-priority-option"><input type="radio" name="voicePriority" value="online-only" onchange="workoutVoice.saveSettings()"><span class="material-symbols-rounded">cloud_done</span><strong>&#20165;&#22312;&#32447;</strong></label>
+                <label class="voice-priority-option"><input type="radio" name="voicePriority" value="local-only" onchange="workoutVoice.saveSettings()"><span class="material-symbols-rounded">mic</span><strong>&#20165;&#26412;&#22320;</strong></label>
             </div>
             <div class="voice-section-title">&#22312;&#32447;&#24341;&#25806;</div>
             <div id="voiceEngineList" class="voice-engine-list"></div>
@@ -512,19 +516,6 @@
                     <button class="md-btn md-btn-filled" onclick="workoutVoice.saveEngineEdit()" type="button"><span class="material-symbols-rounded">save</span> &#20445;&#23384;&#38899;&#28304;</button>
                 </div>
             </div>
-            <div class="voice-import-panel">
-                <div class="voice-section-title">&#31896;&#36148; Legado JSON &#23548;&#20837;</div>
-                <div class="md-field voice-json-field">
-                    <textarea id="voiceLegadoJson" rows="5" placeholder=" " spellcheck="false"></textarea>
-                    <label>Legado JSON</label>
-                </div>
-                <div class="md-row voice-actions">
-                    <button class="md-btn md-btn-tonal" onclick="workoutVoice.validateLegadoJson()" type="button"><span class="material-symbols-rounded">check</span> &#26657;&#39564;</button>
-                    <button class="md-btn md-btn-filled" onclick="workoutVoice.importLegadoJson()" type="button"><span class="material-symbols-rounded">upload</span> &#23548;&#20837;</button>
-                    <button class="md-btn md-btn-tonal" onclick="workoutVoice.exportEngines()" type="button"><span class="material-symbols-rounded">download</span> &#23548;&#20986;</button>
-                </div>
-                <div id="voiceImportStatus" class="voice-status"></div>
-            </div>
             <div class="voice-cache-row">
                 <label class="voice-cache-toggle"><input type="checkbox" id="voiceCacheEnabled" onchange="workoutVoice.saveSettings()"> &#21551;&#29992; MP3 &#32531;&#23384;</label>
                 <button class="md-btn md-btn-tonal" onclick="workoutVoice.clearCache()" type="button"><span class="material-symbols-rounded">delete</span> &#28165;&#31354;&#32531;&#23384;</button>
@@ -539,6 +530,24 @@
                 <button class="md-btn md-btn-filled" onclick="workoutVoice.testCurrent()" type="button"><span class="material-symbols-rounded">volume_up</span> &#24403;&#21069;&#20248;&#20808;&#32423;</button>
             </div>
             <div id="voiceTestResult" class="voice-status"></div>
+        </div>
+    </div>
+    <div id="voiceImportDialog" class="md-modal hidden voice-import-dialog" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="voiceImportTitle">
+        <div class="md-modal-backdrop" onclick="workoutVoice.closeImportDialog()"></div>
+        <div class="md-modal-card voice-import-card">
+            <div class="md-modal-head">
+                <strong id="voiceImportTitle"><span class="material-symbols-rounded">upload</span> &#23548;&#20837; Legado &#28304;</strong>
+                <button class="icon-btn" onclick="workoutVoice.closeImportDialog()" type="button" aria-label="&#20851;&#38381;" data-modal-close><span class="material-symbols-rounded">close</span></button>
+            </div>
+            <div class="md-field voice-json-field">
+                <textarea id="voiceLegadoJson" rows="7" placeholder=" " spellcheck="false" oninput="workoutVoice.autoResizeJson(this)"></textarea>
+                <label>Legado JSON</label>
+            </div>
+            <div class="md-row voice-actions voice-import-actions">
+                <button class="md-btn md-btn-tonal" onclick="workoutVoice.validateLegadoJson()" type="button"><span class="material-symbols-rounded">check</span> &#26657;&#39564;</button>
+                <button class="md-btn md-btn-filled" onclick="workoutVoice.importLegadoJson()" type="button"><span class="material-symbols-rounded">upload</span> &#23548;&#20837;</button>
+            </div>
+            <div id="voiceImportStatus" class="voice-status"></div>
         </div>
     </div>
     <div id="aiTemplateManagerSheet" class="md-modal md-modal-sheet hidden" aria-hidden="true">

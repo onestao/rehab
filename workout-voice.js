@@ -174,6 +174,14 @@
             el.dataset.type = type;
         },
 
+        autoResizeJson(el = document.getElementById('voiceLegadoJson')) {
+            if (!el) return;
+            const maxHeight = Math.max(180, Math.min(360, Math.round(window.innerHeight * 0.48)));
+            el.style.height = 'auto';
+            el.style.height = `${Math.min(el.scrollHeight, maxHeight)}px`;
+            el.style.overflowY = el.scrollHeight > maxHeight ? 'auto' : 'hidden';
+        },
+
         openSettings() {
             this.renderSettingsUI();
             const sheet = document.getElementById('voiceSettingsSheet');
@@ -183,9 +191,35 @@
             if (window.focusTrap?.trap) window.focusTrap.trap(sheet);
         },
 
+        openImportDialog() {
+            const dialog = document.getElementById('voiceImportDialog');
+            if (!dialog) return;
+            dialog.classList.remove('hidden');
+            dialog.setAttribute('aria-hidden', 'false');
+            this.setStatus('', '');
+            if (window.focusTrap?.trap) window.focusTrap.trap(dialog);
+            const input = document.getElementById('voiceLegadoJson');
+            requestAnimationFrame(() => this.autoResizeJson(input));
+            input?.focus?.();
+        },
+
+        closeImportDialog(options = {}) {
+            const dialog = document.getElementById('voiceImportDialog');
+            if (!dialog) return;
+            dialog.classList.add('hidden');
+            dialog.setAttribute('aria-hidden', 'true');
+            if (window.focusTrap?.release) window.focusTrap.release();
+            const shouldRestoreSettings = options.restoreSettings !== false;
+            const sheet = document.getElementById('voiceSettingsSheet');
+            if (shouldRestoreSettings && sheet && !sheet.classList.contains('hidden') && window.focusTrap?.trap) {
+                window.focusTrap.trap(sheet);
+            }
+        },
+
         closeSettings() {
             const sheet = document.getElementById('voiceSettingsSheet');
             if (!sheet) return;
+            this.closeImportDialog({ restoreSettings: false });
             sheet.classList.add('hidden');
             sheet.setAttribute('aria-hidden', 'true');
             this.cancelEngineEdit();
@@ -209,6 +243,7 @@
 
         validateLegadoJson() {
             const input = document.getElementById('voiceLegadoJson');
+            this.autoResizeJson(input);
             try {
                 const result = window.voiceEngine.parseLegadoConfigWithWarnings(input?.value || '');
                 const warningText = result.warnings.length ? `；${result.warnings.map(w => w.message).join('；')}` : '';
@@ -229,6 +264,7 @@
             data.save({ render: false, sync: false });
             this.init();
             this.renderSettingsUI();
+            this.closeImportDialog();
             if (window.toast?.show) toast.show('语音引擎已导入', 'success');
         },
 
