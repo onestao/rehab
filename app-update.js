@@ -2,13 +2,14 @@
 const appUpdate = {
     registration: null,
     waitingWorker: null,
+    swUrl: 'sw.js?v=106',
 
     async registerServiceWorker() {
         if (!('serviceWorker' in navigator)) return;
         try {
-            this.registration = await navigator.serviceWorker.register('sw.js?v=105');
+            this.registration = await navigator.serviceWorker.register(this.swUrl, { updateViaCache: 'none' });
             this.bindRegistration(this.registration);
-            this.registration.update?.();
+            await this.registration.update?.();
             navigator.serviceWorker.addEventListener('controllerchange', () => {
                 window.location.reload();
             }, { once: true });
@@ -18,14 +19,21 @@ const appUpdate = {
     bindRegistration(registration) {
         if (!registration) return;
         if (registration.waiting) this.show(registration.waiting);
+        if (registration.installing) this.bindWorker(registration.installing);
         registration.addEventListener('updatefound', () => {
             const worker = registration.installing;
             if (!worker) return;
-            worker.addEventListener('statechange', () => {
-                if (worker.state === 'installed' && navigator.serviceWorker.controller) {
-                    this.show(worker);
-                }
-            });
+            this.bindWorker(worker);
+        });
+    },
+
+    bindWorker(worker) {
+        if (!worker || worker._appUpdateBound) return;
+        worker._appUpdateBound = true;
+        worker.addEventListener('statechange', () => {
+            if (worker.state === 'installed' && navigator.serviceWorker.controller) {
+                this.show(worker);
+            }
         });
     },
 
