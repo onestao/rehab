@@ -106,6 +106,7 @@ const advicePanel = {
             deleteAdviceVersion: this.deleteAdviceVersion,
             shareAdviceMessage: this.shareAdviceMessage
         });
+        Object.assign(target, window.adviceTemplateManager || {});
 
         target.loadAdviceSettings?.();
         this.listenThemeChanges();
@@ -207,185 +208,6 @@ const advicePanel = {
                 payload: { ...target }
             });
         }
-    },
-
-    getAdviceTemplates() {
-        return Array.isArray(this.db.aiTemplates) ? this.db.aiTemplates : [];
-    },
-
-    getActiveAdviceTemplate() {
-        const templates = this.getAdviceTemplates();
-        if (!templates.length) return null;
-        const activeId = this.db.aiTemplateActiveId || '';
-        return templates.find(t => t.id === activeId) || templates[0] || null;
-    },
-
-    selectAdviceTemplate(id) {
-        this.db.aiTemplateActiveId = id || '';
-        this.saveAdviceSettings();
-        this.captureAdviceDraft();
-        this.rerenderAdvicePanel({ refreshMessages: false });
-    },
-
-    toggleTemplateManager() {
-        this._templateManagerOpen = !this._templateManagerOpen;
-        const sheet = document.getElementById('aiTemplateManagerSheet');
-        const content = document.getElementById('aiTemplateManagerContent');
-        if (!sheet || !content) return;
-        content.innerHTML = this.renderTemplateManagerContent();
-        sheet.classList.toggle('hidden', !this._templateManagerOpen);
-        sheet.setAttribute('aria-hidden', this._templateManagerOpen ? 'false' : 'true');
-    },
-
-    closeTemplateManager() {
-        this._templateManagerOpen = false;
-        const sheet = document.getElementById('aiTemplateManagerSheet');
-        if (!sheet) return;
-        sheet.classList.add('hidden');
-        sheet.setAttribute('aria-hidden', 'true');
-    },
-
-    createTemplateDraft(template = null) {
-        return window.dataAiTemplates?.sanitizeTemplate(template || {
-            name: '新模板',
-            scenario: 'custom',
-            system: '',
-            user: '{prompt}',
-            vars: ['prompt']
-        }) || template;
-    },
-
-    editTemplateById(id) {
-        if (!id) {
-            this._templateEditor = this.createTemplateDraft();
-            const content = document.getElementById('aiTemplateManagerContent');
-            if (content) content.innerHTML = this.renderTemplateManagerContent();
-            return;
-        }
-        const template = this.getAdviceTemplates().find(item => item.id === id);
-        this._templateEditor = this.createTemplateDraft(template || null);
-        const content = document.getElementById('aiTemplateManagerContent');
-        if (content) content.innerHTML = this.renderTemplateManagerContent();
-    },
-
-    setTemplateEditorField(field, value) {
-        const draft = this._templateEditor || this.createTemplateDraft();
-        if (field === 'vars') {
-            draft.vars = String(value || '').split(/[,，\s]+/).map(v => v.trim()).filter(Boolean);
-        } else {
-            draft[field] = value;
-        }
-        this._templateEditor = draft;
-    },
-
-    resetTemplateEditor() {
-        this._templateEditor = null;
-        const content = document.getElementById('aiTemplateManagerContent');
-        if (content) content.innerHTML = this.renderTemplateManagerContent();
-    },
-
-    saveTemplateEditor() {
-        const form = this._templateEditor || {};
-        const template = window.dataAiTemplates?.sanitizeTemplate(form) || form;
-        const list = this.getAdviceTemplates();
-        const idx = list.findIndex(t => t.id === template.id);
-        if (idx >= 0) list[idx] = template;
-        else list.push(template);
-        this.db.aiTemplates = list;
-        if (!this.db.aiTemplateActiveId) this.db.aiTemplateActiveId = template.id;
-        this._templateEditor = null;
-        this.save();
-        const content = document.getElementById('aiTemplateManagerContent');
-        if (content) content.innerHTML = this.renderTemplateManagerContent();
-    },
-
-    deleteTemplateById(id) {
-        if (!id) return;
-        const list = this.getAdviceTemplates().filter(t => t.id !== id);
-        this.db.aiTemplates = list;
-        if (this.db.aiTemplateActiveId === id) {
-            this.db.aiTemplateActiveId = list[0]?.id || '';
-        }
-        this.save();
-        const content = document.getElementById('aiTemplateManagerContent');
-        if (content) content.innerHTML = this.renderTemplateManagerContent();
-    },
-
-    renderTemplateManagerContent() {
-        const templates = this.getAdviceTemplates();
-        const draft = this._templateEditor;
-        const activeId = this.db.aiTemplateActiveId || templates[0]?.id || '';
-        const draftVars = Array.isArray(draft?.vars) ? draft.vars.join(', ') : '';
-        return `<div class="template-manager-body">
-            <div class="template-manager-list">
-                ${templates.map(t => `<button class="template-manager-item ${t.id === activeId ? 'active' : ''}" onclick="data.selectAdviceTemplate('${this.escapeHtml(t.id)}')" type="button">
-                    <div class="template-manager-item-main">
-                        <strong>${this.escapeHtml(t.name)}</strong>
-                        <small>${this.escapeHtml(t.scenario)}</small>
-                    </div>
-                    <span class="template-manager-item-actions">
-                        <span class="material-symbols-rounded" onclick="event.stopPropagation();data.editTemplateById('${this.escapeHtml(t.id)}')">edit</span>
-                        <span class="material-symbols-rounded" onclick="event.stopPropagation();data.deleteTemplateById('${this.escapeHtml(t.id)}')">delete</span>
-                    </span>
-                </button>`).join('')}
-            </div>
-            <div class="template-manager-toolbar">
-                <button class="md-btn md-btn-tonal" onclick="data.editTemplateById('')" type="button"><span class="material-symbols-rounded">add</span> 新建</button>
-            </div>
-            ${draft ? `<div class="template-editor-card">
-                <div class="md-grid modal-grid">
-                    <div class="md-field span-full"><input type="text" value="${this.escapeHtml(draft.name || '')}" oninput="data.setTemplateEditorField('name', this.value)" placeholder=" "><label>模板名称</label></div>
-                    <div class="md-field span-full"><input type="text" value="${this.escapeHtml(draft.scenario || '')}" oninput="data.setTemplateEditorField('scenario', this.value)" placeholder=" "><label>场景</label></div>
-                    <div class="md-field span-full"><input type="text" value="${this.escapeHtml(draftVars)}" oninput="data.setTemplateEditorField('vars', this.value)" placeholder=" "><label>变量（逗号分隔）</label></div>
-                    <div class="md-field span-full"><textarea rows="3" oninput="data.setTemplateEditorField('system', this.value)" placeholder=" ">${this.escapeHtml(draft.system || '')}</textarea><label>System Prompt</label></div>
-                    <div class="md-field span-full"><textarea rows="6" oninput="data.setTemplateEditorField('user', this.value)" placeholder=" ">${this.escapeHtml(draft.user || '')}</textarea><label>User Template</label></div>
-                </div>
-                <div class="md-row modal-actions">
-                    <button class="md-btn md-btn-tonal" onclick="data.resetTemplateEditor()" type="button">取消</button>
-                    <button class="md-btn md-btn-filled" onclick="data.saveTemplateEditor()" type="button"><span class="material-symbols-rounded">save</span> 保存</button>
-                </div>
-            </div>` : ''}
-        </div>`;
-    },
-
-    exportTemplates() {
-        const payload = JSON.stringify({ templates: this.getAdviceTemplates() }, null, 2);
-        const blob = new Blob([payload], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `rehab-ai-templates-${this.logicalDateKey()}.json`;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        setTimeout(() => URL.revokeObjectURL(url), 1000);
-    },
-
-    openTemplateImport() {
-        document.getElementById('aiTemplateImportInput')?.click();
-    },
-
-    async handleTemplateImport(event) {
-        const file = event?.target?.files?.[0];
-        if (!file) return;
-        try {
-            const text = await file.text();
-            const json = JSON.parse(text);
-            const list = Array.isArray(json?.templates) ? json.templates : Array.isArray(json) ? json : [];
-            const normalized = window.dataAiTemplates?.normalizeTemplates(list) || list;
-            this.db.aiTemplates = normalized;
-            this.db.aiTemplateActiveId = normalized[0]?.id || '';
-            this.save();
-        } catch (e) {
-            alert('模板导入失败: ' + (e?.message || e));
-        } finally {
-            if (event?.target) event.target.value = '';
-            this.renderProfilePage?.();
-        }
-    },
-
-    importTemplates() {
-        this.openTemplateImport();
     },
 
     buildAdviceTemplateVars(context = {}) {
@@ -1237,7 +1059,8 @@ const advicePanel = {
         const ctxOpen = !!this.adviceContextOpen;
         const enabledCount = ['diet','training','weight','goal'].filter(k => contexts[k]).length;
         const range = this.adviceRange || 'today';
-        const searchQuery = this.escapeHtml(this.adviceSearchQuery || '');
+        const rawSearchQuery = this.adviceSearchQuery || '';
+        const searchQuery = this.escapeHtml(rawSearchQuery);
         const searchOpen = !!this.adviceSearchOpen || !!this.adviceSearchQuery;
         const messageSummary = this.adviceMessageSummary(messages, visibleMessages);
         return `<div class="advice-chat-header">
@@ -1268,7 +1091,7 @@ const advicePanel = {
             ${searchOpen ? `<div class="advice-search-row">
                 <span class="material-symbols-rounded">search</span>
                 <input id="adviceSearchInput" value="${searchQuery}" oninput="data.onAdviceSearchInput(this)" placeholder="搜索聊天记录、日期或模型" autocomplete="off">
-                ${searchQuery ? '<button onclick="data.clearAdviceSearch()" type="button" aria-label="清空搜索"><span class="material-symbols-rounded">close</span></button>' : ''}
+                ${rawSearchQuery ? '<button onclick="data.clearAdviceSearch()" type="button" aria-label="清空搜索"><span class="material-symbols-rounded">close</span></button>' : ''}
             </div>` : ''}
             ${ctxOpen ? `<div class="advice-context-popover">
                 <div class="advice-context-popover-head">
@@ -1284,7 +1107,8 @@ const advicePanel = {
     renderAdvicePanel() {
         const messages = this.activeRecords(this.db.health.aiAdviceChat || []);
         const visibleMessages = this.visibleAdviceMessages(messages);
-        const draft = this.escapeHtml(this.restoreAdviceDraft());
+        const rawDraft = this.restoreAdviceDraft();
+        const draft = this.escapeHtml(rawDraft);
         const activeModel = this.adviceModel || '__current__';
         const modelOptions = [{ id: '__current__', name: ai.cfg.model ? `当前配置：${ai.cfg.model}` : '当前配置模型' }, ...(ai.models || [])];
         const activeEntry = modelOptions.find(m => m.id === activeModel);
@@ -1293,7 +1117,7 @@ const advicePanel = {
         const modelVisual = this.adviceModelVisual(activeModelValue);
         const modelThemeStyle = this.adviceModelThemeStyle(modelVisual);
         const modelMark = this.adviceModelIconHtml(modelVisual);
-        const sendHint = this.isMobileAdviceInput() ? '回车换行，点击发送按钮提交' : 'Enter 发送，Shift + Enter 换行';
+        const sendHint = this.escapeHtml(this.isMobileAdviceInput() ? '回车换行，点击发送按钮提交' : 'Enter 发送，Shift + Enter 换行');
         const goalType = this.db.health.dietGoal?.goalType || this.db.health.goalType || 'loss';
         const isGain = goalType === 'gain';
         const quicks = isGain
@@ -1316,7 +1140,7 @@ const advicePanel = {
                             <select id="adviceModel" class="advice-model-switch" onchange="data.setAdviceModel(this.value)">${modelOptions.map(m => `<option value="${this.escapeHtml(m.id)}" ${m.id === activeModel ? 'selected' : ''}>${this.escapeHtml(m.name || m.id)}</option>`).join('')}</select>
                         </label>
                         <textarea id="advicePrompt" class="advice-composer-input" rows="1" placeholder="向 AI 提问…" oninput="data.onAdvicePromptInput(this)" onkeydown="data.onAdvicePromptKeydown(event)">${draft}</textarea>
-                        <button id="adviceSendBtn" class="advice-send-btn" onclick="data.sendAiAdvice()" type="button" ${draft.trim() ? '' : 'disabled'} aria-label="发送问题"><span class="material-symbols-rounded">send</span></button>
+                        <button id="adviceSendBtn" class="advice-send-btn" onclick="data.sendAiAdvice()" type="button" ${String(rawDraft || '').trim() ? '' : 'disabled'} aria-label="发送问题"><span class="material-symbols-rounded">send</span></button>
                     </div>
                     <div id="adviceStatus" class="food-ai-status advice-status-line">
                         <span class="advice-status-text">${sendHint}</span>

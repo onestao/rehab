@@ -24,7 +24,9 @@
         },
 
         escapeHtml(value = '') {
-            return String(value).replace(/[&<>'"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[ch]));
+            return window.renderSafe?.escapeHtml
+                ? window.renderSafe.escapeHtml(value)
+                : String(value).replace(/[&<>'"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[ch]));
         },
 
         dayCutoffHour: 4,

@@ -1,60 +1,73 @@
 // @ts-nocheck
-const CACHE = 'training-assistant-v96';
+const CACHE = 'training-assistant-v100';
 const ASSETS = [
     'index.html',
-    'build/generated.css?v=96',
-    'css-src/42-health-profile.css?v=96',
-    'theme.js?v=96',
-    'fooddb.js?v=96',
-    'ai-store.js?v=96',
-    'ai-profile.js?v=96',
-    'ai-models.js?v=96',
-    'ai-api.js?v=96',
-    'ai-pricing.js?v=96',
-    'ai-templates.js?v=96',
-    'data-utils-pure.js?v=96',
-    'data-utils.js?v=96',
-    'storage/idb.js?v=96',
-    'storage/migrate.js?v=96',
-    'data-store.js?v=96',
-    'data-ui-state.js?v=96',
-    'health-diet.js?v=96',
-    'health-weight.js?v=96',
-    'health-exercise.js?v=96',
-    'goal-plan.js?v=96',
-    'routine-library.js?v=96',
-    'data-views.js?v=96',
-    'data.js?v=96',
-    'food-log.js?v=96',
-    'advice-panel.js?v=96',
-    'advice-render.js?v=96',
-    'advice-prompt.js?v=96',
-    'advice-stream-renderer.js?v=96',
-    'backup.js?v=96',
-    'sync.js?v=96',
-    'sync-pure.js?v=96',
-    'sync-status.js?v=96',
-    'workout-system.js?v=96',
-    'workout-wakelock.js?v=96',
-    'workout-media-session.js?v=96',
-    'workout-pip.js?v=96',
-    'workout-core.js?v=96',
-    'workout-cardio.js?v=96',
-    'workout-engine.js?v=96',
-    'workout-state.js?v=96',
-    'app-update.js?v=96',
-    'toast.js?v=96',
-    'error-bus.js?v=96',
-    'i18n.js?v=96',
-    'a11y-focus-trap.js?v=96',
-    'i18n/zh-CN.json?v=96',
-    'i18n/en-US.json?v=96',
-    'weekly-summary.js?v=96',
-    'pr-tracker.js?v=96',
-    'volume-heatmap.js?v=96',
-    'onboarding.js?v=96',
-    'swipe-actions.js?v=96',
-    'health-profile.js?v=96',
+    'build/generated.css?v=100',
+    'css-src/42-health-profile.css?v=100',
+    'theme.js?v=100',
+    'fooddb.js?v=100',
+    'ai-store.js?v=100',
+    'ai-profile.js?v=100',
+    'ai-models.js?v=100',
+    'ai-api.js?v=100',
+    'ai-pricing.js?v=100',
+    'ai-templates.js?v=100',
+    'render-safe.js?v=100',
+    'data-utils-pure.js?v=100',
+    'data-utils.js?v=100',
+    'data-records.js?v=100',
+    'data-schema.js?v=100',
+    'storage/idb.js?v=100',
+    'storage/migrate.js?v=100',
+    'data-store.js?v=100',
+    'data-ui-state.js?v=100',
+    'health-diet.js?v=100',
+    'health-weight.js?v=100',
+    'health-exercise.js?v=100',
+    'goal-plan.js?v=100',
+    'routine-plan.js?v=100',
+    'routine-library.js?v=100',
+    'data-views.js?v=100',
+    'data.js?v=100',
+    'voice-engine.js?v=100',
+    'voice-cache.js?v=100',
+    'voice-webspeech-adapter.js?v=100',
+    'voice-legado-adapter.js?v=100',
+    'workout-voice.js?v=100',
+    'food-log.js?v=100',
+    'advice-panel.js?v=100',
+    'advice-template-manager.js?v=100',
+    'advice-render.js?v=100',
+    'advice-prompt.js?v=100',
+    'advice-stream-renderer.js?v=100',
+    'backup.js?v=100',
+    'sync-ui.js?v=100',
+    'sync-adapters.js?v=100',
+    'sync.js?v=100',
+    'sync-pure.js?v=100',
+    'sync-status.js?v=100',
+    'workout-system.js?v=100',
+    'workout-wakelock.js?v=100',
+    'workout-media-session.js?v=100',
+    'workout-pip.js?v=100',
+    'workout-core.js?v=100',
+    'workout-cardio-pure.js?v=100',
+    'workout-cardio.js?v=100',
+    'workout-engine.js?v=100',
+    'workout-state.js?v=100',
+    'app-update.js?v=100',
+    'toast.js?v=100',
+    'error-bus.js?v=100',
+    'i18n.js?v=100',
+    'a11y-focus-trap.js?v=100',
+    'i18n/zh-CN.json?v=100',
+    'i18n/en-US.json?v=100',
+    'weekly-summary.js?v=100',
+    'pr-tracker.js?v=100',
+    'volume-heatmap.js?v=100',
+    'onboarding.js?v=100',
+    'swipe-actions.js?v=100',
+    'health-profile.js?v=100',
     'assets/model-icons/openai.svg',
     'assets/model-icons/gemini.svg',
     'assets/model-icons/grok.svg',
@@ -70,6 +83,8 @@ const ASSETS = [
     'manifest.json'
     , 'favicon.ico'
 ];
+
+let voiceTtsHosts = new Set();
 
 self.addEventListener('install', (e) => {
     e.waitUntil((async () => {
@@ -90,6 +105,9 @@ self.addEventListener('activate', (e) => {
 
 self.addEventListener('message', (e) => {
     if (e.data && e.data.type === 'SKIP_WAITING') self.skipWaiting();
+    if (e.data && e.data.type === 'VOICE_TTS_HOSTS') {
+        voiceTtsHosts = new Set((e.data.hosts || []).map(host => String(host || '').toLowerCase()).filter(Boolean));
+    }
 });
 
 function isVersionedAsset(url) {
@@ -99,6 +117,10 @@ function isVersionedAsset(url) {
 self.addEventListener('fetch', (event) => {
     if (event.request.method !== 'GET') return;
     const url = new URL(event.request.url);
+    if (voiceTtsHosts.has(url.hostname.toLowerCase())) {
+        event.respondWith(fetch(event.request));
+        return;
+    }
     if (url.origin !== location.origin) return;
 
     if (isVersionedAsset(url)) {

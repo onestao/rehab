@@ -7,6 +7,7 @@ const data = {
         routines: [],
         history: [],
         rate: 1.1,
+        voice: { priority: 'online-first', engines: [], cache: true, timeoutMs: 4000 },
         cardio: { weight: 70, target: 30, type: 'walk' },
         health: { weights: [], foodLogs: [], exerciseLogs: [], goalType: 'loss', bodyPlan: null, weightPlan: null, dietGoal: null, aiAdviceChat: [], weeklyGoalSessions: 5 },
         aiProfiles: [],
@@ -34,6 +35,8 @@ const data = {
 
 Object.assign(
     data,
+    window.dataRecords || {},
+    window.dataSchema || {},
     window.dataUtils || {},
     window.dataStore || {},
     window.dataUiState || {},
@@ -42,15 +45,19 @@ Object.assign(
     window.dataHealthExercise || {},
     window.dataHealthProfile || {},
     window.dataGoalPlan || {},
+    window.dataRoutinePlan || {},
     window.dataRoutineLibrary || {},
     window.dataHistoryView || {},
     window.dataWeeklySummary || {},
     window.dataViews || {},
-    window.dataAiTemplates || {}
+    window.dataAiTemplates || {},
+    window.adviceTemplateManager || {}
 );
 
 data.refreshModules = function () {
     Object.assign(data,
+        window.dataRecords || {},
+        window.dataSchema || {},
         window.dataUtils || {},
         window.dataStore || {},
         window.dataUiState || {},
@@ -59,11 +66,13 @@ data.refreshModules = function () {
         window.dataHealthExercise || {},
         window.dataHealthProfile || {},
         window.dataGoalPlan || {},
+        window.dataRoutinePlan || {},
         window.dataRoutineLibrary || {},
         window.dataHistoryView || {},
         window.dataWeeklySummary || {},
         window.dataViews || {},
-        window.dataAiTemplates || {}
+        window.dataAiTemplates || {},
+        window.adviceTemplateManager || {}
     );
     window.advicePanel?.attach?.(data);
 };

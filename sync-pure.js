@@ -2,7 +2,7 @@
  * @param {Array<{id?: string, updatedAt?: number, deletedAt?: number|null, deleted?: boolean, [key: string]: any}>} localList
  * @param {Array<{id?: string, updatedAt?: number, deletedAt?: number|null, deleted?: boolean, [key: string]: any}>} remoteList
  */
-export function mergeIncremental(localList, remoteList) {
+function mergeIncremental(localList, remoteList) {
     const merged = new Map();
     for (const item of localList || []) {
         if (!item?.id) continue;
@@ -19,7 +19,7 @@ export function mergeIncremental(localList, remoteList) {
 }
 
 /** @param {number} attempt @param {{baseDelay?: number, factor?: number, jitter?: number}=} opts */
-export function computeRetryDelay(attempt, opts = {}) {
+function computeRetryDelay(attempt, opts = {}) {
     const baseDelay = Number(opts.baseDelay || 800);
     const factor = Number(opts.factor || 2);
     const jitter = Number(opts.jitter || 0.2);
@@ -29,7 +29,7 @@ export function computeRetryDelay(attempt, opts = {}) {
 }
 
 /** @param {unknown} error */
-export function isRetryableError(error) {
+function isRetryableError(error) {
     const status = Number(error && typeof error === 'object' && 'status' in error ? error.status : 0);
     if (status === 429 || status >= 500) return true;
     if (status >= 400 && status < 500) return false;
@@ -42,7 +42,7 @@ export function isRetryableError(error) {
  * @param {{updatedAt?: number, __fieldUpdatedAt?: Record<string, string>, [k: string]: any}} local
  * @param {{updatedAt?: number, __fieldUpdatedAt?: Record<string, string>, [k: string]: any}} remote
  */
-export function mergeRecordsFieldwise(local, remote) {
+function mergeRecordsFieldwise(local, remote) {
     const lTs = Number(local?.updatedAt || 0);
     const rTs = Number(remote?.updatedAt || 0);
     const lMeta = local?.__fieldUpdatedAt || null;
@@ -66,7 +66,7 @@ export function mergeRecordsFieldwise(local, remote) {
  * @param {number} limit
  * @returns {{ batch: any[], tail: any[] }}
  */
-export function takeQueueBatch(queue, limit = 20) {
+function takeQueueBatch(queue, limit = 20) {
     const q = Array.isArray(queue) ? queue : [];
     return { batch: q.slice(0, limit), tail: q.slice(limit) };
 }
@@ -75,7 +75,7 @@ export function takeQueueBatch(queue, limit = 20) {
  * @param {Array<{id?: string, createdAt?: number}>} localVersions
  * @param {Array<{id?: string, createdAt?: number}>} remoteVersions
  */
-export function mergeAdviceVersions(localVersions, remoteVersions) {
+function mergeAdviceVersions(localVersions, remoteVersions) {
     const map = new Map();
     for (const item of localVersions || []) {
         if (!item?.id) continue;
@@ -99,7 +99,7 @@ export function mergeAdviceVersions(localVersions, remoteVersions) {
  * @param {{id?: string, updatedAt?: number, versions?: Array<any>, activeVersionId?: string, pinnedVersionId?: string}} local
  * @param {{id?: string, updatedAt?: number, versions?: Array<any>, activeVersionId?: string, pinnedVersionId?: string}} remote
  */
-export function mergeAdviceRecord(local, remote) {
+function mergeAdviceRecord(local, remote) {
     const lTs = Number(local?.updatedAt || 0);
     const rTs = Number(remote?.updatedAt || 0);
     const base = rTs >= lTs ? { ...local, ...remote } : { ...remote, ...local };
@@ -120,7 +120,7 @@ export function mergeAdviceRecord(local, remote) {
  * @param {number} localSchemaVer
  * @returns {{ ok: boolean, reason?: string, code?: string, db?: any }}
  */
-export function validatePayload(json, localSchemaVer = 1) {
+function validatePayload(json, localSchemaVer = 1) {
     if (!json || typeof json !== 'object') return { ok: false, reason: '结构非法' };
     const db = json.db || (json.actions ? json : null);
     if (!db || typeof db !== 'object') return { ok: false, reason: '缺少 db 字段' };
@@ -137,7 +137,7 @@ export function validatePayload(json, localSchemaVer = 1) {
  * @param {number} dropRatio
  * @returns {Array<{ entity: string, remote: number, local: number }>}
  */
-export function compareCounts(remoteCounts, localDb, dropRatio = 0.5) {
+function compareCounts(remoteCounts, localDb, dropRatio = 0.5) {
     const warns = [];
     if (!remoteCounts || typeof remoteCounts !== 'object') return warns;
     const map = {
@@ -157,6 +157,18 @@ export function compareCounts(remoteCounts, localDb, dropRatio = 0.5) {
     }
     return warns;
 }
+
+export {
+    mergeIncremental,
+    computeRetryDelay,
+    isRetryableError,
+    mergeRecordsFieldwise,
+    takeQueueBatch,
+    mergeAdviceVersions,
+    mergeAdviceRecord,
+    validatePayload,
+    compareCounts
+};
 
 if (typeof window !== 'undefined') {
     const win = /** @type {any} */ (window);

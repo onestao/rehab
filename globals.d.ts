@@ -38,6 +38,9 @@ interface Window {
   storageIdb: any;
   swipeActions: any;
   errorBus: any;
+  renderSafe: any;
+  dataRecords: any;
+  dataSchema: any;
   dataUtils: any;
   dataStore: any;
   dataUiState: any;
@@ -46,13 +49,18 @@ interface Window {
   dataHealthExercise: any;
   dataHealthProfile: any;
   dataGoalPlan: any;
+  dataRoutinePlan: any;
   dataRoutineLibrary: any;
   dataHistoryView: any;
   dataWeeklySummary: any;
   dataViews: any;
   dataAiTemplates: any;
+  adviceTemplateManager: any;
   aiPricing: any;
   syncPure: any;
+  syncUi: any;
+  syncAdapters: any;
+  cardioPure: any;
   prTracker: any;
   volumeHeatmap: any;
 }

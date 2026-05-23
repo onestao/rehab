@@ -1,17 +1,6 @@
 ﻿// @ts-nocheck
 const cardio = {
-    types: {
-        walk: { name: '步行', met: 3.5 },
-        brisk_walk: { name: '快走', met: 4.3 },
-        jog: { name: '慢跑', met: 7.0 },
-        run: { name: '跑步', met: 9.8 },
-        cycling: { name: '骑行', met: 6.8 },
-        swim: { name: '游泳', met: 7.0 },
-        elliptical: { name: '椭圆机', met: 5.0 },
-        rowing: { name: '划船机', met: 7.0 },
-        battle_rope: { name: '战绳', met: 8.0 },
-        spin_bike: { name: '动感单车', met: 7.5 }
-    },
+    types: window.cardioPure?.cardioTypes || {},
     isRunning: false,
     isPaused: false,
     seconds: 0,
@@ -30,7 +19,7 @@ const cardio = {
         const type = document.getElementById('cardioType').value;
         const weight = parseFloat(document.getElementById('cardioWeight').value) || 70;
         const target = parseInt(document.getElementById('cardioTarget').value) || 30;
-        return { type, weight, target, ...(this.types[type] || this.types.walk) };
+        return window.cardioPure.normalizeCardioPlan({ type, weight, target });
     },
 
     updatePlan() {
@@ -46,12 +35,12 @@ const cardio = {
     },
 
     calories(seconds = this.seconds) {
-        const plan = this.currentPlan();
-        return plan.met * plan.weight * (seconds / 3600);
+        return window.cardioPure.calcCaloriesForSeconds(this.currentPlan(), seconds);
     },
 
     async toggle() {
         if (!this.isRunning) {
+            window.workoutVoice?.unlockAudio?.();
             this.isRunning = true;
             this.isPaused = false;
             this.seconds = 0;
@@ -83,17 +72,14 @@ const cardio = {
         this.seconds++;
         workout.totalSec = this.seconds;
         this.updateUI();
-        const targetSec = this.currentPlan().target * 60;
-        if (!this.targetAnnounced && targetSec > 0 && this.seconds >= targetSec) {
+        if (window.cardioPure.shouldAnnounceTarget({ seconds: this.seconds, target: this.currentPlan().target, targetAnnounced: this.targetAnnounced })) {
             this.targetAnnounced = true;
             this.speak('有氧目标完成');
         }
     },
 
     updateUI() {
-        const m = Math.floor(this.seconds / 60).toString().padStart(2, '0');
-        const s = (this.seconds % 60).toString().padStart(2, '0');
-        document.getElementById('mainTime').innerText = `${m}:${s}`;
+        document.getElementById('mainTime').innerText = window.cardioPure.formatDurationParts(this.seconds).label;
         document.getElementById('sessionTime').innerText = `${Math.round(this.calories())} kcal`;
         workout._lastActiveAt = Date.now();
         workout.renderPip();
@@ -103,7 +89,7 @@ const cardio = {
     async stop() {
         if (!this.isRunning) return;
         if (!confirm('结束有氧训练？')) return;
-        if (this.seconds < 20) {
+        if (!window.cardioPure.shouldSaveCardioSession(this.seconds)) {
             this.reset();
             alert('有氧时间低于20秒，无法保存记录');
             return;
@@ -144,8 +130,7 @@ const cardio = {
         const min = parseInt(document.getElementById('cardioEditMin').value) || 0;
         const sec = parseInt(document.getElementById('cardioEditSec').value) || 0;
         const totalSec = min * 60 + sec;
-        const info = this.types[type] || this.types.walk;
-        const cal = info.met * weight * (totalSec / 3600);
+        const cal = window.cardioPure.calcCaloriesForSeconds({ type, weight, target: 1 }, totalSec);
         document.getElementById('cardioEditCal').value = Math.round(cal);
     },
 
@@ -157,29 +142,18 @@ const cardio = {
         const target = parseInt(document.getElementById('cardioEditTarget').value) || 0;
         const calories = parseInt(document.getElementById('cardioEditCal').value) || 0;
         const duration = min * 60 + sec;
-        if (duration < 20) {
+        if (!window.cardioPure.shouldSaveCardioSession(duration)) {
             alert('有氧时间低于20秒，无法保存');
             return;
         }
-        const info = this.types[type] || this.types.walk;
-        data.db.history.unshift({
+        data.db.history.unshift(window.cardioPure.buildCardioHistoryRecord({
             id: data.generateRecordId('history'),
-            type: 'cardio',
-            date: new Date().toLocaleString(),
+            now: Date.now(),
             dayKey: data.logicalDateKey(),
+            plan: { type, weight, target },
             duration,
-            actions: [],
-            cardio: {
-                name: info.name,
-                type,
-                met: info.met,
-                weight,
-                target,
-                calories
-            },
-            updatedAt: Date.now(),
-            deleted: false
-        });
+            calories
+        }));
         this.closeEditModal();
         this.speak('有氧训练完成');
         await data.saveAndBackup();
@@ -197,7 +171,7 @@ const cardio = {
         workout.totalSec = 0;
         clearInterval(workout._speechWatchdog); clearInterval(workout._audioKeepAliveInt);
         workout.closePip();
-        window.speechSynthesis.cancel();
+        (window.workoutVoice?.cancel?.() ?? window.speechSynthesis.cancel());
         if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'none';
         workout.releaseWakeLock();
         document.body.classList.remove('is-cardio', 'is-cardio-paused');
@@ -210,6 +184,10 @@ const cardio = {
 
     speak(text) {
         workout.playCue?.('normal');
+        if (window.workoutVoice?.speak) {
+            window.workoutVoice.speak(text, { rate: parseFloat(data.db.rate || 1.1) });
+            return;
+        }
         window.speechSynthesis.cancel();
         const u = new SpeechSynthesisUtterance(text);
         u.lang = 'zh-CN';

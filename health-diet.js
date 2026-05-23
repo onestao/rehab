@@ -135,9 +135,11 @@
         },
 
         renderDietLogItem(f) {
+            const name = this.escapeHtml(f.name || '未命名食物');
+            const grams = f.grams ? ` ${this.escapeHtml(f.grams)}g` : '';
             return `<div class="diet-log-item">
             <div class="diet-log-main">
-                <span class="diet-log-name">${f.name}${f.grams ? ' ' + f.grams + 'g' : ''}</span>
+                <span class="diet-log-name">${name}${grams}</span>
                 <b class="diet-log-cal">${f.cal} kcal</b>
             </div>
             <div class="diet-log-sub">
@@ -163,16 +165,17 @@
                 carbPer100g: f.carbPer100g || '',
                 fatPer100g: f.fatPer100g || ''
             };
+            const safeNumberValue = value => this.escapeHtml(value ?? '');
             return `<div class="diet-log-editor">
             <div class="food-inline-edit-grid">
                 <div class="md-field"><select onchange="data._editingFoodDraft.meal=this.value"><option value="breakfast" ${draft.meal === 'breakfast' ? 'selected' : ''}>早餐</option><option value="lunch" ${draft.meal === 'lunch' ? 'selected' : ''}>午餐</option><option value="dinner" ${draft.meal === 'dinner' ? 'selected' : ''}>晚餐</option><option value="snack" ${draft.meal === 'snack' ? 'selected' : ''}>加餐</option></select><label>餐次</label></div>
                 <div class="md-field"><input type="text" value="${this.escapeHtml(draft.name)}" oninput="data._editingFoodDraft.name=this.value" placeholder=" "><label>食物</label></div>
-                <div class="md-field"><input type="number" value="${draft.grams}" oninput="data._editingFoodDraft.grams=this.value" placeholder=" "><label>克数</label></div>
+                <div class="md-field"><input type="number" value="${safeNumberValue(draft.grams)}" oninput="data._editingFoodDraft.grams=this.value" placeholder=" "><label>克数</label></div>
                 <div class="md-field"><select onchange="data.changeEditingFoodCalUnit(this.value)"><option value="kj" ${draft.calUnit === 'kj' ? 'selected' : ''}>千焦 kJ</option><option value="kcal" ${draft.calUnit === 'kcal' ? 'selected' : ''}>千卡 kcal</option></select><label>热量单位</label></div>
-                <div class="md-field"><input type="number" step="0.1" value="${draft.calInputPer100g}" oninput="data.updateEditingFoodCalInput(this.value)" placeholder=" "><label>${this.foodCalLabel ? this.foodCalLabel(draft.calUnit) : '千卡 kcal/100g'}</label></div>
-                <div class="md-field"><input type="number" value="${draft.proPer100g}" oninput="data._editingFoodDraft.proPer100g=this.value" placeholder=" "><label>蛋白/100g</label></div>
-                <div class="md-field"><input type="number" value="${draft.carbPer100g}" oninput="data._editingFoodDraft.carbPer100g=this.value" placeholder=" "><label>碳水/100g</label></div>
-                <div class="md-field"><input type="number" value="${draft.fatPer100g}" oninput="data._editingFoodDraft.fatPer100g=this.value" placeholder=" "><label>脂肪/100g</label></div>
+                <div class="md-field"><input type="number" step="0.1" value="${safeNumberValue(draft.calInputPer100g)}" oninput="data.updateEditingFoodCalInput(this.value)" placeholder=" "><label>${this.escapeHtml(this.foodCalLabel ? this.foodCalLabel(draft.calUnit) : '千卡 kcal/100g')}</label></div>
+                <div class="md-field"><input type="number" value="${safeNumberValue(draft.proPer100g)}" oninput="data._editingFoodDraft.proPer100g=this.value" placeholder=" "><label>蛋白/100g</label></div>
+                <div class="md-field"><input type="number" value="${safeNumberValue(draft.carbPer100g)}" oninput="data._editingFoodDraft.carbPer100g=this.value" placeholder=" "><label>碳水/100g</label></div>
+                <div class="md-field"><input type="number" value="${safeNumberValue(draft.fatPer100g)}" oninput="data._editingFoodDraft.fatPer100g=this.value" placeholder=" "><label>脂肪/100g</label></div>
             </div>
             <div class="food-inline-actions food-edit-actions">
                 <button class="md-btn md-btn-tonal" onclick="data.cancelEditFoodLog()">取消</button>

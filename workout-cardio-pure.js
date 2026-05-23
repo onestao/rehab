@@ -1,4 +1,4 @@
-export const cardioTypes = {
+const cardioTypes = {
     walk: { name: '步行', met: 3.5 },
     brisk_walk: { name: '快走', met: 4.3 },
     jog: { name: '慢跑', met: 7.0 },
@@ -17,7 +17,7 @@ export const cardioTypes = {
  * @param {number} durationMin
  * @returns {number}
  */
-export function calcCalories(met, weightKg, durationMin) {
+function calcCalories(met, weightKg, durationMin) {
     const safeMet = Number(met);
     const safeWeight = Number(weightKg);
     const safeDuration = Number(durationMin);
@@ -25,4 +25,88 @@ export function calcCalories(met, weightKg, durationMin) {
     if (!Number.isFinite(safeWeight) || safeWeight <= 0) return 0;
     if (!Number.isFinite(safeDuration) || safeDuration <= 0) return 0;
     return safeMet * safeWeight * (safeDuration / 60);
+}
+
+function normalizeCardioPlan(input = {}) {
+    const rawType = String(input.type || 'walk');
+    const info = cardioTypes[rawType] || cardioTypes.walk;
+    const type = cardioTypes[rawType] ? rawType : 'walk';
+    const weight = Number(input.weight || 70);
+    const target = Number.parseInt(input.target || 30, 10);
+    return {
+        type,
+        weight: Number.isFinite(weight) && weight > 0 ? weight : 70,
+        target: Number.isFinite(target) && target > 0 ? target : 30,
+        name: info.name,
+        met: info.met
+    };
+}
+
+function calcCaloriesForSeconds(plan, seconds) {
+    const normalized = normalizeCardioPlan(plan);
+    return calcCalories(normalized.met, normalized.weight, Number(seconds || 0) / 60);
+}
+
+function formatDurationParts(seconds) {
+    const safe = Math.max(0, Number.parseInt(seconds || 0, 10) || 0);
+    return {
+        minutes: Math.floor(safe / 60),
+        seconds: safe % 60,
+        label: `${Math.floor(safe / 60).toString().padStart(2, '0')}:${(safe % 60).toString().padStart(2, '0')}`
+    };
+}
+
+function shouldSaveCardioSession(seconds, minSeconds = 20) {
+    return Number(seconds || 0) >= minSeconds;
+}
+
+function shouldAnnounceTarget({ seconds = 0, target = 0, targetAnnounced = false } = {}) {
+    const targetSec = Number(target || 0) * 60;
+    return !targetAnnounced && targetSec > 0 && Number(seconds || 0) >= targetSec;
+}
+
+function buildCardioHistoryRecord({ id, now = Date.now(), dayKey, plan, duration, calories }) {
+    const normalized = normalizeCardioPlan(plan);
+    return {
+        id,
+        type: 'cardio',
+        date: new Date(now).toLocaleString(),
+        dayKey,
+        duration: Number(duration || 0),
+        actions: [],
+        cardio: {
+            name: normalized.name,
+            type: normalized.type,
+            met: normalized.met,
+            weight: normalized.weight,
+            target: normalized.target,
+            calories: Math.round(Number(calories || 0))
+        },
+        updatedAt: now,
+        deleted: false
+    };
+}
+
+export {
+    cardioTypes,
+    calcCalories,
+    normalizeCardioPlan,
+    calcCaloriesForSeconds,
+    formatDurationParts,
+    shouldSaveCardioSession,
+    shouldAnnounceTarget,
+    buildCardioHistoryRecord
+};
+
+if (typeof window !== 'undefined') {
+    window.cardioPure = {
+        cardioTypes,
+        calcCalories,
+        normalizeCardioPlan,
+        calcCaloriesForSeconds,
+        formatDurationParts,
+        shouldSaveCardioSession,
+        shouldAnnounceTarget,
+        buildCardioHistoryRecord
+    };
 }

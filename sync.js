@@ -138,74 +138,14 @@ const sync = {
         data.save({ render: false, sync: false });
     },
 
-    async _ensureWebdavDirs(remotePath) {
-        const cfg = data.cfg.dav || {};
-        const base = (cfg.url || '').trim().replace(/\/+$/, '');
-        const root = this.davRoot();
-        const cleanPath = String(remotePath || '').replace(/^\/+/, '');
-        const fullBase = `${base}/${root ? `${root}/` : ''}`;
-        const parts = cleanPath.split('/');
-        let currentPath = '';
-        for (let i = 0; i < parts.length - 1; i++) {
-            currentPath += parts[i] + '/';
-            try {
-                const res = await fetch(`${fullBase}${currentPath}`, {
-                    method: 'MKCOL',
-                    headers: this.davHeaders()
-                });
-                if (res.status === 405 || res.status === 409) continue;
-            } catch (e) {
-                console.warn('MKCOL failed', currentPath, e);
-            }
-        }
-    },
-
     async writeRawBlob(remotePath, blob, contentType = 'application/octet-stream') {
         if (data.cfg.mode === 's3') {
-            return this._s3PutBlob(remotePath, blob, contentType);
+            return window.syncAdapters.s3PutBlob(this, remotePath, blob, contentType);
         }
         if (data.cfg.mode === 'webdav') {
-            await this._ensureWebdavDirs(remotePath);
-            const res = await fetch(this.davUrl(remotePath), {
-                method: 'PUT',
-                headers: this.davHeaders({ 'Content-Type': contentType }),
-                body: blob
-            });
-            if (!res.ok) throw new Error(`WebDAV PUT ${res.status}`);
-            return res.headers.get('ETag') || '';
+            return window.syncAdapters.webdavPutBlob(remotePath, blob, contentType);
         }
         throw new Error('未配置同步模式');
-    },
-
-    async _s3PutBlob(remotePath, blob, contentType = 'application/octet-stream') {
-        const { endpoint, region, bucket, key, secret } = data.cfg.s3 || {};
-        if (!endpoint || !region || !bucket || !key || !secret) throw new Error('请完整填写 S3 参数');
-        const host = new URL(endpoint).host;
-        const path = `/${bucket}/${remotePath}`;
-        const dt = new Date().toISOString().replace(/[:\-]|\.\d{3}/g, '');
-        const date = dt.slice(0, 8);
-        const buf = await blob.arrayBuffer();
-        const hash = await this.sha256(new Uint8Array(buf));
-        const canon = `PUT\n${path}\n\nhost:${host}\nx-amz-content-sha256:${hash}\nx-amz-date:${dt}\n\nhost;x-amz-content-sha256;x-amz-date\n${hash}`;
-        const scope = `${date}/${region}/s3/aws4_request`;
-        const stringToSign = `AWS4-HMAC-SHA256\n${dt}\n${scope}\n${await this.sha256(canon)}`;
-        const kDate = await this.hmac('AWS4' + secret, date);
-        const kRegion = await this.hmac(kDate, region);
-        const kService = await this.hmac(kRegion, 's3');
-        const kSigning = await this.hmac(kService, 'aws4_request');
-        const sig = Array.from(new Uint8Array(await this.hmac(kSigning, stringToSign)))
-            .map(x => x.toString(16).padStart(2, '0')).join('');
-
-        return fetch(`${endpoint}${path}`, {
-            method: 'PUT',
-            headers: {
-                Authorization: `AWS4-HMAC-SHA256 Credential=${key}/${scope}, SignedHeaders=host;x-amz-content-sha256;x-amz-date, Signature=${sig}`,
-                'x-amz-date': dt,
-                'x-amz-content-sha256': hash,
-                'Content-Type': contentType
-            },
-            body: buf
-        });
     },
 
     remoteEntityMapFromDb(dbObj) {
@@ -222,6 +162,16 @@ const sync = {
             aiAdviceChat: health.aiAdviceChat || [],
             aiCipher: db.aiCipher ? [db.aiCipher] : []
         };
+    },
+
+    remoteSnapshotDb(dbObj = data.db) {
+        const snapshot = JSON.parse(JSON.stringify(dbObj || {}));
+        // Voice engines may contain Authorization/Cookie headers from user-pasted
+        // Legado configs. Keep them local-only until there is an explicit sync path.
+        if (snapshot.voice && typeof snapshot.voice === 'object') {
+            snapshot.voice = { ...snapshot.voice, engines: [] };
+        }
+        return snapshot;
     },
 
     remoteEntityMap() {
@@ -473,8 +423,10 @@ const sync = {
         }
 
         const localBefore = JSON.parse(JSON.stringify(data.db));
+        const localVoice = data.db?.voice ? JSON.parse(JSON.stringify(data.db.voice)) : null;
         data.db = remoteDb || {};
         data.normalizeDb();
+        if (localVoice) data.db.voice = localVoice;
         const entities = Object.keys(this.remoteEntityMap());
         entities.forEach(entity => {
             const localRef = this.getEntityRef(localBefore, entity);
@@ -486,78 +438,27 @@ const sync = {
     },
 
     async s3Req(method, remotePath, body = null, extraHeaders = {}) {
-        const { endpoint, region, bucket, key, secret } = data.cfg.s3 || {};
-        if (!endpoint || !region || !bucket || !key || !secret) throw new Error('请完整填写 S3 参数');
-        const host = new URL(endpoint).host;
-        const path = `/${bucket}/${remotePath}`;
-        const dt = new Date().toISOString().replace(/[:\-]|\.\d{3}/g, '');
-        const date = dt.slice(0, 8);
-        const hash = body
-            ? await this.sha256(body)
-            : 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855';
-        const canon = `${method}\n${path}\n\nhost:${host}\nx-amz-content-sha256:${hash}\nx-amz-date:${dt}\n\nhost;x-amz-content-sha256;x-amz-date\n${hash}`;
-        const scope = `${date}/${region}/s3/aws4_request`;
-        const stringToSign = `AWS4-HMAC-SHA256\n${dt}\n${scope}\n${await this.sha256(canon)}`;
-        const kDate = await this.hmac('AWS4' + secret, date);
-        const kRegion = await this.hmac(kDate, region);
-        const kService = await this.hmac(kRegion, 's3');
-        const kSigning = await this.hmac(kService, 'aws4_request');
-        const sig = Array.from(new Uint8Array(await this.hmac(kSigning, stringToSign)))
-            .map(x => x.toString(16).padStart(2, '0')).join('');
-
-        return fetch(`${endpoint}${path}`, {
-            method,
-            headers: {
-                Authorization: `AWS4-HMAC-SHA256 Credential=${key}/${scope}, SignedHeaders=host;x-amz-content-sha256;x-amz-date, Signature=${sig}`,
-                'x-amz-date': dt,
-                'x-amz-content-sha256': hash,
-                'Content-Type': 'application/json',
-                ...extraHeaders
-            },
-            body
-        });
+        return window.syncAdapters.s3Req(this, method, remotePath, body, extraHeaders);
     },
 
     davRoot() {
-        const cfg = data.cfg.dav || {};
-        const raw = String(cfg.path || '').trim().replace(/^\/+|\/+$/g, '');
-        if (!raw) return '';
-        if (/\.json$/i.test(raw)) {
-            const pos = raw.lastIndexOf('/');
-            return pos >= 0 ? raw.slice(0, pos) : '';
-        }
-        return raw;
+        return window.syncAdapters.davRoot();
     },
 
     davUrl(remotePath) {
-        const cfg = data.cfg.dav || {};
-        const base = (cfg.url || '').trim().replace(/\/+$/, '');
-        if (!base) throw new Error('请填写 WebDAV 地址');
-        const root = this.davRoot();
-        const cleanPath = String(remotePath || '').replace(/^\/+/, '');
-        return `${base}/${root ? `${root}/` : ''}${cleanPath}`;
+        return window.syncAdapters.davUrl(remotePath);
     },
 
     basicAuth(user, pass) {
-        const bytes = new TextEncoder().encode(`${user || ''}:${pass || ''}`);
-        let binary = '';
-        bytes.forEach(b => { binary += String.fromCharCode(b); });
-        return btoa(binary);
+        return window.syncAdapters.basicAuth(user, pass);
     },
 
     davHeaders(extraHeaders = {}) {
-        const { user, pass } = data.cfg.dav || {};
-        const headers = { 'Content-Type': 'application/json', ...extraHeaders };
-        if (user || pass) headers.Authorization = `Basic ${this.basicAuth(user, pass)}`;
-        return headers;
+        return window.syncAdapters.davHeaders(extraHeaders);
     },
 
     async davReq(method, remotePath, body = null, extraHeaders = {}) {
-        return fetch(this.davUrl(remotePath), {
-            method,
-            headers: this.davHeaders(extraHeaders),
-            body
-        });
+        return window.syncAdapters.davReq(method, remotePath, body, extraHeaders);
     },
 
     async syncReq(method, remotePath, body = null, extraHeaders = {}) {
@@ -670,9 +571,10 @@ const sync = {
         await data.flush();
         this.setStatus('syncing', options.quiet ? '正在重建快照' : '正在上传全量快照');
         const snapshotTs = Date.now();
-        const snapshotBody = JSON.stringify(data.db);
+        const snapshotDb = this.remoteSnapshotDb(data.db);
+        const snapshotBody = JSON.stringify(snapshotDb);
         const snapshotHash = await this.sha256(snapshotBody);
-        await this.withRetry(() => this.writeJson(this.REMOTE_SNAPSHOT, data.db, this.REMOTE_SNAPSHOT));
+        await this.withRetry(() => this.writeJson(this.REMOTE_SNAPSHOT, snapshotDb, this.REMOTE_SNAPSHOT));
         const manifest = this.ensureManifestShape(options.baseManifest || null);
         manifest.snapshotTs = snapshotTs;
         manifest.snapshotHash = snapshotHash;
@@ -858,61 +760,28 @@ const sync = {
     },
 
     saveConfig() {
-        data.cfg.mode = document.getElementById('syncMode').value;
-        data.cfg.s3 = {
-            endpoint: document.getElementById('s3Endpoint').value,
-            region: document.getElementById('s3Region').value || 'us-east-1',
-            bucket: document.getElementById('s3Bucket').value,
-            key: document.getElementById('s3Key').value,
-            secret: document.getElementById('s3Secret').value
-        };
-        data.cfg.dav = {
-            url: document.getElementById('davUrl').value,
-            user: document.getElementById('davUser').value,
-            pass: document.getElementById('davPass').value,
-            path: document.getElementById('davPath').value || 'training_assistant_data.json'
-        };
+        const next = window.syncUi.readConfigForm(data.cfg);
+        data.cfg.mode = next.mode;
+        data.cfg.s3 = next.s3;
+        data.cfg.dav = next.dav;
         if (typeof data.persistCfg === 'function') data.persistCfg();
         this.setStatus(data.cfg.mode === 'none' ? 'local' : 'cloud', data.cfg.mode === 'none' ? '当前仅保存本地数据' : '同步配置已本地保存');
         alert('配置已本地保存');
     },
 
     setStatus(state, detail = '') {
-        const el = document.getElementById('syncStatus');
-        if (!el) return;
-        const map = {
-            local: ['cloud_off', '本地'],
-            syncing: ['sync', '同步中'],
-            cloud: ['cloud_done', '云端'],
-            error: ['cloud_alert', '同步失败']
-        };
-        const pair = map[state] || map.local;
-        const icon = pair[0];
-        const label = pair[1];
-        el.innerHTML = `<span class="material-symbols-rounded" style="font-size:14px">${icon}</span> ${label}`;
-        el.dataset.state = state;
-        el.dataset.detail = detail;
+        window.syncUi.setStatus(state, detail);
     },
 
     toggleFields(m) {
-        document.getElementById('s3Fields').classList.toggle('hidden', m !== 's3');
-        document.getElementById('webdavFields').classList.toggle('hidden', m !== 'webdav');
+        window.syncUi.toggleFields(m);
     },
 
     initUI() {
         data.cfg.s3 = data.cfg.s3 || {};
         data.cfg.dav = data.cfg.dav || {};
-        document.getElementById('s3Endpoint').value = data.cfg.s3.endpoint || '';
-        document.getElementById('s3Region').value = data.cfg.s3.region || 'us-east-1';
-        document.getElementById('s3Bucket').value = data.cfg.s3.bucket || '';
-        document.getElementById('s3Key').value = data.cfg.s3.key || '';
-        document.getElementById('s3Secret').value = data.cfg.s3.secret || '';
-        document.getElementById('davUrl').value = data.cfg.dav.url || '';
-        document.getElementById('davUser').value = data.cfg.dav.user || '';
-        document.getElementById('davPass').value = data.cfg.dav.pass || '';
-        document.getElementById('davPath').value = data.cfg.dav.path || 'training_assistant_data.json';
         const mode = data.cfg.mode || 'none';
-        document.getElementById('syncMode').value = mode;
+        window.syncUi.writeConfigForm(data.cfg);
         this.toggleFields(mode);
         this.setStatus(mode === 'none' ? 'local' : 'cloud');
         if (!this.__onlineBound) {

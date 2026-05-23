@@ -56,9 +56,9 @@ Object.assign(workout, {
             document.body.classList.toggle('is-cardio-paused', nextPaused);
         } else {
             this.isPaused = nextPaused;
-            if (nextPaused) window.speechSynthesis.pause();
-            else window.speechSynthesis.resume();
+            if (!nextPaused) window.speechSynthesis.resume();
         }
+        if (nextPaused) (window.workoutVoice?.cancel?.() ?? window.speechSynthesis.cancel());
         document.getElementById('playIcon').innerText = nextPaused ? 'play_arrow' : 'pause';
         if ('mediaSession' in navigator) navigator.mediaSession.playbackState = nextPaused ? 'paused' : 'playing';
         this.syncPipVideoElement(!nextPaused);
@@ -129,6 +129,7 @@ Object.assign(workout, {
         if (this.mode === 'cardio') return cardio.toggle();
         if (!this.isPlaying) {
             if ((data._planActions ? data._planActions() : data.activeRecords(data.db.actions || []).filter(a => !a.libOnly)).length === 0) return;
+            window.workoutVoice?.unlockAudio?.();
             this.isPlaying = true; this.isPaused = false; this.totalSec = 0;
             if (window.workoutEngine) workoutEngine.state = workoutEngine.createInitialState();
             this.updateStateClasses();
@@ -197,7 +198,7 @@ Object.assign(workout, {
     },
     abortCurrentPhaseWait() {
         this.skipFlag = true;
-        window.speechSynthesis.cancel();
+        (window.workoutVoice?.cancel?.() ?? window.speechSynthesis.cancel());
         if (this._speakResolve) { this._speakResolve(); this._speakResolve = null; }
         if (this._countResolve) { this._countResolve(); this._countResolve = null; }
         clearInterval(this.timer);
@@ -228,7 +229,7 @@ Object.assign(workout, {
         clearInterval(this.timer); clearInterval(this.sessionInt);
         clearInterval(this._speechWatchdog); clearInterval(this._audioKeepAliveInt);
         this.closePip();
-        window.speechSynthesis.cancel();
+        (window.workoutVoice?.cancel?.() ?? window.speechSynthesis.cancel());
         if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'none';
         this.releaseWakeLock();
         try { window.dispatchEvent(new CustomEvent('workout:state', { detail: { status: 'stopped', phase: 'completed', action: null, set: 0, rep: 0 } })); } catch {}

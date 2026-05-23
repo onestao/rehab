@@ -268,7 +268,7 @@
                         const renderOne = ({ h, i }) => {
                             const mins = Math.floor(h.duration / 60);
                             const secs = h.duration % 60;
-                            const names = this.historyNames(h).join('、');
+                            const names = this.escapeHtml(this.historyNames(h).join('、'));
                             const meta = h.type === 'cardio'
                                 ? `${Math.round(h.cardio.calories || 0)} kcal &middot; ${h.cardio.weight || 0}kg`
                                 : `${h.actions.length}个动作`;
@@ -276,7 +276,7 @@
                             return `<div class="list-item">
                                 <span class="record-icon material-symbols-rounded">${icon}</span>
                                 <div style="flex:1;min-width:0">
-                                    <strong>${h.date}</strong>
+                                    <strong>${this.escapeHtml(h.date)}</strong>
                                     <small>${mins}分${secs}秒 &middot; ${meta}</small>
                                     <div class="item-chip">${names.length > 20 ? names.slice(0, 20) + '...' : names}</div>
                                 </div>
@@ -328,7 +328,7 @@
                     </div>
                     <div class="calendar-events">
                         ${names.map(name => `
-                            <span class="calendar-event" style="--event-color:${this.actionColor(name)}"><span class="material-symbols-rounded">${this.sportIcon(name)}</span>${this.shortName(name)}</span>
+                            <span class="calendar-event" style="--event-color:${this.actionColor(name)}"><span class="material-symbols-rounded">${this.sportIcon(name)}</span>${this.escapeHtml(this.shortName(name))}</span>
                         `).join('')}
                     </div>
                 </div>`);
@@ -353,7 +353,7 @@
             if (names.length === 0) return '';
             return `
             <div class="calendar-legend">
-                ${names.map(name => `<span><i style="background:${this.actionColor(name)}"></i>${name}</span>`).join('')}
+                ${names.map(name => `<span><i style="background:${this.actionColor(name)}"></i>${this.escapeHtml(name)}</span>`).join('')}
             </div>`;
         },
 
@@ -387,16 +387,16 @@
             </div>
             ${entries.length ? `<div class="day-detail-section"><b>训练</b>${entries.map(h => {
                 const icon = this.historyIcon(h);
-                const names = this.historyNames(h).join('、');
+                const names = this.escapeHtml(this.historyNames(h).join('、'));
                 const mins = Math.floor(h.duration / 60);
                 const secs = h.duration % 60;
                 return `<div class="day-detail-item"><span class="record-icon material-symbols-rounded">${icon}</span><span>${names}</span><small>${mins}分${secs}秒${h.cardio ? ' · ' + Math.round(h.cardio.calories || 0) + ' kcal' : ''}</small></div>`;
             }).join('')}</div>` : ''}
             ${foods.length ? `<div class="day-detail-section"><b>饮食 · ${foodCal} kcal · P${foodPro.toFixed(0)} C${foodCarb.toFixed(0)} F${foodFat.toFixed(0)}</b>${foods.map(f => {
-                return `<div class="day-detail-item"><span class="food-tag">${mealNames[f.meal] || f.meal}</span><span>${f.name}${f.grams ? ' ' + f.grams + 'g' : ''}</span><small>${f.cal} kcal · P${Number(f.pro || 0).toFixed(0)} C${Number(f.carb || 0).toFixed(0)} F${Number(f.fat || 0).toFixed(0)}</small></div>`;
+                return `<div class="day-detail-item"><span class="food-tag">${this.escapeHtml(mealNames[f.meal] || f.meal)}</span><span>${this.escapeHtml(f.name || '')}${f.grams ? ' ' + this.escapeHtml(f.grams) + 'g' : ''}</span><small>${f.cal} kcal · P${Number(f.pro || 0).toFixed(0)} C${Number(f.carb || 0).toFixed(0)} F${Number(f.fat || 0).toFixed(0)}</small></div>`;
             }).join('')}</div>` : ''}
             ${manualExercises.length ? `<div class="day-detail-section"><b>手动运动</b>${manualExercises.map(e => `<div class="day-detail-item"><span class="record-icon material-symbols-rounded">${this.sportIcon(this.exerciseLabel(e.type, e))}</span><span>${this.exerciseLabel(e.type, e)} ${e.minutes} 分钟${e.note ? ' · ' + this.escapeHtml(e.note) : ''}</span><small>${e.calories || 0} kcal</small></div>`).join('')}</div>` : ''}
-            ${weight ? `<div class="day-detail-section"><b>体重</b><div class="day-detail-item"><span class="material-symbols-rounded" style="font-size:18px">monitor_weight</span><span>${weight.weight.toFixed(1)} kg</span>${weight.note ? `<small>${weight.note}</small>` : ''}</div></div>` : ''}
+            ${weight ? `<div class="day-detail-section"><b>体重</b><div class="day-detail-item"><span class="material-symbols-rounded" style="font-size:18px">monitor_weight</span><span>${weight.weight.toFixed(1)} kg</span>${weight.note ? `<small>${this.escapeHtml(weight.note)}</small>` : ''}</div></div>` : ''}
         </div>`;
         },
 

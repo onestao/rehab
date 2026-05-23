@@ -17,6 +17,9 @@
     position: relative;
     z-index: 1;
     width: min(92vw, 420px);
+    max-height: min(88vh, 720px);
+    overflow: auto;
+    overscroll-behavior: contain;
     padding: 16px;
     border-radius: var(--md-sys-shape-xl);
     background: var(--md-sys-surface-container-lowest);

@@ -143,8 +143,9 @@ Object.assign(ai, {
         if (k) k.value = this.apiKeyFor(this.cfg.activeProfileId) || '';
         if (n) n.value = current?.name || '';
         if (select) {
+            const esc = window.renderSafe?.escapeHtml || (v => String(v ?? ''));
             const options = this.cfg.profiles.length
-                ? this.cfg.profiles.map(pr => `<option value="${pr.id}" ${pr.id === this.cfg.activeProfileId ? 'selected' : ''}>${pr.name} (${pr.provider || 'openai'})</option>`).join('')
+                ? this.cfg.profiles.map(pr => `<option value="${esc(pr.id)}" ${pr.id === this.cfg.activeProfileId ? 'selected' : ''}>${esc(pr.name)} (${esc(pr.provider || 'openai')})</option>`).join('')
                 : '<option value="">未保存配置</option>';
             select.innerHTML = options;
         }

@@ -1,8 +1,12 @@
 /* --- A11y --- */
 
 :focus-visible {
-    outline: 2px solid var(--md-sys-color-primary);
+    outline: 2px solid var(--md-sys-primary);
     outline-offset: 2px;
+}
+
+.advice-composer-input:focus-visible {
+    outline: none;
 }
 
 @media (prefers-reduced-motion: reduce) {

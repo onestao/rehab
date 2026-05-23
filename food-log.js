@@ -254,8 +254,9 @@ const foodLog = {
         const el = document.getElementById('foodSearchSuggest');
         if (!el) return;
         if (!kw || results.length === 0) { el.innerHTML = ''; return; }
+        const esc = this.escapeHtml || window.renderSafe?.escapeHtml || (v => String(v ?? ''));
         el.innerHTML = results.map(item =>
-            `<button class="food-result-item" onclick="data.applyFoodItem('${item.id}')"><span>${item.name}</span><small>${item.cal} kcal/100g</small></button>`
+            `<button class="food-result-item" onclick="data.applyFoodItem('${esc(item.id)}')"><span>${esc(item.name)}</span><small>${Number(item.cal || 0)} kcal/100g</small></button>`
         ).join('');
     },
 
@@ -324,13 +325,14 @@ const foodLog = {
 
     renderAiFoodEditor(idx) {
         const draft = this._aiFoodDrafts?.[idx] || this.formatAiDraft(this._aiFoodResults?.[idx] || {});
+        const safeValue = value => this.escapeHtml(String(value ?? ''));
         return `<div class="food-inline-edit-grid">
             <div class="md-field"><input type="text" value="${this.escapeHtml(draft.name)}" oninput="data.updateAiFoodDraft(${idx}, 'name', this.value)" placeholder=" "><label>食物</label></div>
-            <div class="md-field"><input type="number" value="${draft.grams}" oninput="data.updateAiFoodDraft(${idx}, 'grams', this.value)" placeholder=" "><label>克数</label></div>
-            <div class="md-field"><input type="number" value="${draft.cal}" oninput="data.updateAiFoodDraft(${idx}, 'cal', this.value)" placeholder=" "><label>kcal</label></div>
-            <div class="md-field"><input type="number" value="${draft.pro}" oninput="data.updateAiFoodDraft(${idx}, 'pro', this.value)" placeholder=" "><label>蛋白</label></div>
-            <div class="md-field"><input type="number" value="${draft.carb}" oninput="data.updateAiFoodDraft(${idx}, 'carb', this.value)" placeholder=" "><label>碳水</label></div>
-            <div class="md-field"><input type="number" value="${draft.fat}" oninput="data.updateAiFoodDraft(${idx}, 'fat', this.value)" placeholder=" "><label>脂肪</label></div>
+            <div class="md-field"><input type="number" value="${safeValue(draft.grams)}" oninput="data.updateAiFoodDraft(${idx}, 'grams', this.value)" placeholder=" "><label>克数</label></div>
+            <div class="md-field"><input type="number" value="${safeValue(draft.cal)}" oninput="data.updateAiFoodDraft(${idx}, 'cal', this.value)" placeholder=" "><label>kcal</label></div>
+            <div class="md-field"><input type="number" value="${safeValue(draft.pro)}" oninput="data.updateAiFoodDraft(${idx}, 'pro', this.value)" placeholder=" "><label>蛋白</label></div>
+            <div class="md-field"><input type="number" value="${safeValue(draft.carb)}" oninput="data.updateAiFoodDraft(${idx}, 'carb', this.value)" placeholder=" "><label>碳水</label></div>
+            <div class="md-field"><input type="number" value="${safeValue(draft.fat)}" oninput="data.updateAiFoodDraft(${idx}, 'fat', this.value)" placeholder=" "><label>脂肪</label></div>
         </div>`;
     },
 
@@ -344,9 +346,10 @@ const foodLog = {
             ${items.map((item, idx) => {
                 const added = this._aiFoodAdded && this._aiFoodAdded.has(idx);
                 const draft = this._aiFoodDrafts?.[idx] || this.formatAiDraft(item);
+                const gramsText = draft.grams ? ' ' + this.escapeHtml(String(draft.grams)) + 'g' : '';
                 return `<div class="food-ai-result-card ${added ? 'food-added' : ''}">
                     <div class="food-result-item food-ai-result">
-                        <span>${this.escapeHtml(draft.name || item.name)} ${draft.grams ? draft.grams + 'g' : ''}</span>
+                        <span>${this.escapeHtml(draft.name || item.name)}${gramsText}</span>
                         <small>${draft.cal || 0} kcal${draft.pro ? ' · 蛋白' + draft.pro + 'g' : ''}</small>
                         ${added
                             ? '<span class="food-added-badge">已添加</span>'

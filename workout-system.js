@@ -70,12 +70,7 @@ Object.assign(workout, {
                 setTimeout(resolve, 160);
             };
             this._speakResolve = done;
-            window.speechSynthesis.cancel();
-            const u = new SpeechSynthesisUtterance(text);
-            u.lang = 'zh-CN'; u.rate = parseFloat(data.db.rate);
-            u.volume = 1;
-            u.pitch = 1.05;
-            u.onend = done; u.onerror = done;
+            (window.workoutVoice?.cancel?.() ?? window.speechSynthesis.cancel());
             this._speechWatchdog = setInterval(() => {
                 if (this.isPaused || this.skipFlag || !this.isPlaying) return;
                 window.speechSynthesis.resume();
@@ -83,7 +78,16 @@ Object.assign(workout, {
             }, 2500);
             setTimeout(done, text.length * 450 + 1200);
             this.playCue?.(/^\d+$/.test(String(text)) ? 'countdown' : 'normal');
-            window.speechSynthesis.speak(u);
+            if (window.workoutVoice?.speak) {
+                window.workoutVoice.speak(text, { rate: parseFloat(data.db.rate) }).then(done).catch(done);
+            } else {
+                const u = new SpeechSynthesisUtterance(text);
+                u.lang = 'zh-CN'; u.rate = parseFloat(data.db.rate);
+                u.volume = 1;
+                u.pitch = 1.05;
+                u.onend = done; u.onerror = done;
+                window.speechSynthesis.speak(u);
+            }
         });
     },
 
