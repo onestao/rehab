@@ -9,6 +9,7 @@ const __dirname = path.dirname(__filename);
 const root = path.resolve(__dirname, '..');
 const swPath = path.join(root, 'sw.js');
 const htmlPath = path.join(root, 'index.html');
+const appUpdatePath = path.join(root, 'app-update.js');
 const iconsCsvPath = path.join(root, 'build', 'icons.csv');
 const collectIconsPath = path.join(root, 'scripts', 'collect-icons.mjs');
 
@@ -78,6 +79,7 @@ function readHtmlVersions(htmlText) {
 function checkVersionSync() {
     const sw = fs.readFileSync(swPath, 'utf8');
     const html = fs.readFileSync(htmlPath, 'utf8');
+    const appUpdate = fs.readFileSync(appUpdatePath, 'utf8');
     const swVersion = readSwVersion(sw);
 
     const swParamSet = new Set();
@@ -92,6 +94,13 @@ function checkVersionSync() {
     const htmlMismatched = [...htmlVersions].filter(v => v !== swVersion);
     if (htmlMismatched.length) {
         console.error(`index.html has ?v=${htmlMismatched.join(',')} but sw.js CACHE is v${swVersion}`);
+        process.exit(1);
+    }
+
+    const appUpdateVersions = readHtmlVersions(appUpdate);
+    const appUpdateMismatched = [...appUpdateVersions].filter(v => v !== swVersion);
+    if (appUpdateMismatched.length) {
+        console.error(`app-update.js has ?v=${appUpdateMismatched.join(',')} but sw.js CACHE is v${swVersion}`);
         process.exit(1);
     }
 
@@ -125,6 +134,10 @@ function bumpVersion() {
     let html = fs.readFileSync(htmlPath, 'utf8');
     html = html.replace(/\?v=\d+/g, `?v=${next}`);
     fs.writeFileSync(htmlPath, html);
+
+    let appUpdate = fs.readFileSync(appUpdatePath, 'utf8');
+    appUpdate = appUpdate.replace(/\?v=\d+/g, `?v=${next}`);
+    fs.writeFileSync(appUpdatePath, appUpdate);
 
     console.log(`bumped to v${next} (${mode})`);
 }

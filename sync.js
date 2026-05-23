@@ -165,13 +165,10 @@ const sync = {
     },
 
     remoteSnapshotDb(dbObj = data.db) {
-        const snapshot = JSON.parse(JSON.stringify(dbObj || {}));
-        // Voice engines may contain Authorization/Cookie headers from user-pasted
-        // Legado configs. Keep them local-only until there is an explicit sync path.
-        if (snapshot.voice && typeof snapshot.voice === 'object') {
-            snapshot.voice = { ...snapshot.voice, engines: [] };
-        }
-        return snapshot;
+        const pure = window.syncPure || {};
+        return pure.prepareRemoteSnapshotDb
+            ? pure.prepareRemoteSnapshotDb(dbObj)
+            : JSON.parse(JSON.stringify(dbObj || {}));
     },
 
     remoteEntityMap() {
@@ -423,10 +420,8 @@ const sync = {
         }
 
         const localBefore = JSON.parse(JSON.stringify(data.db));
-        const localVoice = data.db?.voice ? JSON.parse(JSON.stringify(data.db.voice)) : null;
         data.db = remoteDb || {};
         data.normalizeDb();
-        if (localVoice) data.db.voice = localVoice;
         const entities = Object.keys(this.remoteEntityMap());
         entities.forEach(entity => {
             const localRef = this.getEntityRef(localBefore, entity);

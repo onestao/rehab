@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mergeIncremental, computeRetryDelay, isRetryableError } from '../sync-pure.js';
+import { mergeIncremental, computeRetryDelay, isRetryableError, prepareRemoteSnapshotDb } from '../sync-pure.js';
 
 test('mergeIncremental applies LWW by updatedAt', () => {
     const local = [{ id: 'a', value: 1, updatedAt: 10 }, { id: 'b', value: 2, updatedAt: 20 }];
@@ -23,4 +23,25 @@ test('retry helpers classify delays and errors', () => {
     assert.equal(isRetryableError({ status: 503 }), true);
     assert.equal(isRetryableError({ status: 404 }), false);
     assert.equal(isRetryableError(new Error('Failed to fetch')), true);
+});
+
+test('prepareRemoteSnapshotDb preserves voice engine configuration', () => {
+    const db = {
+        voice: {
+            priority: 'online-first',
+            cache: true,
+            timeoutMs: 4000,
+            engines: [{
+                id: 'legado-1',
+                name: 'Private TTS',
+                url: 'https://tts.example/speak?text={{javaEncode(speakText)}}',
+                header: { Authorization: 'Bearer token' }
+            }]
+        }
+    };
+    const snapshot = prepareRemoteSnapshotDb(db);
+    assert.equal(snapshot.voice.engines.length, 1);
+    assert.equal(snapshot.voice.engines[0].header.Authorization, 'Bearer token');
+    snapshot.voice.engines[0].header.Authorization = 'changed';
+    assert.equal(db.voice.engines[0].header.Authorization, 'Bearer token');
 });

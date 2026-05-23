@@ -158,6 +158,11 @@ function compareCounts(remoteCounts, localDb, dropRatio = 0.5) {
     return warns;
 }
 
+/** @param {any} dbObj */
+function prepareRemoteSnapshotDb(dbObj) {
+    return JSON.parse(JSON.stringify(dbObj || {}));
+}
+
 export {
     mergeIncremental,
     computeRetryDelay,
@@ -167,7 +172,8 @@ export {
     mergeAdviceVersions,
     mergeAdviceRecord,
     validatePayload,
-    compareCounts
+    compareCounts,
+    prepareRemoteSnapshotDb
 };
 
 if (typeof window !== 'undefined') {
@@ -177,6 +183,6 @@ if (typeof window !== 'undefined') {
         mergeIncremental, computeRetryDelay, isRetryableError,
         mergeRecordsFieldwise, takeQueueBatch,
         mergeAdviceVersions, mergeAdviceRecord,
-        validatePayload, compareCounts
+        validatePayload, compareCounts, prepareRemoteSnapshotDb
     });
 }
