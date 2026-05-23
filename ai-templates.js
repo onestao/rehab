@@ -32,6 +32,22 @@
             system: '你是训练与营养健康顾问。',
             user: '{recentRecords}\n用户问题：{prompt}',
             vars: ['recentRecords', 'prompt']
+        },
+        {
+            id: 'tpl-weekly-report',
+            name: '周报复盘',
+            scenario: 'weekly_report',
+            system: '你是严谨的训练与体重数据复盘助手。禁止编造数据，只能引用输入字段。',
+            user: '输入仅包含 metrics JSON 与关键事件清单：\n{prompt}\n输出固定结构：summary 不超过 80 字，highlights 不超过 3 条，suggestions 不超过 3 条。',
+            vars: ['prompt']
+        },
+        {
+            id: 'tpl-monthly-report',
+            name: '月报复盘',
+            scenario: 'monthly_report',
+            system: '你是严谨的训练与体重数据复盘助手。禁止编造数据，只能引用输入字段。',
+            user: '输入仅包含 metrics JSON 与关键事件清单：\n{prompt}\n输出固定结构：summary 不超过 80 字，highlights 不超过 3 条，suggestions 不超过 3 条。',
+            vars: ['prompt']
         }
     ];
 
@@ -41,8 +57,9 @@
 
     function ensureDefaultTemplates(db) {
         if (!db || !Array.isArray(db.aiTemplates)) return;
-        if (db.aiTemplates.length) return;
-        db.aiTemplates = clone(DEFAULT_TEMPLATES);
+        const existing = new Set(db.aiTemplates.map(t => t?.id).filter(Boolean));
+        const missing = DEFAULT_TEMPLATES.filter(t => !existing.has(t.id));
+        if (missing.length) db.aiTemplates = db.aiTemplates.concat(clone(missing));
         db.aiTemplateActiveId = db.aiTemplateActiveId || db.aiTemplates[0]?.id || '';
     }
 

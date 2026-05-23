@@ -1,4 +1,4 @@
-﻿// @ts-nocheck
+// @ts-nocheck
 const cardio = {
     types: window.cardioPure?.cardioTypes || {},
     isRunning: false,
@@ -113,15 +113,25 @@ const cardio = {
         document.getElementById('cardioEditCal').value = Math.round(calories);
         modal.classList.remove('hidden');
         modal.setAttribute('aria-hidden', 'false');
+        window.navStack?.replaceOrPush?.({
+            type: 'modal',
+            id: 'cardioEditModal',
+            close: () => this.closeEditModalInternal()
+        });
         this._editOriginalDuration = duration;
         this._editOriginalCalories = calories;
         this.updateEditCalories();
     },
 
     closeEditModal() {
+        if (!window.navStack?.requestClose?.('modal')) this.closeEditModalInternal();
+    },
+
+    closeEditModalInternal() {
         const modal = document.getElementById('cardioEditModal');
         modal.classList.add('hidden');
         modal.setAttribute('aria-hidden', 'true');
+        return true;
     },
 
     updateEditCalories() {

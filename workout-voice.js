@@ -229,16 +229,18 @@
         voiceModeMeta(voice = this.ensureVoiceDb()) {
             const count = Array.isArray(voice.engines) ? voice.engines.length : 0;
             const mode = voice.priority;
+            const firstOnline = voice.engines?.[0]?.name || (count ? 'Legado 在线音源' : '');
+            const localName = '本地 Web Speech';
             if (mode === 'online-first') {
-                return { mode, title: '在线优先', detail: count ? `${count} 个在线音源，失败后回退本地` : '未导入在线音源，实际使用本地' };
+                return { mode, title: '在线优先', detail: `当前音源：${firstOnline || localName}` };
             }
             if (mode === 'local-first') {
-                return { mode, title: '本地优先', detail: count ? `先用本地，失败后尝试 ${count} 个在线音源` : '仅本地 Web Speech 可用' };
+                return { mode, title: '本地优先', detail: `当前音源：${localName}` };
             }
             if (mode === 'online-only') {
-                return { mode, title: '仅在线', detail: count ? `${count} 个在线音源` : '未导入在线音源' };
+                return { mode, title: '仅在线', detail: `当前音源：${firstOnline || '未导入在线音源'}` };
             }
-            return { mode: 'local-only', title: '仅本地', detail: 'Web Speech API' };
+            return { mode: 'local-only', title: '仅本地', detail: `当前音源：${localName}` };
         },
 
         validateLegadoJson() {

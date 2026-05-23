@@ -158,6 +158,7 @@ const sync = {
             weights: health.weights || [],
             foodLogs: health.foodLogs || [],
             exerciseLogs: health.exerciseLogs || [],
+            reports: health.reports || [],
             healthProfile: health.profile && typeof health.profile === 'object' ? [health.profile] : [],
             aiAdviceChat: health.aiAdviceChat || [],
             aiCipher: db.aiCipher ? [db.aiCipher] : []
@@ -272,6 +273,14 @@ const sync = {
                     set: (value) => {
                         db.health = db.health || {};
                         db.health.exerciseLogs = value;
+                    }
+                };
+            case 'reports':
+                return {
+                    get: () => (db.health || {}).reports || [],
+                    set: (value) => {
+                        db.health = db.health || {};
+                        db.health.reports = value;
                     }
                 };
             case 'healthProfile':

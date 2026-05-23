@@ -3,15 +3,21 @@
     window.dataRoutineLibrary = {
         // ---- M3E modal helpers (avoid native prompt/confirm) ----
         _activeModalEl: null,
-        _closeActiveModal() {
+        _closeActiveModalInternal() {
             const el = this._activeModalEl || document.querySelector('.md-modal[data-rl-modal="1"]');
             if (el) el.remove();
             this._activeModalEl = null;
             if (window.focusTrap?.release) window.focusTrap.release();
+            return true;
+        },
+
+        _closeActiveModal() {
+            if (!window.navStack?.requestClose?.('modal')) this._closeActiveModalInternal();
         },
 
         _openModal({ title, icon, bodyHtml, actionsHtml, onMount }) {
-            this._closeActiveModal();
+            if (this._activeModalEl) window.navStack?.popType?.('modal');
+            this._closeActiveModalInternal();
             const modal = document.createElement('div');
             modal.className = 'md-modal';
             modal.setAttribute('data-rl-modal', '1');
@@ -41,6 +47,11 @@
 
             document.body.appendChild(modal);
             this._activeModalEl = modal;
+            window.navStack?.push?.({
+                type: 'modal',
+                id: `routine-${Date.now()}`,
+                close: () => this._closeActiveModalInternal()
+            });
             if (window.focusTrap?.trap) window.focusTrap.trap(modal);
             try { onMount?.(modal, close); } catch {}
         },

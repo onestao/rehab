@@ -138,9 +138,17 @@
         renderPrLeaderboard(limit = 8) {
             const entries = window.prTracker?.topEntries?.(this.db, limit) || [];
             if (!entries.length) return '';
-            return `<div class="md-card pr-board-card">
-                <div class="today-timeline-header" style="margin:0 0 10px"><span class="material-symbols-rounded">trending_up</span><strong>PR 排行</strong><small>${entries.length} 个动作</small></div>
-                <div class="pr-board-list">${entries.map((item, idx) => {
+            const collapsed = this.isCollapsed('prLeaderboardCard', true);
+            return `<div class="md-card collapsible-card pr-board-card ${collapsed ? 'collapsed' : ''}">
+                <button class="panel-head collapsible-head-btn" onclick="data.toggleCollapse('prLeaderboardCard')" type="button" aria-expanded="${!collapsed}">
+                    <div>
+                        <span class="cardio-kicker">力量复盘</span>
+                        <h3>PR 排行</h3>
+                        <small>${entries.length} 个动作 · 点击展开查看排行</small>
+                    </div>
+                    <span class="collapse-btn"><span class="material-symbols-rounded">${collapsed ? 'expand_more' : 'expand_less'}</span></span>
+                </button>
+                <div class="collapse-content pr-board-list">${entries.map((item, idx) => {
                     const safeKey = this.escapeHtml(item.action);
                     const collapsed = this.isCollapsed(`pr_action_${safeKey}`, idx > 2);
                     return `<div class="pr-board-item ${collapsed ? 'collapsed' : ''}">
@@ -155,6 +163,14 @@
                     </div>`;
                 }).join('')}</div>
             </div>`;
+        },
+
+        renderTrainingReviewSection() {
+            const content = [
+                this.renderPrLeaderboard?.() || '',
+                this.renderVolumeHeatmap?.() || ''
+            ].filter(Boolean).join('');
+            return content ? `<div class="record-section-title">训练复盘</div>${content}` : '';
         },
 
         renderVolumeHeatmap() {

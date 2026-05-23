@@ -61,6 +61,7 @@
 }
 @media (max-width: 360px) {
     .md-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .strength-input-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
     .md-card { margin: 3px 6px; padding: 10px; }
     .record-quick-actions { gap: 3px; margin: 0 6px 2px; }
     .record-quick-btn { padding: 6px 1px; font-size: 9px; }

@@ -270,11 +270,24 @@ Object.assign(workout, {
         document.getElementById('setReviewReps').value = plannedReps;
         document.getElementById('setReviewWeight').value = '';
         document.getElementById('setReviewNote').value = '';
-        document.getElementById('setReviewModal').classList.remove('hidden');
+        const modal = document.getElementById('setReviewModal');
+        window.navStack?.replaceOrPush?.({
+            type: 'modal',
+            id: 'setReviewModal',
+            close: () => this.closeSetReviewInternal()
+        });
+        modal.classList.remove('hidden');
+        modal.setAttribute('aria-hidden', 'false');
     },
     closeSetReview() {
-        document.getElementById('setReviewModal').classList.add('hidden');
+        if (!window.navStack?.requestClose?.('modal')) this.closeSetReviewInternal();
+    },
+    closeSetReviewInternal() {
+        const modal = document.getElementById('setReviewModal');
+        modal.classList.add('hidden');
+        modal.setAttribute('aria-hidden', 'true');
         this._reviewCtx = null;
+        return true;
     },
     saveSetReview() {
         if (!this._reviewCtx) return;

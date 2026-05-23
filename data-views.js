@@ -61,11 +61,10 @@
                         this.renderManualExercisePanel() +
                         '<div class="record-section-title">最近训练记录</div>' +
                         this.renderRecentHistoryList(5) +
+                        (this.renderTrainingReviewSection?.() || '') +
                         (this.renderContextAiCard?.('exercise') || '');
                 case 'calendar':
                     return '<div class="record-section-title">记录日历</div>' +
-                        (this.renderVolumeHeatmap?.() || '') +
-                        (this.renderPrLeaderboard?.() || '') +
                         this.renderHistoryCalendar() +
                         this.renderCalendarDayDetail() +
                         '<div class="record-section-title">历史明细</div>' +

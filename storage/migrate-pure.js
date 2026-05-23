@@ -12,6 +12,7 @@ export function migrateLegacyState(db, fallbackTs = Date.now()) {
     next.health.weights = Array.isArray(next.health.weights) ? next.health.weights : [];
     next.health.foodLogs = Array.isArray(next.health.foodLogs) ? next.health.foodLogs : [];
     next.health.exerciseLogs = Array.isArray(next.health.exerciseLogs) ? next.health.exerciseLogs : [];
+    next.health.reports = Array.isArray(next.health.reports) ? next.health.reports : [];
     next.health.aiAdviceChat = Array.isArray(next.health.aiAdviceChat) ? next.health.aiAdviceChat : [];
     next.health.profile = next.health.profile && typeof next.health.profile === 'object' ? next.health.profile : {};
     next.aiTemplates = Array.isArray(next.aiTemplates) ? next.aiTemplates : [];
@@ -35,6 +36,7 @@ export function migrateLegacyState(db, fallbackTs = Date.now()) {
     next.health.weights = next.health.weights.map(item => patch(item, 'weight'));
     next.health.foodLogs = next.health.foodLogs.map(item => patch(item, 'food'));
     next.health.exerciseLogs = next.health.exerciseLogs.map(item => patch(item, 'exercise'));
+    next.health.reports = next.health.reports.map(item => patch(item, 'health-report'));
     next.health.aiAdviceChat = next.health.aiAdviceChat.map(item => patch(item, 'advice'));
     next.health.profile = patch(next.health.profile, 'profile');
     return next;

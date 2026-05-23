@@ -149,25 +149,22 @@ Object.assign(workout, {
     },
 
     initBackGuard() {
-        const pushGuard = () => history.pushState({ rehabGuard: true }, '');
-        if (this._backGuardBound) { pushGuard(); return; }
+        if (this._backGuardBound) return;
         this._backGuardBound = true;
-        history.replaceState({ rehabRoot: true }, '');
-        pushGuard();
-        window.addEventListener('popstate', () => {
-            if (!this.isPlaying) {
-                return;
-            }
-            pushGuard();
-            this.showBackToast();
-            if (!this.isPaused) window.speechSynthesis.resume();
-            document.getElementById('silentAudio').play().catch(()=>{});
-        });
         window.addEventListener('beforeunload', (e) => {
             if (!this.isPlaying) return;
             e.preventDefault();
             e.returnValue = '训练正在进行，退出会中断后台播放。';
         });
+    },
+
+    handleBackGuard() {
+        if (!this.isPlaying) return false;
+        this.showBackToast();
+        if (!this.isPaused) window.speechSynthesis.resume();
+        document.getElementById('silentAudio')?.play?.().catch(()=>{});
+        try { history.pushState({ navWorkoutGuard: true }, ''); } catch {}
+        return true;
     },
 
     showToast(message) {

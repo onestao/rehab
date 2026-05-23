@@ -108,6 +108,7 @@
                 this.db.health.weights,
                 this.db.health.foodLogs,
                 this.db.health.exerciseLogs,
+                this.db.health.reports,
                 this.db.health.aiAdviceChat
             ];
             let purged = 0;
@@ -124,6 +125,7 @@
                 this.db.health.weights,
                 this.db.health.foodLogs,
                 this.db.health.exerciseLogs,
+                this.db.health.reports,
                 this.db.health.aiAdviceChat
             ] = entities;
             if (purged > 0) this.save({ render: false });

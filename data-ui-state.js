@@ -19,7 +19,7 @@
         },
 
         setHealthView(view) {
-            this.scrollToHealthView(view || 'weight');
+            this.scrollToHealthView(view || 'diet');
         },
 
         setRoutineView(view) {
@@ -249,7 +249,7 @@
 
         findCollapseContainer(id) {
             const button = this.findCollapseButton(id);
-            return button?.closest('.collapsible-card, .diet-meal-group, .history-month-group, .history-older-group, .weight-history-card') || null;
+            return button?.closest('.pr-board-item, .collapsible-card, .diet-meal-group, .history-month-group, .history-older-group, .weight-history-card') || null;
         },
 
         findCollapseButton(id) {
@@ -267,18 +267,52 @@
         },
 
         setWeightRange(range) {
+            this.setWeightTrendRange?.(range);
+        },
+
+        setWeightTrendRange(range) {
+            this.weightTrendRange = range;
             this.weightRange = range;
+            const latestKey = this.latestWeightDateKey?.() || this.logicalDateKey();
+            this.weightTrendAnchorKey = this.resolveWeightTrendAnchor?.(range, latestKey) || latestKey;
             this.renderHistory();
+        },
+
+        setWeightRecordRange(range) {
+            this.weightRecordRange = range;
+            this.ensureWeightRecordAnchor?.();
+            this.renderHistory();
+        },
+
+        shiftWeightRecordPeriod(delta) {
+            if (typeof this.shiftWeightRecordAnchor === 'function') {
+                this.shiftWeightRecordAnchor(delta);
+                this.renderHistory();
+            }
         },
 
         openWeightModal() {
             document.getElementById('modalWeightDate').value = this.logicalDateKey();
             document.getElementById('modalHeight').value = this.db.health.height || '';
-            document.getElementById('weightModal').classList.remove('hidden');
+            window.navStack?.replaceOrPush?.({
+                type: 'modal',
+                id: 'weightModal',
+                close: () => this.closeWeightModalInternal()
+            });
+            const modal = document.getElementById('weightModal');
+            modal?.classList.remove('hidden');
+            modal?.setAttribute('aria-hidden', 'false');
         },
 
         closeWeightModal() {
-            document.getElementById('weightModal').classList.add('hidden');
+            if (!window.navStack?.requestClose?.('modal')) this.closeWeightModalInternal();
+        },
+
+        closeWeightModalInternal() {
+            const modal = document.getElementById('weightModal');
+            modal?.classList.add('hidden');
+            modal?.setAttribute('aria-hidden', 'true');
+            return true;
         },
 
         openDietModal() {
@@ -287,16 +321,29 @@
             this._foodCalUnit = 'kj';
             this.syncFoodCalLabel?.();
             this.setFoodSource('');
-            document.getElementById('dietModal').classList.remove('hidden');
+            window.navStack?.replaceOrPush?.({
+                type: 'modal',
+                id: 'dietModal',
+                close: () => this.closeDietModalInternal()
+            });
+            const modal = document.getElementById('dietModal');
+            modal?.classList.remove('hidden');
+            modal?.setAttribute('aria-hidden', 'false');
             const savedMode = this.db.health.dietInputMode || 'ai';
             this._dietInputMode = savedMode;
             this.setDietInputMode(savedMode);
         },
 
         closeDietModal() {
-            document.getElementById('dietModal').classList.add('hidden');
+            if (!window.navStack?.requestClose?.('modal')) this.closeDietModalInternal();
+        },
+
+        closeDietModalInternal() {
+            const modal = document.getElementById('dietModal');
+            modal?.classList.add('hidden');
+            modal?.setAttribute('aria-hidden', 'true');
             this.clearAiResults?.();
-            this.renderHistory();
+            return true;
         },
 
         renderDietModalContent() {
@@ -326,12 +373,25 @@
         openExerciseModal() {
             const el = document.getElementById('exerciseModalContent');
             if (el) el.innerHTML = this.renderExerciseModalContent();
-            document.getElementById('exerciseModal').classList.remove('hidden');
+            window.navStack?.replaceOrPush?.({
+                type: 'modal',
+                id: 'exerciseModal',
+                close: () => this.closeExerciseModalInternal()
+            });
+            const modal = document.getElementById('exerciseModal');
+            modal?.classList.remove('hidden');
+            modal?.setAttribute('aria-hidden', 'false');
         },
 
         closeExerciseModal() {
-            document.getElementById('exerciseModal').classList.add('hidden');
-            this.renderHistory();
+            if (!window.navStack?.requestClose?.('modal')) this.closeExerciseModalInternal();
+        },
+
+        closeExerciseModalInternal() {
+            const modal = document.getElementById('exerciseModal');
+            modal?.classList.add('hidden');
+            modal?.setAttribute('aria-hidden', 'true');
+            return true;
         },
 
         renderExerciseModalContent() {
@@ -401,6 +461,7 @@
             if (index < 0) return;
             this.captureAdviceDraft?.();
             this.healthView = view;
+            this.syncHealthSubtabNav(view);
             this.updateHealthTabActive();
             const deck = document.getElementById('healthSwipeDeck');
             if (!deck) {
@@ -409,6 +470,25 @@
             }
             deck.scrollLeft = index * deck.clientWidth;
             if (view === 'diet') requestAnimationFrame(() => this.autoResizeDietInput?.());
+        },
+
+        syncHealthSubtabNav(view) {
+            if (this._closingHealthSubtab) return;
+            if (view === 'diet') {
+                window.navStack?.popType?.('subtab');
+                return;
+            }
+            window.navStack?.replaceOrPush?.({
+                type: 'subtab',
+                id: 'health',
+                close: () => {
+                    this._closingHealthSubtab = true;
+                    this.healthView = 'diet';
+                    this.renderHistory();
+                    this._closingHealthSubtab = false;
+                    return true;
+                }
+            });
         },
 
         syncHealthDeckPosition(smooth = false) {
@@ -430,6 +510,7 @@
                 const nextView = order[index];
                 if (!nextView || nextView === this.healthView) return;
                 this.healthView = nextView;
+                this.syncHealthSubtabNav(nextView);
                 this.updateHealthTabActive();
                 if (nextView === 'diet') requestAnimationFrame(() => this.autoResizeDietInput?.());
             }, 80);
