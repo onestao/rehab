@@ -34,11 +34,59 @@
         const state = {
             buffer: '',
             shown: '',
+            committedText: '',
             committedHtml: '',
             tail: '',
             destroyed: false,
             autoScroll: true
         };
+        let stableEl = null;
+        let tailEl = null;
+
+        function ensureNodes() {
+            if (stableEl && tailEl && stableEl.isConnected && tailEl.isConnected) return;
+            target.innerHTML = '';
+            stableEl = document.createElement('span');
+            stableEl.setAttribute('data-stream', 'stable');
+            tailEl = document.createElement('span');
+            tailEl.setAttribute('data-stream', 'tail');
+            tailEl.setAttribute('data-no-stream-cursor', '');
+            target.append(stableEl, tailEl);
+        }
+
+        function stableBoundary(text) {
+            const value = String(text || '');
+            let inCode = false;
+            let boundary = 0;
+            const lines = value.split('\n');
+            let pos = 0;
+            lines.forEach(line => {
+                const end = pos + line.length + 1;
+                if (line.trim().startsWith('```')) inCode = !inCode;
+                if (!inCode && !line.trim()) boundary = end;
+                pos = end;
+            });
+            return Math.max(0, Math.min(boundary, value.length));
+        }
+
+        function animateTokens(root) {
+            root.querySelectorAll('p, li, h1, h2, h3').forEach(el => el.classList.add('m3e-token-in'));
+        }
+
+        function commitStable() {
+            const boundary = stableBoundary(state.shown);
+            if (boundary <= state.committedText.length) return;
+            const stableText = state.shown.slice(state.committedText.length, boundary);
+            if (!stableText) return;
+            ensureNodes();
+            const chunk = document.createElement('span');
+            chunk.setAttribute('data-stream', 'committed');
+            chunk.innerHTML = render(stableText);
+            animateTokens(chunk);
+            stableEl.appendChild(chunk);
+            state.committedText = state.shown.slice(0, boundary);
+            state.committedHtml = stableEl.innerHTML;
+        }
 
         function emit(detail) {
             try { window.dispatchEvent(new CustomEvent('advice:render-state', { detail })); } catch {}
@@ -51,9 +99,11 @@
             const chunk = state.buffer.slice(0, n);
             state.buffer = state.buffer.slice(n);
             state.shown += chunk;
-            state.tail = state.shown;
-            target.innerHTML = `<span data-stream="tail" data-no-stream-cursor>${render(state.tail)}</span>`;
-            target.querySelectorAll('p, li, h1, h2, h3').forEach(el => el.classList.add('m3e-token-in'));
+            ensureNodes();
+            commitStable();
+            state.tail = state.shown.slice(state.committedText.length);
+            tailEl.innerHTML = render(state.tail);
+            animateTokens(tailEl);
             if (state.autoScroll) {
                 target.scrollIntoView({ block: 'end' });
             }
@@ -70,8 +120,14 @@
             if (state.destroyed) return;
             state.shown = String(text || '');
             state.buffer = '';
+            state.committedText = '';
+            state.committedHtml = '';
             state.tail = state.shown;
-            target.innerHTML = `<span data-stream="tail" data-no-stream-cursor>${render(state.tail)}</span>`;
+            stableEl = null;
+            tailEl = null;
+            ensureNodes();
+            tailEl.innerHTML = render(state.tail);
+            animateTokens(tailEl);
         }
 
         function pause(reason = 'manual') {

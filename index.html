@@ -8,10 +8,10 @@
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230061a4'/%3E%3Cpath d='M22 22h6v20h-6zM36 22h6v20h-6z' fill='white'/%3E%3Cpath d='M16 28h8v8h-8zM40 28h8v8h-8z' fill='white' opacity='.9'/%3E%3C/svg%3E">
     <meta name="theme-color" content="#0061a4">
     <style>
-        @import url("https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&icon_names=accessibility_new,add,add_circle,assignment,auto_awesome,backup,badge,balance,block,bookmark_add,bookmark_border,bookmarks,brightness_auto,calendar_month,check,check_circle,chevron_left,chevron_right,clinical_notes,close,close_fullscreen,cloud_alert,cloud_done,cloud_off,cloud_sync,content_copy,dark_mode,delete,directions_bike,directions_run,directions_walk,done_all,download,download_for_offline,edit,edit_note,egg_alt,error,event,event_note,exercise,expand_less,expand_more,fitness_center,flag,format_color_fill,forum,health_and_safety,help,history,info,inventory_2,keyboard_arrow_down,keyboard_arrow_left,keyboard_arrow_right,keyboard_arrow_up,library_books,light_mode,local_fire_department,lock,lock_open,mic,mic_off,monitor_heart,monitor_weight,monitoring,more_vert,no_food,notifications,notifications_active,palette,pause,pedal_bike,person,picture_in_picture_alt,play_arrow,playlist_add,pool,psychology,record_voice_over,refresh,remove,replay,restart_alt,restaurant,rowing,save,schedule,search,search_off,self_improvement,send,settings,shield,show_chart,skip_next,skip_previous,speed,sports,sports_gymnastics,stop,swap_horiz,sync,sync_problem,system_update,timeline,timer,today,trending_down,trending_up,tune,upload,upload_file,visibility,visibility_off,volume_off,volume_up,warning,waterfall_chart,week") layer(fonts);
+        @import url("https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&icon_names=accessibility_new,add,add_circle,assignment,auto_awesome,backup,badge,balance,block,bookmark_add,bookmark_border,bookmarks,brightness_auto,calendar_month,check,check_circle,chevron_left,chevron_right,clinical_notes,close,close_fullscreen,cloud_alert,cloud_done,cloud_off,cloud_sync,content_copy,dark_mode,delete,directions_bike,directions_run,directions_walk,done,done_all,download,download_for_offline,edit,edit_note,egg_alt,error,event,event_note,exercise,expand_less,expand_more,fitness_center,flag,format_color_fill,forum,health_and_safety,help,history,info,inventory_2,keyboard_arrow_down,keyboard_arrow_left,keyboard_arrow_right,keyboard_arrow_up,library_books,light_mode,local_fire_department,lock,lock_open,mic,mic_off,monitor_heart,monitor_weight,monitoring,more_vert,no_food,notifications,notifications_active,palette,pause,pedal_bike,person,picture_in_picture_alt,play_arrow,playlist_add,pool,psychology,record_voice_over,refresh,remove,replay,restart_alt,restaurant,rowing,save,schedule,search,search_off,self_improvement,send,settings,shield,show_chart,skip_next,skip_previous,speed,sports,sports_gymnastics,stop,swap_horiz,sync,sync_problem,system_update,timeline,timer,today,trending_down,trending_up,tune,upload,upload_file,visibility,visibility_off,volume_off,volume_up,warning,waterfall_chart,week") layer(fonts);
     </style>
-    <link rel="stylesheet" href="build/generated.css?v=121">
-    <link rel="stylesheet" href="css-src/42-health-profile.css?v=121">
+    <link rel="stylesheet" href="build/generated.css?v=132">
+    <link rel="stylesheet" href="css-src/42-health-profile.css?v=132">
 </head>
 <body>
     <div id="appUpdateBanner" class="app-update-banner hidden">
@@ -42,6 +42,7 @@
                 <div id="statusText">READY</div>
                 <div id="mainTime">00</div>
                 <div id="subText">&#20934;&#22791;&#24320;&#22987;</div>
+                <div id="rehabWorkoutBanner" class="rehab-workout-banner hidden"></div>
                 <div class="timer-stats">
                     <div class="stat-item">
                         <span class="stat-label">&#24635;&#26102;&#38271;</span>
@@ -117,7 +118,7 @@
             <div class="workout-controls" aria-label="&#35757;&#32451;&#25511;&#21046;">
                 <button class="md-fab fab-stop hidden" id="stopBtn" onclick="workout.stop()" aria-label="&#32467;&#26463;&#35757;&#32451;" aria-keyshortcuts="Escape"><span class="material-symbols-rounded">stop</span></button>
                 <button class="md-fab fab-prev hidden" id="prevBtn" onclick="workout.prevAction?.()" aria-label="&#22238;&#21040;&#19978;&#19968;&#38454;&#27573;" aria-keyshortcuts="ArrowLeft"><span class="material-symbols-rounded">restart_alt</span></button>
-                <button class="md-fab fab-play" id="playBtn" onclick="workout.toggle()" aria-label="&#24320;&#22987;&#25110;&#26242;&#20572;&#24403;&#21069;&#35745;&#26102;" aria-keyshortcuts="Space"><span class="material-symbols-rounded" id="playIcon">play_arrow</span></button>
+                <button class="md-fab fab-play" id="playBtn" onclick="workout.toggle()" aria-label="&#24320;&#22987;&#25110;&#26242;&#20572;&#24403;&#21069;&#35745;&#26102;" aria-keyshortcuts="Space"><span class="material-symbols-rounded" id="playIcon">play_arrow</span><span class="fab-label">&#24320;&#22987;&#35757;&#32451;</span></button>
                 <button class="md-fab fab-pip" id="pipBtn" onclick="workout.togglePip()" aria-label="&#25171;&#24320;&#30011;&#20013;&#30011;"><span class="material-symbols-rounded" id="pipIcon">picture_in_picture_alt</span></button>
             </div>
             <div class="md-card cardio-card hidden">
@@ -356,40 +357,40 @@
         </button>
     </nav>
 
-    <script src="toast.js?v=121"></script>
-    <script src="haptics.js?v=121"></script>
-    <script src="error-bus.js?v=121"></script>
-    <script src="i18n.js?v=121"></script>
-    <script src="a11y-focus-trap.js?v=121"></script>
-    <script src="theme.js?v=121"></script>
-    <script src="fooddb.js?v=121"></script>
-    <script src="render-safe.js?v=121"></script>
-    <script src="nav-stack.js?v=121"></script>
-    <script type="module" src="data-utils-pure.js?v=121"></script>
-    <script src="data-utils.js?v=121"></script>
-    <script src="storage/idb.js?v=121"></script>
-    <script src="storage/migrate.js?v=121"></script>
-    <script src="data-records.js?v=121"></script>
-    <script src="data-schema.js?v=121"></script>
-    <script src="data-store.js?v=121"></script>
-    <script src="data-ui-state.js?v=121"></script>
-    <script src="onboarding.js?v=121"></script>
-    <script src="data-views.js?v=121"></script>
-    <script src="routine-plan.js?v=121"></script>
-    <script src="data.js?v=121"></script>
-    <script type="module" src="voice-engine.js?v=121"></script>
-    <script src="voice-cache.js?v=121"></script>
-    <script src="voice-webspeech-adapter.js?v=121"></script>
-    <script src="voice-legado-adapter.js?v=121"></script>
-    <script src="workout-voice.js?v=121"></script>
-    <script src="strength-form.js?v=121"></script>
-    <script src="weekly-plan.js?v=121"></script>
-    <script src="action-history.js?v=121"></script>
-    <script type="module" src="sync-pure.js?v=121"></script>
-    <script src="sync-status.js?v=121"></script>
-    <script src="credential-fields.js?v=121"></script>
-    <script src="sheet-drag.js?v=121"></script>
-    <script src="app-update.js?v=121"></script>
+    <script src="toast.js?v=132"></script>
+    <script src="haptics.js?v=132"></script>
+    <script src="error-bus.js?v=132"></script>
+    <script src="i18n.js?v=132"></script>
+    <script src="a11y-focus-trap.js?v=132"></script>
+    <script src="theme.js?v=132"></script>
+    <script src="fooddb.js?v=132"></script>
+    <script src="render-safe.js?v=132"></script>
+    <script src="nav-stack.js?v=132"></script>
+    <script type="module" src="data-utils-pure.js?v=132"></script>
+    <script src="data-utils.js?v=132"></script>
+    <script src="storage/idb.js?v=132"></script>
+    <script src="storage/migrate.js?v=132"></script>
+    <script src="data-records.js?v=132"></script>
+    <script src="data-schema.js?v=132"></script>
+    <script src="data-store.js?v=132"></script>
+    <script src="data-ui-state.js?v=132"></script>
+    <script src="onboarding.js?v=132"></script>
+    <script src="data-views.js?v=132"></script>
+    <script src="routine-plan.js?v=132"></script>
+    <script src="data.js?v=132"></script>
+    <script type="module" src="voice-engine.js?v=132"></script>
+    <script src="voice-cache.js?v=132"></script>
+    <script src="voice-webspeech-adapter.js?v=132"></script>
+    <script src="voice-legado-adapter.js?v=132"></script>
+    <script src="workout-voice.js?v=132"></script>
+    <script src="strength-form.js?v=132"></script>
+    <script src="weekly-plan.js?v=132"></script>
+    <script src="action-history.js?v=132"></script>
+    <script type="module" src="sync-pure.js?v=132"></script>
+    <script src="sync-status.js?v=132"></script>
+    <script src="credential-fields.js?v=132"></script>
+    <script src="sheet-drag.js?v=132"></script>
+    <script src="app-update.js?v=132"></script>
     <div id="weightModal" class="md-modal md-modal-sheet hidden" aria-hidden="true">
         <div class="md-modal-backdrop" onclick="data.closeWeightModal()"></div>
         <div class="md-modal-card md-modal-sheet-card">
@@ -428,7 +429,38 @@
             </div>
             <div id="exerciseModalContent"></div>
         </div>
-    </div>    <div id="cardioEditModal" class="md-modal md-modal-sheet hidden" aria-hidden="true">
+    </div>
+    <div id="rehabFeedbackSheet" class="md-modal md-modal-sheet hidden" aria-hidden="true">
+        <div class="md-modal-backdrop" onclick="data.closeRehabFeedback?.()"></div>
+        <div class="md-modal-card md-modal-sheet-card">
+            <div class="md-modal-head">
+                <strong>康复反馈</strong>
+                <button class="icon-btn" onclick="data.closeRehabFeedback?.()" type="button"><span class="material-symbols-rounded">close</span></button>
+            </div>
+            <div class="md-modal-body" id="rehabFeedbackSheetBody"></div>
+        </div>
+    </div>
+    <div id="rehabWeeklySheet" class="md-modal md-modal-sheet hidden" aria-hidden="true">
+        <div class="md-modal-backdrop" onclick="rehabWeekly.close?.()"></div>
+        <div class="md-modal-card md-modal-sheet-card">
+            <div class="md-modal-head">
+                <strong>本周康复</strong>
+                <button class="icon-btn" onclick="rehabWeekly.close?.()" type="button"><span class="material-symbols-rounded">close</span></button>
+            </div>
+            <div class="md-modal-body" id="rehabWeeklySheetBody"></div>
+        </div>
+    </div>
+    <div id="rehabAiSheet" class="md-modal md-modal-sheet hidden" aria-hidden="true">
+        <div class="md-modal-backdrop" onclick="data.closeRehabAiSheet?.()"></div>
+        <div class="md-modal-card md-modal-sheet-card">
+            <div class="md-modal-head">
+                <strong>康复计划 AI</strong>
+                <button class="icon-btn" onclick="data.closeRehabAiSheet?.()" type="button"><span class="material-symbols-rounded">close</span></button>
+            </div>
+            <div class="md-modal-body" id="rehabAiSheetBody"></div>
+        </div>
+    </div>
+    <div id="cardioEditModal" class="md-modal md-modal-sheet hidden" aria-hidden="true">
         <div class="md-modal-backdrop" onclick="cardio.closeEditModal()"></div>
         <div class="md-modal-card md-modal-sheet-card">
             <div class="md-modal-head">
@@ -481,7 +513,16 @@
                         <button class="set-review-rpe-btn" type="button" onclick="workout.setReviewRpe(9)" data-rpe="9">9<span>还剩 1-2</span></button>
                         <button class="set-review-rpe-btn" type="button" onclick="workout.setReviewRpe(10)" data-rpe="10">10<span>已力竭</span></button>
                     </div>
+                    <div class="set-review-rpe-label">RIR</div>
+                    <div class="set-review-rpe-options" role="radiogroup" aria-label="RIR">
+                        <button class="set-review-rpe-btn" type="button" onclick="workout.setReviewRir(4)" data-rir="4">4<span>余力充足</span></button>
+                        <button class="set-review-rpe-btn" type="button" onclick="workout.setReviewRir(3)" data-rir="3">3<span>还能 3 次</span></button>
+                        <button class="set-review-rpe-btn" type="button" onclick="workout.setReviewRir(2)" data-rir="2">2<span>还能 2 次</span></button>
+                        <button class="set-review-rpe-btn" type="button" onclick="workout.setReviewRir(1)" data-rir="1">1<span>还能 1 次</span></button>
+                        <button class="set-review-rpe-btn" type="button" onclick="workout.setReviewRir(0)" data-rir="0">0<span>力竭</span></button>
+                    </div>
                     <input type="hidden" id="setReviewRpe" value="">
+                    <input type="hidden" id="setReviewRir" value="">
                 </details>
                 <div class="md-field"><input type="number" id="setReviewReps" placeholder=" "><label>&#23454;&#38469;&#27425;&#25968;</label></div>
                 <div class="md-field span-full"><input type="text" id="setReviewNote" placeholder=" "><label>备注（可空）</label></div>
@@ -678,11 +719,11 @@
     </div>
     <script>
         const PAGE_DEPS = {
-            workout: ['voice-engine','voice-cache','voice-webspeech-adapter','voice-legado-adapter','workout-voice','strength-form','weekly-plan','action-history','workout-system','workout-pip','workout-core','workout-cardio-pure','workout-cardio','workout-engine','workout-state','swipe-actions','routine-plan','routine-library','workout-wakelock','workout-media-session'],
-            'ai-coach': ['ai-store','ai-profile','ai-models','ai-api','ai-pricing','ai-templates','advice-template-manager','advice-panel','advice-render','advice-prompt','advice-stream-renderer'],
-            profile: ['voice-engine','voice-cache','voice-webspeech-adapter','voice-legado-adapter','workout-voice','credential-fields','weekly-plan','backup','sync-ui','sync-adapters','sync','routine-library','goal-plan','weekly-summary'],
-            records: ['history-view','weekly-summary','health-diet','health-weight','health-profile','health-exercise','goal-plan','routine-library','food-log','pr-tracker','volume-heatmap','action-history','report-metrics-pure','report-panel'],
-            today: ['health-diet','health-weight','health-exercise','food-log','history-view','report-metrics-pure','report-panel']
+            workout: ['voice-engine','voice-cache','voice-webspeech-adapter','voice-legado-adapter','workout-voice','strength-form','weekly-plan','action-history','rehab-chains','rehab-progression','rehab-store','rehab-feedback','rehab-cooldown','rehab-weekly','rehab-equipment','rehab-ai','rehab-dock','rehab-ui','workout-system','workout-pip','workout-core','workout-cardio-pure','workout-cardio','workout-engine','workout-state','swipe-actions','routine-plan','routine-library','workout-wakelock','workout-media-session','ai-store','ai-profile','ai-api'],
+            'ai-coach': ['ai-store','ai-profile','ai-models','ai-api','ai-pricing','ai-templates','advice-template-manager','advice-panel','advice-render','advice-prompt','advice-stream-renderer','routine-library','rehab-chains','rehab-progression','rehab-store','rehab-ai'],
+            profile: ['voice-engine','voice-cache','voice-webspeech-adapter','voice-legado-adapter','workout-voice','credential-fields','weekly-plan','backup','sync-ui','sync-adapters','sync','routine-library','goal-plan','weekly-summary','rehab-chains','rehab-progression','rehab-store','rehab-equipment','rehab-ui'],
+            records: ['history-view','weekly-summary','health-diet','health-weight','health-profile','health-exercise','goal-plan','routine-library','food-log','pr-tracker','volume-heatmap','action-history','report-metrics-pure','report-panel','rehab-chains','rehab-progression','rehab-store','rehab-weekly','rehab-ui'],
+            today: ['health-diet','health-weight','health-exercise','food-log','history-view','report-metrics-pure','report-panel','routine-library','rehab-chains','rehab-progression','rehab-store','rehab-feedback','rehab-cooldown','rehab-weekly','rehab-equipment','rehab-ai','rehab-dock','rehab-ui','ai-store','ai-profile','ai-api']
         };
         const _loaded = new Set(['render-safe','nav-stack','data-utils-pure','data-records','data-schema','data-utils','storage/idb','storage/migrate','data-store','data-ui-state','onboarding','data-views','data','voice-engine','voice-cache','voice-webspeech-adapter','voice-legado-adapter','workout-voice','strength-form','weekly-plan','action-history','sync-pure','sync-status','credential-fields','sheet-drag','haptics','app-update']);
         const _loadingPromises = new Map();
@@ -706,7 +747,15 @@
             'workout-voice': ['voice-engine','voice-webspeech-adapter','voice-legado-adapter','voice-cache'],
             'workout-system': ['workout-voice'],
             'sync': ['backup','sync-ui','sync-adapters'],
-            'routine-library': ['routine-plan']
+            'routine-library': ['routine-plan'],
+            'rehab-store': ['rehab-chains','rehab-progression'],
+            'rehab-feedback': ['rehab-store'],
+            'rehab-cooldown': ['rehab-store','rehab-feedback'],
+            'rehab-weekly': ['rehab-store'],
+            'rehab-equipment': ['rehab-store'],
+            'rehab-ai': ['rehab-store','ai-api'],
+            'rehab-dock': ['rehab-store','rehab-weekly'],
+            'rehab-ui': ['rehab-store','rehab-feedback','rehab-cooldown','rehab-weekly','rehab-equipment','rehab-dock']
             ,'report-panel': ['report-metrics-pure']
         };
         function loadScript(name) {
@@ -718,7 +767,7 @@
                 if (_loaded.has(name)) return res();
                 const s = document.createElement('script');
                 if (MODULE_SCRIPTS.has(name)) s.type = 'module';
-                s.src = `${name}.js?v=121`;
+                s.src = `${name}.js?v=132`;
                 s.onload = () => { _loaded.add(name); res(); };
                 s.onerror = rej;
                 document.head.appendChild(s);

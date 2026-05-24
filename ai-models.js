@@ -30,8 +30,38 @@ Object.assign(ai, {
         const res = await fetch(`${baseUrl}/models`, { headers: { 'Authorization': `Bearer ${apiKey}` } });
         if (!res.ok) throw new Error(`${res.status}`);
         const json = await res.json();
-        return (json.data || json.models || []).map(m => ({ id: m.id || m.name || '', vision: this.isVisionModel(m.id || m.name || '') }))
+        return (json.data || json.models || []).map(m => {
+            const id = m.id || m.name || '';
+            return { id, vision: this.isVisionModel(id) || this.inferVisionFromModelMeta(m) };
+        })
             .sort((a, b) => a.vision === b.vision ? a.id.localeCompare(b.id) : (a.vision ? -1 : 1));
+    },
+
+    inferVisionFromModelMeta(model) {
+        try {
+            if (!model || typeof model !== 'object') return false;
+            if (model.vision === true) return true;
+            const modalities = [];
+            const pushArr = (v) => {
+                if (!v) return;
+                if (Array.isArray(v)) v.forEach(x => modalities.push(String(x || '')));
+                else modalities.push(String(v));
+            };
+            pushArr(model.modalities);
+            pushArr(model.input_modalities);
+            pushArr(model.inputModalities);
+            pushArr(model.output_modalities);
+            pushArr(model.outputModalities);
+            if (model.capabilities && typeof model.capabilities === 'object') {
+                if (model.capabilities.vision === true) return true;
+                pushArr(model.capabilities.modalities);
+                pushArr(model.capabilities.input_modalities);
+                pushArr(model.capabilities.inputModalities);
+            }
+            const hasImage = modalities.map(s => s.toLowerCase()).some(s => s.includes('image') || s.includes('vision') || s.includes('multimodal'));
+            if (hasImage) return true;
+        } catch {}
+        return false;
     },
 
     async fetchGeminiModels(baseUrl, apiKey) {
@@ -63,7 +93,7 @@ Object.assign(ai, {
 
     isVisionModel(id) {
         const s = String(id).toLowerCase();
-        return /vision|gpt-4o|gpt-4-turbo|gemini-1\.5|gemini-2|gemini-pro-vision|claude-3|llava|moondream|pixtral|qwen-vl|minicpm-v/.test(s);
+        return /vision|gpt-4o|gpt-4-turbo|gpt-4\.1|gemini-1\.5|gemini-2|gemini-pro-vision|claude-3|llava|moondream|pixtral|qwen-vl|minicpm-v/.test(s);
     },
 
     showCachedModels() {

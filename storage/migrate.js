@@ -101,7 +101,32 @@
         };
     }
 
-    function createIdbAdapter() {
+    function splitLargeCollections(db) {
+        const source = JSON.parse(JSON.stringify(db || {}));
+        source.health = source.health && typeof source.health === 'object' ? source.health : {};
+        const history = Array.isArray(source.history) ? source.history : [];
+        const advice = Array.isArray(source.health.aiAdviceChat) ? source.health.aiAdviceChat : [];
+        source.history = [];
+        source.health.aiAdviceChat = [];
+        source.largeCollections = { ...(source.largeCollections || {}), history: true, advice: true };
+        return { meta: source, history, advice };
+    }
+
+    function hydrateLargeCollections(meta, large) {
+        const next = JSON.parse(JSON.stringify(meta || {}));
+        next.health = next.health && typeof next.health === 'object' ? next.health : {};
+        next.history = Array.isArray(large?.history) ? large.history : (Array.isArray(next.history) ? next.history : []);
+        next.health.aiAdviceChat = Array.isArray(large?.advice) ? large.advice : (Array.isArray(next.health.aiAdviceChat) ? next.health.aiAdviceChat : []);
+        return next;
+    }
+
+    function largeKeys(dbKey) {
+        return { history: dbKey + ':history', advice: dbKey + ':advice' };
+    }
+
+    function createIdbAdapter(options) {
+        const dbKey = options?.dbKey;
+        const keys = dbKey ? largeKeys(dbKey) : null;
         function readLocalSnapshot(key) {
             try {
                 return safeParse(localStorage.getItem(key), key);
@@ -121,6 +146,22 @@
             async read(key) {
                 const idbValue = await window.storageIdb.get(key);
                 const localSnapshot = readLocalSnapshot(key);
+                if (key === dbKey && idbValue) {
+                    const history = await window.storageIdb.get(keys.history);
+                    const advice = await window.storageIdb.get(keys.advice);
+                    const hydrated = hydrateLargeCollections(idbValue, {
+                        history: history || localSnapshot?.history || idbValue.history,
+                        advice: advice || localSnapshot?.health?.aiAdviceChat || idbValue.health?.aiAdviceChat
+                    });
+                    if (isNewerSnapshot(localSnapshot, hydrated)) {
+                        const split = splitLargeCollections(localSnapshot);
+                        await window.storageIdb.set(key, split.meta);
+                        await window.storageIdb.set(keys.history, split.history);
+                        await window.storageIdb.set(keys.advice, split.advice);
+                        return localSnapshot;
+                    }
+                    return hydrated;
+                }
                 if (isNewerSnapshot(localSnapshot, idbValue)) {
                     await window.storageIdb.set(key, localSnapshot);
                     return localSnapshot;
@@ -128,14 +169,30 @@
                 return idbValue;
             },
             async write(key, value) {
+                if (key === dbKey) {
+                    const split = splitLargeCollections(value);
+                    localStorage.setItem(key, JSON.stringify(split.meta));
+                    await window.storageIdb.set(key, split.meta);
+                    await window.storageIdb.set(keys.history, split.history);
+                    await window.storageIdb.set(keys.advice, split.advice);
+                    return;
+                }
                 localStorage.setItem(key, JSON.stringify(value));
                 await window.storageIdb.set(key, value);
             },
             flushSync(key, value) {
+                if (key === dbKey) {
+                    localStorage.setItem(key, JSON.stringify(splitLargeCollections(value).meta));
+                    return;
+                }
                 localStorage.setItem(key, JSON.stringify(value));
             },
             async remove(key) {
                 await window.storageIdb.remove(key);
+                if (key === dbKey) {
+                    await window.storageIdb.remove(keys.history);
+                    await window.storageIdb.remove(keys.advice);
+                }
             }
         };
     }
@@ -168,7 +225,7 @@
             if (!migration.ok) {
                 return { adapter: localAdapter, mode: 'localStorage', migration: migration };
             }
-            return { adapter: createIdbAdapter(), mode: 'idb', migration: migration };
+            return { adapter: createIdbAdapter(options), mode: 'idb', migration: migration };
         },
 
         async migrateLocalToIdb(options, localAdapter) {
@@ -190,10 +247,25 @@
 
             try {
                 await window.storageIdb.open();
-                if (sourceDb != null) await window.storageIdb.set(dbKey, sourceDb);
+                if (sourceDb != null) {
+                    const split = splitLargeCollections(sourceDb);
+                    const keys = largeKeys(dbKey);
+                    if (sourceDbRaw != null && !localStorage.getItem(dbKey + ':legacy-full')) {
+                        localStorage.setItem(dbKey + ':legacy-full', sourceDbRaw);
+                        localStorage.setItem(dbKey + ':legacy-full:createdAt', String(Date.now()));
+                    }
+                    await window.storageIdb.set(dbKey, split.meta);
+                    await window.storageIdb.set(keys.history, split.history);
+                    await window.storageIdb.set(keys.advice, split.advice);
+                }
                 if (sourceCfg != null) await window.storageIdb.set(cfgKey, sourceCfg);
 
-                const targetDb = await window.storageIdb.get(dbKey);
+                const keys = largeKeys(dbKey);
+                const targetDbMeta = await window.storageIdb.get(dbKey);
+                const targetDb = targetDbMeta == null ? null : hydrateLargeCollections(targetDbMeta, {
+                    history: await window.storageIdb.get(keys.history),
+                    advice: await window.storageIdb.get(keys.advice)
+                });
                 const targetCfg = await window.storageIdb.get(cfgKey);
                 const dbDiff = diffFieldSet(sourceDb, targetDb);
                 const cfgDiff = diffFieldSet(sourceCfg, targetCfg);

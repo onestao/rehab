@@ -18,8 +18,6 @@
     };
 
     function byId(id) { return document.getElementById(id); }
-    function num(id) { return Number(byId(id)?.value || 0); }
-
     function ensureHelper(field, text) {
         if (!field) return;
         let helper = field.querySelector('.md-field-helper');
@@ -37,16 +35,10 @@
         const work = byId('work');
         const repsField = reps?.closest('.md-field');
         const workField = work?.closest('.md-field');
-        const hasReps = num('reps') > 0;
-        const hasWork = num('work') > 0;
-        if (hasReps && document.activeElement === reps && work) work.value = '';
-        if (hasWork && document.activeElement === work && reps) reps.value = '';
-        const nextHasReps = num('reps') > 0;
-        const nextHasWork = num('work') > 0;
-        if (work) work.disabled = nextHasReps;
-        if (reps) reps.disabled = nextHasWork;
-        ensureHelper(workField, nextHasReps ? '与次数二选一' : '');
-        ensureHelper(repsField, nextHasWork ? '与时长二选一' : '');
+        if (work) work.disabled = false;
+        if (reps) reps.disabled = false;
+        ensureHelper(workField, '');
+        ensureHelper(repsField, '');
     }
 
     function fillDefaults() {

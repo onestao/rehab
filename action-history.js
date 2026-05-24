@@ -24,7 +24,7 @@
 
     function collect(actionName, days = 90) {
         const since = Date.now() - Number(days || 90) * 86400000;
-        return (window.data?.activeRecords?.(data.db.history || []) || [])
+        const points = (window.data?.activeRecords?.(data.db.history || []) || [])
             .map(history => {
                 const date = parseDate(history);
                 if (!date || date.getTime() < since) return null;
@@ -50,6 +50,31 @@
             })
             .filter(Boolean)
             .sort((a, b) => a.date - b.date);
+        const best = { weight: 0, reps: 0, volume: 0 };
+        points.forEach(point => {
+            point.pr = {};
+            Object.keys(metrics).forEach(key => {
+                const value = Number(point[key] || 0);
+                point.pr[key] = value > 0 && value >= best[key] && value > Math.max(0, best[key]);
+                if (value > best[key]) best[key] = value;
+            });
+        });
+        return points;
+    }
+
+    function prSummary(points) {
+        const best = { weight: 0, reps: 0, volume: 0 };
+        points.forEach(point => {
+            Object.keys(best).forEach(key => {
+                best[key] = Math.max(best[key], Number(point[key] || 0));
+            });
+        });
+        if (!best.weight && !best.reps && !best.volume) return '';
+        const parts = [];
+        if (best.weight) parts.push(`最大重量 ${best.weight}kg`);
+        if (best.reps) parts.push(`最多 ${best.reps} 次`);
+        if (best.volume) parts.push(`最大容量 ${Math.round(best.volume)}`);
+        return parts.join(' · ');
     }
 
     function render() {
@@ -57,9 +82,7 @@
         const title = document.getElementById('actionHistoryTitle');
         if (!content || !title) return;
         const points = collect(state.actionName, state.range);
-        const pr = window.prTracker?.computePrByAction
-            ? window.prTracker.computePrByAction(data.db.history || {})?.[state.actionName]
-            : data.db.cache?.prByAction?.[state.actionName];
+        const pr = prSummary(points);
         title.textContent = state.actionName || '动作历史';
         content.innerHTML = `
             <div class="action-history-controls">
@@ -71,7 +94,7 @@
                 </div>
             </div>
             <canvas id="actionHistoryCanvas" class="action-history-chart" height="180"></canvas>
-            ${pr ? `<div class="action-history-pr"><span class="material-symbols-rounded">trending_up</span> PR ${esc(JSON.stringify(pr))}</div>` : ''}
+            ${pr ? `<div class="action-history-pr"><span class="material-symbols-rounded">trending_up</span> PR ${esc(pr)}</div>` : ''}
             <div class="action-history-list">
                 ${points.slice(-20).reverse().map(p => `<div class="action-history-row">
                     <strong>${esc(p.date.toLocaleDateString('zh-CN'))}</strong>
@@ -113,13 +136,21 @@
             else ctx.lineTo(x, y);
         });
         ctx.stroke();
+        const styles = getComputedStyle(document.documentElement);
+        const prColor = styles.getPropertyValue('--md-sys-tertiary').trim() || '#7c3aed';
         ctx.fillStyle = metrics[state.metric].color;
         points.forEach((p, i) => {
             const x = xFor(i);
             const y = yFor(Number(p[state.metric] || 0));
             ctx.beginPath();
-            ctx.arc(x, y, 3.5, 0, Math.PI * 2);
+            ctx.arc(x, y, p.pr?.[state.metric] ? 5 : 3.5, 0, Math.PI * 2);
+            ctx.fillStyle = p.pr?.[state.metric] ? prColor : metrics[state.metric].color;
             ctx.fill();
+            if (p.pr?.[state.metric]) {
+                ctx.lineWidth = 1.5;
+                ctx.strokeStyle = prColor;
+                ctx.stroke();
+            }
         });
     }
 

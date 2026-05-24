@@ -13,6 +13,97 @@ Object.assign(ai, {
         return this._callOpenAIChat(messages, maxTokens, key, false, null, effective);
     },
 
+    // --- Vision Helpers ---
+    async _blobToDataUrl(blob) {
+        return await new Promise((resolve, reject) => {
+            try {
+                const reader = new FileReader();
+                reader.onerror = () => reject(new Error('读取图片失败'));
+                reader.onload = () => resolve(String(reader.result || ''));
+                reader.readAsDataURL(blob);
+            } catch (e) {
+                reject(e);
+            }
+        });
+    },
+
+    async _resizeImageBlob(file, maxDimension = 1024, outMime = 'image/jpeg', quality = 0.85) {
+        if (typeof document === 'undefined') return file;
+        if (!file) throw new Error('缺少图片文件');
+        const safeMax = Math.max(256, Math.min(2048, Number(maxDimension) || 1024));
+        const safeQuality = Math.max(0.5, Math.min(0.95, Number(quality) || 0.85));
+        const loadBitmap = async () => {
+            if (typeof createImageBitmap === 'function') {
+                return await createImageBitmap(file);
+            }
+            const url = URL.createObjectURL(file);
+            try {
+                const img = new Image();
+                img.decoding = 'async';
+                img.src = url;
+                await img.decode();
+                return img;
+            } finally {
+                URL.revokeObjectURL(url);
+            }
+        };
+
+        let bitmap;
+        try {
+            bitmap = await loadBitmap();
+        } catch {
+            return file;
+        }
+        try {
+            const w = bitmap.width || bitmap.naturalWidth || 0;
+            const h = bitmap.height || bitmap.naturalHeight || 0;
+            if (!w || !h) return file;
+            const scale = Math.min(1, safeMax / Math.max(w, h));
+            const tw = Math.max(1, Math.round(w * scale));
+            const th = Math.max(1, Math.round(h * scale));
+            const canvas = document.createElement('canvas');
+            canvas.width = tw;
+            canvas.height = th;
+            const ctx = canvas.getContext('2d', { alpha: false });
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+            ctx.drawImage(bitmap, 0, 0, tw, th);
+
+            const blob = await new Promise(resolve => {
+                try {
+                    canvas.toBlob(b => resolve(b || null), outMime, safeQuality);
+                } catch {
+                    resolve(null);
+                }
+            });
+            return blob || file;
+        } finally {
+            try { bitmap.close?.(); } catch {}
+        }
+    },
+
+    async prepareVisionImage(file, opts = {}) {
+        const resized = await this._resizeImageBlob(file, opts.maxDimension ?? 1024, opts.outMime ?? 'image/jpeg', opts.quality ?? 0.85);
+        const dataUrl = await this._blobToDataUrl(resized);
+        const base64 = (dataUrl.split(',')[1] || '').trim();
+        const mimeType = resized?.type || opts.outMime || file?.type || 'image/jpeg';
+        if (!base64) throw new Error('图片编码失败');
+        return { dataUrl, base64, mimeType };
+    },
+
+    async callVisionTextImage(promptText, imageFile, maxTokens = 2000, systemText = '') {
+        const effective = this.getEffectiveConfig ? this.getEffectiveConfig() : { ...this.cfg, profileId: this.cfg.activeProfileId, apiKey: this.apiKeyFor(this.cfg.activeProfileId) };
+        if (!effective.enabled) throw new Error('请先在设置中配置 AI 接口');
+        const key = effective.apiKey;
+        if (!key) throw new Error('请先在当前 AI 配置中填写 API Key');
+        const provider = effective.provider || 'openai';
+        const img = await this.prepareVisionImage(imageFile, { maxDimension: 1024, outMime: 'image/jpeg', quality: 0.85 });
+        if (provider === 'claude') return this._callClaudeVision(promptText, img, maxTokens, key, effective, systemText);
+        if (provider === 'openai-responses') return this._callOpenAIResponsesVision(promptText, img, maxTokens, key, effective, systemText);
+        if (provider === 'gemini') return this._callGeminiVision(promptText, img, maxTokens, key, effective, systemText);
+        return this._callOpenAIChatVision(promptText, img, maxTokens, key, effective, systemText);
+    },
+
     async callStream(messages, maxTokens = 2000, onToken = () => {}) {
         const effective = this.getEffectiveConfig ? this.getEffectiveConfig() : { ...this.cfg, profileId: this.cfg.activeProfileId, apiKey: this.apiKeyFor(this.cfg.activeProfileId) };
         if (!effective.enabled) throw new Error('请先在设置中配置 AI 接口');
@@ -23,6 +114,128 @@ Object.assign(ai, {
         if (provider === 'openai-responses') return this._callOpenAIResponses(messages, maxTokens, key, true, onToken, effective);
         if (provider === 'gemini')           return this._callGemini(messages, maxTokens, key, true, onToken, effective);
         return this._callOpenAIChat(messages, maxTokens, key, true, onToken, effective);
+    },
+
+    async _callOpenAIChatVision(promptText, img, maxTokens, key, effective, systemText = '') {
+        const url = `${effective.baseUrl}/chat/completions`;
+        const messages = [
+            ...(systemText ? [{ role: 'system', content: systemText }] : []),
+            {
+                role: 'user',
+                content: [
+                    { type: 'text', text: promptText },
+                    { type: 'image_url', image_url: { url: img.dataUrl } }
+                ]
+            }
+        ];
+        const body = { model: effective.model, messages, temperature: 0.3, max_tokens: maxTokens };
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
+            body: JSON.stringify(body)
+        });
+        if (!res.ok) {
+            const txt = await res.text().catch(() => '');
+            throw new Error(`AI 请求失败: ${res.status} ${txt.slice(0, 120)}`);
+        }
+        const d = await res.json();
+        return d.choices?.[0]?.message?.content || '';
+    },
+
+    async _callOpenAIResponsesVision(promptText, img, maxTokens, key, effective, systemText = '') {
+        const url = `${effective.baseUrl}/responses`;
+        const body = {
+            model: effective.model,
+            input: [{
+                role: 'user',
+                content: [
+                    { type: 'input_text', text: promptText },
+                    { type: 'input_image', image_url: img.dataUrl }
+                ]
+            }],
+            max_output_tokens: maxTokens,
+            temperature: 0.3
+        };
+        if (systemText) body.instructions = systemText;
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
+            body: JSON.stringify(body)
+        });
+        if (!res.ok) {
+            const txt = await res.text().catch(() => '');
+            throw new Error(`AI 请求失败: ${res.status} ${txt.slice(0, 120)}`);
+        }
+        const d = await res.json();
+        if (d.output_text) return d.output_text;
+        let txt = '';
+        for (const item of (d.output || [])) {
+            for (const c of (item.content || [])) {
+                if (c.type === 'output_text' || c.type === 'text') txt += c.text || '';
+            }
+        }
+        return txt;
+    },
+
+    async _callClaudeVision(promptText, img, maxTokens, key, effective, systemText = '') {
+        const url = `${effective.baseUrl}/messages`;
+        const body = {
+            model: effective.model,
+            messages: [{
+                role: 'user',
+                content: [
+                    { type: 'text', text: promptText },
+                    { type: 'image', source: { type: 'base64', media_type: img.mimeType, data: img.base64 } }
+                ]
+            }],
+            max_tokens: maxTokens,
+            temperature: 0.3
+        };
+        if (systemText) body.system = systemText;
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-api-key': key,
+                'anthropic-version': '2023-06-01',
+                'anthropic-dangerous-direct-browser-access': 'true'
+            },
+            body: JSON.stringify(body)
+        });
+        if (!res.ok) {
+            const txt = await res.text().catch(() => '');
+            throw new Error(`AI 请求失败: ${res.status} ${txt.slice(0, 120)}`);
+        }
+        const d = await res.json();
+        return (d.content || []).filter(c => c.type === 'text').map(c => c.text).join('');
+    },
+
+    async _callGeminiVision(promptText, img, maxTokens, key, effective, systemText = '') {
+        const action = `generateContent?key=${key}`;
+        const url = `${effective.baseUrl}/models/${effective.model}:${action}`;
+        const contents = [{
+            role: 'user',
+            parts: [
+                { text: promptText },
+                { inline_data: { mime_type: img.mimeType, data: img.base64 } }
+            ]
+        }];
+        const body = {
+            contents,
+            generationConfig: { temperature: 0.3, maxOutputTokens: maxTokens },
+            ...(systemText ? { systemInstruction: { parts: [{ text: systemText }] } } : {})
+        };
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+        if (!res.ok) {
+            const txt = await res.text().catch(() => '');
+            throw new Error(`AI 请求失败: ${res.status} ${txt.slice(0, 120)}`);
+        }
+        const d = await res.json();
+        return d.candidates?.[0]?.content?.parts?.map(p => p.text).join('') || '';
     },
 
     // ---------- OpenAI Chat Completions ----------
@@ -262,6 +475,14 @@ Object.assign(ai, {
             { role: 'user', content: prompt }
         ]);
         const match = raw.match(/\[[\s\S]*\]/);
+        if (!match) throw new Error('AI 返回格式异常');
+        return JSON.parse(match[0]);
+    },
+
+    async parseFoodFromImage(file) {
+        const prompt = `你是营养师助手。用户给出了一张“这顿饭/食物”的照片。请你根据图片内容识别食物，并严格只返回 JSON 数组，不要其他文字。\n每个元素格式：{"name":"食物名","grams":克数,"cal":热量kcal,"pro":蛋白质g,"carb":碳水g,"fat":脂肪g}\n要求：\n- 如果无法判断克数，请用常见份量估算；\n- 如果图片中看不清或不确定，请不要编造，返回空数组 [] 或减少条目；\n- 不要输出 markdown、不要解释。`;
+        const raw = await this.callVisionTextImage(prompt, file, 2000, '你是营养师助手，只返回纯 JSON 数组，不要 markdown，不要解释。');
+        const match = String(raw || '').match(/\[[\s\S]*\]/);
         if (!match) throw new Error('AI 返回格式异常');
         return JSON.parse(match[0]);
     },

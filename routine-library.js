@@ -588,7 +588,7 @@
             content.classList.toggle('profile-view-forward', direction === 'next');
             content.classList.toggle('profile-view-back', direction === 'prev');
             if (view === 'library') {
-                content.innerHTML = tabBar + this.renderLibrarySegment() + this.renderLibraryDeck();
+                content.innerHTML = tabBar + (this.renderRehabEquipmentCard?.() || '') + this.renderLibrarySegment() + this.renderLibraryDeck();
                 requestAnimationFrame(() => {
                     this.syncLibraryDeckPosition?.(false);
                     this.updateLibraryTabActive?.();

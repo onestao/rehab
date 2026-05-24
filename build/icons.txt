@@ -29,6 +29,7 @@ delete
 directions_bike
 directions_run
 directions_walk
+done
 done_all
 download
 download_for_offline

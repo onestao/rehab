@@ -109,8 +109,10 @@
         },
 
         deleteManualExercise(id) {
-            this.softDeleteById(this.db.health.exerciseLogs, id);
-            this.saveAndBackup();
+            this.deleteWithUndo(this.db.health.exerciseLogs, id, {
+                save: () => this.saveAndBackup(),
+                render: () => this.renderHistory?.()
+            });
         },
 
         todayExerciseLogs() {

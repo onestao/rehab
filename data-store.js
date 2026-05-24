@@ -2,6 +2,7 @@
 (function () {
     window.dataStore = {
         STORAGE_VERSION_KEY: 'storageVersion',
+        STORAGE_TARGET_VERSION: 4,
         MIGRATION_FAILED_KEY: 'migration.failed',
         FLUSH_DEBOUNCE_MS: 300,
         _storage: null,
@@ -46,7 +47,7 @@
                     cfgKey: this.CFG_KEY,
                     storageVersionKey: this.STORAGE_VERSION_KEY,
                     migrationFailedKey: this.MIGRATION_FAILED_KEY,
-                    targetVersion: this.SCHEMA_VERSION
+                    targetVersion: this.STORAGE_TARGET_VERSION
                 });
                 this._storage = migrationResult.adapter;
                 this._storageMode = migrationResult.mode;

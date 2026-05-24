@@ -22,6 +22,128 @@
             if (select && select.value !== unit) select.value = unit;
         },
 
+        renderDietModalContent() {
+            const mode = this._dietInputMode || this.db.health.dietInputMode || 'ai';
+            const meal = this._dietMeal || 'lunch';
+            const mealBtn = (key, label) => `<button class="diet-meal-pill ${meal === key ? 'active' : ''}" onclick="data.setDietMeal('${key}')" type="button">${this.escapeHtml(label)}</button>`;
+            const photoSupported = this.isDietPhotoAiSupported();
+            return `
+                <div class="diet-mode-tabs" style="margin-bottom:10px">
+                    <button class="diet-mode-tab ${mode === 'ai' ? 'active' : ''}" data-mode="ai" onclick="data.setDietInputMode('ai')" type="button"><span class="material-symbols-rounded">auto_awesome</span> AI</button>
+                    <button class="diet-mode-tab ${mode === 'manual' ? 'active' : ''}" data-mode="manual" onclick="data.setDietInputMode('manual')" type="button"><span class="material-symbols-rounded">edit_note</span> 手动</button>
+                </div>
+                <div class="diet-meal-selector" style="margin-bottom:10px">
+                    ${mealBtn('breakfast', '早餐')}${mealBtn('lunch', '午餐')}${mealBtn('dinner', '晚餐')}${mealBtn('snack', '加餐')}
+                </div>
+                <div id="foodAiArea" class="diet-ai-entry ${mode === 'ai' ? '' : 'hidden'}">
+                    <textarea id="foodAiText" class="diet-ai-input" placeholder="说说你这顿吃了什么，例如：鸡胸肉饭加一杯豆浆" oninput="data.autoResizeDietInput(this)"></textarea>
+                    <div class="diet-ai-actions">
+                        <button class="md-btn md-btn-filled" onclick="data.aiParseFood()" type="button"><span class="material-symbols-rounded">auto_awesome</span> 文本识别</button>
+                        <button class="md-btn md-btn-tonal" onclick="data.triggerDietPhoto()" type="button" ${photoSupported ? '' : 'disabled'} title="${photoSupported ? '拍照识别' : '当前 AI 模型不支持视觉或未配置'}"><span class="material-symbols-rounded">visibility</span> 拍照识别</button>
+                        <input id="dietPhotoInput" class="hidden" type="file" accept="image/*" capture="environment" onchange="data.handleDietPhoto(this.files?.[0])">
+                    </div>
+                    <small id="foodAiStatus" class="food-ai-status"></small>
+                    <div id="foodAiResults"></div>
+                </div>
+                <div id="foodManualArea" class="${mode === 'manual' ? '' : 'hidden'}">
+                    <div class="md-grid modal-grid">
+                        <div class="md-field span-full"><input id="foodName" type="text" placeholder=" " oninput="data.onFoodSearchInput()" onblur="data.autoFillFoodByName()"><label>食物</label></div>
+                        <div id="foodSearchSuggest" class="span-full"></div>
+                        <div class="md-field"><input id="foodGrams" type="number" step="1" placeholder=" " oninput="data.updateFoodComputedPreview()"><label>克数</label></div>
+                        <div class="md-field"><select id="foodCalUnit" onchange="data.changeFoodCalUnit(this.value)"><option value="kj">千焦 kJ</option><option value="kcal">千卡 kcal</option></select><label>热量单位</label></div>
+                        <div class="md-field"><input id="foodCal" type="number" step="0.1" placeholder=" " oninput="data.updateFoodComputedPreview()"><label id="foodCalLabel">千焦 kJ/100g</label></div>
+                        <div class="md-field"><input id="foodPro" type="number" step="0.1" placeholder=" " oninput="data.updateFoodComputedPreview()"><label>蛋白/100g</label></div>
+                        <div class="md-field"><input id="foodCarb" type="number" step="0.1" placeholder=" " oninput="data.updateFoodComputedPreview()"><label>碳水/100g</label></div>
+                        <div class="md-field"><input id="foodFat" type="number" step="0.1" placeholder=" " oninput="data.updateFoodComputedPreview()"><label>脂肪/100g</label></div>
+                        <small id="foodCalUnitHint" class="span-full"></small>
+                        <small id="foodComputed" class="span-full">输入食物和重量后自动计算</small>
+                    </div>
+                    <div class="md-row modal-actions">
+                        <button class="md-btn md-btn-tonal" onclick="data.closeDietModal()" type="button">取消</button>
+                        <button class="md-btn md-btn-filled" onclick="data.addFoodLog()" type="button"><span class="material-symbols-rounded">save</span> 保存记录</button>
+                    </div>
+                </div>
+            `;
+        },
+
+        openDietModal() {
+            const modal = document.getElementById('dietModal');
+            const content = document.getElementById('dietModalContent');
+            if (!modal || !content) return;
+            content.innerHTML = this.renderDietModalContent();
+            this.syncFoodCalLabel?.();
+            this.setDietInputMode(this._dietInputMode || this.db.health.dietInputMode || 'ai');
+            modal.classList.remove('hidden');
+            modal.setAttribute('aria-hidden', 'false');
+            window.navStack?.replaceOrPush?.({
+                type: 'modal',
+                id: 'dietModal',
+                close: () => this.closeDietModalInternal()
+            });
+        },
+
+        closeDietModal() {
+            if (!window.navStack?.requestClose?.('modal')) this.closeDietModalInternal();
+        },
+
+        closeDietModalInternal() {
+            const modal = document.getElementById('dietModal');
+            modal?.classList.add('hidden');
+            modal?.setAttribute('aria-hidden', 'true');
+            return true;
+        },
+
+        isDietPhotoAiSupported() {
+            const cfg = window.ai?.getEffectiveConfig?.() || window.ai?.cfg || {};
+            const provider = String(cfg.provider || '').toLowerCase();
+            const model = String(cfg.model || '').toLowerCase();
+            if (!cfg.enabled || !cfg.apiKey) return false;
+            if (!/openai|openai-responses|claude|gemini/.test(provider)) return false;
+            const cached = (window.ai?.models || []).find(m => String(m.id || '').toLowerCase() === model && (!m.provider || String(m.provider).toLowerCase() === provider));
+            return !!(cached?.vision || window.ai?.isVisionModel?.(model));
+        },
+
+        triggerDietPhoto() {
+            if (!this.isDietPhotoAiSupported()) {
+                window.toast?.show?.('当前 AI 模型不支持视觉或未配置', 'info');
+                return;
+            }
+            document.getElementById('dietPhotoInput')?.click?.();
+        },
+
+        async handleDietPhoto(file) {
+            const statusEl = document.getElementById('foodAiStatus');
+            const inputEl = document.getElementById('dietPhotoInput');
+            if (!file) return;
+            if (!this.isDietPhotoAiSupported()) {
+                if (statusEl) statusEl.textContent = '当前 AI 模型不支持视觉或未配置';
+                window.toast?.show?.('当前 AI 模型不支持视觉或未配置', 'info');
+                if (inputEl) inputEl.value = '';
+                return;
+            }
+            if (!window.ai?.parseFoodFromImage) {
+                if (statusEl) statusEl.textContent = '当前版本未接入图片识别';
+                window.toast?.show?.('当前版本未接入图片识别', 'info');
+                if (inputEl) inputEl.value = '';
+                return;
+            }
+            if (statusEl) statusEl.textContent = 'AI 识别中...';
+            try {
+                const items = await window.ai.parseFoodFromImage(file);
+                if (!items || !items.length) throw new Error('未识别到食物');
+                this._aiFoodResults = items;
+                this._aiFoodAdded = new Set();
+                const format = typeof this.formatAiDraft === 'function' ? this.formatAiDraft.bind(this) : (v => v);
+                this._aiFoodDrafts = items.map(item => format(item));
+                this.renderAiFoodResults?.();
+                if (statusEl) statusEl.textContent = `AI 已识别 ${items.length} 项，点击逐个添加或批量添加`;
+            } catch (e) {
+                if (statusEl) statusEl.textContent = 'AI 识别失败: ' + (window.toast ? toast.sanitize(e) : (e?.message || String(e)));
+            } finally {
+                if (inputEl) inputEl.value = '';
+            }
+        },
+
         changeFoodCalUnit(unit) {
             const nextUnit = unit === 'kcal' ? 'kcal' : 'kj';
             const input = document.getElementById('foodCal');

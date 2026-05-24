@@ -8,12 +8,24 @@
             if (activePage === 'workout') {
                 safe('renderActions', () => this.renderActions?.());
                 safe('renderWorkoutPlanCard', () => this.renderWorkoutPlanCard?.());
+                safe('renderRehabDock', () => this.renderRehabDock?.('workout'));
                 return;
             }
             if (activePage === 'today') return safe('renderTodayPage', () => this.renderTodayPage?.());
-            if (activePage === 'records') return safe('renderRecordsPage', () => this.renderRecordsPage?.());
-            if (activePage === 'ai-coach') return safe('renderAiCoachPage', () => this.renderAiCoachPage?.());
-            if (activePage === 'profile') return safe('renderProfilePage', () => this.renderProfilePage?.());
+            if (activePage === 'records') {
+                safe('renderRecordsPage', () => this.renderRecordsPage?.());
+                safe('renderRehabDock', () => this.renderRehabDock?.('records'));
+                return;
+            }
+            if (activePage === 'ai-coach') {
+                safe('renderAiCoachPage', () => this.renderAiCoachPage?.());
+                safe('renderRehabDock', () => this.renderRehabDock?.('ai-coach'));
+                return;
+            }
+            if (activePage === 'profile') {
+                safe('renderProfilePage', () => this.renderProfilePage?.());
+                safe('renderRehabDock', () => this.renderRehabDock?.('profile'));
+            }
         },
 
         renderTodayPage() {
@@ -23,9 +35,11 @@
             const timeline = document.getElementById('todayTimeline');
             const aiCard = document.getElementById('todayAiCard');
             if (overview) overview.innerHTML = ctx.renderRecordOverview?.() || '';
-            if (quickActions) quickActions.innerHTML = ctx.renderRecordQuickActions?.() || '';
+            if (quickActions) quickActions.innerHTML = ctx.renderRehabTodaySection?.() || ctx.renderRecordQuickActions?.() || '';
             if (timeline) timeline.innerHTML = ctx.renderTodayTimeline?.() || '';
             if (aiCard) aiCard.innerHTML = ctx.renderContextAiCard?.('today') || '';
+            ctx.bindRehabQuickRepeat?.();
+            ctx.renderRehabDock?.('today');
         },
 
         renderDietPage() {
@@ -78,11 +92,22 @@
         renderAiCoachPage() {
             const content = document.getElementById('aiCoachContent');
             if (content && typeof this.renderAdvicePanel === 'function') {
-                content.innerHTML = this.renderAdvicePanel();
+                try {
+                    if (window.advicePanel && typeof advicePanel.attach === 'function') advicePanel.attach(this);
+                    content.innerHTML = this.renderAdvicePanel();
+                } catch (e) {
+                    if (window.advicePanel && typeof advicePanel.attach === 'function') {
+                        advicePanel.attach(this);
+                        content.innerHTML = this.renderAdvicePanel();
+                    } else {
+                        throw e;
+                    }
+                }
                 requestAnimationFrame(() => this.autoResizeAdvicePrompt?.());
                 requestAnimationFrame(() => {
                     this.bindAdviceScrollListener?.();
                     this.restoreAdviceScroll?.();
+                    requestAnimationFrame(() => this.syncAdviceTopChromeToScroll?.());
                 });
             }
         }

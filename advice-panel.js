@@ -27,6 +27,7 @@ const advicePanel = {
             captureAdviceScroll: this.captureAdviceScroll,
             restoreAdviceScroll: this.restoreAdviceScroll,
             bindAdviceScrollListener: this.bindAdviceScrollListener,
+            syncAdviceTopChromeToScroll: this.syncAdviceTopChromeToScroll,
             measureAdviceTopChrome: this.measureAdviceTopChrome,
             applyAdviceTopChromeOffset: this.applyAdviceTopChromeOffset,
             holdAdviceTopChrome: this.holdAdviceTopChrome,
@@ -101,12 +102,19 @@ const advicePanel = {
             renderAdviceMarkdown: this.renderAdviceMarkdown,
             renderAdviceMessages: this.renderAdviceMessages,
             renderAdviceMessage: this.renderAdviceMessage,
+            extractAdviceRoutineBlocks: this.extractAdviceRoutineBlocks,
+            normalizeAdviceRoutine: this.normalizeAdviceRoutine,
+            openAdviceRoutineSave: this.openAdviceRoutineSave,
+            saveAdviceRoutine: this.saveAdviceRoutine,
             renderAdvicePanel: this.renderAdvicePanel,
             setAdviceStreamUiState: this.setAdviceStreamUiState,
             toggleAdviceStreamRender: this.toggleAdviceStreamRender,
             flushAdviceStreamRender: this.flushAdviceStreamRender,
             pauseStreamForScroll: this.pauseStreamForScroll,
             resumeStreamFromScroll: this.resumeStreamFromScroll,
+            showAdviceNewMessageButton: this.showAdviceNewMessageButton,
+            hideAdviceNewMessageButton: this.hideAdviceNewMessageButton,
+            jumpAdviceToLatest: this.jumpAdviceToLatest,
             _handleAdviceStreamScroll: this._handleAdviceStreamScroll,
             getAdviceVersionGroup: this.getAdviceVersionGroup,
             setActiveAdviceVersion: this.setActiveAdviceVersion,
@@ -299,6 +307,7 @@ const advicePanel = {
         renderer.pause('scroll');
         this._adviceUserScrollPaused = true;
         this.setAdviceStreamUiState('paused');
+        this.showAdviceNewMessageButton();
     },
 
     resumeStreamFromScroll() {
@@ -308,7 +317,29 @@ const advicePanel = {
         if (!renderer) return;
         renderer.resume();
         this._adviceUserScrollPaused = false;
+        this.hideAdviceNewMessageButton();
         this.setAdviceStreamUiState('streaming');
+    },
+
+    showAdviceNewMessageButton() {
+        const btn = document.getElementById('adviceNewMessageBtn');
+        if (!btn) return;
+        btn.classList.remove('hidden');
+        btn.setAttribute('aria-hidden', 'false');
+    },
+
+    hideAdviceNewMessageButton() {
+        const btn = document.getElementById('adviceNewMessageBtn');
+        if (!btn) return;
+        btn.classList.add('hidden');
+        btn.setAttribute('aria-hidden', 'true');
+    },
+
+    jumpAdviceToLatest() {
+        this.resumeStreamFromScroll();
+        this._adviceUserScrollPaused = false;
+        this.hideAdviceNewMessageButton();
+        this.scrollAdviceToLatest(true, 'smooth');
     },
 
     captureAdviceDraft() {
@@ -389,6 +420,15 @@ const advicePanel = {
         window.scrollTo({ top: Math.min(cardTop + savedPageOffset, maxWindowTop), behavior: 'auto' });
     },
 
+    syncAdviceTopChromeToScroll(list = document.querySelector('.advice-chat-list')) {
+        if (!list || !this.isAdvicePageActive(list)) return;
+        const maxOffset = this.measureAdviceTopChrome(list);
+        const nextOffset = Math.min(Math.max(0, list.scrollTop || 0), maxOffset);
+        this._adviceTopChromeHoldUntil = 0;
+        this._adviceTopChromeLastScrollTop = list.scrollTop || 0;
+        this.applyAdviceTopChromeOffset(list, nextOffset);
+    },
+
     bindAdviceScrollListener() {
         const list = document.querySelector('.advice-chat-list');
         if (!list) return;
@@ -399,11 +439,16 @@ const advicePanel = {
         }
         if (this._adviceScrollEl && this._adviceOnUserIntent) {
             this._adviceScrollEl.removeEventListener('wheel', this._adviceOnUserIntent);
-            this._adviceScrollEl.removeEventListener('touchstart', this._adviceOnUserIntent);
             this._adviceScrollEl.removeEventListener('keydown', this._adviceOnUserIntent);
         }
         if (this._adviceScrollEl && this._adviceOnTopChromeTouchMove) {
             this._adviceScrollEl.removeEventListener('touchmove', this._adviceOnTopChromeTouchMove);
+        }
+        if (this._adviceGestureEl && this._adviceOnTopChromeTouchStart) {
+            this._adviceGestureEl.removeEventListener('touchstart', this._adviceOnTopChromeTouchStart, true);
+        }
+        if (this._adviceGestureEl && this._adviceOnTopChromeTouchMove) {
+            this._adviceGestureEl.removeEventListener('touchmove', this._adviceOnTopChromeTouchMove, true);
         }
         if (this._adviceTopChromeEl && this._adviceOnTopChromePointerDown) {
             this._adviceTopChromeEl.removeEventListener('pointerdown', this._adviceOnTopChromePointerDown);
@@ -427,14 +472,30 @@ const advicePanel = {
                 this._adviceUserScrollIntent = false;
             }, 600);
         };
-        this._adviceOnTopChromeTouchMove = event => this._handleAdviceTopChromePull(list, event);
+        const markTouchIntent = () => {
+            this._adviceUserScrollIntent = true;
+            clearTimeout(this._adviceUserScrollIntentTimer);
+            this._adviceUserScrollIntentTimer = setTimeout(() => {
+                this._adviceUserScrollIntent = false;
+            }, 600);
+        };
+        this._adviceOnTopChromeTouchStart = event => {
+            markTouchIntent();
+            this._handleAdviceTopChromePull(list, event);
+        };
+        this._adviceOnTopChromeTouchMove = event => {
+            markTouchIntent();
+            this._handleAdviceTopChromePull(list, event);
+        };
         list.addEventListener('scroll', this._adviceOnScroll, { passive: true });
         list.addEventListener('wheel', this._adviceOnUserIntent, { passive: true });
-        list.addEventListener('touchstart', this._adviceOnUserIntent, { passive: true });
-        list.addEventListener('touchmove', this._adviceOnTopChromeTouchMove, { passive: true });
         list.addEventListener('keydown', this._adviceOnUserIntent, { passive: true });
         this._adviceScrollEl = list;
         const chrome = list.closest('.advice-chat-shell')?.querySelector('.advice-top-chrome');
+        const shell = list.closest('.advice-chat-shell');
+        shell?.addEventListener('touchstart', this._adviceOnTopChromeTouchStart, { passive: true, capture: true });
+        shell?.addEventListener('touchmove', this._adviceOnTopChromeTouchMove, { passive: true, capture: true });
+        this._adviceGestureEl = shell;
         this._adviceOnTopChromePointerDown = () => this.holdAdviceTopChrome(list, false);
         this._adviceOnTopChromeIntent = event => {
             this._adviceUserScrollIntent = true;
@@ -452,6 +513,7 @@ const advicePanel = {
         this._adviceTopChromeEl = chrome;
         this._adviceTopChromeLastScrollTop = list.scrollTop || 0;
         this.applyAdviceTopChromeOffset(list, this._adviceTopChromeOffset || 0);
+        requestAnimationFrame(() => this.syncAdviceTopChromeToScroll(list));
     },
 
     measureAdviceTopChrome(list = document.querySelector('.advice-chat-list')) {
@@ -504,23 +566,15 @@ const advicePanel = {
     },
 
     _handleAdviceTopChromeScroll(list) {
-        if (this._adviceTopChromeHoldUntil && performance.now() < this._adviceTopChromeHoldUntil) {
-            this._adviceTopChromeLastScrollTop = list.scrollTop || 0;
-            this.applyAdviceTopChromeOffset(list, 0);
-            return;
-        }
-        const top = list.scrollTop || 0;
-        const previous = Number.isFinite(this._adviceTopChromeLastScrollTop) ? this._adviceTopChromeLastScrollTop : top;
-        const delta = top - previous;
+        const top = Math.max(0, list.scrollTop || 0);
+        const maxOffset = this.measureAdviceTopChrome(list);
+        const nextOffset = Math.min(top, maxOffset);
         this._adviceTopChromeLastScrollTop = top;
-        if (Math.abs(delta) < 0.5) {
-            this.applyAdviceTopChromeOffset(list, this._adviceTopChromeOffset || 0);
-            return;
-        }
-        this.applyAdviceTopChromeOffset(list, (this._adviceTopChromeOffset || 0) + delta);
+        this.applyAdviceTopChromeOffset(list, nextOffset);
     },
 
     _handleAdviceTopChromePull(list, event) {
+        this._adviceTopChromeHoldUntil = 0;
         const currentOffset = this._adviceTopChromeOffset || 0;
         if (event?.type === 'touchstart') {
             this._adviceTopChromeLastTouchY = event.touches?.[0]?.clientY ?? null;
@@ -533,17 +587,13 @@ const advicePanel = {
             this._adviceTopChromeLastTouchY = y;
             if (!Number.isFinite(lastY)) return;
             const deltaY = y - lastY;
-            if (deltaY < 0) {
-                this.applyAdviceTopChromeOffset(list, currentOffset - deltaY);
-            } else if (deltaY > 0 && (list.scrollTop || 0) <= 0) {
+            if (deltaY > 0 && (list.scrollTop || 0) <= 0) {
                 this.applyAdviceTopChromeOffset(list, currentOffset - deltaY);
             }
             return;
         }
         if (event?.type === 'wheel') {
-            if (event.deltaY > 0) {
-                this.applyAdviceTopChromeOffset(list, currentOffset + event.deltaY);
-            } else if (event.deltaY < 0 && (list.scrollTop || 0) <= 0) {
+            if (event.deltaY < 0 && (list.scrollTop || 0) <= 0) {
                 this.applyAdviceTopChromeOffset(list, currentOffset + event.deltaY);
             }
         }
@@ -555,6 +605,7 @@ const advicePanel = {
         const atBottom = distance < 24;
         if (atBottom) {
             if (this._adviceUserScrollPaused) this.resumeStreamFromScroll();
+            this.hideAdviceNewMessageButton();
             return;
         }
         if (this._adviceUserScrollIntent && !this._adviceUserScrollPaused) {
@@ -918,6 +969,140 @@ const advicePanel = {
         });
     },
 
+    extractAdviceRoutineBlocks(text = '') {
+        const blocks = [];
+        const source = String(text || '');
+        const re = /```routine\s*([\s\S]*?)```/gi;
+        let match;
+        while ((match = re.exec(source))) {
+            const raw = String(match[1] || '').trim();
+            if (!raw) continue;
+            try {
+                const parsed = JSON.parse(raw);
+                const routine = this.normalizeAdviceRoutine(parsed);
+                if (routine.ok) blocks.push(routine.value);
+            } catch {}
+        }
+        return blocks;
+    },
+
+    normalizeAdviceRoutine(input) {
+        if (!input || typeof input !== 'object' || Array.isArray(input)) {
+            return { ok: false, reason: '方案必须是 JSON 对象' };
+        }
+        const actions = Array.isArray(input.actions) ? input.actions : [];
+        if (!actions.length) return { ok: false, reason: '方案缺少 actions 数组' };
+        if (actions.length > 60) return { ok: false, reason: '动作数量过多' };
+        const normalizedActions = [];
+        for (const item of actions) {
+            if (!item || typeof item !== 'object' || Array.isArray(item)) {
+                return { ok: false, reason: '动作必须是对象' };
+            }
+            const name = String(item.name || '').trim();
+            if (!name) return { ok: false, reason: '动作缺少 name' };
+            const num = (key, fallback = 0, min = 0, max = 9999) => {
+                const value = Number(item[key] ?? fallback);
+                if (!Number.isFinite(value)) return fallback;
+                return Math.min(max, Math.max(min, value));
+            };
+            const action = {
+                id: this.generateRecordId('routine-action'),
+                name: name.slice(0, 80),
+                phase: ['warmup', 'main', 'cooldown'].includes(item.phase) ? item.phase : 'main',
+                sets: Math.round(num('sets', 1, 1, 99)),
+                reps: Math.round(num('reps', 0, 0, 999)),
+                work: Math.round(num('work', 0, 0, 3600)),
+                repRest: Math.round(num('repRest', 0, 0, 3600)),
+                actionRest: Math.round(num('actionRest', 90, 0, 7200)),
+                groupRest: Math.round(num('groupRest', 120, 0, 7200)),
+                isAlt: !!item.isAlt,
+                libOnly: false,
+                deleted: false,
+                updatedAt: Date.now()
+            };
+            if (!action.reps && !action.work) return { ok: false, reason: `${name} 缺少 reps 或 work` };
+            normalizedActions.push(action);
+        }
+        const tags = Array.isArray(input.tags)
+            ? input.tags.map(t => this.normalizeTagText ? this.normalizeTagText(t) : String(t || '').trim()).filter(Boolean).slice(0, 8)
+            : [];
+        return {
+            ok: true,
+            value: {
+                name: String(input.name || 'AI 生成方案').trim().slice(0, 80) || 'AI 生成方案',
+                tags,
+                actions: normalizedActions
+            }
+        };
+    },
+
+    openAdviceRoutineSave(messageId = '', blockIndex = 0) {
+        const msg = (this.db.health?.aiAdviceChat || []).find(item => item && item.id === messageId && !item.deleted);
+        const routine = this.extractAdviceRoutineBlocks(msg?.content || '')[Number(blockIndex) || 0];
+        if (!routine) {
+            window.toast?.show?.('未找到可保存的方案 JSON', 'error');
+            return;
+        }
+        const name = this.escapeHtml(routine.name || 'AI 生成方案');
+        const tags = this.escapeHtml((routine.tags || ['AI']).join(', '));
+        if (typeof this._openModal !== 'function') {
+            this.saveAdviceRoutine(messageId, blockIndex, routine.name, (routine.tags || ['AI']).join(', '));
+            return;
+        }
+        this._openModal({
+            title: '保存到方案库',
+            icon: 'library_books',
+            bodyHtml: `
+                <div class="md-grid modal-grid" style="margin:0">
+                    <div class="md-field span-full"><input id="adviceRoutineNameInput" type="text" placeholder=" " value="${name}"><label>方案名称</label></div>
+                    <div class="md-field span-full"><input id="adviceRoutineTagsInput" type="text" placeholder=" " value="${tags}"><label>标签，用逗号分隔</label></div>
+                    <div style="grid-column:1/-1;color:var(--md-sys-on-surface-variant);font-size:12px">${routine.actions.length} 个动作</div>
+                </div>
+            `,
+            actionsHtml: `
+                <button class="md-btn" type="button" data-modal-close>取消</button>
+                <button class="md-btn md-btn-filled" type="button" data-advice-routine-save><span class="material-symbols-rounded">save</span> 保存</button>
+            `,
+            onMount: (root, close) => {
+                root.querySelector('[data-advice-routine-save]')?.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    const nextName = root.querySelector('#adviceRoutineNameInput')?.value || routine.name;
+                    const nextTags = root.querySelector('#adviceRoutineTagsInput')?.value || '';
+                    if (this.saveAdviceRoutine(messageId, blockIndex, nextName, nextTags)) close();
+                });
+            }
+        });
+    },
+
+    saveAdviceRoutine(messageId = '', blockIndex = 0, name = '', tagsText = '') {
+        const msg = (this.db.health?.aiAdviceChat || []).find(item => item && item.id === messageId && !item.deleted);
+        const routine = this.extractAdviceRoutineBlocks(msg?.content || '')[Number(blockIndex) || 0];
+        if (!routine) {
+            window.toast?.show?.('方案 JSON 校验失败', 'error');
+            return false;
+        }
+        const routineName = String(name || routine.name || '').trim();
+        if (!routineName) {
+            window.toast?.show?.('请输入方案名称', 'error');
+            return false;
+        }
+        const tags = [...new Set(String(tagsText || '').split(/[,，]/).map(t => this.normalizeTagText ? this.normalizeTagText(t) : String(t || '').trim()).filter(Boolean))];
+        this.db.routines = this.db.routines || [];
+        this.db.routines.push({
+            id: this.generateRecordId('routine'),
+            name: routineName.slice(0, 80),
+            tags,
+            actions: JSON.parse(JSON.stringify(routine.actions)).map(a => this.ensureRecordMeta(a, 'routine-action', Date.now())),
+            created: new Date().toLocaleDateString(),
+            updatedAt: Date.now(),
+            deleted: false
+        });
+        this.saveAndBackup?.() || this.save?.();
+        window.haptics?.light?.();
+        window.toast?.show?.(`方案 "${routineName.slice(0, 24)}" 已保存`, 'success');
+        return true;
+    },
+
     async sendAiAdvice(promptOverride = '', options = {}) {
         const effective = ai.getEffectiveConfig ? ai.getEffectiveConfig() : { ...ai.cfg, profileId: ai.cfg.activeProfileId };
         if (!effective.enabled) return alert('请先在设置中配置 AI');
@@ -1080,8 +1265,10 @@ const advicePanel = {
         const targetId = target?.id;
         if (!targetId) return;
         this.preserveAdviceScroll(() => {
-            this.softDeleteById(this.db.health.aiAdviceChat, targetId);
-            this.saveAndBackup();
+            this.deleteWithUndo(this.db.health.aiAdviceChat, targetId, {
+                save: () => this.saveAndBackup(),
+                render: () => this.refreshAdviceSearchResults?.()
+            });
         });
     },
 
@@ -1221,22 +1408,46 @@ const advicePanel = {
 
     deleteAdviceVersion(rootId, versionId) {
         const group = this.getAdviceVersionGroup(rootId);
-        if (group.length <= 1) {
-            this.softDeleteById(this.db.health.aiAdviceChat, versionId);
-        } else {
-            const target = group.find(m => m.id === versionId);
-            if (!target) return;
-            const wasActive = this._isVersionActive(target, group);
-            this.softDeleteById(this.db.health.aiAdviceChat, versionId);
-            if (wasActive) {
-                const remaining = this.getAdviceVersionGroup(rootId);
-                const next = remaining[remaining.length - 1];
-                if (next) {
-                    remaining.forEach(m => { m.versionActive = m.id === next.id; });
+        const removeVersion = () => {
+            if (group.length <= 1) {
+                this.softDeleteById(this.db.health.aiAdviceChat, versionId);
+            } else {
+                const target = group.find(m => m.id === versionId);
+                if (!target) return;
+                const wasActive = this._isVersionActive(target, group);
+                this.softDeleteById(this.db.health.aiAdviceChat, versionId);
+                if (wasActive) {
+                    const remaining = this.getAdviceVersionGroup(rootId);
+                    const next = remaining[remaining.length - 1];
+                    if (next) {
+                        remaining.forEach(m => { m.versionActive = m.id === next.id; });
+                    }
                 }
             }
-        }
+        };
+        const restoreVersion = () => {
+            if (!this.restoreById(this.db.health.aiAdviceChat, versionId)) return;
+            const restored = this.db.health.aiAdviceChat.find(m => m?.id === versionId);
+            if (restored) restored.versionActive = true;
+            this.getAdviceVersionGroup(rootId).forEach(m => {
+                if (m.id !== versionId) m.versionActive = false;
+            });
+        };
+        removeVersion();
         this.save();
+        this.refreshAdviceSearchResults?.();
+        if (window.toast?.show) {
+            toast.show('已删除', 'info', {
+                action: '撤销',
+                timeout: 5000,
+                onAction: () => {
+                    restoreVersion();
+                    this.save();
+                    this.refreshAdviceSearchResults?.();
+                    window.haptics?.success?.();
+                }
+            });
+        }
     },
 
     renderAdviceTopChromeInner() {
@@ -1299,9 +1510,10 @@ const advicePanel = {
         const sendHint = this.escapeHtml(this.isMobileAdviceInput() ? '回车换行，点击发送按钮提交' : 'Enter 发送，Shift + Enter 换行');
         const goalType = this.db.health.dietGoal?.goalType || this.db.health.goalType || 'loss';
         const isGain = goalType === 'gain';
-        const quicks = isGain
+        const baseQuicks = isGain
             ? ['分析我最近增肌进展是否正常', '根据今天饮食给我加餐建议', '帮我安排本周力量训练重点', '我今天蛋白质和碳水够不够？']
             : ['分析我最近减重停滞的原因', '根据今天饮食给我晚餐建议', '帮我调整本周训练强度', '我今天蛋白质够不够？'];
+        const quicks = [...(this.rehabAiQuickPrompts?.() || []), ...baseQuicks].slice(0, 7);
         return `<div class="md-card advice-main-card ${this._adviceSuppressCardAnimation ? 'advice-no-enter' : ''}">
             <div class="advice-chat-shell">
                 <div class="advice-top-chrome">
@@ -1310,6 +1522,7 @@ const advicePanel = {
                     </div>
                 </div>
                 <div class="advice-chat-list">${this.renderAdviceMessages(visibleMessages)}</div>
+                <button id="adviceNewMessageBtn" class="advice-new-message-btn hidden" onclick="data.jumpAdviceToLatest()" type="button" aria-hidden="true">↓ 新消息</button>
                 <div class="advice-composer-tail">
                     <div class="advice-quick-prompts">${quicks.map(q => `<button onclick="data.useAdvicePrompt('${this.escapeHtml(q)}')" type="button">${this.escapeHtml(q)}</button>`).join('')}</div>
                     <div class="advice-composer">

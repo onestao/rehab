@@ -45,6 +45,33 @@
             record.deleted = false;
             record.updatedAt = Date.now();
             return true;
+        },
+
+        deleteWithUndo(list, id, options = {}) {
+            const record = (list || []).find(item => item && item.id === id);
+            if (!record || record.deleted) return false;
+            this.softDeleteById(list, id);
+            const save = typeof options.save === 'function'
+                ? options.save
+                : () => (this.saveAndBackup?.() || this.save?.());
+            const render = typeof options.render === 'function'
+                ? options.render
+                : () => this.render?.();
+            save.call(this);
+            render.call(this);
+            if (window.toast?.show) {
+                toast.show(options.message || '已删除', 'info', {
+                    action: options.actionLabel || '撤销',
+                    timeout: Number(options.timeout || 5000),
+                    onAction: () => {
+                        if (!this.restoreById(list, id)) return;
+                        save.call(this);
+                        render.call(this);
+                        window.haptics?.success?.();
+                    }
+                });
+            }
+            return true;
         }
     };
 })();

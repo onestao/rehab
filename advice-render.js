@@ -307,6 +307,9 @@ Object.assign(advicePanel, {
             ? ` · $${highlightKeyword(msg.costUsd.toFixed(4), currentKeyword)}`
             : '';
         const rawContent = String(msg.content || '');
+        const routineBlocks = msg.role === 'assistant' && !msg.pending && !msg.error && typeof this.extractAdviceRoutineBlocks === 'function'
+            ? this.extractAdviceRoutineBlocks(rawContent)
+            : [];
         const content = msg.role === 'assistant'
             ? (rawContent ? highlightRenderedHtml(this.renderAdviceMarkdown(rawContent), currentKeyword) : '')
             : `<p>${highlightKeyword(rawContent, currentKeyword).replace(/\n/g, '<br>')}</p>`;
@@ -328,6 +331,11 @@ Object.assign(advicePanel, {
             </div>`;
         }
         const safeId = escapeHtml(msg.id || '');
+        const routineActions = routineBlocks.length && safeId
+            ? `<div class="advice-routine-actions">
+                ${routineBlocks.map((_routine, idx) => `<button class="md-btn md-btn-tonal" onclick="data.openAdviceRoutineSave(this.closest('.advice-bubble')?.dataset.adviceId || '', ${idx})" type="button"><span class="material-symbols-rounded">library_books</span> 保存到方案库${routineBlocks.length > 1 ? ` ${idx + 1}` : ''}</button>`).join('')}
+            </div>`
+            : '';
         const actions = msg.role === 'assistant'
             ? `<div class="advice-bubble-actions">
                 <button onclick="data.copyAdviceMessage(${msg.idx}, this.closest('.advice-bubble')?.dataset.adviceId || '')" type="button">复制</button>
@@ -345,6 +353,7 @@ Object.assign(advicePanel, {
                 ${msg.pending ? '<span class="advice-typing-dot"></span>' : ''}
             </div>
             <div class="advice-bubble-content">${msg.pending ? '<div class="skeleton-line skeleton" style="width:80%"></div><div class="skeleton-line skeleton" style="width:60%"></div><div class="skeleton-line skeleton" style="width:90%"></div>' : content}</div>
+            ${routineActions}
             ${actions}
         </div>`;
     },

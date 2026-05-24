@@ -173,8 +173,10 @@ const foodLog = {
     },
 
     deleteFoodLog(id) {
-        this.softDeleteById(this.db.health.foodLogs, id);
-        this.saveAndBackup();
+        this.deleteWithUndo(this.db.health.foodLogs, id, {
+            save: () => this.saveAndBackup(),
+            render: () => this.renderHistory?.()
+        });
     },
 
     todayFoodLogs() {

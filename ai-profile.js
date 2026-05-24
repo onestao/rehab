@@ -154,7 +154,9 @@ Object.assign(ai, {
             status.textContent = this.cfg.enabled ? '已配置' : '未配置';
             status.className = 'ai-status ' + (this.cfg.enabled ? 'ai-ready' : 'ai-off');
         }
-        if (this.models.length) this.renderModels(this.models, true);
+        if (this.models.length && typeof this.renderModels === 'function') {
+            this.renderModels(this.models, true);
+        }
         this.checkEncrypted();
         try { window.dispatchEvent(new CustomEvent('ai:ready')); } catch {}
     },

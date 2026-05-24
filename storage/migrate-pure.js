@@ -41,3 +41,28 @@ export function migrateLegacyState(db, fallbackTs = Date.now()) {
     next.health.profile = patch(next.health.profile, 'profile');
     return next;
 }
+
+export function splitLargeCollections(db) {
+    const source = JSON.parse(JSON.stringify(db || {}));
+    source.health = source.health && typeof source.health === 'object' ? source.health : {};
+    const history = Array.isArray(source.history) ? source.history : [];
+    const advice = Array.isArray(source.health.aiAdviceChat) ? source.health.aiAdviceChat : [];
+    source.history = [];
+    source.health.aiAdviceChat = [];
+    source.largeCollections = {
+        ...(source.largeCollections && typeof source.largeCollections === 'object' ? source.largeCollections : {}),
+        history: true,
+        advice: true
+    };
+    return { meta: source, history, advice };
+}
+
+export function hydrateLargeCollections(meta, large = {}) {
+    const next = JSON.parse(JSON.stringify(meta || {}));
+    next.health = next.health && typeof next.health === 'object' ? next.health : {};
+    next.history = Array.isArray(large.history) ? large.history : (Array.isArray(next.history) ? next.history : []);
+    next.health.aiAdviceChat = Array.isArray(large.advice)
+        ? large.advice
+        : (Array.isArray(next.health.aiAdviceChat) ? next.health.aiAdviceChat : []);
+    return next;
+}

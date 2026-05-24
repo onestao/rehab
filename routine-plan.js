@@ -151,8 +151,10 @@
 
         deleteAction(id) {
             if (!id) return;
-            if (!this.softDeleteById(this.db.actions, id)) return;
-            this.save();
+            this.deleteWithUndo(this.db.actions, id, {
+                save: () => this.save(),
+                render: () => this.renderWorkoutPlanCard?.()
+            });
         },
 
         renderActions() {

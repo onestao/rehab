@@ -28,6 +28,8 @@ Object.assign(workout, {
         this.renderPip();
         const prev = document.getElementById('prevBtn');
         if (prev) prev.classList.toggle('hidden', !this.isPlaying);
+        window.data?.updateRehabWorkoutBanner?.();
+        window.rehabDock?.render?.(document.querySelector('.page.active')?.id || 'workout');
     },
 
     tweakPhase(delta) {
@@ -225,11 +227,14 @@ Object.assign(workout, {
         if(confirm("停止并保存记录？")) {
             this.isPlaying = false;
             if (this._countResolve) { this._countResolve(); this._countResolve = null; }
+            this._manualStopRequested = true;
             this.finish();
         }
     },
     finish() {
         const duration = this.totalSec;
+        const manualStop = !!this._manualStopRequested;
+        this._manualStopRequested = false;
         this.isPlaying = false;
         this.isPaused = false;
         this.updateStateClasses();
@@ -252,6 +257,12 @@ Object.assign(workout, {
         const bar = document.getElementById('globalTrainingBar');
         if (bar) { bar.classList.add('hidden'); bar.querySelector('span').style.width = '0%'; }
         if (duration < 20) {
+            if (window.data?.activeRun) {
+                const ctx = window.data.activeRun;
+                if (ctx.previousPlan && window.data?._replacePlanActions) window.data._replacePlanActions(ctx.previousPlan);
+                window.data.activeRun = null;
+                window.data.updateRehabWorkoutBanner?.();
+            }
             this.speak("训练时间过短，无法记录");
             alert("训练时间低于20秒，无法保存记录");
             data.save();
@@ -259,14 +270,17 @@ Object.assign(workout, {
         }
         this.speak("训练完成");
         window.haptics?.success?.();
-        data.db.history.unshift({
+        const historyRecord = {
             id: data.generateRecordId('history'),
             date: new Date().toLocaleString(), dayKey: data.logicalDateKey(), duration,
             actions: [...(data._planActions ? data._planActions() : data.activeRecords(data.db.actions || []).filter(a => !a.libOnly))],
             actualSets: data.db.actualSetsBuffer || [],
+            manualStop,
             updatedAt: Date.now(),
             deleted: false
-        });
+        };
+        data.db.history.unshift(historyRecord);
+        window.data?.handleRehabWorkoutFinished?.(historyRecord);
         data.db.actualSetsBuffer = [];
         data.saveAndBackup();
         this.resetMainPanel();
@@ -278,8 +292,10 @@ Object.assign(workout, {
         document.getElementById('setReviewReps').value = plannedReps;
         document.getElementById('setReviewWeight').value = '';
         document.getElementById('setReviewRpe').value = '';
+        document.getElementById('setReviewRir').value = '';
         document.getElementById('setReviewNote').value = '';
         this.setReviewRpe('');
+        this.setReviewRir('');
         const modal = document.getElementById('setReviewModal');
         window.navStack?.replaceOrPush?.({
             type: 'modal',
@@ -304,11 +320,16 @@ Object.assign(workout, {
         const w = parseFloat(document.getElementById('setReviewWeight').value) || 0;
         const reps = parseInt(document.getElementById('setReviewReps').value) || this._reviewCtx.plannedReps;
         const rpe = parseInt(document.getElementById('setReviewRpe')?.value || '', 10) || null;
+        const rirValue = document.getElementById('setReviewRir')?.value ?? '';
+        const rir = rirValue === '' ? null : Math.max(0, parseInt(rirValue, 10) || 0);
         const note = document.getElementById('setReviewNote').value || '';
+        const extras = {};
+        if (rpe) extras.rpe = rpe;
+        if (rir !== null) extras.rir = rir;
         data.db.actualSetsBuffer = data.db.actualSetsBuffer || [];
         data.db.actualSetsBuffer.push({
             action: this._reviewCtx.actionName, setIdx: this._reviewCtx.setIdx,
-            weightKg: w, reps, note, extras: rpe ? { rpe } : {}, rpe, at: new Date().toISOString()
+            weightKg: w, reps, note, extras, rpe, rir, at: new Date().toISOString()
         });
         window.haptics?.success?.();
         data.save();
@@ -322,5 +343,14 @@ Object.assign(workout, {
             btn.setAttribute('aria-selected', String(btn.classList.contains('active')));
         });
         if (value) window.haptics?.light?.();
+    },
+    setReviewRir(value) {
+        const input = document.getElementById('setReviewRir');
+        if (input) input.value = value === '' || value == null ? '' : String(value);
+        document.querySelectorAll('[data-rir]').forEach(btn => {
+            btn.classList.toggle('active', String(btn.getAttribute('data-rir')) === String(value));
+            btn.setAttribute('aria-selected', String(btn.classList.contains('active')));
+        });
+        if (value !== '' && value != null) window.haptics?.light?.();
     }
 });

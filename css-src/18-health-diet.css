@@ -213,6 +213,27 @@
     display: grid;
     gap: 8px;
 }
+.diet-ai-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+}
+.diet-ai-actions .md-btn {
+    width: 100%;
+    min-width: 0;
+    min-height: 44px;
+    height: 44px;
+    margin-top: 0;
+    padding: 0 10px;
+    justify-content: center;
+    white-space: nowrap;
+}
+
+@media (max-width: 360px) {
+    .diet-ai-actions {
+        grid-template-columns: 1fr;
+    }
+}
 .diet-ai-input {
     width: 100%;
     min-height: 20px;
@@ -361,6 +382,7 @@
     display: flex;
     flex-direction: column;
     gap: 0;
+    position: relative;
 }
 .advice-top-chrome {
     --advice-top-chrome-visible: var(--advice-top-chrome-full, auto);
@@ -720,6 +742,21 @@
 .advice-chat-list:hover::-webkit-scrollbar-thumb {
     background: color-mix(in srgb, var(--md-sys-outline) 48%, transparent);
 }
+.advice-new-message-btn {
+    position: absolute;
+    right: 10px;
+    bottom: 96px;
+    z-index: 4;
+    min-height: 36px;
+    border: none;
+    border-radius: var(--md-sys-shape-full);
+    padding: 0 14px;
+    background: var(--md-sys-tertiary-container);
+    color: var(--md-sys-on-tertiary-container);
+    font-size: 12px;
+    font-weight: 900;
+    box-shadow: var(--md-sys-elevation-2);
+}
 .advice-date-group { display: grid; gap: 8px; }
 .advice-date-head {
     border: none;
@@ -871,6 +908,16 @@
 .advice-bubble.user .advice-bubble-actions button {
     background: color-mix(in srgb, var(--md-sys-on-primary-container) 12%, transparent);
     color: var(--md-sys-on-primary-container);
+}
+.advice-routine-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+}
+.advice-routine-actions .md-btn {
+    min-height: 40px;
+    font-size: 12px;
 }
 .advice-typing-dot {
     width: 8px;

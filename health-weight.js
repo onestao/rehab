@@ -30,8 +30,10 @@
         },
 
         deleteWeight(id) {
-            this.softDeleteById(this.db.health.weights, id);
-            this.saveAndBackup();
+            this.deleteWithUndo(this.db.health.weights, id, {
+                save: () => this.saveAndBackup(),
+                render: () => this.renderHistory?.()
+            });
         },
 
         renderWeightPanel() {
