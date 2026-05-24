@@ -409,6 +409,11 @@ const advicePanel = {
             this._adviceTopChromeEl.removeEventListener('pointerdown', this._adviceOnTopChromePointerDown);
             this._adviceTopChromeEl.removeEventListener('click', this._adviceOnTopChromePointerDown);
         }
+        if (this._adviceTopChromeEl && this._adviceOnTopChromeIntent) {
+            this._adviceTopChromeEl.removeEventListener('wheel', this._adviceOnTopChromeIntent);
+            this._adviceTopChromeEl.removeEventListener('touchstart', this._adviceOnTopChromeIntent);
+            this._adviceTopChromeEl.removeEventListener('touchmove', this._adviceOnTopChromeIntent);
+        }
         this._adviceOnScroll = () => {
             this.captureAdviceScroll();
             this._handleAdviceTopChromeScroll(list);
@@ -431,8 +436,19 @@ const advicePanel = {
         this._adviceScrollEl = list;
         const chrome = list.closest('.advice-chat-shell')?.querySelector('.advice-top-chrome');
         this._adviceOnTopChromePointerDown = () => this.holdAdviceTopChrome(list, false);
+        this._adviceOnTopChromeIntent = event => {
+            this._adviceUserScrollIntent = true;
+            this._handleAdviceTopChromePull(list, event);
+            clearTimeout(this._adviceUserScrollIntentTimer);
+            this._adviceUserScrollIntentTimer = setTimeout(() => {
+                this._adviceUserScrollIntent = false;
+            }, 600);
+        };
         chrome?.addEventListener('pointerdown', this._adviceOnTopChromePointerDown, { passive: true });
         chrome?.addEventListener('click', this._adviceOnTopChromePointerDown, { passive: true });
+        chrome?.addEventListener('wheel', this._adviceOnTopChromeIntent, { passive: true });
+        chrome?.addEventListener('touchstart', this._adviceOnTopChromeIntent, { passive: true });
+        chrome?.addEventListener('touchmove', this._adviceOnTopChromeIntent, { passive: true });
         this._adviceTopChromeEl = chrome;
         this._adviceTopChromeLastScrollTop = list.scrollTop || 0;
         this.applyAdviceTopChromeOffset(list, this._adviceTopChromeOffset || 0);
@@ -506,7 +522,6 @@ const advicePanel = {
 
     _handleAdviceTopChromePull(list, event) {
         const currentOffset = this._adviceTopChromeOffset || 0;
-        if (!currentOffset) return;
         if (event?.type === 'touchstart') {
             this._adviceTopChromeLastTouchY = event.touches?.[0]?.clientY ?? null;
             return;
@@ -517,14 +532,20 @@ const advicePanel = {
             const lastY = this._adviceTopChromeLastTouchY;
             this._adviceTopChromeLastTouchY = y;
             if (!Number.isFinite(lastY)) return;
-            const pullDistance = y - lastY;
-            if (pullDistance > 0 && (list.scrollTop || 0) <= 0) {
-                this.applyAdviceTopChromeOffset(list, currentOffset - pullDistance);
+            const deltaY = y - lastY;
+            if (deltaY < 0) {
+                this.applyAdviceTopChromeOffset(list, currentOffset - deltaY);
+            } else if (deltaY > 0 && (list.scrollTop || 0) <= 0) {
+                this.applyAdviceTopChromeOffset(list, currentOffset - deltaY);
             }
             return;
         }
-        if (event?.type === 'wheel' && event.deltaY < 0 && (list.scrollTop || 0) <= 0) {
-            this.applyAdviceTopChromeOffset(list, currentOffset + event.deltaY);
+        if (event?.type === 'wheel') {
+            if (event.deltaY > 0) {
+                this.applyAdviceTopChromeOffset(list, currentOffset + event.deltaY);
+            } else if (event.deltaY < 0 && (list.scrollTop || 0) <= 0) {
+                this.applyAdviceTopChromeOffset(list, currentOffset + event.deltaY);
+            }
         }
     },
 

@@ -43,6 +43,10 @@ P0:
 - P0-10 AI model picker decoupling: done. The drawer now lists independently selectable cached/default models by provider scope; profiles are only used to locate credentials for a provider, not as the model option source. The chip and rows reuse the original `advice-model-*` themed fill colors while keeping the bottom-sheet picker.
 - P0-11 calendar compact text and weekly icon regression: done. The 360px calendar no longer hides event text/icons as color-only bars, and weekly plan UI now uses `calendar_month` instead of the missing `week` symbol.
 - P0-12 password visibility button styling: done. Credential eye buttons are now transparent M3E icon buttons with state-layer feedback, no browser-default border/background box.
+- P0-13 AI coach top chrome gesture collapse: done. The AI coach header/filter chrome can again collapse from an upward gesture that starts on the title/filter area, restoring more visible chat text space.
+- P0-14 AI coach filter tap flash: done. AI coach filter chips and icon toggles no longer show Android tap-highlight or pressed-color flashes when clicked.
+- P0-15 stale app shell update path: done. `index.html` is no longer precached by the service worker, navigation requests use network `no-store`, SW registration uses stable `sw.js` with `updateViaCache: none`, new SW installs call `skipWaiting()`, and stale versioned asset requests such as `?v=114` are normalized to the active cache version.
+- P0-16 AI coach filter blue background flash: done. AI coach card hover/active tint is disabled inside the chat surface, and filter active states use secondary container coloring to avoid a primary-blue flash during rerender.
 
 P0-6 DOM state examples:
 ```html
@@ -97,10 +101,18 @@ Version:
 ```text
 node scripts/bump-version.js
 Collected 120 icons -> build/icons.txt, build/icons.csv
-bumped to v113 (patch)
+bumped to v116 (patch)
+
+node scripts/bump-version.js
+Collected 120 icons -> build/icons.txt, build/icons.csv
+bumped to v117 (patch)
+
+node scripts/bump-version.js
+Collected 120 icons -> build/icons.txt, build/icons.csv
+bumped to v118 (patch)
 
 node scripts/bump-version.js --check
-version sync OK (v113)
+version sync OK (v118)
 ```
 
 CSS:
@@ -118,10 +130,10 @@ node --test test/*.test.mjs
 tests 56, pass 56, fail 0
 
 size-limit:
-first-paint-critical-js 22.14 kB / 60 kB
-generated-css 23.77 kB / 80 kB
+first-paint-critical-js 22.13 kB / 60 kB
+generated-css 23.82 kB / 80 kB
 workout-bundle 24.13 kB / 50 kB
-ai-bundle 34.37 kB / 50 kB
+ai-bundle 34.43 kB / 50 kB
 ```
 
 Note: PowerShell printed an npm/npx profile warning about denied access to `C:\Users\YING\AppData\Roaming\npm\...`, but each command continued and exited successfully.

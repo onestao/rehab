@@ -1,82 +1,82 @@
 // @ts-nocheck
-const CACHE = 'training-assistant-v113';
+const CACHE = 'training-assistant-v118';
+const CACHE_VERSION = CACHE.replace(/^training-assistant-v/, '');
 const ASSETS = [
-    'index.html',
-    'build/generated.css?v=113',
-    'css-src/42-health-profile.css?v=113',
-    'theme.js?v=113',
-    'haptics.js?v=113',
-    'fooddb.js?v=113',
-    'ai-store.js?v=113',
-    'ai-profile.js?v=113',
-    'ai-models.js?v=113',
-    'ai-api.js?v=113',
-    'ai-pricing.js?v=113',
-    'ai-templates.js?v=113',
-    'render-safe.js?v=113',
-    'nav-stack.js?v=113',
-    'data-utils-pure.js?v=113',
-    'data-utils.js?v=113',
-    'data-records.js?v=113',
-    'data-schema.js?v=113',
-    'storage/idb.js?v=113',
-    'storage/migrate.js?v=113',
-    'data-store.js?v=113',
-    'data-ui-state.js?v=113',
-    'health-diet.js?v=113',
-    'health-weight.js?v=113',
-    'health-exercise.js?v=113',
-    'goal-plan.js?v=113',
-    'routine-plan.js?v=113',
-    'routine-library.js?v=113',
-    'data-views.js?v=113',
-    'data.js?v=113',
-    'voice-engine.js?v=113',
-    'voice-cache.js?v=113',
-    'voice-webspeech-adapter.js?v=113',
-    'voice-legado-adapter.js?v=113',
-    'workout-voice.js?v=113',
-    'strength-form.js?v=113',
-    'weekly-plan.js?v=113',
-    'action-history.js?v=113',
-    'food-log.js?v=113',
-    'advice-panel.js?v=113',
-    'advice-template-manager.js?v=113',
-    'advice-render.js?v=113',
-    'advice-prompt.js?v=113',
-    'advice-stream-renderer.js?v=113',
-    'backup.js?v=113',
-    'sync-ui.js?v=113',
-    'sync-adapters.js?v=113',
-    'sync.js?v=113',
-    'sync-pure.js?v=113',
-    'sync-status.js?v=113',
-    'workout-system.js?v=113',
-    'workout-wakelock.js?v=113',
-    'workout-media-session.js?v=113',
-    'workout-pip.js?v=113',
-    'workout-core.js?v=113',
-    'workout-cardio-pure.js?v=113',
-    'workout-cardio.js?v=113',
-    'workout-engine.js?v=113',
-    'workout-state.js?v=113',
-    'app-update.js?v=113',
-    'credential-fields.js?v=113',
-    'sheet-drag.js?v=113',
-    'toast.js?v=113',
-    'error-bus.js?v=113',
-    'i18n.js?v=113',
-    'a11y-focus-trap.js?v=113',
-    'i18n/zh-CN.json?v=113',
-    'i18n/en-US.json?v=113',
-    'weekly-summary.js?v=113',
-    'pr-tracker.js?v=113',
-    'volume-heatmap.js?v=113',
-    'onboarding.js?v=113',
-    'swipe-actions.js?v=113',
-    'health-profile.js?v=113',
-    'report-metrics-pure.js?v=113',
-    'report-panel.js?v=113',
+    'build/generated.css?v=118',
+    'css-src/42-health-profile.css?v=118',
+    'theme.js?v=118',
+    'haptics.js?v=118',
+    'fooddb.js?v=118',
+    'ai-store.js?v=118',
+    'ai-profile.js?v=118',
+    'ai-models.js?v=118',
+    'ai-api.js?v=118',
+    'ai-pricing.js?v=118',
+    'ai-templates.js?v=118',
+    'render-safe.js?v=118',
+    'nav-stack.js?v=118',
+    'data-utils-pure.js?v=118',
+    'data-utils.js?v=118',
+    'data-records.js?v=118',
+    'data-schema.js?v=118',
+    'storage/idb.js?v=118',
+    'storage/migrate.js?v=118',
+    'data-store.js?v=118',
+    'data-ui-state.js?v=118',
+    'health-diet.js?v=118',
+    'health-weight.js?v=118',
+    'health-exercise.js?v=118',
+    'goal-plan.js?v=118',
+    'routine-plan.js?v=118',
+    'routine-library.js?v=118',
+    'data-views.js?v=118',
+    'data.js?v=118',
+    'voice-engine.js?v=118',
+    'voice-cache.js?v=118',
+    'voice-webspeech-adapter.js?v=118',
+    'voice-legado-adapter.js?v=118',
+    'workout-voice.js?v=118',
+    'strength-form.js?v=118',
+    'weekly-plan.js?v=118',
+    'action-history.js?v=118',
+    'food-log.js?v=118',
+    'advice-panel.js?v=118',
+    'advice-template-manager.js?v=118',
+    'advice-render.js?v=118',
+    'advice-prompt.js?v=118',
+    'advice-stream-renderer.js?v=118',
+    'backup.js?v=118',
+    'sync-ui.js?v=118',
+    'sync-adapters.js?v=118',
+    'sync.js?v=118',
+    'sync-pure.js?v=118',
+    'sync-status.js?v=118',
+    'workout-system.js?v=118',
+    'workout-wakelock.js?v=118',
+    'workout-media-session.js?v=118',
+    'workout-pip.js?v=118',
+    'workout-core.js?v=118',
+    'workout-cardio-pure.js?v=118',
+    'workout-cardio.js?v=118',
+    'workout-engine.js?v=118',
+    'workout-state.js?v=118',
+    'app-update.js?v=118',
+    'credential-fields.js?v=118',
+    'sheet-drag.js?v=118',
+    'toast.js?v=118',
+    'error-bus.js?v=118',
+    'i18n.js?v=118',
+    'a11y-focus-trap.js?v=118',
+    'i18n/zh-CN.json?v=118',
+    'i18n/en-US.json?v=118',
+    'weekly-summary.js?v=118',
+    'pr-tracker.js?v=118',
+    'volume-heatmap.js?v=118',
+    'onboarding.js?v=118',
+    'swipe-actions.js?v=118',
+    'health-profile.js?v=118',
+    'report-metrics-pure.js?v=118',
+    'report-panel.js?v=118',
     'assets/model-icons/openai.svg',
     'assets/model-icons/gemini.svg',
     'assets/model-icons/grok.svg',
@@ -101,6 +101,7 @@ self.addEventListener('install', (e) => {
         await Promise.all(ASSETS.map((asset) => cache.add(asset).catch((err) => {
             console.warn('[sw] precache skipped', asset, err && err.message);
         })));
+        await self.skipWaiting();
     })());
 });
 
@@ -123,6 +124,13 @@ function isVersionedAsset(url) {
     return url.searchParams.has('v');
 }
 
+function normalizeVersionedAsset(url) {
+    if (!isVersionedAsset(url) || url.searchParams.get('v') === CACHE_VERSION) return url.toString();
+    const next = new URL(url.toString());
+    next.searchParams.set('v', CACHE_VERSION);
+    return next.toString();
+}
+
 self.addEventListener('fetch', (event) => {
     if (event.request.method !== 'GET') return;
     const url = new URL(event.request.url);
@@ -132,21 +140,27 @@ self.addEventListener('fetch', (event) => {
     }
     if (url.origin !== location.origin) return;
 
+    if (event.request.mode === 'navigate' || url.pathname.endsWith('/index.html') || url.pathname === '/') {
+        event.respondWith(fetch(event.request, { cache: 'no-store' }));
+        return;
+    }
+
     if (isVersionedAsset(url)) {
         // Cache-first for hashed assets: avoids slow waterfall on tab switch.
         event.respondWith((async () => {
-            const cached = await caches.match(event.request);
+            const cacheKey = normalizeVersionedAsset(url);
+            const cached = await caches.match(cacheKey);
             if (cached) return cached;
             try {
-                const res = await fetch(event.request);
+                const res = await fetch(cacheKey, { credentials: 'same-origin', cache: 'no-store' });
                 if (res && res.ok) {
                     const clone = res.clone();
                     const cache = await caches.open(CACHE);
-                    cache.put(event.request, clone).catch(() => {});
+                    cache.put(cacheKey, clone).catch(() => {});
                 }
                 return res;
             } catch (err) {
-                const fallback = await caches.match(event.request);
+                const fallback = await caches.match(cacheKey);
                 if (fallback) return fallback;
                 throw err;
             }
@@ -154,7 +168,7 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
-    // Network-first for unversioned navigations / dynamic data.
+    // Network-first for unversioned dynamic data.
     event.respondWith((async () => {
         try {
             const res = await fetch(event.request);
