@@ -16,6 +16,7 @@ const ai = {
     },
     models: [],
     keyMap: {},
+    overrideModel: null,
     dbPromise: null,
 
     async init(options = {}) {
@@ -30,6 +31,7 @@ const ai = {
         };
         this.models = [];
         this.keyMap = {};
+        this.overrideModel = null;
 
         await this.initDb();
 
@@ -153,6 +155,46 @@ const ai = {
             tx.oncomplete = () => resolve();
             tx.onerror = () => reject(tx.error);
         }).catch(() => {});
+    },
+
+    findProfile(id) {
+        return (this.cfg.profiles || []).find(p => p.id === id) || null;
+    },
+
+    setOverride(override = {}) {
+        const profileId = override.profileId || this.cfg.activeProfileId || '';
+        this.overrideModel = {
+            profileId,
+            provider: override.provider || this.findProfile(profileId)?.provider || this.cfg.provider || 'openai',
+            model: override.model || this.findProfile(profileId)?.model || this.cfg.model || ''
+        };
+        try { window.dispatchEvent(new CustomEvent('ai:override-change', { detail: this.overrideModel })); } catch {}
+    },
+
+    clearOverride() {
+        this.overrideModel = null;
+        try { window.dispatchEvent(new CustomEvent('ai:override-change')); } catch {}
+    },
+
+    getEffectiveConfig() {
+        const profile = this.findProfile(this.overrideModel?.profileId) || this.findProfile(this.cfg.activeProfileId);
+        const fallback = profile || {
+            id: this.cfg.activeProfileId || '',
+            provider: this.cfg.provider || 'openai',
+            model: this.cfg.model || '',
+            baseUrl: this.cfg.baseUrl || ''
+        };
+        const profileId = this.overrideModel?.profileId || fallback.id || this.cfg.activeProfileId || '';
+        const provider = this.overrideModel?.provider || fallback.provider || this.cfg.provider || 'openai';
+        const model = this.overrideModel?.model || fallback.model || this.cfg.model || '';
+        return {
+            profileId,
+            provider,
+            model,
+            baseUrl: fallback.baseUrl || this.cfg.baseUrl || '',
+            enabled: !!((fallback.baseUrl || this.cfg.baseUrl) && model),
+            apiKey: profileId ? this.apiKeyFor(profileId) : ''
+        };
     },
 };
 

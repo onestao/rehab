@@ -34,6 +34,8 @@
         const state = {
             buffer: '',
             shown: '',
+            committedHtml: '',
+            tail: '',
             destroyed: false,
             autoScroll: true
         };
@@ -49,7 +51,9 @@
             const chunk = state.buffer.slice(0, n);
             state.buffer = state.buffer.slice(n);
             state.shown += chunk;
-            target.innerHTML = render(state.shown);
+            state.tail = state.shown;
+            target.innerHTML = `<span data-stream="tail" data-no-stream-cursor>${render(state.tail)}</span>`;
+            target.querySelectorAll('p, li, h1, h2, h3').forEach(el => el.classList.add('m3e-token-in'));
             if (state.autoScroll) {
                 target.scrollIntoView({ block: 'end' });
             }
@@ -66,7 +70,8 @@
             if (state.destroyed) return;
             state.shown = String(text || '');
             state.buffer = '';
-            target.innerHTML = render(state.shown);
+            state.tail = state.shown;
+            target.innerHTML = `<span data-stream="tail" data-no-stream-cursor>${render(state.tail)}</span>`;
         }
 
         function pause(reason = 'manual') {

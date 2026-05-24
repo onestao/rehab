@@ -424,7 +424,7 @@
                 ['training', 'health_and_safety', '健康'],
                 ['calendar', 'calendar_month', '记录日历']
             ];
-            return `<div class="record-tabs record-tabs-scroll" role="tablist" aria-label="健康记录视图">${tabs.map(([key, icon, label]) => `<button class="record-tab ${this.healthView === key ? 'active' : ''}" data-health-view="${key}" onclick="data.scrollToHealthView('${key}')" type="button"><span class="material-symbols-rounded">${icon}</span>${label}</button>`).join('')}</div>`;
+            return `<div class="record-tabs record-tabs-scroll" role="tablist" aria-label="健康记录视图">${tabs.map(([key, icon, label]) => `<button class="record-tab ${this.healthView === key ? 'active' : ''}" data-health-view="${key}" onclick="data.scrollToHealthView('${key}')" type="button" role="tab" aria-selected="${this.healthView === key}" aria-pressed="${this.healthView === key}"><span class="material-symbols-rounded">${icon}</span>${label}</button>`).join('')}</div>`;
         },
 
         healthViewOrder() {

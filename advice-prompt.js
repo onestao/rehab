@@ -171,12 +171,12 @@ Object.assign(advicePanel, {
 
     async requestAiAdvice(prompt, model) {
         const messages = this.buildAdviceMessages(prompt, model);
-        const oldModel = ai.cfg.model;
-        ai.cfg.model = model;
+        const oldOverride = ai.overrideModel;
+        if (model) ai.setOverride?.({ model });
         try {
             return await ai.call(messages, 2400);
         } finally {
-            ai.cfg.model = oldModel;
+            ai.overrideModel = oldOverride || null;
         }
     },
 });

@@ -1,6 +1,14 @@
 // @ts-nocheck
 window.toast = {
     show(msg, type = 'info', ms = 2400, action = null) {
+        if (ms && typeof ms === 'object') {
+            action = ms.action ? {
+                label: ms.action,
+                onClick: typeof ms.onAction === 'function' ? ms.onAction : ms.onClick
+            } : (ms.actionConfig || null);
+            ms = Number(ms.timeout || ms.ms || 2400);
+        }
+        if (type === 'error') window.haptics?.error?.();
         let el = document.getElementById('appToast');
         if (!el) {
             el = document.createElement('div');

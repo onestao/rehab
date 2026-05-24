@@ -461,6 +461,7 @@
             if (modeDetail) modeDetail.textContent = meta.detail;
             document.querySelectorAll('input[name="voicePriority"]').forEach(input => {
                 input.checked = input.value === voice.priority;
+                input.closest('.voice-priority-option')?.setAttribute('aria-checked', String(input.checked));
             });
             if (cacheEl) cacheEl.checked = !!voice.cache;
             if (timeoutEl) timeoutEl.value = voice.timeoutMs;

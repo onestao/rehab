@@ -49,6 +49,7 @@ Object.assign(workout, {
 
     setTrainingPaused(paused) {
         if (!this.isPlaying) return;
+        window.haptics?.light?.();
         const nextPaused = !!paused;
         if (this.mode === 'cardio') {
             cardio.isPaused = nextPaused;
@@ -82,6 +83,9 @@ Object.assign(workout, {
         document.getElementById('modeStrengthBtn').setAttribute('aria-selected', String(mode === 'strength'));
         document.getElementById('modeCardioBtn').setAttribute('aria-selected', String(mode === 'cardio'));
         document.getElementById('modeStrengthLogBtn').setAttribute('aria-selected', String(mode === 'strengthLog'));
+        document.getElementById('modeStrengthBtn').setAttribute('aria-pressed', String(mode === 'strength'));
+        document.getElementById('modeCardioBtn').setAttribute('aria-pressed', String(mode === 'cardio'));
+        document.getElementById('modeStrengthLogBtn').setAttribute('aria-pressed', String(mode === 'strengthLog'));
         document.getElementById('strengthCard').classList.toggle('hidden', mode !== 'strength');
         document.querySelector('.cardio-card').classList.toggle('hidden', mode !== 'cardio');
         document.getElementById('strengthLogCard').classList.toggle('hidden', mode !== 'strengthLog');
@@ -119,6 +123,7 @@ Object.assign(workout, {
     },
 
     async toggle() {
+        window.haptics?.light?.();
         const fab = document.getElementById('playBtn');
         if (fab) {
             const r = document.createElement('span');
@@ -186,6 +191,7 @@ Object.assign(workout, {
 
     skip() {
         if (!this.isPlaying) return;
+        window.haptics?.medium?.();
         if (this.mode === 'strength' && window.workoutEngine?.skipCurrentPhase()) {
             document.getElementById('statusText').innerText = 'SKIP';
             document.getElementById('subText').innerText = '已跳过当前阶段';
@@ -215,6 +221,7 @@ Object.assign(workout, {
     },
     stop() {
         if (this.mode === 'cardio') return cardio.stop();
+        window.haptics?.medium?.();
         if(confirm("停止并保存记录？")) {
             this.isPlaying = false;
             if (this._countResolve) { this._countResolve(); this._countResolve = null; }
@@ -251,6 +258,7 @@ Object.assign(workout, {
             return;
         }
         this.speak("训练完成");
+        window.haptics?.success?.();
         data.db.history.unshift({
             id: data.generateRecordId('history'),
             date: new Date().toLocaleString(), dayKey: data.logicalDateKey(), duration,
@@ -269,7 +277,9 @@ Object.assign(workout, {
         document.getElementById('setReviewTitle').textContent = `${actionName} 第${setIdx}组`;
         document.getElementById('setReviewReps').value = plannedReps;
         document.getElementById('setReviewWeight').value = '';
+        document.getElementById('setReviewRpe').value = '';
         document.getElementById('setReviewNote').value = '';
+        this.setReviewRpe('');
         const modal = document.getElementById('setReviewModal');
         window.navStack?.replaceOrPush?.({
             type: 'modal',
@@ -293,13 +303,24 @@ Object.assign(workout, {
         if (!this._reviewCtx) return;
         const w = parseFloat(document.getElementById('setReviewWeight').value) || 0;
         const reps = parseInt(document.getElementById('setReviewReps').value) || this._reviewCtx.plannedReps;
+        const rpe = parseInt(document.getElementById('setReviewRpe')?.value || '', 10) || null;
         const note = document.getElementById('setReviewNote').value || '';
         data.db.actualSetsBuffer = data.db.actualSetsBuffer || [];
         data.db.actualSetsBuffer.push({
             action: this._reviewCtx.actionName, setIdx: this._reviewCtx.setIdx,
-            weightKg: w, reps, note, at: new Date().toISOString()
+            weightKg: w, reps, note, extras: rpe ? { rpe } : {}, rpe, at: new Date().toISOString()
         });
+        window.haptics?.success?.();
         data.save();
         this.closeSetReview();
+    },
+    setReviewRpe(value) {
+        const input = document.getElementById('setReviewRpe');
+        if (input) input.value = value ? String(value) : '';
+        document.querySelectorAll('[data-rpe]').forEach(btn => {
+            btn.classList.toggle('active', String(btn.getAttribute('data-rpe')) === String(value));
+            btn.setAttribute('aria-selected', String(btn.classList.contains('active')));
+        });
+        if (value) window.haptics?.light?.();
     }
 });

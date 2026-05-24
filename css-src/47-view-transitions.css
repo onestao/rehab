@@ -1,0 +1,18 @@
+/* --- View Transitions --- */
+::view-transition-old(root) {
+    animation: view-fade-out 80ms var(--md-sys-motion-standard-accelerate, cubic-bezier(.3,0,1,1)) both;
+}
+
+::view-transition-new(root) {
+    animation: view-fade-in 200ms var(--md-sys-motion-standard-decelerate, cubic-bezier(0,0,.2,1)) both;
+}
+
+@keyframes view-fade-out {
+    from { opacity: 1; }
+    to { opacity: 0; }
+}
+
+@keyframes view-fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}

@@ -2,31 +2,33 @@
 Object.assign(ai, {
     // --- API Calls (统一入口，按 provider 分发) ---
     async call(messages, maxTokens = 2000) {
-        if (!this.cfg.enabled) throw new Error('请先在设置中配置 AI 接口');
-        const key = this.apiKeyFor(this.cfg.activeProfileId);
+        const effective = this.getEffectiveConfig ? this.getEffectiveConfig() : { ...this.cfg, profileId: this.cfg.activeProfileId, apiKey: this.apiKeyFor(this.cfg.activeProfileId) };
+        if (!effective.enabled) throw new Error('请先在设置中配置 AI 接口');
+        const key = effective.apiKey;
         if (!key) throw new Error('请先在当前 AI 配置中填写 API Key');
-        const provider = this.cfg.provider || 'openai';
-        if (provider === 'claude')           return this._callClaude(messages, maxTokens, key, false);
-        if (provider === 'openai-responses') return this._callOpenAIResponses(messages, maxTokens, key, false);
-        if (provider === 'gemini')           return this._callGemini(messages, maxTokens, key, false);
-        return this._callOpenAIChat(messages, maxTokens, key, false);
+        const provider = effective.provider || 'openai';
+        if (provider === 'claude')           return this._callClaude(messages, maxTokens, key, false, null, effective);
+        if (provider === 'openai-responses') return this._callOpenAIResponses(messages, maxTokens, key, false, null, effective);
+        if (provider === 'gemini')           return this._callGemini(messages, maxTokens, key, false, null, effective);
+        return this._callOpenAIChat(messages, maxTokens, key, false, null, effective);
     },
 
     async callStream(messages, maxTokens = 2000, onToken = () => {}) {
-        if (!this.cfg.enabled) throw new Error('请先在设置中配置 AI 接口');
-        const key = this.apiKeyFor(this.cfg.activeProfileId);
+        const effective = this.getEffectiveConfig ? this.getEffectiveConfig() : { ...this.cfg, profileId: this.cfg.activeProfileId, apiKey: this.apiKeyFor(this.cfg.activeProfileId) };
+        if (!effective.enabled) throw new Error('请先在设置中配置 AI 接口');
+        const key = effective.apiKey;
         if (!key) throw new Error('请先在当前 AI 配置中填写 API Key');
-        const provider = this.cfg.provider || 'openai';
-        if (provider === 'claude')           return this._callClaude(messages, maxTokens, key, true, onToken);
-        if (provider === 'openai-responses') return this._callOpenAIResponses(messages, maxTokens, key, true, onToken);
-        if (provider === 'gemini')           return this._callGemini(messages, maxTokens, key, true, onToken);
-        return this._callOpenAIChat(messages, maxTokens, key, true, onToken);
+        const provider = effective.provider || 'openai';
+        if (provider === 'claude')           return this._callClaude(messages, maxTokens, key, true, onToken, effective);
+        if (provider === 'openai-responses') return this._callOpenAIResponses(messages, maxTokens, key, true, onToken, effective);
+        if (provider === 'gemini')           return this._callGemini(messages, maxTokens, key, true, onToken, effective);
+        return this._callOpenAIChat(messages, maxTokens, key, true, onToken, effective);
     },
 
     // ---------- OpenAI Chat Completions ----------
-    async _callOpenAIChat(messages, maxTokens, key, stream, onChunk) {
-        const url = `${this.cfg.baseUrl}/chat/completions`;
-        const body = { model: this.cfg.model, messages, temperature: 0.3, max_tokens: maxTokens };
+    async _callOpenAIChat(messages, maxTokens, key, stream, onChunk, effective = this.getEffectiveConfig?.() || this.cfg) {
+        const url = `${effective.baseUrl}/chat/completions`;
+        const body = { model: effective.model, messages, temperature: 0.3, max_tokens: maxTokens };
         if (stream) body.stream = true;
         const res = await fetch(url, {
             method: 'POST',
@@ -65,15 +67,15 @@ Object.assign(ai, {
     },
 
     // ---------- OpenAI Responses API（最新 /v1/responses） ----------
-    async _callOpenAIResponses(messages, maxTokens, key, stream, onChunk) {
-        const url = `${this.cfg.baseUrl}/responses`;
+    async _callOpenAIResponses(messages, maxTokens, key, stream, onChunk, effective = this.getEffectiveConfig?.() || this.cfg) {
+        const url = `${effective.baseUrl}/responses`;
         const sys = messages.filter(m => m.role === 'system').map(m => m.content).join('\n');
         const input = messages.filter(m => m.role !== 'system').map(m => ({
             role: m.role,
             content: [{ type: m.role === 'assistant' ? 'output_text' : 'input_text', text: m.content }]
         }));
         const body = {
-            model: this.cfg.model,
+            model: effective.model,
             input,
             max_output_tokens: maxTokens,
             temperature: 0.3
@@ -114,15 +116,15 @@ Object.assign(ai, {
     },
 
     // ---------- Anthropic Claude Messages API ----------
-    async _callClaude(messages, maxTokens, key, stream, onChunk) {
-        const url = `${this.cfg.baseUrl}/messages`;
+    async _callClaude(messages, maxTokens, key, stream, onChunk, effective = this.getEffectiveConfig?.() || this.cfg) {
+        const url = `${effective.baseUrl}/messages`;
         const sys = messages.filter(m => m.role === 'system').map(m => m.content).join('\n');
         const msgs = messages.filter(m => m.role !== 'system').map(m => ({
             role: m.role === 'assistant' ? 'assistant' : 'user',
             content: m.content
         }));
         const body = {
-            model: this.cfg.model,
+            model: effective.model,
             messages: msgs,
             max_tokens: maxTokens,
             temperature: 0.3
@@ -162,14 +164,14 @@ Object.assign(ai, {
     },
 
     // ---------- Gemini ----------
-    async _callGemini(messages, maxTokens, key, stream, onChunk) {
+    async _callGemini(messages, maxTokens, key, stream, onChunk, effective = this.getEffectiveConfig?.() || this.cfg) {
         const sys = messages.filter(m => m.role === 'system').map(m => m.content).join('\n');
         const contents = messages.filter(m => m.role !== 'system').map(m => ({
             role: m.role === 'assistant' ? 'model' : 'user',
             parts: [{ text: m.content }]
         }));
         const action = stream ? `streamGenerateContent?alt=sse&key=${key}` : `generateContent?key=${key}`;
-        const url = `${this.cfg.baseUrl}/models/${this.cfg.model}:${action}`;
+        const url = `${effective.baseUrl}/models/${effective.model}:${action}`;
         const body = {
             contents,
             generationConfig: { temperature: 0.3, maxOutputTokens: maxTokens },

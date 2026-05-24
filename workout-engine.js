@@ -219,6 +219,7 @@ const workoutEngine = {
                     this.state.sideIndex = 0;
                     this.state.repIndex = 0;
                     this.state.setIndex++;
+                    window.haptics?.success?.();
                     this.transition(this.state.setIndex < action.sets ? 'setRest' : 'actionBreak');
                 }
                 continue;

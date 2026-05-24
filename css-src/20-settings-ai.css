@@ -484,3 +484,45 @@
     to { transform: translate3d(0,0,0) scale(1); }
 }
 
+.md-field-has-action input {
+    padding-right: 48px;
+}
+
+.password-visibility-toggle {
+    position: absolute;
+    right: 6px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 40px;
+    height: 40px;
+    border: 0;
+    border-radius: var(--md-sys-shape-full);
+    padding: 0;
+    background: transparent;
+    color: var(--md-sys-on-surface-variant);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition:
+        background var(--md-sys-motion-duration-short) var(--md-sys-motion-emphasized),
+        color var(--md-sys-motion-duration-short) var(--md-sys-motion-emphasized),
+        transform var(--md-sys-motion-duration-short) var(--md-expressive-spring);
+}
+
+.password-visibility-toggle:hover,
+.password-visibility-toggle:focus-visible {
+    background: color-mix(in srgb, var(--md-sys-on-surface) 8%, transparent);
+    color: var(--md-sys-on-surface);
+}
+
+.password-visibility-toggle:active {
+    transform: translateY(-50%) scale(.94);
+    background: color-mix(in srgb, var(--md-sys-on-surface) 12%, transparent);
+}
+
+.password-visibility-toggle .material-symbols-rounded {
+    font-size: 22px;
+    line-height: 1;
+}

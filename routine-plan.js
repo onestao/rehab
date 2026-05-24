@@ -28,12 +28,12 @@
             };
             return {
                 name: document.getElementById('name').value || '未命名',
-                sets: Math.max(1, readInt('sets', 1)),
-                reps: Math.max(1, readInt('reps', 1)),
-                work: Math.max(1, readInt('work', 5)),
-                repRest: readInt('repRest', 2),
-                actionRest: readInt('actionRest', 10),
-                groupRest: readInt('groupRest', 15),
+                sets: Math.max(1, readInt('sets', 3)),
+                reps: Math.max(0, readInt('reps', 12)),
+                work: Math.max(0, readInt('work', 0)),
+                repRest: readInt('repRest', 30),
+                actionRest: readInt('actionRest', 90),
+                groupRest: readInt('groupRest', 120),
                 switchRest: 3,
                 isAlt: document.getElementById('isAlt').checked,
                 phase: document.getElementById('actionPhase')?.value || 'main',
@@ -60,6 +60,7 @@
             };
             this.save();
             document.getElementById('name').value = '';
+            window.haptics?.light?.();
         },
 
         saveCurrentActionToLibrary() {
@@ -86,6 +87,7 @@
             this.db.actions.push(a);
             this.db.libraryView = 'actions';
             this.saveAndBackup?.() || this.save();
+            window.haptics?.light?.();
             if (window.toast?.show) toast.show(`"${name}" 已存入动作库`, 'success');
         },
 
@@ -123,6 +125,7 @@
                         <div class="item-chip">组休${a.actionRest}s &middot; 项休${a.groupRest}s${a.isAlt ? ' &middot; 双侧' : ''}</div>
                     </div>
                     <button class="save-lib-btn" onclick="data.savePlanActionToLibrary('${a.id}')" title="存入动作库" aria-label="存入动作库"><span class="material-symbols-rounded">bookmark_add</span></button>
+                    <button class="save-lib-btn" onclick="actionHistory.openFor(decodeURIComponent('${encodeURIComponent(a.name || '')}'))" title="查看历史曲线" aria-label="查看历史曲线"><span class="material-symbols-rounded">monitoring</span></button>
                     <button class="delete-btn" onclick="data.deleteAction('${a.id}')"><span class="material-symbols-rounded">delete</span></button>
                 </div>`).join('')}</div>`;
             }).join('');
@@ -136,8 +139,11 @@
             const recentRoutines = routines.slice(-3).reverse();
             const actionCount = actions.length;
 
+            const todayBanner = window.weeklyPlan?.renderTodayBanner?.() || '';
+
             if (actionCount === 0 && routines.length === 0) {
                 el.innerHTML = `
+                ${todayBanner}
                 <div class="md-card workout-plan-card workout-plan-empty">
                     <div class="workout-plan-empty-icon">
                         <span class="material-symbols-rounded">fitness_center</span>
@@ -160,6 +166,7 @@
 
             if (actionCount === 0 && routines.length > 0) {
                 el.innerHTML = `
+                ${todayBanner}
                 <div class="md-card workout-plan-card workout-plan-import">
                     <div class="workout-plan-import-head">
                         <div>
@@ -198,6 +205,7 @@
             }, 0) / 60);
 
             el.innerHTML = `
+            ${todayBanner}
             <div class="md-card workout-plan-card">
                 <div class="workout-plan-head">
                     <div class="workout-plan-info">

@@ -7,9 +7,11 @@
     <link rel="manifest" href="manifest.json">
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230061a4'/%3E%3Cpath d='M22 22h6v20h-6zM36 22h6v20h-6z' fill='white'/%3E%3Cpath d='M16 28h8v8h-8zM40 28h8v8h-8z' fill='white' opacity='.9'/%3E%3C/svg%3E">
     <meta name="theme-color" content="#0061a4">
-    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&icon_names=accessibility_new,add,add_circle,assignment,auto_awesome,backup,badge,balance,block,bookmark_add,bookmark_border,bookmarks,brightness_auto,calendar_month,check,check_circle,chevron_left,chevron_right,clinical_notes,close,close_fullscreen,cloud_alert,cloud_done,cloud_off,cloud_sync,content_copy,dark_mode,delete,directions_bike,directions_run,directions_walk,done_all,download,download_for_offline,edit,edit_note,egg_alt,error,event,event_note,exercise,expand_less,expand_more,fitness_center,flag,format_color_fill,forum,health_and_safety,help,history,info,inventory_2,keyboard_arrow_down,keyboard_arrow_left,keyboard_arrow_right,keyboard_arrow_up,library_books,light_mode,local_fire_department,lock,lock_open,mic,mic_off,monitor_heart,monitor_weight,monitoring,more_vert,no_food,notifications,notifications_active,palette,pause,pedal_bike,person,picture_in_picture_alt,play_arrow,playlist_add,pool,psychology,record_voice_over,refresh,remove,replay,restart_alt,restaurant,rowing,save,schedule,search,search_off,self_improvement,send,settings,shield,show_chart,skip_next,skip_previous,speed,sports,sports_gymnastics,stop,swap_horiz,sync,sync_problem,system_update,timeline,timer,today,trending_down,trending_up,tune,upload,upload_file,visibility,visibility_off,volume_off,volume_up,warning,waterfall_chart,week" rel="stylesheet" />
-    <link rel="stylesheet" href="build/generated.css?v=106">
-    <link rel="stylesheet" href="css-src/42-health-profile.css?v=106">
+    <style>
+        @import url("https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&icon_names=accessibility_new,add,add_circle,assignment,auto_awesome,backup,badge,balance,block,bookmark_add,bookmark_border,bookmarks,brightness_auto,calendar_month,check,check_circle,chevron_left,chevron_right,clinical_notes,close,close_fullscreen,cloud_alert,cloud_done,cloud_off,cloud_sync,content_copy,dark_mode,delete,directions_bike,directions_run,directions_walk,done_all,download,download_for_offline,edit,edit_note,egg_alt,error,event,event_note,exercise,expand_less,expand_more,fitness_center,flag,format_color_fill,forum,health_and_safety,help,history,info,inventory_2,keyboard_arrow_down,keyboard_arrow_left,keyboard_arrow_right,keyboard_arrow_up,library_books,light_mode,local_fire_department,lock,lock_open,mic,mic_off,monitor_heart,monitor_weight,monitoring,more_vert,no_food,notifications,notifications_active,palette,pause,pedal_bike,person,picture_in_picture_alt,play_arrow,playlist_add,pool,psychology,record_voice_over,refresh,remove,replay,restart_alt,restaurant,rowing,save,schedule,search,search_off,self_improvement,send,settings,shield,show_chart,skip_next,skip_previous,speed,sports,sports_gymnastics,stop,swap_horiz,sync,sync_problem,system_update,timeline,timer,today,trending_down,trending_up,tune,upload,upload_file,visibility,visibility_off,volume_off,volume_up,warning,waterfall_chart,week") layer(fonts);
+    </style>
+    <link rel="stylesheet" href="build/generated.css?v=113">
+    <link rel="stylesheet" href="css-src/42-health-profile.css?v=113">
 </head>
 <body>
     <div id="appUpdateBanner" class="app-update-banner hidden">
@@ -58,9 +60,9 @@
             </div>
 
             <div class="mode-tabs" role="tablist" aria-label="&#35757;&#32451;&#27169;&#24335;">
-                <button id="modeStrengthBtn" class="mode-tab active" role="tab" aria-selected="true" onclick="workout.setMode('strength')" type="button"><span class="material-symbols-rounded">exercise</span>&#21147;&#37327;</button>
-                <button id="modeCardioBtn" class="mode-tab" role="tab" aria-selected="false" onclick="workout.setMode('cardio')" type="button"><span class="material-symbols-rounded">directions_run</span>&#26377;&#27687;</button>
-                <button id="modeStrengthLogBtn" class="mode-tab" role="tab" aria-selected="false" onclick="workout.setMode('strengthLog')" type="button"><span class="material-symbols-rounded">fitness_center</span>&#21147;&#37327;&#35760;&#24405;</button>
+                <button id="modeStrengthBtn" class="mode-tab active" role="tab" aria-selected="true" aria-pressed="true" onclick="workout.setMode('strength')" type="button"><span class="material-symbols-rounded">exercise</span>&#21147;&#37327;</button>
+                <button id="modeCardioBtn" class="mode-tab" role="tab" aria-selected="false" aria-pressed="false" onclick="workout.setMode('cardio')" type="button"><span class="material-symbols-rounded">directions_run</span>&#26377;&#27687;</button>
+                <button id="modeStrengthLogBtn" class="mode-tab" role="tab" aria-selected="false" aria-pressed="false" onclick="workout.setMode('strengthLog')" type="button"><span class="material-symbols-rounded">fitness_center</span>&#21147;&#37327;&#35760;&#24405;</button>
             </div>
 
             <div class="md-card input-card" id="strengthCard">
@@ -70,6 +72,12 @@
                     <input type="range" id="ttsRate" min="0.5" max="3" step="0.1" value="1.1" oninput="workout.updateRate(this.value)">
                 </div>
                 <div class="md-divider compact-divider"></div>
+                <div class="strength-presets">
+                    <button class="md-chip" onclick="strengthForm.applyPreset('classic')" type="button">12×3 &#32463;&#20856;</button>
+                    <button class="md-chip" onclick="strengthForm.applyPreset('tabata')" type="button">Tabata 20/10</button>
+                    <button class="md-chip" onclick="strengthForm.applyPreset('strength55')" type="button">5×5 &#21147;&#37327;</button>
+                    <button class="md-chip" onclick="strengthForm.applyPreset('emom30')" type="button">30s×4 EMOM</button>
+                </div>
                 <div class="md-grid strength-input-grid">
                     <div class="md-field strength-name-field">
                         <input type="text" id="name" placeholder=" " autocomplete="off">
@@ -139,8 +147,11 @@
             </div>
             <div class="md-card strength-log-card hidden" id="strengthLogCard">
                 <div class="md-grid">
-                    <div class="md-field span-full">
-                        <input type="text" id="slName" placeholder=" "><label>&#21160;&#20316;&#21517;&#31216;</label>
+                    <div class="sl-name-row span-full">
+                        <div class="md-field">
+                            <input type="text" id="slName" placeholder=" "><label>&#21160;&#20316;&#21517;&#31216;</label>
+                        </div>
+                        <button class="md-icon-btn" onclick="actionHistory.openFor(document.getElementById('slName')?.value)" type="button" aria-label="查看动作历史" title="查看动作历史"><span class="material-symbols-rounded">monitoring</span></button>
                     </div>
                     <div class="md-field"><input type="number" id="slWeight" step="0.5" placeholder=" "><label>&#37325;&#37327; kg</label></div>
                     <div class="md-field"><input type="number" id="slSets" placeholder=" "><label>&#32452;&#25968;</label></div>
@@ -233,8 +244,8 @@
                         </select>
                         <label>AI &#25552;&#20379;&#21830;</label>
                     </div>
-                    <div class="md-field"><input type="text" id="aiBaseUrl" placeholder=" "><label>Base URL</label></div>
-                    <div class="md-field"><input type="text" id="aiApiKey" class="masked-input" placeholder=" " autocomplete="off" spellcheck="false"><label>API Key</label></div>
+                    <div class="md-field"><input type="text" id="aiBaseUrl" pattern="^https?://.+" placeholder=" "><label>Base URL</label></div>
+                    <div class="md-field"><input type="password" id="aiApiKey" class="masked-input" placeholder=" " autocomplete="off" spellcheck="false"><label>API Key</label></div>
                     <button class="md-btn md-btn-tonal" onclick="ai.fetchModels()"><span class="material-symbols-rounded">refresh</span> &#33719;&#21462;&#21487;&#29992;&#27169;&#22411;</button>
                     <div id="aiFetchStatus" class="food-ai-status"></div>
                     <div id="aiModelList" class="ai-model-list hidden"></div>
@@ -244,7 +255,7 @@
                          <div class="ai-encrypt-section">
                              <div class="ai-encrypt-title"><span class="material-symbols-rounded">lock</span> &#21152;&#23494;&#21516;&#27493; AI &#37197;&#32622;</div>
                              <small>&#25226;&#24403;&#21069; AI &#37197;&#32622;&#21152;&#23494;&#21518;&#19978;&#20256;&#21040;&#20113;&#31471;&#12290;&#21482;&#26377;&#36755;&#20837;&#27491;&#30830;&#23494;&#30721;&#65292;&#25165;&#33021;&#22312;&#20854;&#20182;&#35774;&#22791;&#19978;&#24674;&#22797;&#36825;&#20123;&#37197;&#32622;&#12290;</small>
-                             <div class="md-field"><input type="text" id="aiEncryptPass" class="masked-input" placeholder=" " autocomplete="off" spellcheck="false"><label>&#21152;&#23494;&#23494;&#30721;</label></div>
+                             <div class="md-field"><input type="password" id="aiEncryptPass" class="masked-input" placeholder=" " autocomplete="off" spellcheck="false"><label>&#21152;&#23494;&#23494;&#30721;</label></div>
                              <button class="md-btn md-btn-tonal" onclick="ai.exportToSync()"><span class="material-symbols-rounded">upload</span> &#21152;&#23494;&#24182;&#19978;&#20256;&#21040;&#20113;&#31471;</button>
                          </div>
                          <div class="md-divider"></div>
@@ -268,7 +279,7 @@
                     <div id="aiDecryptSection" class="ai-encrypt-section hidden">
                         <div class="ai-encrypt-title"><span class="material-symbols-rounded">lock_open</span> &#23548;&#20837; AI &#37197;&#32622;</div>
                         <small>&#22914;&#26524;&#20113;&#31471;&#24050;&#32463;&#20445;&#23384;&#20102;&#21152;&#23494;&#30340; AI &#37197;&#32622;&#65292;&#22312;&#36825;&#37324;&#36755;&#20837;&#23494;&#30721;&#21518;&#21363;&#21487;&#19979;&#36733;&#24182;&#24674;&#22797;&#12290;</small>
-                        <div class="md-field"><input type="text" id="aiDecryptPass" class="masked-input" placeholder=" " autocomplete="off" spellcheck="false"><label>&#35299;&#23494;&#23494;&#30721;</label></div>
+                        <div class="md-field"><input type="password" id="aiDecryptPass" class="masked-input" placeholder=" " autocomplete="off" spellcheck="false"><label>&#35299;&#23494;&#23494;&#30721;</label></div>
                         <button class="md-btn md-btn-tonal" onclick="ai.importFromSync()"><span class="material-symbols-rounded">download</span> &#19979;&#36733;&#24182;&#23548;&#20837;</button>
                     </div>
                 </div>
@@ -286,12 +297,12 @@
                         <div class="md-field"><input type="text" id="s3Region" placeholder=" "><label>Region (&#22914; us-east-1)</label></div>
                         <div class="md-field"><input type="text" id="s3Bucket" placeholder=" "><label>Bucket</label></div>
                         <div class="md-field"><input type="text" id="s3Key" placeholder=" "><label>Access Key</label></div>
-                        <div class="md-field"><input type="text" id="s3Secret" class="masked-input" placeholder=" " autocomplete="off" spellcheck="false"><label>Secret Key</label></div>
+                        <div class="md-field"><input type="password" id="s3Secret" class="masked-input" placeholder=" " autocomplete="off" spellcheck="false"><label>Secret Key</label></div>
                     </div>
                     <div id="webdavFields" class="hidden">
                         <div class="md-field"><input type="text" id="davUrl" placeholder=" "><label>WebDAV &#22320;&#22336;</label></div>
                         <div class="md-field"><input type="text" id="davUser" placeholder=" "><label>&#29992;&#25143;&#21517;</label></div>
-                        <div class="md-field"><input type="text" id="davPass" class="masked-input" placeholder=" " autocomplete="off" spellcheck="false"><label>&#23494;&#30721; / App Password</label></div>
+                        <div class="md-field"><input type="password" id="davPass" class="masked-input" placeholder=" " autocomplete="off" spellcheck="false"><label>&#23494;&#30721; / App Password</label></div>
                         <div class="md-field"><input type="text" id="davPath" placeholder=" "><label>&#36828;&#31243;&#30446;&#24405;</label></div>
                     </div>
                     <div class="sync-actions">
@@ -342,34 +353,40 @@
         </button>
     </nav>
 
-    <script src="toast.js?v=106"></script>
-    <script src="error-bus.js?v=106"></script>
-    <script src="i18n.js?v=106"></script>
-    <script src="a11y-focus-trap.js?v=106"></script>
-    <script src="theme.js?v=106"></script>
-    <script src="fooddb.js?v=106"></script>
-    <script src="render-safe.js?v=106"></script>
-    <script src="nav-stack.js?v=106"></script>
-    <script type="module" src="data-utils-pure.js?v=106"></script>
-    <script src="data-utils.js?v=106"></script>
-    <script src="storage/idb.js?v=106"></script>
-    <script src="storage/migrate.js?v=106"></script>
-    <script src="data-records.js?v=106"></script>
-    <script src="data-schema.js?v=106"></script>
-    <script src="data-store.js?v=106"></script>
-    <script src="data-ui-state.js?v=106"></script>
-    <script src="onboarding.js?v=106"></script>
-    <script src="data-views.js?v=106"></script>
-    <script src="routine-plan.js?v=106"></script>
-    <script src="data.js?v=106"></script>
-    <script type="module" src="voice-engine.js?v=106"></script>
-    <script src="voice-cache.js?v=106"></script>
-    <script src="voice-webspeech-adapter.js?v=106"></script>
-    <script src="voice-legado-adapter.js?v=106"></script>
-    <script src="workout-voice.js?v=106"></script>
-    <script type="module" src="sync-pure.js?v=106"></script>
-    <script src="sync-status.js?v=106"></script>
-    <script src="app-update.js?v=106"></script>
+    <script src="toast.js?v=113"></script>
+    <script src="haptics.js?v=113"></script>
+    <script src="error-bus.js?v=113"></script>
+    <script src="i18n.js?v=113"></script>
+    <script src="a11y-focus-trap.js?v=113"></script>
+    <script src="theme.js?v=113"></script>
+    <script src="fooddb.js?v=113"></script>
+    <script src="render-safe.js?v=113"></script>
+    <script src="nav-stack.js?v=113"></script>
+    <script type="module" src="data-utils-pure.js?v=113"></script>
+    <script src="data-utils.js?v=113"></script>
+    <script src="storage/idb.js?v=113"></script>
+    <script src="storage/migrate.js?v=113"></script>
+    <script src="data-records.js?v=113"></script>
+    <script src="data-schema.js?v=113"></script>
+    <script src="data-store.js?v=113"></script>
+    <script src="data-ui-state.js?v=113"></script>
+    <script src="onboarding.js?v=113"></script>
+    <script src="data-views.js?v=113"></script>
+    <script src="routine-plan.js?v=113"></script>
+    <script src="data.js?v=113"></script>
+    <script type="module" src="voice-engine.js?v=113"></script>
+    <script src="voice-cache.js?v=113"></script>
+    <script src="voice-webspeech-adapter.js?v=113"></script>
+    <script src="voice-legado-adapter.js?v=113"></script>
+    <script src="workout-voice.js?v=113"></script>
+    <script src="strength-form.js?v=113"></script>
+    <script src="weekly-plan.js?v=113"></script>
+    <script src="action-history.js?v=113"></script>
+    <script type="module" src="sync-pure.js?v=113"></script>
+    <script src="sync-status.js?v=113"></script>
+    <script src="credential-fields.js?v=113"></script>
+    <script src="sheet-drag.js?v=113"></script>
+    <script src="app-update.js?v=113"></script>
     <div id="weightModal" class="md-modal md-modal-sheet hidden" aria-hidden="true">
         <div class="md-modal-backdrop" onclick="data.closeWeightModal()"></div>
         <div class="md-modal-card md-modal-sheet-card">
@@ -452,6 +469,17 @@
             </div>
             <div class="md-grid modal-grid">
                 <div class="md-field"><input type="number" id="setReviewWeight" step="0.5" placeholder=" "><label>实际重量 kg</label></div>
+                <details class="set-review-rpe span-full">
+                    <summary>记录主观强度（可选）</summary>
+                    <div class="set-review-rpe-options" role="radiogroup" aria-label="RPE">
+                        <button class="set-review-rpe-btn" type="button" onclick="workout.setReviewRpe(6)" data-rpe="6">6<span>轻松</span></button>
+                        <button class="set-review-rpe-btn" type="button" onclick="workout.setReviewRpe(7)" data-rpe="7">7<span>可控</span></button>
+                        <button class="set-review-rpe-btn" type="button" onclick="workout.setReviewRpe(8)" data-rpe="8">8<span>接近力竭</span></button>
+                        <button class="set-review-rpe-btn" type="button" onclick="workout.setReviewRpe(9)" data-rpe="9">9<span>还剩 1-2</span></button>
+                        <button class="set-review-rpe-btn" type="button" onclick="workout.setReviewRpe(10)" data-rpe="10">10<span>已力竭</span></button>
+                    </div>
+                    <input type="hidden" id="setReviewRpe" value="">
+                </details>
                 <div class="md-field"><input type="number" id="setReviewReps" placeholder=" "><label>&#23454;&#38469;&#27425;&#25968;</label></div>
                 <div class="md-field span-full"><input type="text" id="setReviewNote" placeholder=" "><label>备注（可空）</label></div>
             </div>
@@ -490,10 +518,10 @@
             </div>
             <div class="voice-section-title">&#20248;&#20808;&#32423;</div>
             <div class="voice-priority-group" role="radiogroup" aria-label="&#35821;&#38899;&#24341;&#25806;&#20248;&#20808;&#32423;">
-                <label class="voice-priority-option"><input type="radio" name="voicePriority" value="online-first" onchange="workoutVoice.saveSettings()"><span class="material-symbols-rounded">cloud_sync</span><strong>&#22312;&#32447;&#20248;&#20808;</strong></label>
-                <label class="voice-priority-option"><input type="radio" name="voicePriority" value="local-first" onchange="workoutVoice.saveSettings()"><span class="material-symbols-rounded">record_voice_over</span><strong>&#26412;&#22320;&#20248;&#20808;</strong></label>
-                <label class="voice-priority-option"><input type="radio" name="voicePriority" value="online-only" onchange="workoutVoice.saveSettings()"><span class="material-symbols-rounded">cloud_done</span><strong>&#20165;&#22312;&#32447;</strong></label>
-                <label class="voice-priority-option"><input type="radio" name="voicePriority" value="local-only" onchange="workoutVoice.saveSettings()"><span class="material-symbols-rounded">mic</span><strong>&#20165;&#26412;&#22320;</strong></label>
+                <label class="voice-priority-option" role="radio" aria-checked="false"><input type="radio" name="voicePriority" value="online-first" onchange="workoutVoice.saveSettings()"><span class="material-symbols-rounded">cloud_sync</span><strong>&#22312;&#32447;&#20248;&#20808;</strong></label>
+                <label class="voice-priority-option" role="radio" aria-checked="false"><input type="radio" name="voicePriority" value="local-first" onchange="workoutVoice.saveSettings()"><span class="material-symbols-rounded">record_voice_over</span><strong>&#26412;&#22320;&#20248;&#20808;</strong></label>
+                <label class="voice-priority-option" role="radio" aria-checked="false"><input type="radio" name="voicePriority" value="online-only" onchange="workoutVoice.saveSettings()"><span class="material-symbols-rounded">cloud_done</span><strong>&#20165;&#22312;&#32447;</strong></label>
+                <label class="voice-priority-option" role="radio" aria-checked="false"><input type="radio" name="voicePriority" value="local-only" onchange="workoutVoice.saveSettings()"><span class="material-symbols-rounded">mic</span><strong>&#20165;&#26412;&#22320;</strong></label>
             </div>
             <div class="voice-section-head">
                 <div class="voice-section-title">&#22312;&#32447;&#24341;&#25806;</div>
@@ -563,6 +591,26 @@
             <div id="aiTemplateManagerContent"></div>
         </div>
     </div>
+    <div id="actionHistorySheet" class="md-modal md-modal-sheet hidden" aria-hidden="true">
+        <div class="md-modal-backdrop" onclick="actionHistory.close()"></div>
+        <div class="md-modal-card md-modal-sheet-card">
+            <div class="md-modal-head">
+                <strong id="actionHistoryTitle">动作历史</strong>
+                <button class="icon-btn" onclick="actionHistory.close()" aria-label="&#20851;&#38381;" data-modal-close><span class="material-symbols-rounded">close</span></button>
+            </div>
+            <div id="actionHistoryContent"></div>
+        </div>
+    </div>
+    <div id="aiModelPickerSheet" class="md-modal md-modal-sheet hidden" aria-hidden="true">
+        <div class="md-modal-backdrop" onclick="data.closeAdviceModelPicker?.()"></div>
+        <div class="md-modal-card md-modal-sheet-card">
+            <div class="md-modal-head">
+                <strong>选择本次模型</strong>
+                <button class="icon-btn" onclick="data.closeAdviceModelPicker?.()" aria-label="&#20851;&#38381;" data-modal-close><span class="material-symbols-rounded">close</span></button>
+            </div>
+            <div id="aiModelPickerContent"></div>
+        </div>
+    </div>
     <div id="themeSheet" class="md-modal md-modal-sheet hidden" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="themeSheetTitle">
         <div class="md-modal-backdrop" onclick="theme.closeSheet()"></div>
         <div class="md-modal-card md-modal-sheet-card theme-sheet-card">
@@ -603,6 +651,15 @@
             </div>
             <div class="theme-sheet-section">
                 <div class="theme-panel-title">
+                    <span class="material-symbols-rounded">notifications_active</span> &#35302;&#24863;&#21453;&#39304;
+                </div>
+                <div class="md-switch" role="switch" aria-checked="true">
+                    <span>Android &#38663;&#21160;&#21453;&#39304;</span>
+                    <label class="switch-track"><input type="checkbox" id="hapticsEnabled" checked><span class="switch-thumb"></span></label>
+                </div>
+            </div>
+            <div class="theme-sheet-section">
+                <div class="theme-panel-title">
                     <span class="theme-language-mark" aria-hidden="true">A/&#20013;</span> Language
                 </div>
                 <div class="md-field theme-language-field">
@@ -618,13 +675,13 @@
     </div>
     <script>
         const PAGE_DEPS = {
-            workout: ['voice-engine','voice-cache','voice-webspeech-adapter','voice-legado-adapter','workout-voice','workout-system','workout-pip','workout-core','workout-cardio-pure','workout-cardio','workout-engine','workout-state','swipe-actions','routine-plan','routine-library','workout-wakelock','workout-media-session'],
+            workout: ['voice-engine','voice-cache','voice-webspeech-adapter','voice-legado-adapter','workout-voice','strength-form','weekly-plan','action-history','workout-system','workout-pip','workout-core','workout-cardio-pure','workout-cardio','workout-engine','workout-state','swipe-actions','routine-plan','routine-library','workout-wakelock','workout-media-session'],
             'ai-coach': ['ai-store','ai-profile','ai-models','ai-api','ai-pricing','ai-templates','advice-template-manager','advice-panel','advice-render','advice-prompt','advice-stream-renderer'],
-            profile: ['voice-engine','voice-cache','voice-webspeech-adapter','voice-legado-adapter','workout-voice','backup','sync-ui','sync-adapters','sync','routine-library','goal-plan','weekly-summary'],
-            records: ['history-view','weekly-summary','health-diet','health-weight','health-profile','health-exercise','goal-plan','routine-library','food-log','pr-tracker','volume-heatmap','report-metrics-pure','report-panel'],
+            profile: ['voice-engine','voice-cache','voice-webspeech-adapter','voice-legado-adapter','workout-voice','credential-fields','weekly-plan','backup','sync-ui','sync-adapters','sync','routine-library','goal-plan','weekly-summary'],
+            records: ['history-view','weekly-summary','health-diet','health-weight','health-profile','health-exercise','goal-plan','routine-library','food-log','pr-tracker','volume-heatmap','action-history','report-metrics-pure','report-panel'],
             today: ['health-diet','health-weight','health-exercise','food-log','history-view','report-metrics-pure','report-panel']
         };
-        const _loaded = new Set(['render-safe','nav-stack','data-utils-pure','data-records','data-schema','data-utils','storage/idb','storage/migrate','data-store','data-ui-state','onboarding','data-views','data','voice-engine','voice-cache','voice-webspeech-adapter','voice-legado-adapter','workout-voice','sync-pure','sync-status','app-update']);
+        const _loaded = new Set(['render-safe','nav-stack','data-utils-pure','data-records','data-schema','data-utils','storage/idb','storage/migrate','data-store','data-ui-state','onboarding','data-views','data','voice-engine','voice-cache','voice-webspeech-adapter','voice-legado-adapter','workout-voice','strength-form','weekly-plan','action-history','sync-pure','sync-status','credential-fields','sheet-drag','haptics','app-update']);
         const _loadingPromises = new Map();
         const MODULE_SCRIPTS = new Set(['data-utils-pure','sync-pure','workout-cardio-pure','voice-engine','report-metrics-pure']);
         const SCRIPT_PREREQUISITES = {
@@ -658,7 +715,7 @@
                 if (_loaded.has(name)) return res();
                 const s = document.createElement('script');
                 if (MODULE_SCRIPTS.has(name)) s.type = 'module';
-                s.src = `${name}.js?v=106`;
+                s.src = `${name}.js?v=113`;
                 s.onload = () => { _loaded.add(name); res(); };
                 s.onerror = rej;
                 document.head.appendChild(s);
@@ -685,6 +742,7 @@
             if (page === 'workout') {
                 window.workoutVoice?.init?.();
                 window.workoutVoice?.renderSettingsUI?.();
+                window.strengthForm?.init?.();
             }
             if (page === 'workout' && window.workout && typeof workout.setMode === 'function' && !_loaded.has('_workoutModeInit')) {
                 workout.setMode('strength');
@@ -709,6 +767,8 @@
                 }
                 window.workoutVoice?.init?.();
                 window.workoutVoice?.renderSettingsUI?.();
+                window.credentialFields?.init?.();
+                window.haptics?.syncToggle?.();
             }
         }
         const ui = {
@@ -719,10 +779,14 @@
                 try { data.captureAdviceDraft?.(); } catch (e) { errorBus?.report?.('ui.captureAdviceDraft', e); }
                 try { data.captureAdviceScroll?.(); } catch (e) { errorBus?.report?.('ui.captureAdviceScroll', e); }
                 await ensureDeps(id);
-                document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-                document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-                document.getElementById(id)?.classList.add('active');
-                el?.classList.add('active');
+                const activate = () => {
+                    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+                    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+                    document.getElementById(id)?.classList.add('active');
+                    el?.classList.add('active');
+                };
+                if (document.startViewTransition) document.startViewTransition(activate);
+                else activate();
                 try { data.render(id); } catch (e) {
                     errorBus?.report?.('ui.tab.render', e, { page: id });
                     console.error('data.render failed in ui.tab', e);

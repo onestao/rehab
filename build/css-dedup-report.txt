@@ -1,0 +1,449 @@
+:root
+  01-vars.css, 37-dark-mode.css, 41-m3e-effects.css
+
+.advice-bubble
+  18-health-diet.css, 41-m3e-effects.css
+
+.advice-bubble-content
+  18-health-diet.css, 36-responsive.css
+
+.advice-bubble.assistant
+  18-health-diet.css, 36-responsive.css
+
+.advice-model-claude
+  18-health-diet.css, 37-dark-mode.css
+
+.advice-model-deepseek
+  18-health-diet.css, 37-dark-mode.css
+
+.advice-model-doubao
+  18-health-diet.css, 37-dark-mode.css
+
+.advice-model-gemini
+  18-health-diet.css, 37-dark-mode.css
+
+.advice-model-generic
+  18-health-diet.css, 37-dark-mode.css
+
+.advice-model-glm
+  18-health-diet.css, 37-dark-mode.css
+
+.advice-model-grok
+  18-health-diet.css, 37-dark-mode.css
+
+.advice-model-kimi
+  18-health-diet.css, 37-dark-mode.css
+
+.advice-model-mark
+  18-health-diet.css, 37-dark-mode.css
+
+.advice-model-mimo
+  18-health-diet.css, 37-dark-mode.css
+
+.advice-model-minimax
+  18-health-diet.css, 37-dark-mode.css
+
+.advice-model-openai
+  18-health-diet.css, 37-dark-mode.css
+
+.advice-model-qwen
+  18-health-diet.css, 37-dark-mode.css
+
+.advice-quick-prompts
+  18-health-diet.css, 41-m3e-effects.css
+
+.advice-quick-prompts::-webkit-scrollbar
+  18-health-diet.css, 41-m3e-effects.css
+
+.ai-template-actions .material-symbols-rounded
+  20-settings-ai.css, 36-responsive.css
+
+.ai-template-actions .md-btn
+  20-settings-ai.css, 36-responsive.css
+
+.calendar-card
+  16-history-hero-calendar.css, 19-health-weightloss-ai.css, 36-responsive.css, 37-dark-mode.css
+
+.calendar-day
+  16-history-hero-calendar.css, 17-record-tabs-health.css, 36-responsive.css, 37-dark-mode.css, 41-m3e-effects.css
+
+.calendar-day-head
+  16-history-hero-calendar.css, 36-responsive.css
+
+.calendar-day-head b
+  16-history-hero-calendar.css, 36-responsive.css
+
+.calendar-day.empty
+  16-history-hero-calendar.css, 37-dark-mode.css
+
+.calendar-day.has-record
+  16-history-hero-calendar.css, 37-dark-mode.css
+
+.calendar-day.selected
+  17-record-tabs-health.css, 37-dark-mode.css
+
+.calendar-event
+  16-history-hero-calendar.css, 36-responsive.css, 37-dark-mode.css
+
+.calendar-event .material-symbols-rounded
+  16-history-hero-calendar.css, 36-responsive.css
+
+.calendar-event-more
+  16-history-hero-calendar.css, 36-responsive.css
+
+.calendar-events
+  16-history-hero-calendar.css, 36-responsive.css
+
+.calendar-legend
+  16-history-hero-calendar.css, 36-responsive.css
+
+.calendar-toolbar
+  16-history-hero-calendar.css, 36-responsive.css
+
+.collapsible-card
+  17-record-tabs-health.css, 19-health-weightloss-ai.css
+
+.context-ai-actions
+  38-record-page.css, 36-responsive.css
+
+.context-ai-card
+  38-record-page.css, 36-responsive.css
+
+.daily-stat
+  17-record-tabs-health.css, 36-responsive.css
+
+.daily-summary-card
+  17-record-tabs-health.css, 36-responsive.css
+
+.day-detail-card
+  17-record-tabs-health.css, 19-health-weightloss-ai.css
+
+.day-detail-item
+  17-record-tabs-health.css, 41-m3e-effects.css
+
+.diet-card
+  18-health-diet.css, 19-health-weightloss-ai.css, 36-responsive.css
+
+.diet-log-item
+  18-health-diet.css, 37-dark-mode.css
+
+.food-result-item
+  18-health-diet.css, 37-dark-mode.css
+
+.food-result-item:active
+  18-health-diet.css, 37-dark-mode.css
+
+.hero-stat
+  16-history-hero-calendar.css, 36-responsive.css
+
+.hero-stat-row
+  16-history-hero-calendar.css, 36-responsive.css
+
+.history-month-content
+  15-components-lists.css, 99-custom-overrides.css
+
+.history-month-group
+  15-components-lists.css, 99-custom-overrides.css
+
+.history-month-group.collapsed .history-month-content
+  15-components-lists.css, 99-custom-overrides.css
+
+.history-month-head
+  15-components-lists.css, 99-custom-overrides.css
+
+.history-month-head .material-symbols-rounded
+  15-components-lists.css, 99-custom-overrides.css
+
+.history-month-head small
+  15-components-lists.css, 99-custom-overrides.css
+
+.history-month-head strong
+  15-components-lists.css, 99-custom-overrides.css
+
+.history-month-head::after
+  15-components-lists.css, 99-custom-overrides.css
+
+.history-month-head:active
+  15-components-lists.css, 99-custom-overrides.css
+
+.history-month-head:active::after
+  15-components-lists.css, 99-custom-overrides.css
+
+.history-month-head:hover
+  15-components-lists.css, 99-custom-overrides.css
+
+.history-month-head:hover::after
+  15-components-lists.css, 99-custom-overrides.css
+
+.input-card
+  33-workout-input-card.css, 36-responsive.css
+
+.library-card-actions
+  24-routines-cards.css, 45-library-segment.css
+
+.library-card-actions .md-btn
+  24-routines-cards.css, 45-library-segment.css
+
+.library-segment-btn
+  24-routines-cards.css, 45-library-segment.css
+
+.library-segment-wrap
+  24-routines-cards.css, 45-library-segment.css
+
+.list-item
+  15-components-lists.css, 36-responsive.css, 37-dark-mode.css, 41-m3e-effects.css
+
+.list-item:active
+  15-components-lists.css, 37-dark-mode.css
+
+.macro-summary
+  17-record-tabs-health.css, 36-responsive.css
+
+.md-btn
+  14-components-buttons.css, 41-m3e-effects.css
+
+.md-btn-tonal
+  14-components-buttons.css, 37-dark-mode.css
+
+.md-card
+  08-components-cards.css, 36-responsive.css, 37-dark-mode.css, 41-m3e-effects.css
+
+.md-chip
+  05-layout-chip.css, 41-m3e-effects.css
+
+.md-fab
+  28-workout-fab.css, 41-m3e-effects.css
+
+.md-field input
+  10-components-fields.css, 37-dark-mode.css
+
+.md-field input:focus
+  10-components-fields.css, 37-dark-mode.css
+
+.md-field input:focus + label
+  10-components-fields.css, 37-dark-mode.css
+
+.md-field input:not(:placeholder-shown) + label
+  10-components-fields.css, 37-dark-mode.css
+
+.md-field select
+  10-components-fields.css, 37-dark-mode.css
+
+.md-field select:focus
+  10-components-fields.css, 37-dark-mode.css
+
+.md-field select:focus + label
+  10-components-fields.css, 37-dark-mode.css
+
+.md-grid
+  11-components-grid.css, 36-responsive.css
+
+.md-modal-sheet
+  35-components-modal.css, 38-record-page.css
+
+.md-modal-sheet-card
+  35-components-modal.css, 38-record-page.css
+
+.md-nav-rail
+  27-layout-nav.css, 36-responsive.css, 37-dark-mode.css
+
+.md-top-app-bar
+  04-layout-appbar.css, 37-dark-mode.css
+
+.mode-tab:active
+  22-workout-mode-tabs.css, 41-m3e-effects.css
+
+.nav-indicator
+  27-layout-nav.css, 37-dark-mode.css
+
+.nav-item
+  27-layout-nav.css, 41-m3e-effects.css
+
+.nav-item.active .material-symbols-rounded
+  27-layout-nav.css, 37-dark-mode.css
+
+.record-icon
+  15-components-lists.css, 17-record-tabs-health.css
+
+.record-overview-card
+  38-record-page.css, 36-responsive.css
+
+.record-overview-stat
+  38-record-page.css, 36-responsive.css
+
+.record-overview-stat b
+  38-record-page.css, 36-responsive.css
+
+.record-overview-stats
+  38-record-page.css, 36-responsive.css
+
+.record-quick-actions
+  38-record-page.css, 36-responsive.css
+
+.record-quick-btn
+  38-record-page.css, 36-responsive.css
+
+.record-quick-btn .material-symbols-rounded
+  38-record-page.css, 36-responsive.css
+
+.record-quick-btn:active
+  38-record-page.css, 41-m3e-effects.css
+
+.record-section-title
+  16-history-hero-calendar.css, 36-responsive.css
+
+.record-tabs-scroll
+  38-record-page.css, 36-responsive.css
+
+.record-tabs-scroll .record-tab
+  38-record-page.css, 36-responsive.css
+
+.session-time
+  09-workout-timer.css, 37-dark-mode.css
+
+.strength-input-grid
+  33-workout-input-card.css, 36-responsive.css
+
+.timer-panel
+  09-workout-timer.css, 37-dark-mode.css
+
+.timer-stats b
+  09-workout-timer.css, 36-responsive.css
+
+.today-focus-card
+  16-history-hero-calendar.css, 36-responsive.css
+
+.today-focus-hint
+  16-history-hero-calendar.css, 36-responsive.css
+
+.today-focus-ring
+  16-history-hero-calendar.css, 41-m3e-effects.css
+
+.today-focus-ring > div
+  16-history-hero-calendar.css, 41-m3e-effects.css
+
+.today-timeline-card
+  38-record-page.css, 36-responsive.css
+
+.today-timeline-header
+  38-record-page.css, 36-responsive.css
+
+.today-timeline-item
+  38-record-page.css, 36-responsive.css, 41-m3e-effects.css
+
+.weight-card
+  17-record-tabs-health.css, 19-health-weightloss-ai.css, 36-responsive.css
+
+.weight-history-card
+  15-components-lists.css, 99-custom-overrides.css
+
+.weight-history-card.collapsed .weight-history-content
+  15-components-lists.css, 99-custom-overrides.css
+
+.weight-history-content
+  15-components-lists.css, 99-custom-overrides.css
+
+.weight-history-head
+  15-components-lists.css, 99-custom-overrides.css
+
+.weight-history-head .material-symbols-rounded
+  15-components-lists.css, 99-custom-overrides.css
+
+.weight-history-head small
+  15-components-lists.css, 99-custom-overrides.css
+
+.weight-history-head strong
+  15-components-lists.css, 99-custom-overrides.css
+
+.weight-history-head::after
+  15-components-lists.css, 99-custom-overrides.css
+
+.weight-history-head:active
+  15-components-lists.css, 99-custom-overrides.css
+
+.weight-history-head:active::after
+  15-components-lists.css, 99-custom-overrides.css
+
+.weight-history-head:hover
+  15-components-lists.css, 99-custom-overrides.css
+
+.weight-history-head:hover::after
+  15-components-lists.css, 99-custom-overrides.css
+
+.weight-range
+  17-record-tabs-health.css, 20-settings-ai.css
+
+.weight-range-tabs
+  17-record-tabs-health.css, 20-settings-ai.css
+
+.weight-range.active
+  17-record-tabs-health.css, 20-settings-ai.css
+
+.weightloss-option
+  19-health-weightloss-ai.css, 37-dark-mode.css
+
+.weightloss-option.active
+  19-health-weightloss-ai.css, 37-dark-mode.css
+
+.weightloss-tips
+  19-health-weightloss-ai.css, 37-dark-mode.css
+
+.workout-controls
+  28-workout-fab.css, 37-dark-mode.css
+
+.workout-plan-card
+  39-workout-plan.css, 36-responsive.css
+
+.workout-plan-chip
+  39-workout-plan.css, 36-responsive.css
+
+.workout-plan-empty
+  39-workout-plan.css, 36-responsive.css
+
+.workout-plan-empty-actions
+  39-workout-plan.css, 36-responsive.css
+
+.workout-plan-icon
+  39-workout-plan.css, 36-responsive.css
+
+.workout-plan-info h3
+  39-workout-plan.css, 36-responsive.css
+
+.workout-plan-recent-item
+  39-workout-plan.css, 36-responsive.css
+
+*
+  02-base.css, 36-responsive.css, 40-a11y.css
+
+*::after
+  02-base.css, 36-responsive.css, 40-a11y.css
+
+*::before
+  02-base.css, 36-responsive.css, 40-a11y.css
+
+#mainTime
+  09-workout-timer.css, 37-dark-mode.css
+
+body
+  02-base.css, 37-dark-mode.css
+
+from
+  06-layout-page.css, 18-health-diet.css, 20-settings-ai.css, 38-record-page.css, 43-identity-card.css, 47-view-transitions.css, 41-m3e-effects.css
+
+media (max-width: 360px)
+  19-health-weightloss-ai.css, 24-routines-cards.css, 33-workout-input-card.css, 36-responsive.css, 43-identity-card.css
+
+media (max-width: 480px)
+  19-health-weightloss-ai.css, 22-workout-mode-tabs.css, 24-routines-cards.css, 36-responsive.css
+
+media (max-width: 520px)
+  20-settings-ai.css, 26-settings-sync.css
+
+media (prefers-color-scheme: dark)
+  08-components-cards.css, 16-history-hero-calendar.css, 37-dark-mode.css
+
+media (prefers-reduced-motion: reduce)
+  36-responsive.css, 40-a11y.css
+
+to
+  06-layout-page.css, 18-health-diet.css, 20-settings-ai.css, 38-record-page.css, 43-identity-card.css, 47-view-transitions.css, 41-m3e-effects.css

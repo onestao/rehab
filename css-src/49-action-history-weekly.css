@@ -1,0 +1,149 @@
+/* --- Action History & Weekly Plan --- */
+.action-history-controls {
+    display: grid;
+    gap: 8px;
+}
+
+.action-history-tabs {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+
+.action-history-tabs::-webkit-scrollbar {
+    display: none;
+}
+
+.action-history-tab {
+    min-height: 36px;
+    border: 0;
+    border-radius: var(--md-sys-shape-full);
+    background: var(--md-sys-surface-container);
+    color: var(--md-sys-on-surface-variant);
+    padding: 0 12px;
+    font-weight: 800;
+    white-space: nowrap;
+}
+
+.action-history-tab.active {
+    background: var(--md-sys-secondary-container);
+    color: var(--md-sys-on-secondary-container);
+}
+
+.action-history-chart {
+    width: 100%;
+    min-height: 180px;
+    border-radius: var(--md-sys-shape-lg);
+    background: var(--md-sys-surface-container-low);
+}
+
+.action-history-list {
+    display: grid;
+    gap: 8px;
+}
+
+.action-history-row {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 4px 10px;
+    padding: 10px 12px;
+    border-radius: var(--md-sys-shape-md);
+    background: var(--md-sys-surface-container-low);
+}
+
+.action-history-row small {
+    grid-column: 1 / -1;
+    color: var(--md-sys-on-surface-variant);
+}
+
+.action-history-pr {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 10px;
+    border-radius: var(--md-sys-shape-full);
+    background: var(--md-sys-tertiary-container);
+    color: var(--md-sys-on-tertiary-container);
+    font-size: 12px;
+    font-weight: 800;
+}
+
+.sl-name-row {
+    display: grid;
+    grid-template-columns: 1fr 48px;
+    gap: 8px;
+}
+
+.weekly-plan-strip {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(72px, 1fr));
+    gap: 6px;
+    overflow-x: auto;
+    padding: 0 8px 8px;
+    scrollbar-width: none;
+}
+
+.weekly-plan-strip::-webkit-scrollbar {
+    display: none;
+}
+
+.weekly-plan-chip {
+    min-height: 56px;
+    border: 1px solid var(--md-sys-outline-variant);
+    border-radius: var(--md-sys-shape-lg);
+    background: var(--md-sys-surface-container-lowest);
+    color: var(--md-sys-on-surface);
+    display: grid;
+    align-content: center;
+    gap: 2px;
+    padding: 6px;
+    text-align: center;
+}
+
+.weekly-plan-chip.is-today {
+    border-color: var(--md-sys-primary);
+    background: var(--md-sys-primary-container);
+    color: var(--md-sys-on-primary-container);
+}
+
+.weekly-plan-chip span {
+    font-weight: 900;
+    font-size: 12px;
+}
+
+.weekly-plan-chip small {
+    font-size: 10px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.weekly-plan-banner {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 8px 16px;
+    padding: 10px 12px;
+    border-radius: var(--md-sys-shape-lg);
+    background: var(--md-sys-secondary-container);
+    color: var(--md-sys-on-secondary-container);
+}
+
+.weekly-plan-banner strong {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.weekly-plan-banner.is-empty {
+    background: var(--md-sys-surface-container-low);
+    color: var(--md-sys-on-surface-variant);
+}
+
+.weekly-plan-picker {
+    display: grid;
+    gap: 8px;
+}

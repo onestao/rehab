@@ -154,6 +154,7 @@
             nameInput.value = '';
             if (tagsInput) tagsInput.value = '';
             this.save();
+            window.haptics?.light?.();
             if (window.toast?.show) {
                 toast.show(`方案 "${name}" 已保存`, 'success');
             } else {
@@ -565,8 +566,8 @@
                 ['ai',         'psychology',    'AI'],
                 ['sync',       'cloud_sync',    '同步'],
             ];
-            const tabBar = `<div class="record-tabs profile-tabs" role="tablist" aria-label="我的视图">
-                ${tabs.map(([k, i, l]) => `<button class="record-tab ${view === k ? 'active' : ''}" data-routine-view="${k}" onclick="data.setRoutineView('${k}')" type="button" role="tab" aria-selected="${view === k}"><span class="material-symbols-rounded">${i}</span><span class="profile-tab-label">${l}</span></button>`).join('')}
+            const tabBar = `<div class="record-tabs" role="tablist" aria-label="我的视图">
+                ${tabs.map(([k, i, l]) => `<button class="record-tab ${view === k ? 'active' : ''}" data-routine-view="${k}" onclick="data.setRoutineView('${k}')" type="button" role="tab" aria-selected="${view === k}" aria-pressed="${view === k}"><span class="material-symbols-rounded">${i}</span><span class="profile-tab-label">${l}</span></button>`).join('')}
             </div>`;
 
             if (!content) return;

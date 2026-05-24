@@ -42,6 +42,33 @@
     height: 46px;
     margin-top: 0;
 }
+.md-modal-sheet {
+    align-items: end;
+    place-items: end center;
+}
+.md-modal-sheet-card {
+    width: min(100vw, 520px);
+    max-height: min(86vh, 760px);
+    border-radius: 28px 28px 0 0;
+    padding-top: 24px;
+    padding-bottom: calc(16px + env(safe-area-inset-bottom));
+    transform: translateY(var(--sheet-drag-y, 0));
+    transition: transform var(--md-sys-motion-duration-medium2, 300ms) var(--md-expressive-spring);
+}
+.md-modal-sheet-card::before {
+    content: '';
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    width: 32px;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--md-sys-outline-variant);
+    transform: translateX(-50%);
+}
+.md-modal-sheet-card.is-dragging {
+    transition: none;
+}
 
 .template-manager-body {
     display: grid;

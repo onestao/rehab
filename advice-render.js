@@ -299,7 +299,7 @@ Object.assign(advicePanel, {
             this.parseHistoryDate(msg.at).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
             currentKeyword
         );
-        const model = msg.model ? ` · ${highlightKeyword(msg.model, currentKeyword)}` : '';
+        const model = msg.model ? ` · ${highlightKeyword(msg.model, currentKeyword)}${msg.temporaryModel ? ' · <span class="advice-temp-model">临时模型</span>' : ''}` : '';
         const usage = msg.tokenUsage && (msg.tokenUsage.in || msg.tokenUsage.out)
             ? ` · ${highlightKeyword(String(msg.tokenUsage.in || 0), currentKeyword)}→${highlightKeyword(String(msg.tokenUsage.out || 0), currentKeyword)} tok`
             : '';

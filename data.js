@@ -17,6 +17,8 @@ const data = {
         aiTemplateActiveId: '',
         aiTrash: [],
         aiRetryMode: 'versioned',
+        prefs: { haptics: true },
+        weeklyPlan: {},
         aiCipher: null,
         libraryView: 'actions',
         libraryFilterTag: '',

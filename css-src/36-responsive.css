@@ -34,7 +34,28 @@
     .today-timeline-item { padding: 6px 0; gap: 10px; }
     .calendar-card { padding: 10px; }
     .calendar-toolbar { margin-bottom: 6px; }
-    .calendar-day { min-height: 48px; padding: 3px 2px; }
+    .calendar-day { min-height: 54px; max-height: 54px; padding: 4px 3px; }
+    .calendar-events { gap: 1px; margin-top: 2px; }
+    .calendar-event {
+        padding: 0 2px;
+        font-size: clamp(8.5px, 2.4vw, 10px);
+        line-height: 1;
+    }
+    .calendar-event .material-symbols-rounded {
+        font-size: 10px;
+        line-height: 1;
+    }
+    .calendar-day-head {
+        min-height: 14px;
+        max-height: 14px;
+        font-size: 10px;
+    }
+    .calendar-day-head b { font-size: 8.5px; }
+    .calendar-event-more {
+        padding: 0 4px;
+        font-size: 9px;
+        line-height: 1;
+    }
     .calendar-legend { padding-top: 8px; margin-top: 8px; gap: 6px; }
     .hero-stat-row { margin-top: 10px; gap: 6px; }
     .hero-stat { padding: 8px 6px; }
@@ -82,7 +103,27 @@
     .ai-template-actions .material-symbols-rounded {
         font-size: 16px;
     }
-    .calendar-day { min-height: 40px; font-size: 10px; }
+    .calendar-day { min-height: 48px; max-height: 48px; font-size: 10px; }
+    .calendar-event {
+        min-height: 10px;
+        padding: 0 1px;
+        border-left-width: 2px;
+        font-size: 8px;
+        line-height: 1;
+        gap: 1px;
+    }
+    .calendar-event .material-symbols-rounded {
+        display: inline-block;
+        font-size: 9px;
+        line-height: 1;
+    }
+    .calendar-event-more {
+        min-height: 10px;
+        padding: 0 2px;
+        font-size: 8px;
+        line-height: 1;
+        color: var(--md-sys-on-surface-variant);
+    }
     .advice-bubble.assistant { max-width: 100%; }
     .advice-bubble-content { font-size: 13.5px; line-height: 1.64; }
 }

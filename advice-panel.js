@@ -42,6 +42,14 @@ const advicePanel = {
             onAdvicePromptInput: this.onAdvicePromptInput,
             onAdvicePromptKeydown: this.onAdvicePromptKeydown,
             setAdviceModel: this.setAdviceModel,
+            providerKeyForModel: this.providerKeyForModel,
+            providerIcon: this.providerIcon,
+            modelShortName: this.modelShortName,
+            openAdviceModelPicker: this.openAdviceModelPicker,
+            closeAdviceModelPicker: this.closeAdviceModelPicker,
+            chooseAdviceModel: this.chooseAdviceModel,
+            setAdviceModelPickerScope: this.setAdviceModelPickerScope,
+            renderAdviceModelPicker: this.renderAdviceModelPicker,
             setAdviceRange: this.setAdviceRange,
             toggleAdviceContext: this.toggleAdviceContext,
             toggleAdviceContextPanel: this.toggleAdviceContextPanel,
@@ -71,6 +79,8 @@ const advicePanel = {
             scheduleAdviceStreamScroll: this.scheduleAdviceStreamScroll,
             refreshAdviceSearchResults: this.refreshAdviceSearchResults,
             refreshAdviceModelPicker: this.refreshAdviceModelPicker,
+            refreshAdviceModelChip: this.refreshAdviceModelChip,
+            renderAdviceModelChip: this.renderAdviceModelChip,
             applyPickerThemeFromCache: this.applyPickerThemeFromCache,
             autoResizeAdvicePrompt: this.autoResizeAdvicePrompt,
             adviceRangeStart: this.adviceRangeStart,
@@ -465,6 +475,7 @@ const advicePanel = {
         }
         const previousTop = list.scrollTop || 0;
         chromeInner.innerHTML = this.renderAdviceTopChromeInner();
+        this.refreshAdviceModelChip?.();
         if (refreshMessages) {
             this.refreshAdviceSearchResults();
             list.scrollTop = Math.max(0, Math.min(previousTop, list.scrollHeight - list.clientHeight));
@@ -569,10 +580,160 @@ const advicePanel = {
     },
 
     setAdviceModel(model) {
-        this.adviceModel = model || '__current__';
-        this.saveAdviceSettings();
+        if (!model || model === '__current__') ai.clearOverride?.();
+        else ai.setOverride?.({ model, provider: (ai.models || []).find(m => m.id === model)?.provider || ai.cfg.provider || 'openai' });
         this.captureAdviceDraft();
-        this.refreshAdviceModelPicker();
+        this.refreshAdviceModelPicker?.();
+        this.rerenderAdvicePanel?.();
+    },
+
+    providerKeyForModel(provider = '', model = '') {
+        const modelText = String(model || '').toLowerCase();
+        if (/grok|x-ai|\bxai\b/.test(modelText)) return 'grok';
+        if (/gemini|google/.test(modelText)) return 'gemini';
+        if (/deepseek/.test(modelText)) return 'deepseek';
+        if (/claude|anthropic/.test(modelText)) return 'claude';
+        if (/qwen|通义|tongyi/.test(modelText)) return 'qwen';
+        if (/doubao|豆包|volc|火山/.test(modelText)) return 'doubao';
+        if (/kimi|moonshot|moon/.test(modelText)) return 'kimi';
+        if (/minimax/.test(modelText)) return 'minimax';
+        if (/mimo/.test(modelText)) return 'mimo';
+        if (/glm|chatglm|zhipu|智谱/.test(modelText)) return 'glm';
+        if (/gpt|openai|chatgpt|\bo[134]\b|o1|o3|o4/.test(modelText)) return 'openai';
+        const providerText = String(provider || 'generic').toLowerCase().split(':')[0].trim();
+        return providerText || 'generic';
+    },
+
+    providerIcon(provider = '', model = '') {
+        const key = this.providerKeyForModel(provider, model);
+        const known = ['openai','gemini','grok','deepseek','claude','qwen','doubao','kimi','minimax','mimo','glm'];
+        return `assets/model-icons/${known.includes(key) ? key : 'generic'}.svg`;
+    },
+
+    modelShortName(model = '') {
+        const text = String(model || '模型');
+        return text.length > 18 ? `${text.slice(0, 16)}…` : text;
+    },
+
+    renderAdviceModelChip() {
+        const effective = ai.getEffectiveConfig?.() || ai.cfg;
+        const isOverride = !!ai.overrideModel;
+        const model = effective.model || '模型';
+        const label = `${effective.provider || 'AI'} ${model}`;
+        const visual = this.adviceModelVisual(model);
+        const style = this.adviceModelThemeStyle(visual);
+        return `<button class="advice-model-picker advice-model-chip advice-model-${visual.key} ${isOverride ? 'is-override' : ''}" ${style ? `style="${this.escapeHtml(style)}"` : ''} onclick="data.openAdviceModelPicker()" type="button" aria-label="切换分析模型：${this.escapeHtml(label)}" title="切换分析模型：${this.escapeHtml(label)}">
+            <span class="advice-model-mark">${this.adviceModelIconHtml(visual)}</span>
+            ${isOverride ? '<span class="advice-model-chip-x" onclick="event.stopPropagation();ai.clearOverride?.();data.refreshAdviceModelChip?.()" role="button" aria-label="恢复默认">×</span>' : ''}
+        </button>`;
+    },
+
+    refreshAdviceModelChip() {
+        const chip = document.querySelector('.advice-model-chip');
+        if (!chip) return;
+        chip.outerHTML = this.renderAdviceModelChip();
+    },
+
+    openAdviceModelPicker() {
+        const modal = document.getElementById('aiModelPickerSheet');
+        const content = document.getElementById('aiModelPickerContent');
+        if (!modal || !content) return;
+        content.innerHTML = this.renderAdviceModelPicker();
+        modal.classList.remove('hidden');
+        modal.setAttribute('aria-hidden', 'false');
+    },
+
+    closeAdviceModelPicker() {
+        const modal = document.getElementById('aiModelPickerSheet');
+        modal?.classList.add('hidden');
+        modal?.setAttribute('aria-hidden', 'true');
+    },
+
+    setAdviceModelPickerScope(scope = 'current') {
+        const allowed = new Set(['current', 'others', 'cached']);
+        this.adviceModelPickerScope = allowed.has(scope) ? scope : 'current';
+        const content = document.getElementById('aiModelPickerContent');
+        if (content) content.innerHTML = this.renderAdviceModelPicker();
+    },
+
+    chooseAdviceModel(profileId, provider, model) {
+        const profile = (ai.cfg.profiles || []).find(p => p.id === profileId) || null;
+        if (!profile || !ai.apiKeyFor(profile.id)) {
+            toast.show('该提供商未配置 API Key', 'error');
+            return;
+        }
+        const cached = (ai.models || []).some(m => (m.provider || profile.provider) === provider && m.id === model);
+        if (!cached && ai.fetchModels) {
+            ai.fetchModels().catch(() => {});
+        }
+        ai.setOverride?.({ profileId, provider, model });
+        this.closeAdviceModelPicker();
+        window.haptics?.light?.();
+        this.refreshAdviceModelChip?.();
+        this.rerenderAdvicePanel?.();
+    },
+
+    renderAdviceModelPicker() {
+        const effective = ai.getEffectiveConfig?.() || ai.cfg;
+        const profiles = ai.cfg.profiles || [];
+        const scope = this.adviceModelPickerScope || 'current';
+        const activeProvider = effective.provider || ai.cfg.provider || 'openai';
+        const profileForProvider = (provider) => {
+            const normalized = provider || 'openai';
+            const active = profiles.find(p => p.id === effective.profileId && (p.provider || 'openai') === normalized && ai.apiKeyFor(p.id));
+            return active || profiles.find(p => (p.provider || 'openai') === normalized && ai.apiKeyFor(p.id)) || null;
+        };
+        const rawRows = [];
+        if (effective.model) {
+            rawRows.push({
+                profileId: effective.profileId || profileForProvider(activeProvider)?.id || '',
+                provider: activeProvider,
+                model: effective.model,
+                label: effective.model,
+                tag: ai.overrideModel ? '临时模型' : '默认模型',
+                disabled: !profileForProvider(activeProvider)
+            });
+        }
+        (ai.models || []).forEach(model => {
+            const provider = model.provider || activeProvider;
+            const profile = profileForProvider(provider);
+            rawRows.push({
+                profileId: profile?.id || '',
+                provider,
+                model: model.id,
+                label: model.displayName || model.id,
+                tag: model.vision ? 'vision' : 'cached',
+                disabled: !profile
+            });
+        });
+        const rows = rawRows.filter(row => {
+            if (!row.model) return false;
+            if (scope === 'current') return row.provider === activeProvider;
+            if (scope === 'others') return row.provider !== activeProvider;
+            return true;
+        });
+        const deduped = rows.filter((row, index, all) => row.model && all.findIndex(x => x.provider === row.provider && x.model === row.model) === index);
+        const restore = `<button class="md-btn md-btn-tonal" onclick="ai.clearOverride?.();data.closeAdviceModelPicker?.();data.rerenderAdvicePanel?.()" type="button">恢复默认</button>`;
+        const emptyText = scope === 'cached'
+            ? '暂无缓存模型，请先在 AI 设置中获取模型'
+            : (scope === 'others' ? '暂无其他提供商缓存模型' : '当前提供商暂无缓存模型');
+        return `<div class="model-picker-body">
+            <div class="model-picker-tabs" role="tablist" aria-label="模型范围">
+                <button class="model-picker-tab ${scope === 'current' ? 'active' : ''}" onclick="data.setAdviceModelPickerScope('current')" type="button" aria-selected="${scope === 'current'}">当前提供商</button>
+                <button class="model-picker-tab ${scope === 'others' ? 'active' : ''}" onclick="data.setAdviceModelPickerScope('others')" type="button" aria-selected="${scope === 'others'}">其他提供商</button>
+                <button class="model-picker-tab ${scope === 'cached' ? 'active' : ''}" onclick="data.setAdviceModelPickerScope('cached')" type="button" aria-selected="${scope === 'cached'}">全部缓存</button>
+            </div>
+            ${deduped.map(row => {
+                const visual = this.adviceModelVisual(row.model);
+                const style = this.adviceModelThemeStyle(visual);
+                return `<button class="model-picker-row advice-model-${visual.key} ${row.model === effective.model && row.provider === effective.provider ? 'is-selected' : ''}" ${style ? `style="${this.escapeHtml(style)}"` : ''} type="button" aria-disabled="${row.disabled}" title="${row.disabled ? '未配置 API Key' : ''}" onclick="data.chooseAdviceModel('${this.escapeHtml(row.profileId)}','${this.escapeHtml(row.provider)}','${this.escapeHtml(row.model)}')">
+                    <span class="advice-model-mark">${this.adviceModelIconHtml(visual)}</span>
+                    <span class="model-picker-main"><strong>${this.escapeHtml(row.label)}</strong><small>${this.escapeHtml(row.provider)} · ${this.escapeHtml(row.tag)}</small></span>
+                    ${row.model === effective.model && row.provider === effective.provider ? '<span class="material-symbols-rounded">check</span>' : ''}
+                </button>`;
+            }).join('') || `<div class="ai-model-empty">${this.escapeHtml(emptyText)}</div>`}
+            ${restore}
+        </div>`;
     },
 
     toggleAdviceSearch() {
@@ -735,7 +896,8 @@ const advicePanel = {
     },
 
     async sendAiAdvice(promptOverride = '', options = {}) {
-        if (!ai.cfg.enabled) return alert('请先在设置中配置 AI');
+        const effective = ai.getEffectiveConfig ? ai.getEffectiveConfig() : { ...ai.cfg, profileId: ai.cfg.activeProfileId };
+        if (!effective.enabled) return alert('请先在设置中配置 AI');
         if (this._adviceSending) return;
         const input = document.getElementById('advicePrompt');
         const prompt = (promptOverride || input?.value || '').trim();
@@ -743,8 +905,13 @@ const advicePanel = {
         const list = document.querySelector('.advice-chat-list');
         this._adviceFollowStream = !list || (list.scrollHeight - list.clientHeight - list.scrollTop) < 180;
         this._adviceUserScrollPaused = false;
-        const selected = document.getElementById('adviceModel')?.value || this.adviceModel || '__current__';
-        const model = selected === '__current__' ? ai.cfg.model : selected;
+        const model = effective.model || ai.cfg.model;
+        const provider = effective.provider || ai.cfg.provider || 'openai';
+        const isOverride = !!ai.overrideModel && (
+            ai.overrideModel.model !== ai.cfg.model ||
+            ai.overrideModel.provider !== ai.cfg.provider ||
+            ai.overrideModel.profileId !== ai.cfg.activeProfileId
+        );
         const now = new Date().toISOString();
         const pendingId = this.generateRecordId('advice-pending');
         const replyToId = options?.replyToId || '';
@@ -759,6 +926,8 @@ const advicePanel = {
             content: '',
             at: now,
             model,
+            provider,
+            temporaryModel: isOverride,
             pending: true,
             updatedAt: Date.now(),
             deleted: false,
@@ -776,15 +945,12 @@ const advicePanel = {
         this.setAdviceStreamUiState('streaming');
         try {
             const messages = this.buildAdviceMessages(prompt, model);
-            const oldModel = ai.cfg.model;
-            ai.cfg.model = model;
             let full = '';
             let _lastRender = 0;
             let _pendingFrame = 0;
-            try {
-                /** @type {{ in: number, out: number }|null} */
-                let lastUsage = null;
-                full = await ai.callStream(messages, 2400, (delta, accumulated, meta) => {
+            /** @type {{ in: number, out: number }|null} */
+            let lastUsage = null;
+            full = await ai.callStream(messages, 2400, (delta, accumulated, meta) => {
                     const idx = this.db.health.aiAdviceChat.findIndex(msg => msg.id === pendingId);
                     if (idx < 0) return;
                     this.db.health.aiAdviceChat[idx].content = accumulated;
@@ -792,7 +958,6 @@ const advicePanel = {
                     if (meta?.usage) {
                         lastUsage = meta.usage;
                         this.db.health.aiAdviceChat[idx].tokenUsage = meta.usage;
-                        const provider = ai.cfg.provider || 'openai';
                         const modelName = model || ai.cfg.model || '';
                         if (window.aiPricing?.estimate) {
                             const est = window.aiPricing.estimate(meta.usage, provider, modelName);
@@ -827,10 +992,7 @@ const advicePanel = {
                     const dots = bubble.querySelector('.advice-typing-dot');
                     if (dots) dots.remove();
                     if (!this._adviceUserScrollPaused) this.scheduleAdviceStreamScroll();
-                });
-            } finally {
-                ai.cfg.model = oldModel;
-            }
+            });
             const idx = this.db.health.aiAdviceChat.findIndex(msg => msg.id === pendingId);
             if (idx >= 0) this.db.health.aiAdviceChat[idx] = {
                 ...this.db.health.aiAdviceChat[idx],
@@ -838,6 +1000,8 @@ const advicePanel = {
                 content: full,
                 at: new Date().toISOString(),
                 model,
+                provider,
+                temporaryModel: isOverride,
                 pending: false,
                 deleted: false,
                 updatedAt: Date.now()
@@ -863,7 +1027,7 @@ const advicePanel = {
             });
         } catch (e) {
             const idx = this.db.health.aiAdviceChat.findIndex(msg => msg.id === pendingId);
-            const failed = { id: pendingId, role: 'assistant', content: `分析失败：${window.toast ? toast.sanitize(e) : e.message}`, at: new Date().toISOString(), model, error: true, retryPrompt: prompt, deleted: false, updatedAt: Date.now() };
+            const failed = { id: pendingId, role: 'assistant', content: `分析失败：${window.toast ? toast.sanitize(e) : e.message}`, at: new Date().toISOString(), model, provider, temporaryModel: isOverride, error: true, retryPrompt: prompt, deleted: false, updatedAt: Date.now() };
             if (idx >= 0) this.db.health.aiAdviceChat[idx] = failed;
             else this.db.health.aiAdviceChat.push(failed);
             this.save();
@@ -1109,14 +1273,6 @@ const advicePanel = {
         const visibleMessages = this.visibleAdviceMessages(messages);
         const rawDraft = this.restoreAdviceDraft();
         const draft = this.escapeHtml(rawDraft);
-        const activeModel = this.adviceModel || '__current__';
-        const modelOptions = [{ id: '__current__', name: ai.cfg.model ? `当前配置：${ai.cfg.model}` : '当前配置模型' }, ...(ai.models || [])];
-        const activeEntry = modelOptions.find(m => m.id === activeModel);
-        const activeModelLabel = activeEntry?.name || activeEntry?.id || modelOptions[0]?.name || activeModel || '模型';
-        const activeModelValue = activeModel === '__current__' ? (ai.cfg.model || activeModelLabel) : activeModelLabel;
-        const modelVisual = this.adviceModelVisual(activeModelValue);
-        const modelThemeStyle = this.adviceModelThemeStyle(modelVisual);
-        const modelMark = this.adviceModelIconHtml(modelVisual);
         const sendHint = this.escapeHtml(this.isMobileAdviceInput() ? '回车换行，点击发送按钮提交' : 'Enter 发送，Shift + Enter 换行');
         const goalType = this.db.health.dietGoal?.goalType || this.db.health.goalType || 'loss';
         const isGain = goalType === 'gain';
@@ -1134,11 +1290,7 @@ const advicePanel = {
                 <div class="advice-composer-tail">
                     <div class="advice-quick-prompts">${quicks.map(q => `<button onclick="data.useAdvicePrompt('${this.escapeHtml(q)}')" type="button">${this.escapeHtml(q)}</button>`).join('')}</div>
                     <div class="advice-composer">
-                        <label class="advice-model-picker advice-model-${modelVisual.key}" style="${this.escapeHtml(modelThemeStyle)}" aria-label="切换分析模型：${this.escapeHtml(modelVisual.label)}" title="切换分析模型：${this.escapeHtml(modelVisual.label)}">
-                            <span class="advice-model-mark">${modelMark}</span>
-                            <span class="material-symbols-rounded advice-model-picker-arrow">expand_more</span>
-                            <select id="adviceModel" class="advice-model-switch" onchange="data.setAdviceModel(this.value)">${modelOptions.map(m => `<option value="${this.escapeHtml(m.id)}" ${m.id === activeModel ? 'selected' : ''}>${this.escapeHtml(m.name || m.id)}</option>`).join('')}</select>
-                        </label>
+                        ${this.renderAdviceModelChip()}
                         <textarea id="advicePrompt" class="advice-composer-input" rows="1" placeholder="向 AI 提问…" oninput="data.onAdvicePromptInput(this)" onkeydown="data.onAdvicePromptKeydown(event)">${draft}</textarea>
                         <button id="adviceSendBtn" class="advice-send-btn" onclick="data.sendAiAdvice()" type="button" ${String(rawDraft || '').trim() ? '' : 'disabled'} aria-label="发送问题"><span class="material-symbols-rounded">send</span></button>
                     </div>

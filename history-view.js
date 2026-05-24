@@ -333,7 +333,9 @@
             for (let day = 1; day <= days; day++) {
                 const key = this.dateKey(new Date(year, month, day));
                 const entries = byDate[key] || [];
-                const names = entries.map(e => e.name).filter(Boolean).slice(0, 3);
+                const names = entries.map(e => e.name).filter(Boolean);
+                const visibleNames = names.slice(0, 2);
+                const overflowCount = Math.max(0, names.length - visibleNames.length);
                 const totalMin = Math.round(entries.reduce((sum, e) => sum + (e.minutes || 0), 0));
                 const isSelected = this.selectedCalendarDate === key;
                 cells.push(`
@@ -343,9 +345,10 @@
                         ${entries.length ? `<b>${totalMin}分</b>` : ''}
                     </div>
                     <div class="calendar-events">
-                        ${names.map(name => `
+                        ${visibleNames.map(name => `
                             <span class="calendar-event" style="--event-color:${this.actionColor(name)}"><span class="material-symbols-rounded">${this.sportIcon(name)}</span>${this.escapeHtml(this.shortName(name))}</span>
                         `).join('')}
+                        ${overflowCount > 0 ? `<div class="calendar-event-more">+${this.escapeHtml(String(overflowCount))}</div>` : ''}
                     </div>
                 </div>`);
             }

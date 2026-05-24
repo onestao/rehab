@@ -88,8 +88,8 @@
         box-shadow: 0 0 0 2px var(--md-sys-primary);
     }
     .calendar-event {
-        background: color-mix(in srgb, var(--event-color) 28%, var(--md-sys-surface-container-highest));
-        color: color-mix(in srgb, var(--event-color) 24%, var(--md-sys-on-surface));
+        background: color-mix(in srgb, var(--event-color) 18%, var(--md-sys-surface-container-highest));
+        color: color-mix(in srgb, var(--event-color) 35%, var(--md-sys-on-surface));
     }
 
     .md-btn-tonal {

@@ -238,6 +238,7 @@
 .calendar-grid { gap: 4px; }
 .calendar-day {
     min-height: 62px;
+    max-height: 62px;
     border-radius: 10px;
     padding: 5px 4px;
     background: var(--md-sys-surface-container-lowest);
@@ -256,6 +257,7 @@
     align-items: center;
     justify-content: space-between;
     min-height: 14px;
+    max-height: 14px;
     gap: 2px;
     font-size: 11px;
     font-weight: 800;
@@ -270,16 +272,17 @@
     display: grid;
     gap: 2px;
     margin-top: 3px;
+    overflow: hidden;
 }
 .calendar-event {
     min-width: 0;
-    padding: 1px 3px;
+    padding: 0 2px;
     border-radius: 4px;
     background: color-mix(in srgb, var(--event-color) 18%, white);
-    color: color-mix(in srgb, var(--event-color) 72%, black);
+    color: color-mix(in srgb, var(--event-color) 65%, var(--md-sys-on-surface));
     font-size: 9px;
     font-weight: 800;
-    line-height: 1.35;
+    line-height: 1.1;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -290,8 +293,27 @@
 }
 .calendar-event .material-symbols-rounded {
     font-size: 11px;
+    line-height: 1;
     font-variation-settings: 'FILL' 1;
     flex: none;
+}
+.calendar-event-more {
+    padding: 0 4px;
+    font-size: 9px;
+    font-weight: 800;
+    line-height: 1.1;
+    color: var(--md-sys-on-surface-variant);
+    background: color-mix(in srgb, var(--md-sys-outline-variant) 30%, transparent);
+    border-radius: 4px;
+    text-align: center;
+    overflow: hidden;
+}
+
+@media (prefers-color-scheme: dark) {
+    .calendar-event {
+        background: color-mix(in srgb, var(--event-color) 18%, var(--md-sys-surface-container-highest));
+        color: color-mix(in srgb, var(--event-color) 35%, var(--md-sys-on-surface));
+    }
 }
 .calendar-legend {
     display: flex;

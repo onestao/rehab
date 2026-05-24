@@ -22,8 +22,10 @@ Object.assign(workout, {
         const icon = document.getElementById('pipIcon');
         if (!btn || !icon) return;
         const active = this.isPipActive();
+        const supported = this.isPipSupported();
         btn.classList.toggle('active', active);
-        btn.classList.toggle('unsupported', !this.isPipSupported());
+        btn.classList.toggle('unsupported', !supported);
+        btn.classList.toggle('hidden', !supported);
         btn.setAttribute('aria-label', active ? '关闭训练画中画' : '打开训练画中画');
         icon.innerText = active ? 'close_fullscreen' : 'picture_in_picture_alt';
     },

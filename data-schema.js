@@ -43,6 +43,9 @@
             const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
             this.db.aiTrash = this.db.aiTrash.filter(item => Number(item?.deletedAt || 0) >= cutoff);
             this.db.aiRetryMode = this.db.aiRetryMode || 'versioned';
+            this.db.prefs = this.db.prefs && typeof this.db.prefs === 'object' ? this.db.prefs : {};
+            if (typeof this.db.prefs.haptics !== 'boolean') this.db.prefs.haptics = true;
+            this.db.weeklyPlan = this.db.weeklyPlan && typeof this.db.weeklyPlan === 'object' ? this.db.weeklyPlan : {};
             this.db.aiCipher = this.db.aiCipher && typeof this.db.aiCipher === 'object' ? this.db.aiCipher : null;
             if (!this.db.aiCipher && this.db.encryptedAi && typeof this.db.encryptedAi === 'object') {
                 this.db.aiCipher = { id: 'ai-cipher', payload: this.db.encryptedAi, updatedAt: nowTs, deleted: false };
