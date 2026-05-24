@@ -19,6 +19,21 @@
             this.db.actions = libraryActions.concat(this._cloneRoutineActionsForPlan(actions));
         },
 
+        planMatchesRoutine(routine) {
+            const planActions = this._planActions();
+            const routineActions = Array.isArray(routine?.actions) ? routine.actions : [];
+            if (!planActions.length || planActions.length !== routineActions.length) return false;
+            return routineActions.every((routineAction, index) => {
+                const planAction = planActions[index];
+                if (!planAction) return false;
+                const routineId = routineAction.id || routineAction.sourceActionId || '';
+                const planSourceId = planAction.sourceActionId || planAction.id || '';
+                const idMatches = routineId && planSourceId && routineId === planSourceId;
+                const nameMatches = String(planAction.name || '').trim() === String(routineAction.name || '').trim();
+                return idMatches || nameMatches;
+            });
+        },
+
         _readActionForm() {
             const readInt = (id, fallback) => {
                 const raw = document.getElementById(id)?.value;
@@ -91,6 +106,49 @@
             if (window.toast?.show) toast.show(`"${name}" 已存入动作库`, 'success');
         },
 
+        openRoutineLibraryFromWorkout() {
+            if (!this.db) this.db = {};
+            this.db.libraryView = 'routines';
+            this.showWorkoutLibrary?.();
+        },
+
+        openActionLibraryFromWorkout() {
+            if (!this.db) this.db = {};
+            this.db.libraryView = 'actions';
+            const profileNav = Array.from(document.querySelectorAll('.nav-item'))
+                .find(btn => (btn.getAttribute('onclick') || '').includes("'profile'"));
+            ui.tab('profile', profileNav);
+            requestAnimationFrame(() => {
+                this.setRoutineView?.('library');
+                this.setLibraryView?.('actions', { smooth: false });
+                window.scrollTo?.({ top: 0, behavior: 'smooth' });
+                document.getElementById('profileContent')?.scrollIntoView?.({ block: 'start', behavior: 'smooth' });
+            });
+        },
+
+        focusManualActionInput() {
+            const input = document.getElementById('name');
+            input?.focus?.();
+            input?.scrollIntoView?.({ block: 'center', behavior: 'smooth' });
+        },
+
+        renderWorkoutPlanToolbar() {
+            return `<div class="workout-plan-toolbar">
+                <button class="md-btn md-btn-tonal" onclick="data.openRoutineLibraryFromWorkout()" type="button">
+                    <span class="material-symbols-rounded">library_books</span> 方案库
+                </button>
+                <button class="md-btn md-btn-tonal" onclick="data.openActionLibraryFromWorkout()" type="button">
+                    <span class="material-symbols-rounded">inventory_2</span> 动作库
+                </button>
+                <button class="md-btn md-btn-tonal" onclick="data.focusManualActionInput()" type="button">
+                    <span class="material-symbols-rounded">add</span> 手动添加
+                </button>
+                <button class="icon-btn" onclick="weeklyPlan.pickDay(weeklyPlan.todayKey())" type="button" aria-label="绑定今天周计划" title="绑定今天周计划">
+                    <span class="material-symbols-rounded">calendar_month</span>
+                </button>
+            </div>`;
+        },
+
         deleteAction(id) {
             if (!id) return;
             if (!this.softDeleteById(this.db.actions, id)) return;
@@ -140,25 +198,19 @@
             const actionCount = actions.length;
 
             const todayBanner = window.weeklyPlan?.renderTodayBanner?.() || '';
+            const toolbar = this.renderWorkoutPlanToolbar();
 
             if (actionCount === 0 && routines.length === 0) {
                 el.innerHTML = `
                 ${todayBanner}
                 <div class="md-card workout-plan-card workout-plan-empty">
+                    ${toolbar}
                     <div class="workout-plan-empty-icon">
                         <span class="material-symbols-rounded">fitness_center</span>
                     </div>
                     <div class="workout-plan-empty-text">
-                        <strong>还没有训练计划</strong>
-                        <p>从运动库导入一个方案，或手动添加动作开始训练</p>
-                    </div>
-                    <div class="workout-plan-empty-actions">
-                        <button class="md-btn md-btn-filled" onclick="data.showWorkoutLibrary()">
-                            <span class="material-symbols-rounded">library_books</span> 从运动库导入
-                        </button>
-                        <button class="md-btn md-btn-tonal" onclick="document.getElementById('name').focus()">
-                            <span class="material-symbols-rounded">add</span> 手动添加
-                        </button>
+                        <strong>还没有动作</strong>
+                        <p>使用上方工具条导入方案、打开动作库或手动添加。</p>
                     </div>
                 </div>`;
                 return;
@@ -168,6 +220,7 @@
                 el.innerHTML = `
                 ${todayBanner}
                 <div class="md-card workout-plan-card workout-plan-import">
+                    ${toolbar}
                     <div class="workout-plan-import-head">
                         <div>
                             <span class="cardio-kicker">训练计划</span>
@@ -189,9 +242,6 @@
                             </div>`;
                         }).join('')}
                     </div>
-                    <button class="md-btn md-btn-tonal workout-plan-lib-btn" onclick="data.showWorkoutLibrary()">
-                        <span class="material-symbols-rounded">library_books</span> 查看全部方案
-                    </button>
                 </div>`;
                 return;
             }
@@ -207,16 +257,12 @@
             el.innerHTML = `
             ${todayBanner}
             <div class="md-card workout-plan-card">
+                ${toolbar}
                 <div class="workout-plan-head">
                     <div class="workout-plan-info">
                         <span class="cardio-kicker">当前计划</span>
                         <h3>${actionCount} 个动作 · ${totalSets} 组</h3>
                         <small>预计 ${estMinutes} 分钟 · 约 ${totalReps} 次</small>
-                    </div>
-                    <div class="workout-plan-actions-top">
-                        <button class="icon-btn" onclick="data.showWorkoutLibrary()" aria-label="从运动库导入" title="从运动库导入">
-                            <span class="material-symbols-rounded">library_books</span>
-                        </button>
                     </div>
                 </div>
                 ${recentRoutines.length > 0 ? `

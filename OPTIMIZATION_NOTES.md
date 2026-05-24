@@ -47,6 +47,7 @@ P0:
 - P0-14 AI coach filter tap flash: done. AI coach filter chips and icon toggles no longer show Android tap-highlight or pressed-color flashes when clicked.
 - P0-15 stale app shell update path: done. `index.html` is no longer precached by the service worker, navigation requests use network `no-store`, SW registration uses stable `sw.js` with `updateViaCache: none`, new SW installs call `skipWaiting()`, and stale versioned asset requests such as `?v=114` are normalized to the active cache version.
 - P0-16 AI coach filter blue background flash: done. AI coach card hover/active tint is disabled inside the chat surface, and filter active states use secondary container coloring to avoid a primary-blue flash during rerender.
+- P0-17 AI coach composer placeholder/scrollbar polish: done. The "向 AI 提问" composer textarea now uses a stable 44dp empty height, vertically centered placeholder padding, and hidden scrollbars until content exceeds the maximum input height.
 
 P0-6 DOM state examples:
 ```html
@@ -74,6 +75,7 @@ P1:
 - P1-6 swipe delete undo toast: skipped. Existing `swipe-actions.js` only opens rows and does not own deletion.
 - P1-7 View Transitions: done. `ui._activateTab` uses `document.startViewTransition` with CSS fade-through fallback.
 - P1-8 AI review one-shot model picker: done. Override stays in memory only, `ai.getEffectiveConfig()` drives calls and pricing, version bubbles record the effective model/provider.
+- P1-9 training plan card import entry cleanup: done. The workout plan card now always renders one top toolbar for 方案库、动作库、手动添加 and today's weekly-plan binding. The empty weekly banner is removed, and the today-plan banner only appears when a bound routine has not already been loaded.
 
 P1-8 DOM state examples:
 ```html
@@ -90,7 +92,7 @@ P1-8 DOM state examples:
 P2/P3:
 - P2-1 M3 token completion: done for tokens required by this pass.
 - P2-2 IDB migration for history/advice: skipped.
-- P2-3 wake lock visualization: skipped.
+- P2-3 wake lock visualization: done. The timer panel shows a small `lock` indicator while screen wake lock is active and `lock_open` when training is active but the lock is unavailable/released; tapping retries the request.
 - P2-4 routine JSON save from AI output: skipped.
 - P2-5 CSS engineering cleanup: done. Build now emits layer-wrapped CSS and `build/css-dedup-report.txt`; optional `lightningcss` minify is used only if installed.
 - P3-1 diet photo recognition: skipped.
@@ -111,8 +113,16 @@ node scripts/bump-version.js
 Collected 120 icons -> build/icons.txt, build/icons.csv
 bumped to v118 (patch)
 
+node scripts/bump-version.js
+Collected 120 icons -> build/icons.txt, build/icons.csv
+bumped to v120 (patch)
+
+node scripts/bump-version.js
+Collected 120 icons -> build/icons.txt, build/icons.csv
+bumped to v121 (patch)
+
 node scripts/bump-version.js --check
-version sync OK (v118)
+version sync OK (v121)
 ```
 
 CSS:

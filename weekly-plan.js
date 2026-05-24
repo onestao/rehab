@@ -40,13 +40,8 @@
 
     function renderTodayBanner() {
         const routine = routineFor();
-        if (!routine) {
-            return `<div class="weekly-plan-banner is-empty">
-                <span class="material-symbols-rounded">calendar_month</span>
-                <strong>今天未配置方案</strong>
-                <button class="md-btn md-btn-tonal" onclick="ui.tab('profile', document.querySelector('.nav-item:nth-child(5)'));data.setRoutineView?.('library')" type="button">去配置</button>
-            </div>`;
-        }
+        if (!routine) return '';
+        if (window.data?.planMatchesRoutine?.(routine)) return '';
         return `<div class="weekly-plan-banner">
             <span class="material-symbols-rounded">today</span>
             <strong>今天计划：${esc(routine.name || '未命名方案')}</strong>
@@ -62,7 +57,7 @@
         }
         const body = `<div class="weekly-plan-picker">
             <button class="model-picker-row" type="button" data-weekly-routine=""><span class="material-symbols-rounded">block</span><span class="model-picker-main"><strong>清空绑定</strong><small>这一天不显示计划</small></span></button>
-            ${routines.map(r => `<button class="model-picker-row" type="button" data-weekly-routine="${esc(r.id)}"><span class="material-symbols-rounded">bookmarks</span><span class="model-picker-main"><strong>${esc(r.name || '未命名方案')}</strong><small>${(r.actions || []).length} 个动作</small></span></button>`).join('')}
+            ${routines.map(r => `<button class="model-picker-row" type="button" data-weekly-routine="${esc(r.id)}"><span class="material-symbols-rounded">library_books</span><span class="model-picker-main"><strong>${esc(r.name || '未命名方案')}</strong><small>${(r.actions || []).length} 个动作</small></span></button>`).join('')}
         </div>`;
         window.data?._openModal?.({
             title: '绑定周计划',

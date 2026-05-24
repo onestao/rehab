@@ -4,6 +4,23 @@
 
 /* Workout Plan Card */
 .workout-plan-card { display: grid; gap: 12px; overflow: hidden; }
+.workout-plan-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+.workout-plan-toolbar::-webkit-scrollbar { display: none; }
+.workout-plan-toolbar .md-btn {
+    min-height: 40px;
+    margin-top: 0;
+    white-space: nowrap;
+    flex: none;
+}
+.workout-plan-toolbar .icon-btn {
+    flex: none;
+}
 .workout-plan-head {
     display: flex;
     align-items: flex-start;

@@ -395,6 +395,34 @@ mark.ai-hit {
         border-color var(--md-sys-motion-duration-short);
 }
 .timer-tts-btn:active { transform: scale(0.96); }
+.timer-wakelock-btn {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 2;
+    width: 32px;
+    height: 32px;
+    border: none;
+    border-radius: var(--md-sys-shape-full);
+    background: transparent;
+    color: rgba(255,255,255,0.62);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+}
+.timer-wakelock-btn .material-symbols-rounded {
+    font-size: 12px;
+    line-height: 1;
+}
+.timer-wakelock-btn.is-active {
+    color: rgba(255,255,255,0.72);
+    pointer-events: none;
+}
+.timer-wakelock-btn:active {
+    background: rgba(255,255,255,0.12);
+}
 .timer-tts-btn[data-mode="online-first"] {
     color: var(--md-sys-on-primary-container);
     background: color-mix(in srgb, var(--md-sys-primary-container) 88%, transparent);
@@ -2486,19 +2514,28 @@ mark.ai-hit {
 }
 .advice-composer-input {
     width: 100%;
-    min-height: 20px;
+    height: 44px;
+    min-height: 44px;
     max-height: 160px;
     resize: none;
-    overflow-y: auto;
+    overflow-y: hidden;
     border: none;
     outline: none;
     background: transparent;
     color: var(--md-sys-on-surface);
     font: inherit;
     font-size: 14px;
-    line-height: 1.35;
-    padding: 10px 0 9px;
+    line-height: 20px;
+    padding: 12px 0;
     display: block;
+    box-sizing: border-box;
+    scrollbar-width: none;
+}
+.advice-composer-input::-webkit-scrollbar {
+    display: none;
+}
+.advice-composer-input.is-scrollable {
+    overflow-y: auto;
 }
 .advice-composer-input::placeholder {
     color: var(--md-sys-on-surface-variant);
@@ -5176,6 +5213,23 @@ body.is-training .fab-pip.active {
 
 /* Workout Plan Card */
 .workout-plan-card { display: grid; gap: 12px; overflow: hidden; }
+.workout-plan-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+.workout-plan-toolbar::-webkit-scrollbar { display: none; }
+.workout-plan-toolbar .md-btn {
+    min-height: 40px;
+    margin-top: 0;
+    white-space: nowrap;
+    flex: none;
+}
+.workout-plan-toolbar .icon-btn {
+    flex: none;
+}
 .workout-plan-head {
     display: flex;
     align-items: flex-start;

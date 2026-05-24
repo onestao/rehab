@@ -62,6 +62,34 @@
         border-color var(--md-sys-motion-duration-short);
 }
 .timer-tts-btn:active { transform: scale(0.96); }
+.timer-wakelock-btn {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 2;
+    width: 32px;
+    height: 32px;
+    border: none;
+    border-radius: var(--md-sys-shape-full);
+    background: transparent;
+    color: rgba(255,255,255,0.62);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+}
+.timer-wakelock-btn .material-symbols-rounded {
+    font-size: 12px;
+    line-height: 1;
+}
+.timer-wakelock-btn.is-active {
+    color: rgba(255,255,255,0.72);
+    pointer-events: none;
+}
+.timer-wakelock-btn:active {
+    background: rgba(255,255,255,0.12);
+}
 .timer-tts-btn[data-mode="online-first"] {
     color: var(--md-sys-on-primary-container);
     background: color-mix(in srgb, var(--md-sys-primary-container) 88%, transparent);

@@ -261,8 +261,8 @@
             const libraryView = this.normalizeLibraryView?.(this.db.libraryView) || 'actions';
             const segment = `<div class="library-segment-wrap" style="margin:0 0 8px">
                 <div class="library-segment" role="tablist" aria-label="训练页导入视图">
-                    <button class="library-segment-btn ${libraryView === 'actions' ? 'active' : ''}" onclick="data.showWorkoutLibraryPane('actions')" type="button"><span class="material-symbols-rounded">fitness_center</span><span class="library-segment-label">动作库</span></button>
-                    <button class="library-segment-btn ${libraryView === 'routines' ? 'active' : ''}" onclick="data.showWorkoutLibraryPane('routines')" type="button"><span class="material-symbols-rounded">bookmark_border</span><span class="library-segment-label">方案库</span></button>
+                    <button class="library-segment-btn ${libraryView === 'actions' ? 'active' : ''}" onclick="data.showWorkoutLibraryPane('actions')" type="button"><span class="material-symbols-rounded">inventory_2</span><span class="library-segment-label">动作库</span></button>
+                    <button class="library-segment-btn ${libraryView === 'routines' ? 'active' : ''}" onclick="data.showWorkoutLibraryPane('routines')" type="button"><span class="material-symbols-rounded">library_books</span><span class="library-segment-label">方案库</span></button>
                     <span class="library-segment-indicator ${libraryView === 'routines' ? 'is-routines' : 'is-actions'}" aria-hidden="true"></span>
                 </div>
             </div>`;
@@ -300,7 +300,7 @@
             } else if (!routines.length) {
                 el.innerHTML = segment + `
                 <div class="empty-state" style="padding:24px 16px">
-                    <span class="material-symbols-rounded">bookmark_border</span>
+                    <span class="material-symbols-rounded">library_books</span>
                     <p>方案库为空</p>
                     <small>先在训练页添加动作并存入方案库</small>
                 </div>`;
@@ -561,7 +561,7 @@
             this._routineSwipeDirection = '';
 
             const tabs = [
-                ['library',    'bookmarks',     '库'],
+                ['library',    'library_books', '库'],
                 ['weightloss', 'trending_down', '目标指导'],
                 ['ai',         'psychology',    'AI'],
                 ['sync',       'cloud_sync',    '同步'],
@@ -632,8 +632,8 @@
             const view = this.normalizeLibraryView?.(this.db.libraryView) || 'actions';
             return `<div class="library-segment-wrap">
                 <div class="library-segment" role="tablist" aria-label="库视图">
-                    <button class="library-segment-btn ${view === 'actions' ? 'active' : ''}" data-library-view="actions" role="tab" aria-selected="${view === 'actions'}" onclick="data.setLibraryView('actions')" type="button"><span class="material-symbols-rounded">fitness_center</span><span class="library-segment-label">动作库</span></button>
-                    <button class="library-segment-btn ${view === 'routines' ? 'active' : ''}" data-library-view="routines" role="tab" aria-selected="${view === 'routines'}" onclick="data.setLibraryView('routines')" type="button"><span class="material-symbols-rounded">bookmarks</span><span class="library-segment-label">方案库</span></button>
+                    <button class="library-segment-btn ${view === 'actions' ? 'active' : ''}" data-library-view="actions" role="tab" aria-selected="${view === 'actions'}" onclick="data.setLibraryView('actions')" type="button"><span class="material-symbols-rounded">inventory_2</span><span class="library-segment-label">动作库</span></button>
+                    <button class="library-segment-btn ${view === 'routines' ? 'active' : ''}" data-library-view="routines" role="tab" aria-selected="${view === 'routines'}" onclick="data.setLibraryView('routines')" type="button"><span class="material-symbols-rounded">library_books</span><span class="library-segment-label">方案库</span></button>
                     <span class="library-segment-indicator ${view === 'routines' ? 'is-routines' : 'is-actions'}" aria-hidden="true"></span>
                 </div>
             </div>`;
@@ -1009,7 +1009,7 @@
             const activeTag = this.normalizeTagText(this.db.libraryFilterTag || '');
             const filtered = activeTag ? routines.filter(r => (r.tags || []).includes(activeTag)) : routines;
             if (!routines.length) {
-                return `<div class="empty-state"><span class="material-symbols-rounded">bookmark_border</span><p>暂无方案</p><small>在训练页可保存当前计划到方案库</small></div>`;
+                return `<div class="empty-state"><span class="material-symbols-rounded">library_books</span><p>暂无方案</p><small>在训练页可保存当前计划到方案库</small></div>`;
             }
             return `${this.renderLibraryTagChips(tags, activeTag)}
                 <div class="library-list routine-library-list">

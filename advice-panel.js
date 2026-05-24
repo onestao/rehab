@@ -597,7 +597,9 @@ const advicePanel = {
     autoResizeAdvicePrompt(el = document.getElementById('advicePrompt')) {
         if (!el) return;
         el.style.height = 'auto';
-        el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
+        const nextHeight = Math.max(44, Math.min(el.scrollHeight, 160));
+        el.style.height = `${nextHeight}px`;
+        el.classList.toggle('is-scrollable', el.scrollHeight > 160);
     },
 
     setAdviceModel(model) {
