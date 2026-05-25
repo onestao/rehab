@@ -156,14 +156,19 @@ const cardio = {
             alert('有氧时间低于20秒，无法保存');
             return;
         }
-        data.db.history.unshift(window.cardioPure.buildCardioHistoryRecord({
+        const cardioRecord = window.cardioPure.buildCardioHistoryRecord({
             id: data.generateRecordId('history'),
             now: Date.now(),
             dayKey: data.logicalDateKey(),
             plan: { type, weight, target },
             duration,
             calories
-        }));
+        });
+        if (data.history) {
+            data.history.append(cardioRecord);
+        } else {
+            data.db.history.unshift(cardioRecord);
+        }
         this.closeEditModal();
         this.speak('有氧训练完成');
         await data.saveAndBackup();

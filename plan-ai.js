@@ -15,6 +15,11 @@
         return raw.length > max ? `${raw.slice(0, max)}…` : raw;
     }
 
+    function setText(id, text) {
+        const el = document.getElementById(id);
+        if (el) el.textContent = text;
+    }
+
     function equipmentLabels(prefs = {}, options = []) {
         const custom = new Map((prefs.customEquipment || []).map((item) => [item.id, item.label]));
         const optionMap = new Map((options || []).map((item) => [item.id, item.label]));
@@ -48,6 +53,19 @@
                 '优化我现有的计划',
                 '根据今日反馈调整明天'
             ];
+        },
+
+        planAiTypeOptions() {
+            return ['rehab', 'cut', 'bulk', 'maintenance', 'custom'];
+        },
+
+        renderPlanAiTypeChips(typesInput = 'rehab') {
+            const selected = new Set(normalizePlanTypes(typesInput));
+            return this.planAiTypeOptions().map((type) => {
+                const info = this.planTypeMeta?.(type) || { label: type, icon: 'event_note' };
+                const active = selected.has(type);
+                return `<button class="md-chip plan-ai-type-chip ${active ? 'active' : ''}" type="button" onclick="data.togglePlanAiType('${type}')" aria-pressed="${active}"><span class="material-symbols-rounded">${this.escapeHtml(info.icon || 'event_note')}</span>${this.escapeHtml(info.label)}</button>`;
+            }).join('');
         },
 
         buildPlanAiContext(mode = 'today', userText = '', typesInput = 'rehab') {
@@ -108,27 +126,24 @@
                     <div class="plan-sheet-head">
                         <span class="material-symbols-rounded plan-head-icon">${meta.icon}</span>
                         <div>
-                            <span class="cardio-kicker">训练计划 AI</span>
-                            <h3>${mode === 'week' ? 'AI 重排本周剩余计划' : `生成${types.length > 1 ? `${types.length} 个训练计划` : meta.label}`}</h3>
+                            <span class="cardio-kicker">生成训练计划</span>
                             <small>会自动带上健康档案、训练阶段、设计偏好装备、最近 7 天反馈和漏做项</small>
                         </div>
                     </div>
-                    <div class="plan-ai-chip-row">
-                        ${types.map((type) => {
-                            const info = this.planTypeMeta?.(type) || { label: type, icon: 'event_note' };
-                            return `<span class="md-chip">${this.escapeHtml(info.label)}</span>`;
-                        }).join('')}
+                    <div id="planAiTypeChipRow" class="plan-ai-chip-row">
+                        ${this.renderPlanAiTypeChips(types)}
                     </div>
                     <div class="plan-ai-chip-row">
-                        ${this.planAiQuickPrompts().map((text) => `<button class="md-chip" type="button" onclick="data.fillPlanAiPrompt('${this.escapeHtml(text)}')">${this.escapeHtml(text)}</button>`).join('')}
+                        ${this.planAiQuickPrompts().map((text) => `<button class="md-chip" type="button" onclick="data.handlePlanAiQuickPrompt('${this.escapeHtml(text)}')">${this.escapeHtml(text)}</button>`).join('')}
                     </div>
                     <div class="md-field">
                         <textarea id="planAiPrompt" rows="5" placeholder=" "></textarea>
                         <label>告诉 AI 你的目标、疼痛点或希望保留的动作</label>
                     </div>
+                    <div id="planAiStatus" class="plan-ai-status" aria-live="polite">填写补充要求后点击生成，AI 会返回可编辑的计划草稿。</div>
                     <div class="md-row modal-actions">
                         <button class="md-btn" type="button" onclick="data.closePlanAiSheet()">取消</button>
-                        <button class="md-btn md-btn-filled" type="button" onclick="data.submitPlanAi('${mode}')">生成计划</button>
+                        <button id="planAiSubmitBtn" class="md-btn md-btn-filled" type="button" onclick="data.submitPlanAi('${mode}')">生成计划</button>
                     </div>
                 </div>`;
             sheet.classList.remove('hidden');
@@ -147,6 +162,51 @@
         fillPlanAiPrompt(text) {
             const input = document.getElementById('planAiPrompt');
             if (input) input.value = text;
+        },
+
+        refreshPlanAiTypeChips() {
+            const row = document.getElementById('planAiTypeChipRow');
+            if (row) row.innerHTML = this.renderPlanAiTypeChips(this._planAiTypes || ['rehab']);
+            const firstType = normalizePlanTypes(this._planAiTypes || ['rehab'])[0];
+            const icon = document.querySelector('#planAiSheet .plan-head-icon');
+            if (icon) icon.textContent = this.planTypeMeta?.(firstType)?.icon || 'event_note';
+        },
+
+        togglePlanAiType(type = 'rehab') {
+            const allowed = this.planAiTypeOptions();
+            if (!allowed.includes(type)) return;
+            const set = new Set(normalizePlanTypes(this._planAiTypes || ['rehab']));
+            if (set.has(type) && set.size > 1) set.delete(type);
+            else set.add(type);
+            this._planAiTypes = [...set];
+            this.refreshPlanAiTypeChips();
+        },
+
+        handlePlanAiQuickPrompt(text) {
+            if (text === '+ 新建训练计划') {
+                this.openNewPlanSheet?.();
+                return;
+            }
+            this.fillPlanAiPrompt(text);
+        },
+
+        setPlanAiStatus(message = '', state = '') {
+            setText('planAiStatus', message);
+            const el = document.getElementById('planAiStatus');
+            if (el) {
+                el.dataset.state = state || '';
+                el.classList.toggle('is-busy', state === 'busy');
+                el.classList.toggle('is-error', state === 'error');
+            }
+        },
+
+        setPlanAiPending(pending) {
+            const btn = document.getElementById('planAiSubmitBtn');
+            if (!btn) return;
+            btn.disabled = !!pending;
+            btn.innerHTML = pending
+                ? '<span class="material-symbols-rounded">progress_activity</span>生成中'
+                : '生成计划';
         },
 
         parsePlanAiPayload(rawText, fallbackTypes = 'rehab') {
@@ -187,19 +247,33 @@
 
         async submitPlanAi(mode = 'today') {
             if (!window.ai?.call) {
+                this.setPlanAiStatus?.('AI 模块尚未加载完成，请稍后重试。', 'error');
                 window.toast?.show?.('AI 模块尚未加载完成', 'error');
                 return;
             }
             const types = normalizePlanTypes(this._planAiTypes);
             const prompt = bodyValue('planAiPrompt').trim();
+            const messages = [
+                { role: 'system', content: '你是训练排程助手，只输出 JSON。' },
+                { role: 'user', content: this.buildPlanAiContext(mode, prompt, types) }
+            ];
             try {
-                window.toast?.show?.('AI 正在生成训练计划…', 'info');
-                const text = await window.ai.call([
-                    { role: 'system', content: '你是训练排程助手，只输出 JSON。' },
-                    { role: 'user', content: this.buildPlanAiContext(mode, prompt, types) }
-                ], 1800);
+                this.setPlanAiPending?.(true);
+                this.setPlanAiStatus?.('正在发送训练档案和最近计划摘要…', 'busy');
+                window.toast?.show?.('AI 正在生成训练计划…', 'info', 4200);
+                let text = '';
+                if (typeof window.ai.callStream === 'function') {
+                    text = await window.ai.callStream(messages, 1800, (_delta, accumulated) => {
+                        const length = String(accumulated || '').length;
+                        this.setPlanAiStatus?.(length ? `正在接收计划草稿：${length} 字` : 'AI 已响应，正在等待内容…', 'busy');
+                    });
+                } else {
+                    text = await window.ai.call(messages, 1800);
+                }
+                this.setPlanAiStatus?.('已收到计划草稿，正在校验 JSON…', 'busy');
                 const parsed = this.parsePlanAiPayload(text, types);
                 if (!parsed.ok) {
+                    this.setPlanAiStatus?.('AI 返回内容无法解析，请调整提示后重试。', 'error');
                     this._openModal?.({
                         title: 'JSON 解析失败',
                         icon: 'warning',
@@ -208,9 +282,13 @@
                     });
                     return;
                 }
+                this.setPlanAiStatus?.('计划草稿已生成，请在预览中确认。', 'success');
                 this.previewPlanAiPlans(parsed.plans);
             } catch (error) {
+                this.setPlanAiStatus?.(`生成失败：${window.toast?.sanitize ? toast.sanitize(error) : error?.message || error}`, 'error');
                 window.toast?.show?.(`AI 生成失败：${window.toast?.sanitize ? toast.sanitize(error) : error?.message || error}`, 'error');
+            } finally {
+                this.setPlanAiPending?.(false);
             }
         },
 

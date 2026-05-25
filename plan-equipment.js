@@ -15,6 +15,10 @@
         return `custom_${Date.now()}_${Math.random().toString(36).slice(2, 7)}_${String(label || '').trim().slice(0, 12)}`;
     }
 
+    function attr(value) {
+        return window.renderSafe?.escapeHtml ? window.renderSafe.escapeHtml(value) : String(value ?? '');
+    }
+
     window.dataPlanEquipment = {
         planEquipmentOptions() {
             const prefs = this.ensurePlanPrefs?.() || {};
@@ -110,18 +114,18 @@
                 </div>
                 <div class="plan-equipment-add-row">
                     <div class="md-field">
-                        <input id="planEquipmentNameInput" type="text" placeholder=" " autocomplete="off" maxlength="24">
+                        <input id="planEquipmentNameInput" data-plan-equipment-input type="text" placeholder=" " autocomplete="off" maxlength="24">
                         <label>新增装备名称</label>
                     </div>
-                    <button class="md-btn md-btn-tonal" type="button" onclick="data.addPlanEquipmentFromInput()"><span class="material-symbols-rounded">add</span>添加</button>
+                    <button class="md-btn md-btn-tonal" type="button" data-plan-equipment-add><span class="material-symbols-rounded">add</span>添加</button>
                 </div>
                 <div class="plan-equipment-chips">
                     ${options.map((item) => `
-                        <button class="plan-equipment-chip ${selected.has(item.id) ? 'active' : ''}" type="button" onclick="data.togglePlanEquipment('${this.escapeHtml(item.id)}')">
+                        <button class="plan-equipment-chip ${selected.has(item.id) ? 'active' : ''}" type="button" data-plan-equipment-toggle="${attr(item.id)}">
                             <span class="material-symbols-rounded">${this.escapeHtml(item.icon)}</span>
                             <strong>${this.escapeHtml(item.label)}</strong>
                             <i class="material-symbols-rounded">${selected.has(item.id) ? 'check_circle' : 'radio_button_unchecked'}</i>
-                            ${item.builtin ? '' : `<em class="material-symbols-rounded" onclick="event.stopPropagation();data.deleteCustomPlanEquipment('${this.escapeHtml(item.id)}')" title="删除">close</em>`}
+                            ${item.builtin ? '' : `<em class="material-symbols-rounded" data-plan-equipment-delete="${attr(item.id)}" title="删除">close</em>`}
                         </button>
                     `).join('')}
                 </div>
@@ -146,8 +150,34 @@
             modal.querySelectorAll('[data-modal-close]').forEach((btn) => {
                 btn.addEventListener('click', () => this.closePlanEquipmentSheet?.());
             });
+            modal.addEventListener('click', (event) => {
+                const deleteBtn = event.target?.closest?.('[data-plan-equipment-delete]');
+                if (deleteBtn) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    this.deleteCustomPlanEquipment?.(deleteBtn.getAttribute('data-plan-equipment-delete') || '');
+                    return;
+                }
+                const addBtn = event.target?.closest?.('[data-plan-equipment-add]');
+                if (addBtn) {
+                    event.preventDefault();
+                    this.addPlanEquipmentFromInput?.();
+                    return;
+                }
+                const chip = event.target?.closest?.('[data-plan-equipment-toggle]');
+                if (chip) {
+                    event.preventDefault();
+                    this.togglePlanEquipment?.(chip.getAttribute('data-plan-equipment-toggle') || '');
+                }
+            });
+            modal.addEventListener('keydown', (event) => {
+                if (event.key !== 'Enter' || !event.target?.matches?.('[data-plan-equipment-input]')) return;
+                event.preventDefault();
+                this.addPlanEquipmentFromInput?.();
+            });
             document.body.appendChild(modal);
             this._planEquipmentSheetEl = modal;
+            requestAnimationFrame(() => document.getElementById('planEquipmentNameInput')?.focus?.());
         },
 
         closePlanEquipmentSheet() {
@@ -202,6 +232,7 @@
             this.renderProfilePage?.();
             this.refreshPlanEquipmentSheet?.();
             window.haptics?.light?.();
+            window.toast?.show?.(`已添加装备：${name}`, 'success');
             return true;
         },
 

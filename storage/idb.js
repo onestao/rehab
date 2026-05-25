@@ -2,13 +2,21 @@
 (function () {
     const DB_NAME = 'rehab_pro_storage';
     const STORE_NAME = 'kv';
-    const DB_VERSION = 2;
+    const HISTORY_STORE_NAME = 'history';
+    const DB_VERSION = 3;
 
     const migrations = {
         1: async function (db) {
             if (!db.objectStoreNames.contains(STORE_NAME)) db.createObjectStore(STORE_NAME);
         },
-        2: async function () {}
+        2: async function () {},
+        3: async function (db) {
+            if (!db.objectStoreNames.contains(HISTORY_STORE_NAME)) {
+                var store = db.createObjectStore(HISTORY_STORE_NAME, { keyPath: 'id' });
+                store.createIndex('byUpdatedAt', 'updatedAt', { unique: false });
+                store.createIndex('byDateKey', 'dayKey', { unique: false });
+            }
+        }
     };
 
     function requestToPromise(request) {
@@ -29,6 +37,7 @@
     const storageIdb = {
         DB_NAME: DB_NAME,
         STORE_NAME: STORE_NAME,
+        HISTORY_STORE_NAME: HISTORY_STORE_NAME,
         DB_VERSION: DB_VERSION,
         migrations: migrations,
         _openPromise: null,

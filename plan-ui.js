@@ -57,6 +57,8 @@
             const pending = items.filter((item) => item.status === 'todo' || item.status === 'in-progress').length;
             const currentMeta = taskStatusMeta(current || {});
             const today = this.logicalDateKey?.() || this.dateKey(new Date());
+            const prefs = this.ensurePlanPrefs?.() || {};
+            const cooldownCount = todayPlans.reduce((sum, item) => sum + Number(this.pendingCooldownCount?.(item) || 0), 0);
             const weekdays = ['周日','周一','周二','周三','周四','周五','周六'];
             const weekday = weekdays[this.dateFromKey(today).getDay()];
             const weight = this.activeRecords?.(this.db.health?.weights || []).find((item) => item.date === today) || this.sortedWeights?.().slice(-1)[0] || null;
@@ -68,15 +70,14 @@
             return `<div class="md-card plan-today-card plan-hero-card">
                 <div class="plan-today-head">
                     <div>
-                        <span class="cardio-kicker">今日</span>
                         <h3>${today.slice(5, 7)}月${today.slice(8, 10)}日 ${weekday}</h3>
                         <small class="plan-today-metrics">${this.escapeHtml(metricText || '现在 / 今天 / 接下来')}</small>
                         ${plan?.notes ? `<small>${this.escapeHtml(plan.notes)}</small>` : ''}
                     </div>
                     <div class="plan-card-actions">
-                        <button class="md-icon-btn" type="button" onclick="data.openPlanPendingCooldownSheet?.()" aria-label="待拉伸"><span class="material-symbols-rounded">self_improvement</span>${this.pendingCooldownCount?.(plan) ? `<b>${this.pendingCooldownCount(plan)}</b>` : ''}</button>
+                        ${prefs.showCooldownDock === false ? '' : `<button class="md-icon-btn" type="button" ${cooldownCount ? 'onclick="data.openPlanPendingCooldownSheet?.()"' : 'disabled'} aria-label="${cooldownCount ? `待集中拉伸 ${cooldownCount} 项` : '暂无待集中拉伸'}" title="${cooldownCount ? `待集中拉伸 ${cooldownCount} 项` : '暂无待集中拉伸'}"><span class="material-symbols-rounded">self_improvement</span>${cooldownCount ? `<b>${cooldownCount}</b>` : ''}</button>`}
                         <button class="md-icon-btn" type="button" onclick="planWeekly.open()" aria-label="本周计划"><span class="material-symbols-rounded">calendar_month</span></button>
-                        <button class="md-icon-btn" type="button" onclick="data.openPlanAiSheet('today')" aria-label="AI 重排训练计划"><span class="material-symbols-rounded">auto_awesome</span></button>
+                        <button class="md-icon-btn" type="button" onclick="data.openPlanTodayAiSheet?.()" aria-label="AI 重排训练计划"><span class="material-symbols-rounded">auto_awesome</span></button>
                     </div>
                 </div>
                 <div class="plan-ring-row">
@@ -132,6 +133,20 @@
         selectTodayPlan(planId) {
             this.selectedPlanId = planId;
             this.renderTodayPage?.();
+        },
+
+        todayPlanAiTypes() {
+            const plans = this.getTodayDailyPlans?.() || [];
+            const selected = plans.find((item) => item.id === this.selectedPlanId);
+            const ordered = [
+                ...(selected ? [selected.type || 'rehab'] : []),
+                ...plans.map((item) => item.type || 'rehab')
+            ];
+            return normalizePlanTypes(ordered);
+        },
+
+        openPlanTodayAiSheet() {
+            this.openPlanAiSheet?.('today', this.todayPlanAiTypes());
         },
 
         openNewPlanSheet() {

@@ -153,6 +153,7 @@
     function createIdbAdapter(options) {
         const dbKey = options?.dbKey;
         const keys = dbKey ? largeKeys(dbKey) : null;
+
         function readLocalSnapshot(key) {
             try {
                 return safeParse(localStorage.getItem(key), key);
@@ -171,13 +172,55 @@
             return Number(localValue.lastModified || 0) > Number(idbValue.lastModified || 0);
         }
 
+        async function readHistoryFromStore() {
+            if (!window.storageCollections) return null;
+            try {
+                const count = await window.storageCollections.count();
+                if (count > 0) {
+                    return await window.storageCollections.getAll();
+                }
+            } catch (_) {}
+            return null;
+        }
+
+        async function lazyMigrateHistoryToStore(historyArray) {
+            if (!window.storageCollections || !Array.isArray(historyArray) || !historyArray.length) return;
+            try {
+                const existing = await window.storageCollections.count();
+                if (existing > 0) return;
+                await window.storageCollections.putMany(historyArray);
+            } catch (_) {}
+        }
+
+        async function readHistoryHybrid() {
+            const storeHistory = await readHistoryFromStore();
+            if (storeHistory && storeHistory.length > 0) return storeHistory;
+            const kvHistory = await window.storageIdb.get(keys.history);
+            if (Array.isArray(kvHistory) && kvHistory.length > 0) {
+                await lazyMigrateHistoryToStore(kvHistory);
+                return kvHistory;
+            }
+            return null;
+        }
+
+        async function writeHistoryToStore(historyArray) {
+            if (!window.storageCollections || !Array.isArray(historyArray)) return;
+            try {
+                await window.storageCollections.clear();
+                if (historyArray.length > 0) {
+                    await window.storageCollections.putMany(historyArray);
+                }
+            } catch (_) {}
+        }
+
         return {
             mode: 'idb',
             async read(key) {
                 const idbValue = await window.storageIdb.get(key);
                 const localSnapshot = readLocalSnapshot(key);
                 if (key === dbKey && idbValue) {
-                    const idbHistory = await window.storageIdb.get(keys.history);
+                    const storeOrKvHistory = await readHistoryHybrid();
+                    const idbHistory = storeOrKvHistory || await window.storageIdb.get(keys.history);
                     const idbAdvice = await window.storageIdb.get(keys.advice);
                     const legacyFull = readLegacyFullSnapshot();
                     const hydrated = recoverLargeCollections(idbValue, {
@@ -201,7 +244,7 @@
                         });
                         const split = splitLargeCollections(recoveredLocal);
                         await window.storageIdb.set(key, split.meta);
-                        await window.storageIdb.set(keys.history, split.history);
+                        await writeHistoryToStore(split.history);
                         await window.storageIdb.set(keys.advice, split.advice);
                         return recoveredLocal;
                     }
@@ -218,7 +261,7 @@
                     if (key === dbKey) {
                         const split = splitLargeCollections(value);
                         await window.storageIdb.set(key, split.meta);
-                        await window.storageIdb.set(keys.history, split.history);
+                        await writeHistoryToStore(split.history);
                         await window.storageIdb.set(keys.advice, split.advice);
                     } else {
                         await window.storageIdb.set(key, value);
@@ -232,7 +275,7 @@
                     const split = splitLargeCollections(value);
                     localStorage.setItem(key, JSON.stringify(split.meta));
                     await window.storageIdb.set(key, split.meta);
-                    await window.storageIdb.set(keys.history, split.history);
+                    await writeHistoryToStore(split.history);
                     await window.storageIdb.set(keys.advice, split.advice);
                     return;
                 }
@@ -249,6 +292,9 @@
             async remove(key) {
                 await window.storageIdb.remove(key);
                 if (key === dbKey) {
+                    if (window.storageCollections) {
+                        try { await window.storageCollections.clear(); } catch (_) {}
+                    }
                     await window.storageIdb.remove(keys.history);
                     await window.storageIdb.remove(keys.advice);
                 }

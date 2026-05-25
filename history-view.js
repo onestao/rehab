@@ -2,9 +2,16 @@
 (function () {
     window.dataHistoryView = {
         deleteHistory(id) {
+            const self = this;
             this.deleteWithUndo(this.db.history, id, {
-                save: () => this.save(),
-                render: () => this.renderHistory?.()
+                save: function () {
+                    const record = self.db.history.find(function (r) { return r && r.id === id; });
+                    if (record && window.storageCollections) {
+                        window.storageCollections.update(record).catch(function () {});
+                    }
+                    self.save();
+                },
+                render: function () { self.renderHistory?.(); }
             });
         },
 

@@ -3,3 +3,4 @@ archive/
 node_modules
 *.tsbuildinfo
 coverage
+debug-backups/

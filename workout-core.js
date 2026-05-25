@@ -279,7 +279,11 @@ Object.assign(workout, {
             updatedAt: Date.now(),
             deleted: false
         };
-        data.db.history.unshift(historyRecord);
+        if (data.history) {
+            data.history.append(historyRecord);
+        } else {
+            data.db.history.unshift(historyRecord);
+        }
         window.data?.handleRehabWorkoutFinished?.(historyRecord);
         data.db.actualSetsBuffer = [];
         data.saveAndBackup();

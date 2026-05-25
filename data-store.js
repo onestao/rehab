@@ -69,6 +69,7 @@
             }
             if (localCfg) this.cfg = localCfg;
             this.normalizeDb();
+            this._initHistoryApi();
             this.bindFlushHooks();
             if (window.sync && typeof sync.initUI === 'function') sync.initUI();
             if (typeof ai !== 'undefined') await ai.init({ saveData: true, renderData: false });
@@ -92,6 +93,71 @@
                 const el = document.getElementById(id);
                 if (el && draft[key] != null) el.value = draft[key];
             });
+        },
+
+        _initHistoryApi() {
+            const self = this;
+            this.history = {
+                append(record) {
+                    if (!record || typeof record !== 'object') return;
+                    if (!record.id) record.id = self.generateRecordId('history');
+                    if (!record.updatedAt) record.updatedAt = Date.now();
+                    if (typeof record.deleted !== 'boolean') record.deleted = false;
+                    self.db.history.unshift(record);
+                    if (window.storageCollections) {
+                        window.storageCollections.append(record).catch(function (e) {
+                            console.warn('history.append store write failed', e);
+                        });
+                    }
+                },
+                update(record) {
+                    if (!record || !record.id) return;
+                    const idx = self.db.history.findIndex(function (r) { return r && r.id === record.id; });
+                    if (idx >= 0) self.db.history[idx] = record;
+                    if (window.storageCollections) {
+                        window.storageCollections.update(record).catch(function (e) {
+                            console.warn('history.update store write failed', e);
+                        });
+                    }
+                },
+                deleteById(id) {
+                    const record = self.db.history.find(function (r) { return r && r.id === id; });
+                    if (!record || record.deleted) return false;
+                    record.deleted = true;
+                    record.updatedAt = Date.now();
+                    if (window.storageCollections) {
+                        window.storageCollections.update(record).catch(function (e) {
+                            console.warn('history.deleteById store write failed', e);
+                        });
+                    }
+                    return true;
+                },
+                queryRecent(limit) {
+                    limit = typeof limit === 'number' ? limit : 10;
+                    if (window.storageCollections) {
+                        return window.storageCollections.getPage(0, limit).catch(function () {
+                            return self.activeRecords(self.db.history).slice(0, limit);
+                        });
+                    }
+                    return Promise.resolve(self.activeRecords(self.db.history).slice(0, limit));
+                },
+                getAll() {
+                    if (window.storageCollections) {
+                        return window.storageCollections.getAll().catch(function () {
+                            return self.db.history || [];
+                        });
+                    }
+                    return Promise.resolve(self.db.history || []);
+                },
+                count() {
+                    if (window.storageCollections) {
+                        return window.storageCollections.count().catch(function () {
+                            return (self.db.history || []).length;
+                        });
+                    }
+                    return Promise.resolve((self.db.history || []).length);
+                }
+            };
         },
 
         purgeBefore(ts, retentionMs = 30 * 24 * 60 * 60 * 1000) {

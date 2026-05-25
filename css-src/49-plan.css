@@ -925,6 +925,31 @@
     gap: 12px;
 }
 
+.plan-ai-status {
+    min-height: 34px;
+    display: flex;
+    align-items: center;
+    padding: 8px 10px;
+    border: 1px solid color-mix(in srgb, var(--md-sys-outline-variant) 72%, transparent);
+    border-radius: var(--md-sys-shape-md);
+    background: var(--md-sys-surface-container-low);
+    color: var(--md-sys-on-surface-variant);
+    font-size: 12px;
+    line-height: 1.35;
+}
+
+.plan-ai-status.is-busy {
+    border-color: color-mix(in srgb, var(--md-sys-primary) 36%, transparent);
+    background: color-mix(in srgb, var(--md-sys-primary-container) 52%, var(--md-sys-surface-container-low));
+    color: var(--md-sys-on-primary-container);
+}
+
+.plan-ai-status.is-error {
+    border-color: color-mix(in srgb, var(--md-sys-error) 48%, transparent);
+    background: color-mix(in srgb, var(--md-sys-error-container) 54%, var(--md-sys-surface-container-low));
+    color: var(--md-sys-on-error-container);
+}
+
 .plan-feedback-grid {
     grid-template-columns: repeat(5, minmax(0, 1fr));
 }
@@ -1224,6 +1249,20 @@
 
 .plan-ai-chip-row .md-chip {
     flex: none;
+}
+
+.plan-ai-type-chip {
+    border: 1px solid transparent;
+}
+
+.plan-ai-type-chip.active {
+    border-color: color-mix(in srgb, var(--md-sys-primary) 44%, transparent);
+    background: var(--md-sys-primary-container);
+    color: var(--md-sys-on-primary-container);
+}
+
+.plan-ai-type-chip .material-symbols-rounded {
+    font-size: 16px;
 }
 
 .plan-ai-preview-plan {
