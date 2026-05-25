@@ -120,6 +120,32 @@
         return next;
     }
 
+    function pickLargestCollection() {
+        return Array.from(arguments)
+            .filter(Array.isArray)
+            .reduce(function (best, item) { return item.length > best.length ? item : best; }, []);
+    }
+
+    function recoverLargeCollections(meta, sources) {
+        sources = sources || {};
+        return hydrateLargeCollections(meta, {
+            history: pickLargestCollection(
+                meta?.history,
+                sources.idbHistory,
+                sources.localHistory,
+                sources.legacyHistory,
+                sources.idbMetaHistory
+            ),
+            advice: pickLargestCollection(
+                meta?.health?.aiAdviceChat,
+                sources.idbAdvice,
+                sources.localAdvice,
+                sources.legacyAdvice,
+                sources.idbMetaAdvice
+            )
+        });
+    }
+
     function largeKeys(dbKey) {
         return { history: dbKey + ':history', advice: dbKey + ':advice' };
     }
@@ -135,6 +161,10 @@
             }
         }
 
+        function readLegacyFullSnapshot() {
+            return dbKey ? readLocalSnapshot(dbKey + ':legacy-full') : null;
+        }
+
         function isNewerSnapshot(localValue, idbValue) {
             if (!localValue || Object.prototype.toString.call(localValue) !== '[object Object]') return false;
             if (!idbValue || Object.prototype.toString.call(idbValue) !== '[object Object]') return true;
@@ -147,24 +177,53 @@
                 const idbValue = await window.storageIdb.get(key);
                 const localSnapshot = readLocalSnapshot(key);
                 if (key === dbKey && idbValue) {
-                    const history = await window.storageIdb.get(keys.history);
-                    const advice = await window.storageIdb.get(keys.advice);
-                    const hydrated = hydrateLargeCollections(idbValue, {
-                        history: history || localSnapshot?.history || idbValue.history,
-                        advice: advice || localSnapshot?.health?.aiAdviceChat || idbValue.health?.aiAdviceChat
+                    const idbHistory = await window.storageIdb.get(keys.history);
+                    const idbAdvice = await window.storageIdb.get(keys.advice);
+                    const legacyFull = readLegacyFullSnapshot();
+                    const hydrated = recoverLargeCollections(idbValue, {
+                        idbHistory,
+                        idbAdvice,
+                        localHistory: localSnapshot?.history,
+                        localAdvice: localSnapshot?.health?.aiAdviceChat,
+                        legacyHistory: legacyFull?.history,
+                        legacyAdvice: legacyFull?.health?.aiAdviceChat,
+                        idbMetaHistory: idbValue.history,
+                        idbMetaAdvice: idbValue.health?.aiAdviceChat
                     });
                     if (isNewerSnapshot(localSnapshot, hydrated)) {
-                        const split = splitLargeCollections(localSnapshot);
+                        const recoveredLocal = recoverLargeCollections(localSnapshot, {
+                            idbHistory,
+                            idbAdvice,
+                            legacyHistory: legacyFull?.history,
+                            legacyAdvice: legacyFull?.health?.aiAdviceChat,
+                            idbMetaHistory: idbValue.history,
+                            idbMetaAdvice: idbValue.health?.aiAdviceChat
+                        });
+                        const split = splitLargeCollections(recoveredLocal);
                         await window.storageIdb.set(key, split.meta);
                         await window.storageIdb.set(keys.history, split.history);
                         await window.storageIdb.set(keys.advice, split.advice);
-                        return localSnapshot;
+                        return recoveredLocal;
                     }
                     return hydrated;
                 }
                 if (isNewerSnapshot(localSnapshot, idbValue)) {
-                    await window.storageIdb.set(key, localSnapshot);
-                    return localSnapshot;
+                    const legacyFull = readLegacyFullSnapshot();
+                    const value = key === dbKey
+                        ? recoverLargeCollections(localSnapshot, {
+                            legacyHistory: legacyFull?.history,
+                            legacyAdvice: legacyFull?.health?.aiAdviceChat
+                        })
+                        : localSnapshot;
+                    if (key === dbKey) {
+                        const split = splitLargeCollections(value);
+                        await window.storageIdb.set(key, split.meta);
+                        await window.storageIdb.set(keys.history, split.history);
+                        await window.storageIdb.set(keys.advice, split.advice);
+                    } else {
+                        await window.storageIdb.set(key, value);
+                    }
+                    return value;
                 }
                 return idbValue;
             },

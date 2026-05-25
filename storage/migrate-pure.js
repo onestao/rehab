@@ -66,3 +66,28 @@ export function hydrateLargeCollections(meta, large = {}) {
         : (Array.isArray(next.health.aiAdviceChat) ? next.health.aiAdviceChat : []);
     return next;
 }
+
+export function pickLargestCollection(...candidates) {
+    return candidates
+        .filter(Array.isArray)
+        .reduce((best, item) => (item.length > best.length ? item : best), []);
+}
+
+export function recoverLargeCollections(meta, sources = {}) {
+    return hydrateLargeCollections(meta, {
+        history: pickLargestCollection(
+            meta?.history,
+            sources.idbHistory,
+            sources.localHistory,
+            sources.legacyHistory,
+            sources.idbMetaHistory
+        ),
+        advice: pickLargestCollection(
+            meta?.health?.aiAdviceChat,
+            sources.idbAdvice,
+            sources.localAdvice,
+            sources.legacyAdvice,
+            sources.idbMetaAdvice
+        )
+    });
+}
