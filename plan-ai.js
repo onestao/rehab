@@ -90,6 +90,67 @@
         };
     }
 
+    function formatMinutes(seconds = 0) {
+        const minutes = Math.round(Number(seconds || 0) / 60);
+        return minutes > 0 ? `${minutes}分钟` : '';
+    }
+
+    function summarizeActualSets(sets = []) {
+        const list = (Array.isArray(sets) ? sets : []).slice(0, 8).map((set) => {
+            const weight = Number(set.weightKg || 0);
+            const reps = Number(set.reps || 0);
+            const action = String(set.action || set.actionName || '').trim();
+            const body = weight > 0 || reps > 0
+                ? `${weight > 0 ? `${weight}kg` : '自重'}×${reps || 0}`
+                : '';
+            return [action, body, set.note ? `备注:${set.note}` : ''].filter(Boolean).join(' ');
+        }).filter(Boolean);
+        return list;
+    }
+
+    function summarizeTodayHistory(ctx, today) {
+        return (ctx.activeRecords?.(ctx.db?.history || []) || [])
+            .filter((record) => (ctx.historyDayKey?.(record) || record.dayKey || '') === today)
+            .slice(-6)
+            .map((record) => {
+                const names = ctx.historyNames?.(record) || (record.actions || []).map((action) => action.name || '未命名');
+                const actions = (record.actions || []).slice(0, 8).map((action) => ({
+                    name: action.name || '',
+                    phase: action.phase || '',
+                    sets: Number(action.sets || 0),
+                    reps: Number(action.reps || 0),
+                    work: Number(action.work || 0),
+                    isAlt: !!action.isAlt
+                }));
+                return {
+                    source: record.plan ? 'plan-workout' : (record.type === 'cardio' ? 'cardio' : 'workout'),
+                    minutes: formatMinutes(record.duration),
+                    calories: Number(record.cardio?.calories || 0),
+                    names: names.slice(0, 10),
+                    actions,
+                    actualSets: summarizeActualSets(record.actualSets)
+                };
+            });
+    }
+
+    function summarizeManualExercises(ctx, today) {
+        return (ctx.activeRecords?.(ctx.db?.health?.exerciseLogs || []) || [])
+            .filter((entry) => entry.date === today)
+            .slice(-8)
+            .map((entry) => ({
+                source: 'manual-exercise',
+                type: entry.type || '',
+                name: ctx.exerciseLabel?.(entry.type, entry) || entry.customName || entry.type || '运动',
+                minutes: Number(entry.minutes || 0),
+                calories: Number(entry.calories || 0),
+                distance: Number(entry.distance || 0),
+                weightKg: Number(entry.weightKg || 0),
+                sets: Number(entry.sets || 0),
+                repsPerSet: Number(entry.repsPerSet || 0),
+                note: String(entry.note || '').slice(0, 120)
+            }));
+    }
+
     window.dataPlanAi = {
         planAiQuickPrompts() {
             return [
@@ -114,12 +175,18 @@
 
         buildPlanAiContext(mode = 'today', userText = '', typesInput = 'rehab') {
             const prefs = this.ensurePlanPrefs?.() || {};
+            const today = this.logicalDateKey?.() || this.dateKey(new Date());
             const types = normalizePlanTypes(typesInput);
             const metas = types.map((type) => this.planTypeMeta?.(type) || { label: '训练计划' });
             const prefEquipment = equipmentLabels(prefs, this.planEquipmentOptions?.() || []);
             const profile = profileContext(this.db.health?.profile || {});
             const profileEquipment = Array.isArray(profile.preferences?.equipment) ? profile.preferences.equipment : [];
             const allEquipment = [...new Set([...prefEquipment, ...profileEquipment].map((item) => String(item || '').trim()).filter(Boolean))];
+            const todayCompleted = {
+                date: today,
+                workouts: summarizeTodayHistory(this, today),
+                manualExercises: summarizeManualExercises(this, today)
+            };
             const recentPlans = this.activeRecords(this.db.dailyPlans || [])
                 .filter((plan) => types.includes(plan.type || 'rehab'))
                 .slice(0, 14)
@@ -146,7 +213,8 @@
                 '力量/次数动作：reps 必须为每组次数，work=0；静态保持/计时动作：work 必须为每次秒数，reps=0。',
                 '不要用 0 占位；只有不按次数的计时动作才能 reps=0，只有不按时间的次数动作才能 work=0。',
                 'repRest 是同一组内每次/左右侧之间休息秒数，actionRest 是组间休息秒数。',
-                '双侧交替或左右轮换动作必须 isAlt=true，否则 isAlt=false。'
+                '双侧交替或左右轮换动作必须 isAlt=true，否则 isAlt=false。',
+                '必须参考今日已完成运动摘要；如果今天已经高强度训练过同动作或同部位，后续计划应降低重复负荷、改为恢复/拉伸/低强度技术练习，除非用户明确要求继续加量。'
             ].join('\n');
             const typeInstructions = types.map((type, index) => `${index + 1}. ${type} / ${this.planTypeMeta?.(type)?.label || type}`).join('\n');
             return [
@@ -160,6 +228,7 @@
                 `设计偏好装备: ${prefEquipment.join(', ') || '无'}`,
                 `健康档案装备偏好: ${profileEquipment.join(', ') || '无'}`,
                 `最终可用装备池: ${allEquipment.join(', ') || '无'}`,
+                `今日已完成运动摘要: ${JSON.stringify(todayCompleted)}`,
                 `最近 7 天对应类型计划摘要: ${JSON.stringify(recentPlans)}`,
                 `健康档案: ${JSON.stringify(profile)}`,
                 `目标类型: ${String(this.db.health?.dietGoal?.goalType || this.db.health?.goalType || '')}`,

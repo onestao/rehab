@@ -17,11 +17,41 @@ function loadPlanAi() {
 function createContext(api) {
   return {
     ...api,
+    db: {
+      dailyPlans: [],
+      history: [],
+      health: { exerciseLogs: [], profile: {}, dietGoal: null }
+    },
     logicalDateKey() {
+      return '2026-05-25';
+    },
+    dateKey() {
       return '2026-05-25';
     },
     escapeHtml(value) {
       return String(value ?? '');
+    },
+    ensurePlanPrefs() {
+      return { equipment: [], customEquipment: [], stage: 'maintenance', customStageLabel: '' };
+    },
+    planEquipmentOptions() {
+      return [];
+    },
+    activeRecords(list) {
+      return (list || []).filter((item) => item && !item.deleted);
+    },
+    completionRate() {
+      return { done: 0, total: 0, rate: 0 };
+    },
+    historyDayKey(entry) {
+      return entry?.dayKey || '2026-05-25';
+    },
+    historyNames(entry) {
+      return (entry?.actions || []).map((item) => item.name || '未命名');
+    },
+    exerciseLabel(type = '', entry = {}) {
+      if (type === 'strength') return entry?.customName || '力量训练';
+      return type || '运动';
     },
     planTypeMeta(type = 'rehab') {
       const map = {
@@ -84,6 +114,46 @@ test('plan AI parser fills usable spec defaults and preserves alternation', () =
     actionRest: 75,
     isAlt: false
   });
+});
+
+test('plan AI context includes today completed workouts and manual exercises', () => {
+  const api = loadPlanAi();
+  const ctx = createContext(api);
+  ctx.db.history = [{
+    id: 'h1',
+    dayKey: '2026-05-25',
+    duration: 1800,
+    actions: [
+      { name: '深蹲', sets: 4, reps: 8, work: 0 },
+      { name: '卧推', sets: 3, reps: 10, work: 0 }
+    ],
+    actualSets: [
+      { action: '深蹲', weightKg: 60, reps: 8 },
+      { action: '深蹲', weightKg: 60, reps: 7 }
+    ],
+    cardio: { calories: 120 }
+  }];
+  ctx.db.health.exerciseLogs = [{
+    id: 'e1',
+    date: '2026-05-25',
+    type: 'strength',
+    customName: '哑铃划船',
+    weightKg: 20,
+    sets: 3,
+    repsPerSet: 12,
+    minutes: 15,
+    calories: 80,
+    note: '背部已疲劳'
+  }];
+
+  const prompt = api.buildPlanAiContext.call(ctx, 'today', '安排后续训练', ['bulk']);
+
+  assert.match(prompt, /今日已完成运动摘要/);
+  assert.match(prompt, /深蹲/);
+  assert.match(prompt, /60kg×8/);
+  assert.match(prompt, /卧推/);
+  assert.match(prompt, /哑铃划船/);
+  assert.match(prompt, /背部已疲劳/);
 });
 
 test('plan AI preview exposes rest and alternation controls', () => {
