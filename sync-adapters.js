@@ -8,10 +8,13 @@
     }
 
     window.syncAdapters = {
-        async s3Req(sync, method, remotePath, body = null, extraHeaders = {}) {
+        async s3Req(sync, method, remotePath, body = null, extraHeaders = {}, options = {}) {
             const { endpoint, region, bucket, key, secret } = requireS3Config();
             const host = new URL(endpoint).host;
-            const path = `/${bucket}/${remotePath}`;
+            const objectKey = options && options.s3Root
+                ? String(remotePath || '').replace(/^\/+/, '')
+                : (typeof sync.s3ObjectKey === 'function' ? sync.s3ObjectKey(remotePath) : String(remotePath || '').replace(/^\/+/, ''));
+            const path = `/${bucket}/${objectKey}`;
             const dt = new Date().toISOString().replace(/[:\-]|\.\d{3}/g, '');
             const date = dt.slice(0, 8);
             const hash = body
@@ -43,7 +46,8 @@
         async s3PutBlob(sync, remotePath, blob, contentType = 'application/octet-stream') {
             const { endpoint, region, bucket, key, secret } = requireS3Config();
             const host = new URL(endpoint).host;
-            const path = `/${bucket}/${remotePath}`;
+            const objectKey = typeof sync.s3ObjectKey === 'function' ? sync.s3ObjectKey(remotePath) : String(remotePath || '').replace(/^\/+/, '');
+            const path = `/${bucket}/${objectKey}`;
             const dt = new Date().toISOString().replace(/[:\-]|\.\d{3}/g, '');
             const date = dt.slice(0, 8);
             const buf = await blob.arrayBuffer();

@@ -38,6 +38,19 @@ function isRetryableError(error) {
 }
 
 /**
+ * @param {string} remotePath
+ * @param {string} prefix
+ */
+function buildS3ObjectKey(remotePath, prefix = 'rehab') {
+    const cleanPath = String(remotePath || '').trim().replace(/^\/+/, '');
+    const cleanPrefix = String(prefix || '').trim().replace(/^\/+|\/+$/g, '');
+    if (!cleanPrefix) return cleanPath;
+    if (!cleanPath) return `${cleanPrefix}/`;
+    if (cleanPath === cleanPrefix || cleanPath.startsWith(`${cleanPrefix}/`)) return cleanPath;
+    return `${cleanPrefix}/${cleanPath}`;
+}
+
+/**
  * Fieldwise merge: only uses per-field timestamps when present, otherwise falls back to LWW by record updatedAt.
  * @param {{updatedAt?: number, __fieldUpdatedAt?: Record<string, string>, [k: string]: any}} local
  * @param {{updatedAt?: number, __fieldUpdatedAt?: Record<string, string>, [k: string]: any}} remote
@@ -169,6 +182,7 @@ export {
     mergeIncremental,
     computeRetryDelay,
     isRetryableError,
+    buildS3ObjectKey,
     mergeRecordsFieldwise,
     takeQueueBatch,
     mergeAdviceVersions,
@@ -183,6 +197,7 @@ if (typeof window !== 'undefined') {
     win.syncPure = win.syncPure || {};
     Object.assign(win.syncPure, {
         mergeIncremental, computeRetryDelay, isRetryableError,
+        buildS3ObjectKey,
         mergeRecordsFieldwise, takeQueueBatch,
         mergeAdviceVersions, mergeAdviceRecord,
         validatePayload, compareCounts, prepareRemoteSnapshotDb

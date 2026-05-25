@@ -62,6 +62,7 @@ function mergeAdviceRecord(local, remote) {
 const sync = {
     INCREMENTAL_WINDOW_MS: 5 * 60 * 1000,
     COMPACTION_THRESHOLD: 50,
+    S3_PREFIX: 'rehab',
     REMOTE_SNAPSHOT: 'rehab_pro_data.json',
     REMOTE_MANIFEST: 'manifest.json',
     REMOTE_INCREMENTAL_DIR: 'incremental',
@@ -104,6 +105,9 @@ const sync = {
         data.db.syncMeta.aiCipherLastResolvedAt = Number(data.db.syncMeta.aiCipherLastResolvedAt || 0);
         data.db.syncMeta.lastArchiveDate = data.db.syncMeta.lastArchiveDate || '';
         data.db.syncMeta.lastArchiveChecksum = data.db.syncMeta.lastArchiveChecksum || '';
+        data.db.syncMeta.sourceLastIncrementalTs = data.db.syncMeta.sourceLastIncrementalTs && typeof data.db.syncMeta.sourceLastIncrementalTs === 'object'
+            ? data.db.syncMeta.sourceLastIncrementalTs
+            : {};
         data.db.syncMeta.conflictLog = Array.isArray(data.db.syncMeta.conflictLog) ? data.db.syncMeta.conflictLog : [];
         return data.db.syncMeta;
     },
@@ -453,8 +457,25 @@ const sync = {
         data.normalizeDb();
     },
 
-    async s3Req(method, remotePath, body = null, extraHeaders = {}) {
-        return window.syncAdapters.s3Req(this, method, remotePath, body, extraHeaders);
+    s3ObjectKey(remotePath) {
+        const pure = window.syncPure || {};
+        return pure.buildS3ObjectKey
+            ? pure.buildS3ObjectKey(remotePath, this.S3_PREFIX)
+            : `${this.S3_PREFIX}/${String(remotePath || '').replace(/^\/+/, '')}`;
+    },
+
+    remoteReadSources() {
+        if (data.cfg.mode === 's3') {
+            return [
+                { key: 's3:root', label: '根目录', options: { s3Root: true } },
+                { key: 's3:prefixed', label: 'rehab目录', options: { s3Root: false } }
+            ];
+        }
+        return [{ key: data.cfg.mode || 'local', label: '默认目录', options: {} }];
+    },
+
+    async s3Req(method, remotePath, body = null, extraHeaders = {}, options = {}) {
+        return window.syncAdapters.s3Req(this, method, remotePath, body, extraHeaders, options);
     },
 
     davRoot() {
@@ -477,21 +498,22 @@ const sync = {
         return window.syncAdapters.davReq(method, remotePath, body, extraHeaders);
     },
 
-    async syncReq(method, remotePath, body = null, extraHeaders = {}) {
-        if (data.cfg.mode === 's3') return this.s3Req(method, remotePath, body, extraHeaders);
+    async syncReq(method, remotePath, body = null, extraHeaders = {}, options = {}) {
+        if (data.cfg.mode === 's3') return this.s3Req(method, remotePath, body, extraHeaders, options);
         if (data.cfg.mode === 'webdav') return this.davReq(method, remotePath, body, extraHeaders);
         throw new Error('请先选择并保存同步方式');
     },
 
-    async fetchJson(remotePath, allow404 = false) {
-        const res = await this.syncReq('GET', remotePath);
+    async fetchJson(remotePath, allow404 = false, options = {}) {
+        const res = await this.syncReq('GET', remotePath, null, {}, options);
         if (res.status === 404 && allow404) return { data: null, etag: '' };
         if (!res.ok) throw new Error(`远端读取失败(${remotePath}): ${res.status}`);
         const etag = res.headers.get('ETag') || '';
         const text = await res.text();
         const data = text ? JSON.parse(text) : null;
         const meta = this.getSyncMeta();
-        meta.etags[remotePath] = etag;
+        const etagKey = options?.s3Root ? `root:${remotePath}` : remotePath;
+        meta.etags[etagKey] = etag;
         this.saveSyncMeta();
         return { data, etag };
     },
@@ -686,34 +708,48 @@ const sync = {
         try {
             await data.flush();
             this.setStatus('syncing', '正在拉取远端变更');
-            const snapshotRes = await this.withRetry(() => this.fetchJson(this.REMOTE_SNAPSHOT, true));
-            if (snapshotRes.data) {
-                if (typeof snapshotRes.data === 'object' && Object.keys(snapshotRes.data).length === 0) {
-                    console.warn('远端快照为空对象，跳过覆盖');
-                } else {
-                    await this.applySnapshot(snapshotRes.data);
+            let appliedSources = 0;
+            const initialMeta = this.getSyncMeta();
+            const sourceLastByKey = { ...(initialMeta.sourceLastIncrementalTs || {}) };
+            let latestPrefixedTs = Number(initialMeta.lastIncrementalTs || 0);
+
+            for (const source of this.remoteReadSources()) {
+                this.setStatus('syncing', `正在拉取${source.label}`);
+                const snapshotRes = await this.withRetry(() => this.fetchJson(this.REMOTE_SNAPSHOT, true, source.options));
+                if (snapshotRes.data) {
+                    if (typeof snapshotRes.data === 'object' && Object.keys(snapshotRes.data).length === 0) {
+                        console.warn('远端快照为空对象，跳过覆盖', source.label);
+                    } else {
+                        await this.applySnapshot(snapshotRes.data);
+                        appliedSources += 1;
+                    }
                 }
-            }
-            const manifest = this.ensureManifestShape((await this.withRetry(() => this.fetchJson(this.REMOTE_MANIFEST, true))).data);
-            const meta = this.getSyncMeta();
-            const startTs = Math.max(Number(meta.lastIncrementalTs || 0), Number(manifest.snapshotTs || 0));
+                const manifest = this.ensureManifestShape((await this.withRetry(() => this.fetchJson(this.REMOTE_MANIFEST, true, source.options))).data);
+                const sourceLast = Number(sourceLastByKey[source.key] || 0);
+                const startTs = Math.max(sourceLast, Number(manifest.snapshotTs || 0));
 
-            const replayTasks = [];
-            Object.keys(manifest.entities || {}).forEach(entity => {
-                const windows = (manifest.entities[entity] && manifest.entities[entity].windows) || [];
-                windows
-                    .filter(ts => Number(ts) > startTs)
-                    .sort((a, b) => a - b)
-                    .forEach(ts => replayTasks.push({ entity, ts: Number(ts) }));
-            });
-            replayTasks.sort((a, b) => a.ts - b.ts || a.entity.localeCompare(b.entity));
+                const replayTasks = [];
+                Object.keys(manifest.entities || {}).forEach(entity => {
+                    const windows = (manifest.entities[entity] && manifest.entities[entity].windows) || [];
+                    windows
+                        .filter(ts => Number(ts) > startTs)
+                        .sort((a, b) => a - b)
+                        .forEach(ts => replayTasks.push({ entity, ts: Number(ts) }));
+                });
+                replayTasks.sort((a, b) => a.ts - b.ts || a.entity.localeCompare(b.entity));
 
-            for (let i = 0; i < replayTasks.length; i++) {
-                const task = replayTasks[i];
-                const remotePath = `${this.REMOTE_INCREMENTAL_DIR}/${task.entity}/${task.ts}.json`;
-                const inc = await this.withRetry(() => this.fetchJson(remotePath, true));
-                const records = inc.data && Array.isArray(inc.data.records) ? inc.data.records : [];
-                await this.mergeEntityRecords(task.entity, records);
+                for (let i = 0; i < replayTasks.length; i++) {
+                    const task = replayTasks[i];
+                    const remotePath = `${this.REMOTE_INCREMENTAL_DIR}/${task.entity}/${task.ts}.json`;
+                    const inc = await this.withRetry(() => this.fetchJson(remotePath, true, source.options));
+                    const records = inc.data && Array.isArray(inc.data.records) ? inc.data.records : [];
+                    await this.mergeEntityRecords(task.entity, records);
+                    if (records.length) appliedSources += 1;
+                }
+                sourceLastByKey[source.key] = Math.max(sourceLast, Number(manifest.lastIncrementalTs || 0));
+                if (source.key === 's3:prefixed' || data.cfg.mode !== 's3') {
+                    latestPrefixedTs = Math.max(latestPrefixedTs, Number(manifest.lastIncrementalTs || 0));
+                }
             }
 
             data.normalizeDb();
@@ -722,10 +758,15 @@ const sync = {
             if (typeof ai !== 'undefined') await ai.init({ saveData: true, renderData: false });
             data.render();
 
-            meta.lastSyncAt = Date.now();
-            meta.lastIncrementalTs = Math.max(Number(meta.lastIncrementalTs || 0), Number(manifest.lastIncrementalTs || 0));
+            const finalMeta = this.getSyncMeta();
+            finalMeta.sourceLastIncrementalTs = { ...(finalMeta.sourceLastIncrementalTs || {}), ...sourceLastByKey };
+            finalMeta.lastSyncAt = Date.now();
+            finalMeta.lastIncrementalTs = latestPrefixedTs;
             this.saveSyncMeta();
             await this.processRetryQueue();
+            if (data.cfg.mode === 's3' && appliedSources > 0) {
+                await this.fullBackup({ quiet: true });
+            }
             this.setStatus('cloud', '拉取完成');
         } catch (e) {
             this.setStatus('error', `拉取失败: ${e.message}`);
