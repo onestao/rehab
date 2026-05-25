@@ -435,8 +435,26 @@
             const { plan, task } = this.findTask(planId, taskId);
             if (!plan || !task) return false;
             task.deleted = true;
+            plan.pendingCooldowns = (plan.pendingCooldowns || []).filter((id) => id !== taskId);
             this.touchRecord(task, ['deleted']);
-            this.touchRecord(plan, ['items']);
+            const activeItems = (plan.items || []).filter((item) => item && !item.deleted);
+            if (!activeItems.length) {
+                const planDate = plan.date;
+                plan.deleted = true;
+                plan.pendingCooldowns = [];
+                if (this.selectedPlanId === planId) {
+                    const next = this.activeRecords(this.db.dailyPlans || []).find((item) => item.id !== planId && item.date === planDate);
+                    this.selectedPlanId = next?.id || '';
+                }
+                if (this.activeRun?.planId === planId) {
+                    if (this.activeRun.previousPlan && this._replacePlanActions) this._replacePlanActions(this.activeRun.previousPlan);
+                    this.activeRun = null;
+                    this.updatePlanWorkoutBanner?.();
+                }
+                this.touchRecord(plan, ['items', 'pendingCooldowns', 'deleted']);
+            } else {
+                this.touchRecord(plan, ['items', 'pendingCooldowns']);
+            }
             this.save();
             return true;
         },

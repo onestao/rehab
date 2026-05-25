@@ -90,7 +90,7 @@ test('plan AI parser fills usable spec defaults and preserves alternation', () =
     date: '2026-05-25',
     type: 'bulk',
     items: [
-      { name: '保加利亚分腿蹲', category: 'main', spec: { sets: 4, isAlt: '双侧交替' } },
+      { name: '保加利亚分腿蹲', category: 'main', spec: { sets: 4, reps: 12, work: 3, isAlt: '双侧交替' } },
       { name: '平板支撑', category: 'cooldown', spec: { sets: 3, work: 40, actionRest: 75 } }
     ]
   }), ['bulk']);
@@ -101,7 +101,7 @@ test('plan AI parser fills usable spec defaults and preserves alternation', () =
   assert.deepEqual(JSON.parse(JSON.stringify(parsed.plans[0].items[0].spec)), {
     sets: 4,
     reps: 12,
-    work: 0,
+    work: 3,
     repRest: 20,
     actionRest: 60,
     isAlt: true
@@ -114,6 +114,53 @@ test('plan AI parser fills usable spec defaults and preserves alternation', () =
     actionRest: 75,
     isAlt: false
   });
+});
+
+test('plan AI parser supplies hold duration and caps very long rests', () => {
+  const api = loadPlanAi();
+  const ctx = createContext(api);
+  const parsed = api.parsePlanAiPayload.call(ctx, JSON.stringify({
+    date: '2026-05-25',
+    type: 'rehab',
+    items: [
+      { name: '平板支撑', category: 'main', spec: { sets: 3, actionRest: 999 } }
+    ]
+  }), ['rehab']);
+
+  assert.equal(parsed.ok, true);
+  assert.equal(parsed.plans[0].items[0].spec.reps, 0);
+  assert.equal(parsed.plans[0].items[0].spec.work, 30);
+  assert.equal(parsed.plans[0].items[0].spec.actionRest, 120);
+});
+
+test('plan AI parser rejects rep actions without explicit AI work seconds', () => {
+  const api = loadPlanAi();
+  const ctx = createContext(api);
+  const parsed = api.parsePlanAiPayload.call(ctx, JSON.stringify({
+    date: '2026-05-25',
+    type: 'bulk',
+    items: [{ name: '俯卧撑', category: 'main', spec: { sets: 3, reps: 10 } }]
+  }), ['bulk']);
+
+  assert.equal(parsed.ok, false);
+  assert.match(parsed.reason, /缺少 AI 明确给出的 spec\.work/);
+});
+
+test('plan AI parser allows short rests for low-level rehab actions', () => {
+  const api = loadPlanAi();
+  const ctx = createContext(api);
+  const parsed = api.parsePlanAiPayload.call(ctx, JSON.stringify({
+    date: '2026-05-25',
+    type: 'rehab',
+    items: [
+      { name: '踝泵', category: 'main', currentLevel: 1, spec: { sets: 2, reps: 15, work: 1, actionRest: 10 } },
+      { name: '股四头肌等长收缩', category: 'main', currentLevel: 1, spec: { sets: 2, reps: 10, work: 5 } }
+    ]
+  }), ['rehab']);
+
+  assert.equal(parsed.ok, true);
+  assert.equal(parsed.plans[0].items[0].spec.actionRest, 10);
+  assert.equal(parsed.plans[0].items[1].spec.actionRest, 15);
 });
 
 test('plan AI context includes today completed workouts and manual exercises', () => {
@@ -161,7 +208,7 @@ test('plan AI preview exposes rest and alternation controls', () => {
   const html = api.renderPlanAiPreviewItem.call(createContext(api), 0, 0, {
     name: '弓步蹲',
     category: 'warmup',
-    spec: { sets: 3, reps: 10, repRest: 15, actionRest: 60, isAlt: true }
+    spec: { sets: 3, reps: 10, work: 3, repRest: 15, actionRest: 60, isAlt: true }
   });
 
   assert.match(html, /data-preview-category/);

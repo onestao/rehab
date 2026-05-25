@@ -460,6 +460,8 @@
         deletePlanTaskConfirm(planId, taskId) {
             this.deleteTask?.(planId, taskId);
             this._closeActiveModal?.();
+            const stillActive = this.activeRecords?.(this.db.dailyPlans || []).some((plan) => plan.id === planId);
+            if (!stillActive) this.closePlanTaskDrawer?.();
             this.render?.();
         },
 

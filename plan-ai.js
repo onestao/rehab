@@ -24,6 +24,11 @@
         return Math.max(0, readNumber(value, fallback));
     }
 
+    function readCappedPositiveNumber(value, fallback = 0, max = Infinity) {
+        const number = readPositiveNumber(value, fallback);
+        return Number.isFinite(max) ? Math.min(number, max) : number;
+    }
+
     function readPositiveInteger(value, fallback = 1) {
         return Math.max(1, Math.round(readNumber(value, fallback)));
     }
@@ -37,19 +42,48 @@
         return false;
     }
 
-    function normalizeAiSpec(item = {}) {
+    function isTimedAiAction(item = {}) {
+        const text = `${item.name || ''} ${item.category || ''} ${item.phase || ''} ${item.section || ''}`.toLowerCase();
+        return /保持|支撑|平板|静蹲|拉伸|伸展|放松|hold|plank|stretch|mobility|wall\s*sit/.test(text)
+            || normalizeAiCategory(item.category || item.phase || item.section) === 'cooldown';
+    }
+
+    function hasExplicitWork(item = {}) {
         const spec = item.spec && typeof item.spec === 'object' ? item.spec : {};
-        const work = readPositiveNumber(spec.work ?? item.work ?? item.seconds ?? item.duration, 0);
+        const raw = spec.work ?? item.work ?? item.seconds ?? item.duration;
+        return raw !== undefined && raw !== null && String(raw).trim() !== '';
+    }
+
+    function isLowLevelRehabAction(item = {}, planType = '') {
+        if (planType !== 'rehab') return false;
+        const text = `${item.name || ''} ${item.category || ''} ${item.phase || ''} ${item.section || ''}`.toLowerCase();
+        return Number(item.currentLevel || 0) <= 1
+            || normalizeAiCategory(item.category || item.phase || item.section) !== 'main'
+            || /踝泵|股四头肌|等长|激活|活动度|低阶|初级|mobility|activation|isometric/.test(text);
+    }
+
+    function normalizeAiSpec(item = {}, options = {}) {
+        const spec = item.spec && typeof item.spec === 'object' ? item.spec : {};
+        const timed = isTimedAiAction(item);
+        const lowLevelRehab = isLowLevelRehabAction(item, options.planType || item.planType || '');
+        const defaultWork = timed ? 30 : 3;
+        let work = readCappedPositiveNumber(spec.work ?? item.work ?? item.seconds ?? item.duration, 0, 90);
         let reps = readPositiveNumber(spec.reps ?? item.reps ?? item.count ?? item.times ?? item.perSet, 0);
-        if (reps <= 0 && work <= 0) reps = 12;
-        return {
+        if (reps <= 0 && work <= 0) {
+            if (timed) work = defaultWork;
+            else return { error: `${item.name || '未命名动作'} 缺少 reps 或 work，无法判断是次数动作还是计时动作` };
+        }
+        if (reps > 0 && (!hasExplicitWork(item) || work <= 0)) {
+            return { error: `${item.name || '未命名动作'} 是次数动作，但缺少 AI 明确给出的 spec.work 执行秒数` };
+        }
+        return { spec: {
             sets: readPositiveInteger(spec.sets ?? item.sets, 3),
             reps,
             work,
-            repRest: readPositiveNumber(spec.repRest ?? item.repRest ?? item.restBetweenReps, 20),
-            actionRest: readPositiveNumber(spec.actionRest ?? item.actionRest ?? item.restBetweenSets ?? item.groupRest, 60),
+            repRest: readCappedPositiveNumber(spec.repRest ?? item.repRest ?? item.restBetweenReps, 20, 60),
+            actionRest: readCappedPositiveNumber(spec.actionRest ?? item.actionRest ?? item.restBetweenSets ?? item.groupRest, lowLevelRehab ? 15 : (timed ? 45 : 60), 120),
             isAlt: parseBoolean(spec.isAlt ?? item.isAlt ?? item.alternating ?? item.bilateral ?? item.sideMode)
-        };
+        } };
     }
 
     function normalizeAiCategory(value = 'main') {
@@ -210,9 +244,10 @@
             const specRules = [
                 '每个 item 必须填写 category，且只能是 warmup / main / cooldown：热身用 warmup，主训练用 main，拉伸/放松用 cooldown。',
                 '每个训练 item 必须填写 spec.sets/spec.reps/spec.work/spec.repRest/spec.actionRest/spec.isAlt。',
-                '力量/次数动作：reps 必须为每组次数，work=0；静态保持/计时动作：work 必须为每次秒数，reps=0。',
-                '不要用 0 占位；只有不按次数的计时动作才能 reps=0，只有不按时间的次数动作才能 work=0。',
-                'repRest 是同一组内每次/左右侧之间休息秒数，actionRest 是组间休息秒数。',
+                'work 是每次动作执行/保持秒数，所有动作都必须给出：力量/次数动作通常 2-5 秒，静态保持/拉伸通常 20-60 秒。',
+                '力量/次数动作：reps 必须为每组次数，work 必须由 AI 明确给出每次执行秒数，不能省略，不能为 0；静态保持/计时动作：reps=0，work 必须为每次保持秒数。',
+                '不要用 0 占位；只有纯计时动作才能 reps=0，但 work 不能为 0。',
+                'repRest 是同一组内每次/左右侧之间休息秒数，actionRest 是组间休息秒数。常规 actionRest 控制在 30-90 秒，除非用户明确要求，不要超过 120 秒；低阶康复/激活/活动度动作可以压缩到 5-15 秒。',
                 '双侧交替或左右轮换动作必须 isAlt=true，否则 isAlt=false。',
                 '必须参考今日已完成运动摘要；如果今天已经高强度训练过同动作或同部位，后续计划应降低重复负荷、改为恢复/拉伸/低强度技术练习，除非用户明确要求继续加量。'
             ].join('\n');
@@ -336,6 +371,7 @@
             const parsed = safeJsonParse(String(rawText || '').trim());
             if (!parsed || typeof parsed !== 'object') return { ok: false, reason: 'AI 返回不是有效 JSON', rawText };
             const plans = Array.isArray(parsed.plans) ? parsed.plans : [parsed];
+            const errors = [];
             const validPlans = plans.map((plan, index) => ({
                 date: String(plan.date || this.logicalDateKey?.() || this.dateKey(new Date())),
                 type: ['rehab', 'cut', 'bulk', 'maintenance', 'custom'].includes(plan.type) ? plan.type : (allowedTypes[index] || allowedTypes[0] || 'rehab'),
@@ -343,7 +379,13 @@
                 notes: String(plan.notes || ''),
                 source: 'ai',
                 items: (Array.isArray(plan.items) ? plan.items : []).map((item) => {
-                    const spec = normalizeAiSpec(item);
+                    const planType = ['rehab', 'cut', 'bulk', 'maintenance', 'custom'].includes(plan.type) ? plan.type : (allowedTypes[index] || allowedTypes[0] || 'rehab');
+                    const result = normalizeAiSpec(item, { planType });
+                    if (result.error) {
+                        errors.push(result.error);
+                        return null;
+                    }
+                    const spec = result.spec;
                     return {
                         name: String(item.name || ''),
                         category: normalizeAiCategory(item.category || item.phase || item.section),
@@ -358,8 +400,9 @@
                         userOverride: false,
                         excludeFromPr: true
                     };
-                }).filter((item) => item.name)
+                }).filter((item) => item && item.name)
             })).filter((plan) => plan.items.length > 0);
+            if (errors.length) return { ok: false, reason: errors.join('；'), rawText };
             if (!validPlans.length) return { ok: false, reason: 'JSON 缺少可用 items', rawText };
             return { ok: true, plans: validPlans };
         },
@@ -445,7 +488,7 @@
         },
 
         renderPlanAiPreviewItem(planIndex, itemIndex, item = {}) {
-            const spec = normalizeAiSpec(item);
+            const spec = normalizeAiSpec(item).spec || { sets: 3, reps: 0, work: 30, repRest: 20, actionRest: 60, isAlt: false };
             const category = normalizeAiCategory(item.category || item.phase);
             return `<div class="plan-ai-preview-item" data-item-index="${itemIndex}">
                 <div class="md-field plan-ai-preview-name">
@@ -487,7 +530,7 @@
             plan.items.push({
                 name: '新训练动作',
                 category: 'main',
-                spec: { sets: 3, reps: 12, work: 0, repRest: 20, actionRest: 60, isAlt: false },
+                spec: { sets: 3, reps: 12, work: 3, repRest: 20, actionRest: 60, isAlt: false },
                 cooldownRefs: [],
                 aiReasoning: '',
                 durationEstHint: '',
