@@ -23,15 +23,22 @@
         return { label: '待执行', icon: 'radio_button_unchecked', className: 'is-todo' };
     }
 
+    function taskCategoryMeta(task = {}) {
+        if (task.category === 'warmup') return { label: '热身', icon: 'directions_run' };
+        if (task.category === 'cooldown') return { label: '拉伸', icon: 'self_improvement' };
+        return { label: '主训练', icon: 'fitness_center' };
+    }
+
     function taskSpecText(task = {}) {
         const spec = task.spec || {};
+        const category = taskCategoryMeta(task);
         const main = Number(spec.reps || 0) > 0 ? `每组${Number(spec.reps || 0)}次` : `每次${Number(spec.work || 0)}秒`;
         const details = [
             Number(spec.repRest || 0) > 0 ? `次休${Number(spec.repRest || 0)}秒` : '',
             Number(spec.actionRest || 0) > 0 ? `组休${Number(spec.actionRest || 0)}秒` : '',
             spec.isAlt ? '双侧交替' : ''
         ].filter(Boolean);
-        return `${Number(spec.sets || 1)}组 · ${main}${details.length ? ` · ${details.join(' · ')}` : ''}`;
+        return `${category.label} · ${Number(spec.sets || 1)}组 · ${main}${details.length ? ` · ${details.join(' · ')}` : ''}`;
     }
 
     function planStatusClass(type = 'rehab') {
@@ -236,6 +243,8 @@
         renderPlanTaskDrawerBody(planId) {
             const plan = this.activeRecords?.(this.db.dailyPlans || []).find((item) => item.id === planId) || this.getTodayDailyPlan?.();
             if (!plan) return '<div class="plan-empty">暂无训练任务</div>';
+            const planMeta = this.planTypeMeta?.(plan.type, plan.title) || { label: '训练计划', icon: 'event_note' };
+            const completion = this.completionRate?.(plan) || { done: 0, total: 0, rate: 0 };
             const items = (plan.items || []).filter((item) => !item.deleted).sort((a, b) => taskSort(a) - taskSort(b));
             const sections = [
                 ['待运动', 'todo', items.filter((item) => item.status === 'todo' || item.status === 'in-progress')],
@@ -243,6 +252,16 @@
                 ['已跳过', 'skipped', items.filter((item) => item.status === 'skipped')]
             ];
             return `<div class="plan-task-drawer">
+                <div class="plan-drawer-summary ${planStatusClass(plan.type)}">
+                    <span class="material-symbols-rounded plan-drawer-summary-icon">${planMeta.icon}</span>
+                    <span class="plan-drawer-summary-copy">
+                        <strong>${this.escapeHtml(plan.title || planMeta.label)}</strong>
+                        <small>${completion.total ? `${completion.done}/${completion.total} 完成` : '暂无待完成训练'}${plan.notes ? ` · ${this.escapeHtml(plan.notes)}` : ''}</small>
+                    </span>
+                    <button class="md-btn md-btn-tonal plan-cancel-day-btn" type="button" data-cancel-plan-id="${this.escapeHtml(plan.id)}" title="取消今日计划" aria-label="取消今日计划">
+                        <span class="material-symbols-rounded">event_busy</span><span>取消计划</span>
+                    </button>
+                </div>
                 ${sections.map(([label, key, list]) => `
                     <section class="plan-section plan-section-${key}">
                         <div class="plan-section-head"><strong>${label}</strong><small>${list.length}</small></div>
@@ -270,6 +289,12 @@
             modal.querySelectorAll('[data-modal-close]').forEach((btn) => {
                 btn.addEventListener('click', () => this.closePlanTaskDrawer?.());
             });
+            modal.querySelectorAll('[data-cancel-plan-id]').forEach((btn) => {
+                btn.addEventListener('click', (event) => {
+                    event.preventDefault();
+                    this.cancelDailyPlanConfirm?.(btn.getAttribute('data-cancel-plan-id') || '');
+                });
+            });
             document.body.appendChild(modal);
             this._planTaskDrawerEl = modal;
         },
@@ -278,6 +303,27 @@
             const el = this._planTaskDrawerEl || document.getElementById('planTaskDrawer');
             el?.remove?.();
             this._planTaskDrawerEl = null;
+        },
+
+        cancelDailyPlanConfirm(planId) {
+            const plan = this.activeRecords?.(this.db.dailyPlans || []).find((item) => item.id === planId);
+            if (!plan) return;
+            const title = plan.title || this.planTypeMeta?.(plan.type, plan.title)?.label || '今日计划';
+            this._confirmModal?.({
+                title: '取消今日计划',
+                icon: 'event_busy',
+                message: `确定取消「${title}」？\n计划会软删除，历史记录和已完成训练不会被删除。`,
+                okText: '取消计划',
+                cancelText: '返回',
+                danger: true,
+                onOk: () => {
+                    const changed = this.cancelDailyPlan?.(planId, { render: false });
+                    if (!changed) return;
+                    this.closePlanTaskDrawer?.();
+                    this.updatePlanWorkoutBanner?.();
+                    this.render?.();
+                }
+            });
         },
 
         renderPlanTaskRow(planId, task, index, compact = false) {
@@ -430,10 +476,12 @@
 
         buildWorkoutActionFromPlanTask(task, options = {}) {
             const spec = task.spec || {};
+            const phase = options.asCooldown ? 'cooldown' : (task.category === 'warmup' ? 'warmup' : (task.category === 'cooldown' ? 'cooldown' : 'main'));
+            const prefix = phase === 'warmup' ? '计划·热身' : (phase === 'cooldown' ? '计划·拉伸' : '计划');
             return {
                 id: `plan-run-${task.id}`,
                 sourceActionId: task.id,
-                name: options.asCooldown ? `计划·放松·${task.name}` : `计划·${task.name}`,
+                name: `${prefix}·${task.name}`,
                 sets: Math.max(1, Number(spec.sets || 1)),
                 reps: Math.max(0, Number(spec.reps || 0)),
                 work: Math.max(0, Number(spec.work || 0)),
@@ -442,7 +490,7 @@
                 groupRest: Math.max(0, Number(spec.actionRest || 0)),
                 switchRest: 3,
                 isAlt: !!spec.isAlt,
-                phase: options.asCooldown ? 'cooldown' : 'main',
+                phase,
                 libOnly: false,
                 deleted: false,
                 updatedAt: Date.now(),

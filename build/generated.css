@@ -252,7 +252,10 @@ body {
     background: var(--md-sys-surface-container-high);
     color: var(--md-sys-on-surface-variant);
     letter-spacing: 0.3px;
+    line-height: 1;
+    white-space: nowrap;
 }
+
 
 }
 @layer components {
@@ -642,9 +645,12 @@ mark.ai-hit {
     align-items: center;
     justify-content: center;
     gap: 8px;
+    min-width: 0;
     transition: all var(--md-sys-motion-duration-short) var(--md-sys-motion-emphasized);
     -webkit-tap-highlight-color: transparent;
     letter-spacing: 0.2px;
+    line-height: 1;
+    white-space: nowrap;
     position: relative;
     overflow: hidden;
 }
@@ -690,6 +696,14 @@ mark.ai-hit {
 .md-btn-tonal:hover { box-shadow: var(--md-sys-elevation-1); }
 
 .md-row { display: flex; gap: 8px; margin-top: 8px; }
+
+@media (max-width: 420px) {
+    .md-btn {
+        padding-inline: 14px;
+        font-size: 13px;
+    }
+}
+
 
 }
 @layer components {
@@ -4809,12 +4823,17 @@ body.is-training .fab-pip.active {
 }
 .md-modal-head strong { font-size: 18px; }
 .modal-grid { margin: 0; }
-.modal-actions { margin-top: 0; }
+.modal-actions {
+    flex-wrap: nowrap;
+    margin-top: 0;
+}
 .modal-actions .md-btn {
     flex: 1;
+    min-width: 0;
     width: auto;
     height: 46px;
     margin-top: 0;
+    padding-inline: 14px;
 }
 .md-modal-sheet {
     align-items: end;
@@ -7221,6 +7240,52 @@ body.is-training .fab-pip.active {
     gap: 12px;
 }
 
+.plan-drawer-summary {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 10px;
+    padding: 10px;
+    border-radius: var(--md-sys-shape-lg);
+    background: var(--md-sys-surface-container);
+}
+
+.plan-drawer-summary-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: var(--md-sys-shape-full);
+    display: inline-grid;
+    place-items: center;
+    background: var(--md-sys-primary-container);
+    color: var(--md-sys-on-primary-container);
+    font-size: 21px;
+}
+
+.plan-drawer-summary-copy {
+    min-width: 0;
+    display: grid;
+    gap: 2px;
+}
+
+.plan-drawer-summary-copy strong,
+.plan-drawer-summary-copy small {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.plan-drawer-summary-copy small {
+    color: var(--md-sys-on-surface-variant);
+}
+
+.plan-cancel-day-btn {
+    flex: none;
+    min-width: 0;
+    margin: 0;
+    padding: 0 12px;
+    white-space: nowrap;
+}
+
 .plan-section-head,
 .plan-task-row,
 .plan-weekly-task,
@@ -8039,6 +8104,7 @@ body.is-training .fab-pip.active {
 }
 
 .plan-ai-preview-name,
+.plan-ai-preview-category,
 .plan-ai-preview-reason,
 .plan-ai-preview-spec {
     grid-column: 1 / 2;
@@ -8046,7 +8112,7 @@ body.is-training .fab-pip.active {
 
 .plan-ai-preview-spec {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
     gap: 8px;
 }
 
@@ -8238,6 +8304,20 @@ body.is-training .fab-pip.active {
 
     .plan-task-drawer .plan-task-row {
         align-items: flex-start;
+    }
+
+    .plan-drawer-summary {
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        gap: 8px;
+        padding: 8px;
+    }
+
+    .plan-cancel-day-btn {
+        height: 38px;
+        min-height: 38px;
+        padding: 0 8px;
+        font-size: 12px;
+        gap: 4px;
     }
 
 }

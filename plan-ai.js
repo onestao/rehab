@@ -52,6 +52,13 @@
         };
     }
 
+    function normalizeAiCategory(value = 'main') {
+        const text = String(value || '').trim().toLowerCase();
+        if (['warmup', 'warm-up', '热身', 'warm'].includes(text)) return 'warmup';
+        if (['cooldown', 'cool-down', 'stretch', 'stretching', '拉伸', '放松'].includes(text)) return 'cooldown';
+        return 'main';
+    }
+
     function setText(id, text) {
         const el = document.getElementById(id);
         if (el) el.textContent = text;
@@ -131,9 +138,10 @@
                 }))
             }));
             const promptMode = mode === 'week'
-                ? '请为接下来 7 天输出 JSON：{"plans":[{date,type,title,notes,items:[{name,chainHint,spec:{sets,reps,work,repRest,actionRest,isAlt},cooldownRefs,aiReasoning,durationEstHint}]}]}'
-                : '请输出 JSON：{date,type,title,notes,items:[{name,chainHint,spec:{sets,reps,work,repRest,actionRest,isAlt},cooldownRefs,aiReasoning,durationEstHint}]}';
+                ? '请为接下来 7 天输出 JSON：{"plans":[{date,type,title,notes,items:[{name,category,chainHint,spec:{sets,reps,work,repRest,actionRest,isAlt},cooldownRefs,aiReasoning,durationEstHint}]}]}'
+                : '请输出 JSON：{date,type,title,notes,items:[{name,category,chainHint,spec:{sets,reps,work,repRest,actionRest,isAlt},cooldownRefs,aiReasoning,durationEstHint}]}';
             const specRules = [
+                '每个 item 必须填写 category，且只能是 warmup / main / cooldown：热身用 warmup，主训练用 main，拉伸/放松用 cooldown。',
                 '每个训练 item 必须填写 spec.sets/spec.reps/spec.work/spec.repRest/spec.actionRest/spec.isAlt。',
                 '力量/次数动作：reps 必须为每组次数，work=0；静态保持/计时动作：work 必须为每次秒数，reps=0。',
                 '不要用 0 占位；只有不按次数的计时动作才能 reps=0，只有不按时间的次数动作才能 work=0。',
@@ -269,6 +277,7 @@
                     const spec = normalizeAiSpec(item);
                     return {
                         name: String(item.name || ''),
+                        category: normalizeAiCategory(item.category || item.phase || item.section),
                         chainId: String(item.chainId || item.chainHint || ''),
                         currentLevel: item.currentLevel == null ? null : Number(item.currentLevel),
                         spec,
@@ -368,10 +377,21 @@
 
         renderPlanAiPreviewItem(planIndex, itemIndex, item = {}) {
             const spec = normalizeAiSpec(item);
+            const category = normalizeAiCategory(item.category || item.phase);
             return `<div class="plan-ai-preview-item" data-item-index="${itemIndex}">
                 <div class="md-field plan-ai-preview-name">
                     <input type="text" data-preview-name value="${this.escapeHtml(item.name || '')}" placeholder=" ">
                     <label>动作</label>
+                </div>
+                <div class="md-field plan-ai-preview-category">
+                    <select data-preview-category>
+                        ${[
+                            ['warmup', '热身'],
+                            ['main', '主训练'],
+                            ['cooldown', '拉伸']
+                        ].map(([value, label]) => `<option value="${value}" ${category === value ? 'selected' : ''}>${label}</option>`).join('')}
+                    </select>
+                    <label>阶段</label>
                 </div>
                 <div class="plan-ai-preview-spec">
                     <div class="md-field"><input type="number" min="1" data-preview-sets value="${Number(spec.sets || 3)}" placeholder=" "><label>组数</label></div>
@@ -397,6 +417,7 @@
             plan.items = Array.isArray(plan.items) ? plan.items : [];
             plan.items.push({
                 name: '新训练动作',
+                category: 'main',
                 spec: { sets: 3, reps: 12, work: 0, repRest: 20, actionRest: 60, isAlt: false },
                 cooldownRefs: [],
                 aiReasoning: '',
@@ -432,6 +453,7 @@
                     if (reps <= 0 && work <= 0) reps = 12;
                     items.push({
                         name,
+                        category: normalizeAiCategory(itemEl.querySelector('[data-preview-category]')?.value || 'main'),
                         spec: {
                             sets: Math.max(1, Math.round(readNumber(itemEl.querySelector('[data-preview-sets]')?.value, 3))),
                             reps,
@@ -464,6 +486,28 @@
             return plans;
         },
 
+        cleanupEmptyUnselectedPlanTypes(plans = []) {
+            const selectedByDate = new Map();
+            plans.forEach((plan) => {
+                const date = String(plan.date || '');
+                const type = String(plan.type || 'rehab');
+                if (!date) return;
+                if (!selectedByDate.has(date)) selectedByDate.set(date, new Set());
+                selectedByDate.get(date).add(type);
+            });
+            if (!selectedByDate.size || !Array.isArray(this.db?.dailyPlans)) return;
+            this.db.dailyPlans.forEach((plan) => {
+                if (!plan || plan.deleted) return;
+                const selected = selectedByDate.get(String(plan.date || ''));
+                if (!selected || selected.has(plan.type || 'rehab')) return;
+                const activeItems = (plan.items || []).filter((item) => item && !item.deleted);
+                if (activeItems.length) return;
+                plan.deleted = true;
+                this.touchRecord?.(plan, ['deleted']);
+                if (this.selectedPlanId === plan.id) this.selectedPlanId = '';
+            });
+        },
+
         confirmPlanAiPlans() {
             const plans = this.collectPlanAiPreviewPlans?.() || [];
             if (!plans.length) {
@@ -488,6 +532,11 @@
                 });
                 this.saveDailyPlan?.(merged, { save: false });
             });
+            this.cleanupEmptyUnselectedPlanTypes(plans);
+            if (!this.selectedPlanId && plans[0]) {
+                const selected = this.getDailyPlans?.(plans[0].date)?.find((item) => (item.type || 'rehab') === (plans[0].type || 'rehab'));
+                this.selectedPlanId = selected?.id || '';
+            }
             this.save();
             this.closePlanAiSheet();
             this._closeActiveModal?.();

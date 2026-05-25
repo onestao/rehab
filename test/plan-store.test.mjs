@@ -15,6 +15,7 @@ import {
     completionRate,
     aggregateCompletionRate,
     softDeletePlan,
+    cancelDailyPlan,
     normalizeProgressionChain
 } from '../plan-store-pure.js';
 
@@ -90,10 +91,36 @@ test('completion rate excludes cooldown items', () => {
     assert.deepEqual(completionRate(plan), { done: 1, total: 1, rate: 1 });
 });
 
+test('normalizes warmup main and cooldown categories', () => {
+    const plan = createDailyPlanRecord({
+        id: 'plan-1',
+        date: '2026-05-24',
+        items: [
+            { id: 'task-1', name: '动态热身', category: 'warmup', spec: { sets: 1, work: 60 } },
+            { id: 'task-2', name: '深蹲', category: 'main', spec: { sets: 3, reps: 10 } },
+            { id: 'task-3', name: '股四头肌拉伸', category: 'stretching', spec: { sets: 1, work: 30 } }
+        ]
+    }, { nowTs: 100 });
+    assert.deepEqual(plan.items.map((item) => item.category), ['warmup', 'main', 'cooldown']);
+});
+
 test('soft delete plan keeps record but marks deleted', () => {
     const plan = createDailyPlanRecord({ id: 'plan-1', date: '2026-05-24' }, { nowTs: 100 });
     const plans = softDeletePlan([plan], 'plan-1', { nowTs: 500 });
     assert.equal(plans[0].deleted, true);
+    assert.equal(plans[0].updatedAt, 500);
+});
+
+test('cancel daily plan soft deletes and clears pending cooldowns', () => {
+    const plan = createDailyPlanRecord({
+        id: 'plan-1',
+        date: '2026-05-24',
+        pendingCooldowns: ['task-1'],
+        items: [{ id: 'task-1', name: '拉伸', category: 'cooldown', spec: { sets: 1, work: 30 } }]
+    }, { nowTs: 100 });
+    const plans = cancelDailyPlan([plan], 'plan-1', { nowTs: 500 });
+    assert.equal(plans[0].deleted, true);
+    assert.deepEqual(plans[0].pendingCooldowns, []);
     assert.equal(plans[0].updatedAt, 500);
 });
 

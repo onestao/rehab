@@ -12,9 +12,12 @@
     align-items: center;
     justify-content: center;
     gap: 8px;
+    min-width: 0;
     transition: all var(--md-sys-motion-duration-short) var(--md-sys-motion-emphasized);
     -webkit-tap-highlight-color: transparent;
     letter-spacing: 0.2px;
+    line-height: 1;
+    white-space: nowrap;
     position: relative;
     overflow: hidden;
 }
@@ -60,4 +63,11 @@
 .md-btn-tonal:hover { box-shadow: var(--md-sys-elevation-1); }
 
 .md-row { display: flex; gap: 8px; margin-top: 8px; }
-
+
+@media (max-width: 420px) {
+    .md-btn {
+        padding-inline: 14px;
+        font-size: 13px;
+    }
+}
+

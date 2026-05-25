@@ -21,7 +21,7 @@ function loadPlanUi() {
 function createContext(api, plans) {
   return {
     ...api,
-    db: { health: { weights: [], dietGoal: null } },
+    db: { dailyPlans: plans, health: { weights: [], dietGoal: null } },
     selectedPlanId: plans[0]?.id || '',
     getTodayDailyPlans() {
       return plans;
@@ -98,4 +98,21 @@ test('today AI types use selected plan first and include other daily plan types'
   ctx.selectedPlanId = 'bulk';
 
   assert.deepEqual(Array.from(api.todayPlanAiTypes.call(ctx)), ['bulk', 'rehab', 'cut']);
+});
+
+test('task drawer exposes compact cancel daily plan action', () => {
+  const api = loadPlanUi();
+  const plans = [{
+    id: 'rehab',
+    type: 'rehab',
+    title: '康复计划',
+    items: [{ id: 'task-1', name: '桥式', status: 'todo', spec: { sets: 3, reps: 12 } }],
+    pendingCooldowns: []
+  }];
+  const html = api.renderPlanTaskDrawerBody.call(createContext(api, plans), 'rehab');
+
+  assert.match(html, /plan-drawer-summary/);
+  assert.match(html, /data-cancel-plan-id="rehab"/);
+  assert.match(html, /plan-cancel-day-btn/);
+  assert.match(html, /取消计划/);
 });

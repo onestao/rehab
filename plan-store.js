@@ -39,6 +39,13 @@
         return [...new Set((Array.isArray(values) ? values : []).map((value) => String(value || '').trim()).filter(Boolean))];
     }
 
+    function normalizeTaskCategory(value = 'main') {
+        const raw = String(value || '').trim().toLowerCase();
+        if (['warmup', 'warm-up', '热身'].includes(raw)) return 'warmup';
+        if (['cooldown', 'cool-down', 'stretch', 'stretching', '拉伸', '放松'].includes(raw)) return 'cooldown';
+        return 'main';
+    }
+
     function normalizeCustomEquipment(values = []) {
         return (Array.isArray(values) ? values : [])
             .map((item) => {
@@ -142,7 +149,7 @@
                 id: item.id || this.generateRecordId('daily-task'),
                 name: String(item.name || '未命名任务'),
                 planType: PLAN_TYPES.includes(item.planType) ? item.planType : (PLAN_TYPES.includes(options.planType) ? options.planType : 'rehab'),
-                category: item.category === 'cooldown' ? 'cooldown' : 'main',
+                category: normalizeTaskCategory(item.category || item.phase),
                 spec: {
                     sets: Math.max(1, Number(spec.sets || 1)),
                     reps: Math.max(0, Number(spec.reps || 0)),
@@ -388,6 +395,27 @@
             plan.pendingCooldowns = (plan.pendingCooldowns || []).filter((id) => id !== taskId);
             this.touchRecord(plan, ['pendingCooldowns']);
             if (options.save !== false) this.save();
+        },
+
+        cancelDailyPlan(planId, options = {}) {
+            this.ensurePlanBootstrap();
+            const plan = this.activeRecords(this.db.dailyPlans || []).find((item) => item.id === planId);
+            if (!plan) return false;
+            const planDate = plan.date;
+            plan.deleted = true;
+            plan.pendingCooldowns = [];
+            this.touchRecord(plan, ['deleted', 'pendingCooldowns']);
+            if (this.selectedPlanId === planId) {
+                const next = this.activeRecords(this.db.dailyPlans || []).find((item) => item.id !== planId && item.date === planDate);
+                this.selectedPlanId = next?.id || '';
+            }
+            if (this.activeRun?.planId === planId) {
+                if (this.activeRun.previousPlan && this._replacePlanActions) this._replacePlanActions(this.activeRun.previousPlan);
+                this.activeRun = null;
+                this.updatePlanWorkoutBanner?.();
+            }
+            if (options.save !== false) this.save({ render: options.render !== false });
+            return true;
         },
 
         moveTask(planId, taskId, targetDate) {

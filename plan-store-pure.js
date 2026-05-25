@@ -32,6 +32,13 @@ function uniqueList(values = []) {
     return [...new Set((Array.isArray(values) ? values : []).map((item) => String(item || '').trim()).filter(Boolean))];
 }
 
+function normalizeTaskCategory(value = 'main') {
+    const raw = String(value || '').trim().toLowerCase();
+    if (['warmup', 'warm-up', '热身'].includes(raw)) return 'warmup';
+    if (['cooldown', 'cool-down', 'stretch', 'stretching', '拉伸', '放松'].includes(raw)) return 'cooldown';
+    return 'main';
+}
+
 function normalizeCustomEquipment(values = []) {
     const normalized = (Array.isArray(values) ? values : [])
         .map((item) => {
@@ -106,7 +113,7 @@ export function normalizeTaskItem(item = {}, options = {}) {
         id: item.id || idFactory('plan-task'),
         name: String(item.name || '未命名任务'),
         planType: PLAN_TYPES.includes(item.planType) ? item.planType : (PLAN_TYPES.includes(options.planType) ? options.planType : 'rehab'),
-        category: item.category === 'cooldown' ? 'cooldown' : 'main',
+        category: normalizeTaskCategory(item.category || item.phase),
         spec: {
             sets: Math.max(1, Number(spec.sets || 1)),
             reps: Math.max(0, Number(spec.reps || 0)),
@@ -271,6 +278,19 @@ export function softDeletePlan(plans = [], planId, options = {}) {
         if (next?.id === planId) {
             next.deleted = true;
             touchRecord(next, ['deleted'], nowTs);
+        }
+        return next;
+    });
+}
+
+export function cancelDailyPlan(plans = [], planId, options = {}) {
+    const nowTs = Number(options.nowTs || Date.now());
+    return (Array.isArray(plans) ? plans : []).map((plan) => {
+        const next = clone(plan);
+        if (next?.id === planId && !next.deleted) {
+            next.deleted = true;
+            next.pendingCooldowns = [];
+            touchRecord(next, ['deleted', 'pendingCooldowns'], nowTs);
         }
         return next;
     });

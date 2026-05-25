@@ -35,12 +35,17 @@
 }
 .md-modal-head strong { font-size: 18px; }
 .modal-grid { margin: 0; }
-.modal-actions { margin-top: 0; }
+.modal-actions {
+    flex-wrap: nowrap;
+    margin-top: 0;
+}
 .modal-actions .md-btn {
     flex: 1;
+    min-width: 0;
     width: auto;
     height: 46px;
     margin-top: 0;
+    padding-inline: 14px;
 }
 .md-modal-sheet {
     align-items: end;

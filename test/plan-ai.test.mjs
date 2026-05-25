@@ -32,6 +32,9 @@ function createContext(api) {
         custom: { label: '自定义计划', icon: 'event_note' }
       };
       return map[type] || map.rehab;
+    },
+    touchRecord(record) {
+      record.updatedAt = 123;
     }
   };
 }
@@ -57,12 +60,14 @@ test('plan AI parser fills usable spec defaults and preserves alternation', () =
     date: '2026-05-25',
     type: 'bulk',
     items: [
-      { name: '保加利亚分腿蹲', spec: { sets: 4, isAlt: '双侧交替' } },
-      { name: '平板支撑', spec: { sets: 3, work: 40, actionRest: 75 } }
+      { name: '保加利亚分腿蹲', category: 'main', spec: { sets: 4, isAlt: '双侧交替' } },
+      { name: '平板支撑', category: 'cooldown', spec: { sets: 3, work: 40, actionRest: 75 } }
     ]
   }), ['bulk']);
 
   assert.equal(parsed.ok, true);
+  assert.equal(parsed.plans[0].items[0].category, 'main');
+  assert.equal(parsed.plans[0].items[1].category, 'cooldown');
   assert.deepEqual(JSON.parse(JSON.stringify(parsed.plans[0].items[0].spec)), {
     sets: 4,
     reps: 12,
@@ -85,13 +90,35 @@ test('plan AI preview exposes rest and alternation controls', () => {
   const api = loadPlanAi();
   const html = api.renderPlanAiPreviewItem.call(createContext(api), 0, 0, {
     name: '弓步蹲',
+    category: 'warmup',
     spec: { sets: 3, reps: 10, repRest: 15, actionRest: 60, isAlt: true }
   });
 
+  assert.match(html, /data-preview-category/);
+  assert.match(html, /value="warmup" selected/);
   assert.match(html, /data-preview-rep-rest/);
   assert.match(html, /data-preview-rest/);
   assert.match(html, /data-preview-is-alt checked/);
   assert.match(html, /每组次数/);
   assert.match(html, /组间休息/);
   assert.match(html, /双侧交替/);
+});
+
+test('plan AI cleanup deletes stale empty unselected plan types only', () => {
+  const api = loadPlanAi();
+  const ctx = createContext(api);
+  ctx.selectedPlanId = 'bulk-empty';
+  ctx.db = {
+    dailyPlans: [
+      { id: 'rehab', date: '2026-05-25', type: 'rehab', items: [{ id: 'a', deleted: false }] },
+      { id: 'bulk-empty', date: '2026-05-25', type: 'bulk', items: [{ id: 'b', deleted: true }] },
+      { id: 'cut-active', date: '2026-05-25', type: 'cut', items: [{ id: 'c', deleted: false }] }
+    ]
+  };
+
+  api.cleanupEmptyUnselectedPlanTypes.call(ctx, [{ date: '2026-05-25', type: 'rehab' }]);
+
+  assert.equal(ctx.db.dailyPlans[1].deleted, true);
+  assert.equal(ctx.db.dailyPlans[2].deleted, undefined);
+  assert.equal(ctx.selectedPlanId, '');
 });
