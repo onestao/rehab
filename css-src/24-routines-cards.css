@@ -118,6 +118,7 @@
     /* Removed .library-segment-btn .library-segment-label display:none to restore missing text */
     .library-card-actions {
         gap: 4px;
+        grid-template-columns: repeat(auto-fit, minmax(52px, 1fr));
     }
     .library-card-actions .md-btn {
         height: 32px;

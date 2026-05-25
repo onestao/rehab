@@ -1,6 +1,6 @@
 // @ts-nocheck
 (function () {
-    if (window.dataRehabCooldown) return;
+    if (window.dataPlanCooldown) return;
 
     function byId(id) {
         return document.getElementById(id);
@@ -8,85 +8,85 @@
 
     function removePrompt(root) {
         if (!root) return;
-        clearInterval(root._rehabTimer);
+        clearInterval(root._planTimer);
         root.remove();
     }
 
-    window.dataRehabCooldown = {
-        afterRehabFeedback(planId, taskId) {
+    window.dataPlanCooldown = {
+        afterPlanFeedback(planId, taskId) {
             const { plan, task } = this.findTask?.(planId, taskId) || {};
             if (!plan || !task) return;
             const refs = Array.isArray(task.cooldownRefs) ? task.cooldownRefs : [];
             if (!refs.length) {
-                this.maybePromptSaveRehabRoutine?.();
+                this.maybePromptSavePlanRoutine?.();
                 return;
             }
             const cooldownId = refs[0];
             const cooldownTask = (plan.items || []).find((item) => item.id === cooldownId && !item.deleted) || null;
             if (!cooldownTask) return;
-            const prefs = this.ensureRehabPrefs?.() || {};
+            const prefs = this.ensurePlanPrefs?.() || {};
             if (prefs.cooldownMode === 'centralized') {
                 this.queueCooldown?.(planId, cooldownId);
-                this.renderRehabDock?.();
-                this.maybePromptSaveRehabRoutine?.();
+                this.renderTodayPage?.();
+                this.maybePromptSavePlanRoutine?.();
                 return;
             }
             if (prefs.cooldownMode === 'paired') {
-                this.runRehabTask?.(planId, cooldownId, { asCooldown: true });
+                this.runPlanTask?.(planId, cooldownId, { asCooldown: true });
                 return;
             }
-            this.showRehabCooldownPrompt(planId, cooldownId, cooldownTask);
+            this.showPlanCooldownPrompt(planId, cooldownId, cooldownTask);
         },
 
-        showRehabCooldownPrompt(planId, taskId, cooldownTask) {
-            document.querySelectorAll('.rehab-cooldown-toast').forEach((el) => removePrompt(el));
+        showPlanCooldownPrompt(planId, taskId, cooldownTask) {
+            document.querySelectorAll('.plan-cooldown-toast').forEach((el) => removePrompt(el));
             const root = document.createElement('div');
-            root.className = 'rehab-cooldown-toast';
-            const equipment = (this.ensureRehabPrefs?.().equipment || []).join('、');
+            root.className = 'plan-cooldown-toast';
+            const equipment = (this.ensurePlanPrefs?.().equipment || []).join('、');
             root.innerHTML = `
-                <div class="rehab-cooldown-toast-head">
+                <div class="plan-cooldown-toast-head">
                     <strong>跟一组「${this.escapeHtml(cooldownTask.name || '放松动作')}」放松吗？</strong>
                     <small>${this.escapeHtml(equipment || '徒手')} · 30s 内自动暂存</small>
                 </div>
-                <div class="rehab-cooldown-actions">
-                    <button class="md-btn" type="button" data-rehab-act="skip">跳过</button>
-                    <button class="md-btn md-btn-tonal" type="button" data-rehab-act="queue">暂存待集中拉伸</button>
-                    <button class="md-btn md-btn-filled" type="button" data-rehab-act="now">现在做</button>
+                <div class="plan-cooldown-actions">
+                    <button class="md-btn" type="button" data-plan-act="skip">跳过</button>
+                    <button class="md-btn md-btn-tonal" type="button" data-plan-act="queue">暂存待集中拉伸</button>
+                    <button class="md-btn md-btn-filled" type="button" data-plan-act="now">现在做</button>
                 </div>
-                <div class="rehab-cooldown-progress"><i></i></div>`;
+                <div class="plan-cooldown-progress"><i></i></div>`;
             document.body.appendChild(root);
-            const bar = root.querySelector('.rehab-cooldown-progress i');
+            const bar = root.querySelector('.plan-cooldown-progress i');
             const started = Date.now();
-            root._rehabTimer = setInterval(() => {
+            root._planTimer = setInterval(() => {
                 const left = Math.max(0, 30000 - (Date.now() - started));
                 if (bar) bar.style.width = `${Math.max(0, Math.round((left / 30000) * 100))}%`;
                 if (left <= 0) {
-                    clearInterval(root._rehabTimer);
+                    clearInterval(root._planTimer);
                     this.queueCooldown?.(planId, taskId);
-                    this.renderRehabDock?.();
+                    this.renderTodayPage?.();
                     removePrompt(root);
                 }
             }, 200);
-            root.querySelectorAll('[data-rehab-act]').forEach((btn) => {
+            root.querySelectorAll('[data-plan-act]').forEach((btn) => {
                 btn.addEventListener('click', () => {
-                    const act = btn.getAttribute('data-rehab-act');
+                    const act = btn.getAttribute('data-plan-act');
                     if (act === 'queue') {
                         this.queueCooldown?.(planId, taskId);
-                        this.renderRehabDock?.();
+                        this.renderTodayPage?.();
                     } else if (act === 'now') {
                         this.dequeueCooldown?.(planId, taskId, { save: false });
-                        this.runRehabTask?.(planId, taskId, { asCooldown: true });
+                        this.runPlanTask?.(planId, taskId, { asCooldown: true });
                     } else {
-                        this.maybePromptSaveRehabRoutine?.();
+                        this.maybePromptSavePlanRoutine?.();
                     }
                     removePrompt(root);
                 });
             });
         },
 
-        openPendingCooldownSheet() {
-            const plan = this.getTodayDailyPlan?.();
-            const queue = (plan?.pendingCooldowns || []).map((id) => (plan.items || []).find((item) => item.id === id)).filter(Boolean);
+        openPlanPendingCooldownSheet() {
+            const plans = this.getTodayDailyPlans?.() || [];
+            const queue = plans.flatMap((plan) => (plan.pendingCooldowns || []).map((id) => ({ plan, item: (plan.items || []).find((task) => task.id === id) })).filter((entry) => entry.item));
             if (!queue.length) {
                 window.toast?.show?.('当前没有待集中拉伸', 'info');
                 return;
@@ -94,9 +94,9 @@
             this._openModal?.({
                 title: '待集中拉伸',
                 icon: 'self_improvement',
-                bodyHtml: `<div class="rehab-queue-list">
-                    ${queue.map((item) => `
-                        <button class="model-picker-row" type="button" onclick="data.runQueuedCooldown('${this.escapeHtml(item.id)}')">
+                bodyHtml: `<div class="plan-queue-list">
+                    ${queue.map(({ plan, item }) => `
+                        <button class="model-picker-row" type="button" onclick="data.runQueuedCooldown('${this.escapeHtml(plan.id)}','${this.escapeHtml(item.id)}')">
                             <span class="material-symbols-rounded">schedule</span>
                             <span class="model-picker-main">
                                 <strong>${this.escapeHtml(item.name || '放松')}</strong>
@@ -112,20 +112,20 @@
             });
         },
 
-        runQueuedCooldown(taskId) {
-            const plan = this.getTodayDailyPlan?.();
+        runQueuedCooldown(planId, taskId) {
+            const plan = (this.getTodayDailyPlans?.() || []).find((item) => item.id === planId) || this.getTodayDailyPlan?.();
             if (!plan || !taskId) return;
             this.dequeueCooldown?.(plan.id, taskId);
-            this.runRehabTask?.(plan.id, taskId, { asCooldown: true });
+            this.runPlanTask?.(plan.id, taskId, { asCooldown: true });
             this._closeActiveModal?.();
         },
 
         runAllQueuedCooldowns() {
-            const plan = this.getTodayDailyPlan?.();
+            const plan = (this.getTodayDailyPlans?.() || []).find((item) => item.pendingCooldowns?.length);
             const nextId = plan?.pendingCooldowns?.[0];
             if (!plan || !nextId) return;
             this.dequeueCooldown?.(plan.id, nextId);
-            this.runRehabTask?.(plan.id, nextId, { asCooldown: true, queueFollowup: true });
+            this.runPlanTask?.(plan.id, nextId, { asCooldown: true, queueFollowup: true });
             this._closeActiveModal?.();
         }
     };

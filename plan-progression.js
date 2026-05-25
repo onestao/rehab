@@ -1,6 +1,6 @@
 // @ts-nocheck
 (function () {
-    if (window.rehabProgression) return;
+    if (window.planProgression) return;
 
     function evaluate(input = {}) {
         const taskItem = input.taskItem || {};
@@ -51,6 +51,6 @@
         return { suggestion: 'maintain', targetLevel: currentLevel, reason: '当前负荷合适，保持现有等级' };
     }
 
-    window.rehabProgression = { evaluate };
+    window.planProgression = { evaluate };
 })();
 

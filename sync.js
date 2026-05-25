@@ -155,6 +155,8 @@ const sync = {
             actions: db.actions || [],
             routines: db.routines || [],
             history: db.history || [],
+            dailyPlans: db.dailyPlans || [],
+            progressionChains: db.progressionChains || [],
             weights: health.weights || [],
             foodLogs: health.foodLogs || [],
             exerciseLogs: health.exerciseLogs || [],
@@ -250,6 +252,16 @@ const sync = {
                 return {
                     get: () => db.history || [],
                     set: (value) => { db.history = value; }
+                };
+            case 'dailyPlans':
+                return {
+                    get: () => db.dailyPlans || [],
+                    set: (value) => { db.dailyPlans = value; }
+                };
+            case 'progressionChains':
+                return {
+                    get: () => db.progressionChains || [],
+                    set: (value) => { db.progressionChains = value; }
                 };
             case 'weights':
                 return {

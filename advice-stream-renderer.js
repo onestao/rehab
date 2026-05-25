@@ -37,11 +37,13 @@
             committedText: '',
             committedHtml: '',
             tail: '',
+            tailRendered: '',
             destroyed: false,
-            autoScroll: true
+            autoScroll: false
         };
         let stableEl = null;
         let tailEl = null;
+        const animatedTokens = new WeakSet();
 
         function ensureNodes() {
             if (stableEl && tailEl && stableEl.isConnected && tailEl.isConnected) return;
@@ -70,7 +72,28 @@
         }
 
         function animateTokens(root) {
-            root.querySelectorAll('p, li, h1, h2, h3').forEach(el => el.classList.add('m3e-token-in'));
+            root.querySelectorAll('p, li, h1, h2, h3').forEach(el => {
+                if (animatedTokens.has(el)) return;
+                animatedTokens.add(el);
+                el.classList.add('m3e-token-in');
+            });
+        }
+
+        function renderTail() {
+            ensureNodes();
+            if (!state.tail) {
+                if (state.tailRendered) {
+                    tailEl.innerHTML = '';
+                    state.tailRendered = '';
+                }
+                return;
+            }
+            const nextHtml = render(state.tail);
+            if (nextHtml === state.tailRendered) return;
+            const shouldAnimate = !state.tailRendered;
+            tailEl.innerHTML = nextHtml;
+            state.tailRendered = nextHtml;
+            if (shouldAnimate) animateTokens(tailEl);
         }
 
         function commitStable() {
@@ -102,11 +125,7 @@
             ensureNodes();
             commitStable();
             state.tail = state.shown.slice(state.committedText.length);
-            tailEl.innerHTML = render(state.tail);
-            animateTokens(tailEl);
-            if (state.autoScroll) {
-                target.scrollIntoView({ block: 'end' });
-            }
+            renderTail();
             if (state.buffer.length) scheduler.schedule(renderFrame);
         }
 
@@ -123,11 +142,11 @@
             state.committedText = '';
             state.committedHtml = '';
             state.tail = state.shown;
+            state.tailRendered = '';
             stableEl = null;
             tailEl = null;
             ensureNodes();
-            tailEl.innerHTML = render(state.tail);
-            animateTokens(tailEl);
+            renderTail();
         }
 
         function pause(reason = 'manual') {

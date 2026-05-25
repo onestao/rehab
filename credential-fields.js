@@ -8,8 +8,15 @@
     function enhancePassword(input) {
         if (!input || input.dataset.visibilityBound === 'true') return;
         input.dataset.visibilityBound = 'true';
-        input.type = 'password';
-        input.autocomplete = 'off';
+        input.type = 'text';
+        input.autocomplete = 'one-time-code';
+        input.setAttribute('autocapitalize', 'off');
+        input.setAttribute('autocorrect', 'off');
+        input.setAttribute('spellcheck', 'false');
+        input.setAttribute('data-lpignore', 'true');
+        input.setAttribute('data-1p-ignore', 'true');
+        input.setAttribute('data-form-type', 'other');
+        input.classList.add('credential-masked');
         const field = input.closest('.md-field');
         if (!field || field.querySelector(`[data-password-toggle="${input.id}"]`)) return;
         field.classList.add('md-field-has-action');
@@ -17,7 +24,7 @@
         button.type = 'button';
         button.className = 'md-icon-btn password-visibility-toggle';
         button.dataset.passwordToggle = input.id;
-        button.setAttribute('aria-label', '显示或隐藏密码');
+        button.setAttribute('aria-label', '显示或隐藏凭据');
         button.innerHTML = '<span class="material-symbols-rounded">visibility</span>';
         button.addEventListener('click', () => toggle(input, button));
         field.appendChild(button);
@@ -25,17 +32,17 @@
 
     function toggle(input, button) {
         const icon = button.querySelector('.material-symbols-rounded');
-        const showing = input.type === 'text';
+        const showing = !input.classList.contains('credential-masked');
         clearTimeout(timers.get(input.id));
         if (showing) {
-            input.type = 'password';
+            input.classList.add('credential-masked');
             if (icon) icon.textContent = 'visibility';
             return;
         }
-        input.type = 'text';
+        input.classList.remove('credential-masked');
         if (icon) icon.textContent = 'visibility_off';
         timers.set(input.id, setTimeout(() => {
-            input.type = 'password';
+            input.classList.add('credential-masked');
             if (icon) icon.textContent = 'visibility';
         }, 3000));
     }

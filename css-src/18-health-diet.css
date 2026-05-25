@@ -77,7 +77,36 @@
 }
 .food-inline-edit-grid .md-field { margin-bottom: 0; }
 .food-inline-actions { display: flex; justify-content: flex-end; gap: 8px; }
-.food-ai-status { font-size: 11px; color: var(--md-sys-tertiary); min-height: 16px; font-weight: 600; }
+.food-ai-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    color: var(--md-sys-tertiary);
+    min-height: 16px;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+}
+.food-ai-cancel {
+    border: none;
+    border-radius: var(--md-sys-shape-full);
+    padding: 3px 10px;
+    background: var(--md-sys-error-container);
+    color: var(--md-sys-on-error-container);
+    font-size: 11px;
+    font-weight: 800;
+    cursor: pointer;
+    flex: none;
+}
+.diet-photo-spin {
+    animation: diet-photo-spin 0.9s linear infinite;
+}
+
+@keyframes diet-photo-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
 .food-computed {
     font-size: 12px;
     color: var(--md-sys-on-surface-variant);

@@ -1,5 +1,30 @@
 ﻿// @ts-nocheck
 Object.assign(ai, {
+    VISION_MODELS_URL: 'assets/vision-models.json',
+
+    async loadVisionWhitelist(force = false) {
+        if (this.visionWhitelist && !force) return this.visionWhitelist;
+        try {
+            const res = await fetch(this.VISION_MODELS_URL, { cache: 'force-cache' });
+            if (res.ok) this.visionWhitelist = await res.json();
+        } catch {}
+        this.visionWhitelist = this.visionWhitelist || { providers: {}, keywords: [], high_res_models: [], exclude_image_gen: [] };
+        return this.visionWhitelist;
+    },
+
+    visionExtraKeywords() {
+        const cfg = this.getEffectiveConfig ? this.getEffectiveConfig() : this.cfg;
+        return cfg?.extraVisionKeywords || this.cfg?.extraVisionKeywords || '';
+    },
+
+    analyzeVisionModel(id, provider = '') {
+        const helper = window.aiVisionPure;
+        if (!helper?.analyzeVisionModel) {
+            return { vision: this.isVisionModel(id), highRes: false, isImageGen: false, source: 'legacy' };
+        }
+        return helper.analyzeVisionModel(id, provider || this.cfg?.provider || 'openai', this.visionWhitelist || {}, this.visionExtraKeywords());
+    },
+
     // --- Model Fetching ---
     async fetchModels() {
         const baseUrl = (document.getElementById('aiBaseUrl')?.value || '').trim().replace(/\/+$/, '');
@@ -11,6 +36,7 @@ Object.assign(ai, {
         const statusEl = document.getElementById('aiFetchStatus');
         if (statusEl) statusEl.textContent = '获取模型列表中...';
         try {
+            await this.loadVisionWhitelist();
             let models = [];
             if (provider === 'gemini') models = await this.fetchGeminiModels(baseUrl, apiKey);
             else if (provider === 'claude') models = await this.fetchClaudeModels(baseUrl, apiKey);
@@ -32,9 +58,10 @@ Object.assign(ai, {
         const json = await res.json();
         return (json.data || json.models || []).map(m => {
             const id = m.id || m.name || '';
-            return { id, vision: this.isVisionModel(id) || this.inferVisionFromModelMeta(m) };
+            const verdict = this.analyzeVisionModel(id, 'openai');
+            return { id, vision: verdict.vision || this.inferVisionFromModelMeta(m), highRes: verdict.highRes, isImageGen: verdict.isImageGen };
         })
-            .sort((a, b) => a.vision === b.vision ? a.id.localeCompare(b.id) : (a.vision ? -1 : 1));
+            .sort((a, b) => a.isImageGen === b.isImageGen ? (a.vision === b.vision ? a.id.localeCompare(b.id) : (a.vision ? -1 : 1)) : (a.isImageGen ? 1 : -1));
     },
 
     inferVisionFromModelMeta(model) {
@@ -70,8 +97,9 @@ Object.assign(ai, {
         const json = await res.json();
         return (json.models || []).map(m => {
             const id = (m.name || '').replace('models/', '');
-            return { id, displayName: m.displayName || id, vision: this.isVisionModel(id) || (m.supportedGenerationMethods || []).includes('generateContent') };
-        }).sort((a, b) => a.vision === b.vision ? a.id.localeCompare(b.id) : (a.vision ? -1 : 1));
+            const verdict = this.analyzeVisionModel(id, 'gemini');
+            return { id, displayName: m.displayName || id, vision: verdict.vision || (m.supportedGenerationMethods || []).includes('generateContent'), highRes: verdict.highRes, isImageGen: verdict.isImageGen };
+        }).sort((a, b) => a.isImageGen === b.isImageGen ? (a.vision === b.vision ? a.id.localeCompare(b.id) : (a.vision ? -1 : 1)) : (a.isImageGen ? 1 : -1));
     },
 
     async fetchClaudeModels(baseUrl, apiKey) {
@@ -87,13 +115,16 @@ Object.assign(ai, {
         return (json.data || json.models || []).map(m => ({
             id: m.id || m.name || '',
             displayName: m.display_name || m.id || '',
-            vision: /claude-3|claude-opus|claude-sonnet|claude-haiku|claude-4/i.test(m.id || '')
-        })).sort((a, b) => a.vision === b.vision ? a.id.localeCompare(b.id) : (a.vision ? -1 : 1));
+            ...this.analyzeVisionModel(m.id || m.name || '', 'claude')
+        })).sort((a, b) => a.isImageGen === b.isImageGen ? (a.vision === b.vision ? a.id.localeCompare(b.id) : (a.vision ? -1 : 1)) : (a.isImageGen ? 1 : -1));
     },
 
     isVisionModel(id) {
+        const verdict = this.analyzeVisionModel ? this.analyzeVisionModel(id, this.cfg?.provider || 'openai') : null;
+        if (verdict && verdict.isImageGen) return false;
+        if (verdict && verdict.vision) return true;
         const s = String(id).toLowerCase();
-        return /vision|gpt-4o|gpt-4-turbo|gpt-4\.1|gemini-1\.5|gemini-2|gemini-pro-vision|claude-3|llava|moondream|pixtral|qwen-vl|minicpm-v/.test(s);
+        return /vision|gpt-4o|gpt-4-turbo|gpt-4\.1|gemini-1\.5|gemini-2|gemini-3|gemini-pro-vision|claude-3|claude-4|claude-5|llava|moondream|pixtral|qwen-vl|qwen3-vl|glm-4v|glm-5v|minicpm-v/.test(s);
     },
 
     showCachedModels() {
@@ -109,21 +140,34 @@ Object.assign(ai, {
             return;
         }
         const currentProvider = document.getElementById('aiProvider')?.value || this.cfg.provider || 'openai';
-        const filtered = models.filter(m => (m.provider || currentProvider) === currentProvider);
-        const vision = filtered.filter(m => m.vision);
-        const normal = filtered.filter(m => !m.vision);
+        const esc = window.renderSafe?.escapeHtml || (v => String(v ?? ''));
+        const filtered = models.filter(m => (m.provider || currentProvider) === currentProvider).map(m => {
+            const verdict = this.analyzeVisionModel(m.id, m.provider || currentProvider);
+            return { ...m, vision: !!(m.vision || verdict.vision), highRes: !!(m.highRes || verdict.highRes), isImageGen: !!(m.isImageGen || verdict.isImageGen) };
+        });
+        const vision = filtered.filter(m => m.vision && !m.isImageGen);
+        const imageGen = filtered.filter(m => m.isImageGen);
+        const normal = filtered.filter(m => !m.vision && !m.isImageGen);
+        const badge = (m) => {
+            if (m.isImageGen) return '<span class="ai-vision-badge ai-vision-badge-imagegen"><span class="material-symbols-rounded">palette</span>图像生成</span>';
+            if (m.vision) return `<span class="ai-vision-badge"><span class="material-symbols-rounded">visibility</span>视觉</span>${m.highRes ? '<span class="ai-vision-badge ai-vision-badge-highres">高分辨率</span>' : ''}`;
+            return '<span class="ai-vision-badge ai-vision-badge-unverified">视觉未验证</span>';
+        };
         const section = (title, list) => list.length ? `
             <div class="ai-model-group">
                 <div class="ai-model-group-title">${title}</div>
                 ${list.map(m => `
-                    <button class="ai-model-item ${m.vision ? 'has-vision' : ''}" onclick="ai.selectModel('${m.id.replace(/'/g, "\\'")}')">
-                        <span class="ai-model-name">${m.id}</span>
-                        ${m.vision ? '<span class="ai-vision-badge"><span class="material-symbols-rounded">visibility</span>视觉</span>' : ''}
+                    <button class="ai-model-item ${m.vision ? 'has-vision' : ''} ${m.isImageGen ? 'is-imagegen' : ''}" data-model="${esc(m.id)}" onclick="ai.selectModel(this.dataset.model)">
+                        <span class="ai-model-name">${esc(m.id)}</span>
+                        ${badge(m)}
                     </button>
                 `).join('')}
             </div>` : '';
-        container.innerHTML = `${section('可处理图片', vision)}${section('文本模型', normal)}`;
+        container.innerHTML = `${section('可处理图片', vision)}${section('视觉未验证', normal)}${section('图像生成', imageGen)}`;
         if (!keepHidden) container.classList.remove('hidden');
+        if (!this.visionWhitelist) {
+            this.loadVisionWhitelist().then(() => this.renderModels(models, true)).catch(() => {});
+        }
     },
 
     async selectModel(id) {

@@ -230,6 +230,21 @@
             exercises.forEach(e => {
                 items.push({ order: 6, sk: e.createdAt || '', icon: this.sportIcon(this.exerciseLabel(e.type, e)), label: this.exerciseLabel(e.type, e), detail: e.minutes+' 分钟', meta: e.calories ? e.calories+' kcal' : '', type: 'exercise' });
             });
+            (this.getTodayDailyPlans?.() || []).forEach(plan => {
+                (plan.items || []).filter(item => item && !item.deleted && item.status === 'done' && item.category !== 'cooldown').forEach(item => {
+                    const doneAt = Number(item.feedback?.doneAt || item.updatedAt || 0);
+                    const time = doneAt ? new Date(doneAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }) : '✓';
+                    items.push({
+                        order: 5,
+                        sk: String(doneAt || item.updatedAt || ''),
+                        icon: 'check_circle',
+                        label: item.name || '计划任务',
+                        detail: time,
+                        meta: item.feedback?.rpe ? `反馈 ${item.feedback.rpe}/5` : (plan.title || '日程计划'),
+                        type: 'plan'
+                    });
+                });
+            });
             if (weight) items.push({ order: 0, sk: '0', icon: 'monitor_weight', label: '体重记录', detail: weight.weight.toFixed(1)+' kg', meta: weight.note || '', type: 'weight' });
             if (!items.length) return '<div class="md-card today-timeline-empty"><div class="empty-state" style="padding:24px 16px"><span class="material-symbols-rounded">timeline</span><p>今天还没有记录，使用上方快捷按钮开始记录</p></div></div>';
             items.sort((a, b) => a.order - b.order || String(a.sk).localeCompare(String(b.sk)));
@@ -347,7 +362,7 @@
                     </div>
                     <div class="calendar-events">
                         ${visibleEntries.map(entry => `
-                            <span class="calendar-event" style="--event-color:${entry.rehab ? 'var(--md-sys-tertiary)' : this.actionColor(entry.name)}"><span class="material-symbols-rounded">${entry.rehab ? 'self_improvement' : this.sportIcon(entry.name)}</span>${this.escapeHtml(this.shortName(entry.name))}</span>
+                            <span class="calendar-event" style="--event-color:${entry.plan ? 'var(--md-sys-tertiary)' : this.actionColor(entry.name)}"><span class="material-symbols-rounded">${entry.plan ? 'event_note' : this.sportIcon(entry.name)}</span>${this.escapeHtml(this.shortName(entry.name))}</span>
                         `).join('')}
                         ${overflowCount > 0 ? `<div class="calendar-event-more">+${this.escapeHtml(String(overflowCount))}</div>` : ''}
                     </div>
@@ -384,12 +399,12 @@
             const foods = this.activeRecords(this.db.health.foodLogs || []).filter(f => f.date === date);
             const manualExercises = this.activeRecords(this.db.health.exerciseLogs || []).filter(e => e.date === date);
             const weight = this.activeRecords(this.db.health.weights || []).find(w => w.date === date);
-            const rehabPlan = this.getDailyPlan?.(date);
-            const rehabStats = this.completionRate?.(rehabPlan) || { done: 0, total: 0, rate: 0 };
-            const rehabItems = (rehabPlan?.items || []).filter(item => item && !item.deleted && item.category !== 'cooldown');
-            const rehabMissed = rehabItems.filter(item => item.status !== 'done').length;
-            const rehabFeedbacks = rehabItems.map(item => Number(item.feedback?.rpe || 0)).filter(Boolean);
-            const rehabAvg = rehabFeedbacks.length ? (rehabFeedbacks.reduce((sum, value) => sum + value, 0) / rehabFeedbacks.length).toFixed(1) : '';
+            const dailyPlans = this.getDailyPlans?.(date) || [];
+            const planStats = this.aggregateCompletionRate?.(dailyPlans) || { done: 0, total: 0, rate: 0 };
+            const planItems = dailyPlans.flatMap(plan => (plan.items || []).filter(item => item && !item.deleted && item.category !== 'cooldown'));
+            const planMissed = planItems.filter(item => item.status !== 'done').length;
+            const planFeedbacks = planItems.map(item => Number(item.feedback?.rpe || 0)).filter(Boolean);
+            const planAvg = planFeedbacks.length ? (planFeedbacks.reduce((sum, value) => sum + value, 0) / planFeedbacks.length).toFixed(1) : '';
             const totalMin = Math.round(entries.reduce((s, h) => s + (h.duration || 0), 0) / 60 + manualExercises.reduce((s, e) => s + (e.minutes || 0), 0));
             const totalCal = Math.round(entries.reduce((s, h) => s + (h.cardio?.calories || 0), 0) + manualExercises.reduce((s, e) => s + (e.calories || 0), 0));
             const foodCal = foods.reduce((s, f) => s + (f.cal || 0), 0);
@@ -397,7 +412,7 @@
             const foodCarb = foods.reduce((s, f) => s + Number(f.carb || 0), 0);
             const foodFat = foods.reduce((s, f) => s + Number(f.fat || 0), 0);
             const mealNames = { breakfast: '早餐', lunch: '午餐', dinner: '晚餐', snack: '加餐' };
-            if (entries.length === 0 && foods.length === 0 && manualExercises.length === 0 && !weight) {
+            if (entries.length === 0 && foods.length === 0 && manualExercises.length === 0 && !weight && !dailyPlans.length) {
                 return `<div class="md-card day-detail-card">
                 <div class="day-detail-head"><span class="material-symbols-rounded">event</span><strong>${date}</strong><button class="icon-btn" onclick="data.selectCalendarDate('${date}')"><span class="material-symbols-rounded">close</span></button></div>
                 <div class="empty-state" style="padding:20px"><p>当天暂无记录</p></div>
@@ -411,10 +426,10 @@
                 ${foodCal ? `<span>${foodCal} kcal 摄入</span>` : ''}
                 ${weight ? `<span>${weight.weight.toFixed(1)} kg</span>` : ''}
             </div>
-            ${rehabPlan ? `<div class="day-detail-section"><b>康复</b>
-                <div class="day-detail-item"><span class="record-icon material-symbols-rounded">self_improvement</span><span>康复完成率</span><small>${rehabStats.done}/${rehabStats.total || 0}</small></div>
-                <div class="day-detail-item"><span class="record-icon material-symbols-rounded">warning</span><span>漏做</span><small>${rehabMissed}</small></div>
-                <div class="day-detail-item"><span class="record-icon material-symbols-rounded">monitor_heart</span><span>平均反馈</span><small>${rehabAvg || '暂无'}</small></div>
+            ${dailyPlans.length ? `<div class="day-detail-section"><b>日程计划</b>
+                <div class="day-detail-item"><span class="record-icon material-symbols-rounded">event_note</span><span>计划完成率</span><small>${planStats.done}/${planStats.total || 0}</small></div>
+                <div class="day-detail-item"><span class="record-icon material-symbols-rounded">warning</span><span>漏做</span><small>${planMissed}</small></div>
+                <div class="day-detail-item"><span class="record-icon material-symbols-rounded">monitor_heart</span><span>平均反馈</span><small>${planAvg || '暂无'}</small></div>
             </div>` : ''}
             ${entries.length ? `<div class="day-detail-section"><b>训练</b>${entries.map(h => {
                 const icon = this.historyIcon(h);
@@ -446,7 +461,7 @@
                 const key = this.historyDayKey(h);
                 if (!map[key]) map[key] = [];
                 this.historyNames(h).forEach((name, idx) => {
-                    map[key].push({ name, minutes: idx === 0 ? (h.duration || 0) / 60 : 0, source: 'history', rehab: !!h.rehab });
+                    map[key].push({ name, minutes: idx === 0 ? (h.duration || 0) / 60 : 0, source: 'history', plan: !!(h.plan || h.rehab) });
                 });
             });
             this.activeRecords(this.db.health.exerciseLogs || []).forEach(e => {

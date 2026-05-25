@@ -1,5 +1,5 @@
 :root
-  01-vars.css, 37-dark-mode.css, 41-m3e-effects.css
+  01-vars.css, 37-dark-mode.css, 49-plan.css, 41-m3e-effects.css
 
 .advice-bubble
   18-health-diet.css, 41-m3e-effects.css
@@ -182,6 +182,9 @@
   24-routines-cards.css, 45-library-segment.css
 
 .library-card-actions .md-btn
+  24-routines-cards.css, 45-library-segment.css
+
+.library-card-actions .md-btn span:last-child
   24-routines-cards.css, 45-library-segment.css
 
 .library-segment-btn
@@ -431,10 +434,10 @@ from
   06-layout-page.css, 18-health-diet.css, 20-settings-ai.css, 38-record-page.css, 43-identity-card.css, 47-view-transitions.css, 41-m3e-effects.css
 
 media (max-width: 360px)
-  18-health-diet.css, 19-health-weightloss-ai.css, 24-routines-cards.css, 33-workout-input-card.css, 36-responsive.css, 43-identity-card.css
+  18-health-diet.css, 19-health-weightloss-ai.css, 24-routines-cards.css, 33-workout-input-card.css, 36-responsive.css, 43-identity-card.css, 49-action-history-weekly.css, 49-plan.css
 
 media (max-width: 480px)
-  19-health-weightloss-ai.css, 22-workout-mode-tabs.css, 24-routines-cards.css, 36-responsive.css, 49-rehab.css
+  19-health-weightloss-ai.css, 22-workout-mode-tabs.css, 24-routines-cards.css, 36-responsive.css, 49-action-history-weekly.css, 49-plan.css
 
 media (max-width: 520px)
   20-settings-ai.css, 26-settings-sync.css

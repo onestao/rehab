@@ -1,6 +1,8 @@
-export const REHAB_PREF_DEFAULTS = {
+export const PLAN_PREF_DEFAULTS = {
     stage: 'unset',
+    customStageLabel: '',
     equipment: [],
+    customEquipment: [],
     cooldownMode: 'attached',
     askOnEdit: 'always',
     askBeforeProgression: true,
@@ -8,12 +10,47 @@ export const REHAB_PREF_DEFAULTS = {
     showWeeklyDock: true
 };
 
+export const PLAN_TYPES = ['rehab', 'cut', 'bulk', 'maintenance', 'custom'];
+
+export function planTypeMeta(type = 'rehab', title = '') {
+    const key = PLAN_TYPES.includes(type) ? type : 'rehab';
+    const map = {
+        rehab: { label: '康复计划', taskLabel: '康复任务', cooldownLabel: '放松', icon: 'self_improvement' },
+        cut: { label: '减脂日程', taskLabel: '减脂任务', cooldownLabel: '拉伸', icon: 'local_fire_department' },
+        bulk: { label: '增肌日程', taskLabel: '增肌任务', cooldownLabel: '整理组', icon: 'fitness_center' },
+        maintenance: { label: '综合训练', taskLabel: '训练任务', cooldownLabel: '放松', icon: 'health_and_safety' },
+        custom: { label: title || '自定义计划', taskLabel: '任务', cooldownLabel: '放松', icon: 'event_note' }
+    };
+    return map[key];
+}
+
 function clone(value) {
     return JSON.parse(JSON.stringify(value));
 }
 
 function uniqueList(values = []) {
     return [...new Set((Array.isArray(values) ? values : []).map((item) => String(item || '').trim()).filter(Boolean))];
+}
+
+function normalizeCustomEquipment(values = []) {
+    const normalized = (Array.isArray(values) ? values : [])
+        .map((item) => {
+            if (typeof item === 'string') {
+                const label = item.trim();
+                return label ? { id: `custom_${label}`, label, icon: 'inventory_2' } : null;
+            }
+            if (!item || typeof item !== 'object') return null;
+            const label = String(item.label || item.name || '').trim();
+            if (!label) return null;
+            const id = String(item.id || `custom_${label}`).trim();
+            return {
+                id,
+                label,
+                icon: String(item.icon || 'inventory_2').trim() || 'inventory_2'
+            };
+        })
+        .filter((item) => item !== null);
+    return normalized.filter((item, index, list) => list.findIndex((candidate) => candidate.id === item.id) === index);
 }
 
 function fieldMeta(record) {
@@ -34,12 +71,31 @@ function touchRecord(record, changedFields = [], nowTs = Date.now()) {
     return next;
 }
 
-export function normalizeRehabPrefs(raw = {}) {
+export function normalizePlanPrefs(raw = {}) {
+    const stage = ['unset', 'post_op', 'post_op_4w', 'post_op_8w', 'cutting', 'bulking', 'maintenance', 'chronic', 'custom'].includes(raw?.stage)
+        ? raw.stage
+        : 'unset';
     return {
-        ...REHAB_PREF_DEFAULTS,
+        ...PLAN_PREF_DEFAULTS,
         ...(raw && typeof raw === 'object' ? raw : {}),
-        equipment: uniqueList(raw?.equipment)
+        stage,
+        customStageLabel: String(raw?.customStageLabel || ''),
+        equipment: uniqueList(raw?.equipment),
+        customEquipment: normalizeCustomEquipment(raw?.customEquipment)
     };
+}
+
+export function migratePlanPrefs(db = {}) {
+    const next = clone(db || {});
+    next.prefs = next.prefs && typeof next.prefs === 'object' ? next.prefs : {};
+    if (!next.prefs.plan && next.prefs.rehab) {
+        next.prefs.plan = normalizePlanPrefs(next.prefs.rehab);
+        delete next.prefs.rehab;
+    } else {
+        next.prefs.plan = normalizePlanPrefs(next.prefs.plan || {});
+        delete next.prefs.rehab;
+    }
+    return next;
 }
 
 export function normalizeTaskItem(item = {}, options = {}) {
@@ -47,8 +103,9 @@ export function normalizeTaskItem(item = {}, options = {}) {
     const idFactory = typeof options.idFactory === 'function' ? options.idFactory : (prefix) => `${prefix}-${nowTs}`;
     const spec = item?.spec && typeof item.spec === 'object' ? item.spec : {};
     return touchRecord({
-        id: item.id || idFactory('rehab-task'),
+        id: item.id || idFactory('plan-task'),
         name: String(item.name || '未命名任务'),
+        planType: PLAN_TYPES.includes(item.planType) ? item.planType : (PLAN_TYPES.includes(options.planType) ? options.planType : 'rehab'),
         category: item.category === 'cooldown' ? 'cooldown' : 'main',
         spec: {
             sets: Math.max(1, Number(spec.sets || 1)),
@@ -84,12 +141,17 @@ export function normalizeTaskItem(item = {}, options = {}) {
 export function normalizeDailyPlan(plan = {}, options = {}) {
     const nowTs = Number(options.nowTs || Date.now());
     const idFactory = typeof options.idFactory === 'function' ? options.idFactory : (prefix) => `${prefix}-${nowTs}`;
-    const items = (Array.isArray(plan.items) ? plan.items : []).map((item) => normalizeTaskItem(item, { nowTs, idFactory }));
+    const legacySource = plan.source === 'rehab-center';
+    const type = PLAN_TYPES.includes(plan.type) ? plan.type : 'rehab';
+    const title = String(plan.title || planTypeMeta(type).label);
+    const items = (Array.isArray(plan.items) ? plan.items : []).map((item) => normalizeTaskItem({ ...item, planType: item.planType || type }, { nowTs, idFactory, planType: type }));
     const pending = uniqueList(plan.pendingCooldowns).filter((id) => items.some((item) => item.id === id));
     return touchRecord({
-        id: plan.id || idFactory('rehab-plan'),
+        id: plan.id || idFactory('daily-plan'),
         date: String(plan.date || ''),
-        source: ['ai', 'manual', 'rehab-center'].includes(plan.source) ? plan.source : 'manual',
+        type,
+        title,
+        source: legacySource ? 'manual' : (['ai', 'manual', 'imported'].includes(plan.source) ? plan.source : 'manual'),
         notes: String(plan.notes || ''),
         items,
         pendingCooldowns: pending,
@@ -110,8 +172,9 @@ export function normalizeProgressionChain(chain = {}, options = {}) {
         hint: String(level?.hint || '')
     }));
     return touchRecord({
-        id: chain.id || idFactory('rehab-chain'),
+        id: chain.id || idFactory('plan-chain'),
         group: String(chain.group || '未分组'),
+        applicableTypes: uniqueList(chain.applicableTypes).filter((type) => PLAN_TYPES.includes(type)),
         levels,
         updatedAt: Number(chain.updatedAt || nowTs),
         deleted: !!chain.deleted,
@@ -137,10 +200,16 @@ export function getPlanByDate(plans = [], date = '') {
     return (Array.isArray(plans) ? plans : []).find((plan) => !plan?.deleted && String(plan?.date || '') === String(date || '')) || null;
 }
 
+export function getPlansByDate(plans = [], date = '') {
+    return (Array.isArray(plans) ? plans : [])
+        .filter((plan) => !plan?.deleted && String(plan?.date || '') === String(date || ''))
+        .map((plan) => normalizeDailyPlan(plan));
+}
+
 export function upsertDailyPlan(plans = [], plan = {}, options = {}) {
     const nextPlan = normalizeDailyPlan(plan, options);
     const list = Array.isArray(plans) ? plans.map((item) => clone(item)) : [];
-    const index = list.findIndex((item) => item?.id === nextPlan.id || (!item?.deleted && item?.date === nextPlan.date));
+    const index = list.findIndex((item) => item?.id === nextPlan.id || (!item?.deleted && item?.date === nextPlan.date && (item.type || 'rehab') === nextPlan.type));
     if (index >= 0) list[index] = nextPlan;
     else list.unshift(nextPlan);
     return list.sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
@@ -216,4 +285,11 @@ export function completionRate(plan = {}) {
         total: items.length,
         rate: done / items.length
     };
+}
+
+export function aggregateCompletionRate(plans = []) {
+    const rates = (Array.isArray(plans) ? plans : []).map((plan) => completionRate(plan));
+    const done = rates.reduce((sum, item) => sum + Number(item.done || 0), 0);
+    const total = rates.reduce((sum, item) => sum + Number(item.total || 0), 0);
+    return { done, total, rate: total ? done / total : 0 };
 }

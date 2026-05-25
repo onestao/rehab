@@ -8,23 +8,19 @@
             if (activePage === 'workout') {
                 safe('renderActions', () => this.renderActions?.());
                 safe('renderWorkoutPlanCard', () => this.renderWorkoutPlanCard?.());
-                safe('renderRehabDock', () => this.renderRehabDock?.('workout'));
                 return;
             }
             if (activePage === 'today') return safe('renderTodayPage', () => this.renderTodayPage?.());
             if (activePage === 'records') {
                 safe('renderRecordsPage', () => this.renderRecordsPage?.());
-                safe('renderRehabDock', () => this.renderRehabDock?.('records'));
                 return;
             }
             if (activePage === 'ai-coach') {
                 safe('renderAiCoachPage', () => this.renderAiCoachPage?.());
-                safe('renderRehabDock', () => this.renderRehabDock?.('ai-coach'));
                 return;
             }
             if (activePage === 'profile') {
                 safe('renderProfilePage', () => this.renderProfilePage?.());
-                safe('renderRehabDock', () => this.renderRehabDock?.('profile'));
             }
         },
 
@@ -34,12 +30,11 @@
             const quickActions = document.getElementById('todayQuickActions');
             const timeline = document.getElementById('todayTimeline');
             const aiCard = document.getElementById('todayAiCard');
-            if (overview) overview.innerHTML = ctx.renderRecordOverview?.() || '';
-            if (quickActions) quickActions.innerHTML = ctx.renderRehabTodaySection?.() || ctx.renderRecordQuickActions?.() || '';
+            if (overview) overview.innerHTML = ctx.renderPlanTodaySection?.() || ctx.renderRecordOverview?.() || '';
+            if (quickActions) quickActions.innerHTML = ctx.renderTodayActionDock?.() || ctx.renderRecordQuickActions?.() || '';
             if (timeline) timeline.innerHTML = ctx.renderTodayTimeline?.() || '';
-            if (aiCard) aiCard.innerHTML = ctx.renderContextAiCard?.('today') || '';
-            ctx.bindRehabQuickRepeat?.();
-            ctx.renderRehabDock?.('today');
+            if (aiCard) aiCard.innerHTML = ctx.renderTodayAiReminder?.() || ctx.renderContextAiCard?.('today') || '';
+            ctx.bindPlanQuickRepeat?.();
         },
 
         renderDietPage() {

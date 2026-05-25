@@ -77,9 +77,9 @@
 
 .weekly-plan-strip {
     display: grid;
-    grid-template-columns: repeat(7, minmax(72px, 1fr));
+    grid-template-columns: repeat(7, minmax(52px, 1fr));
     gap: 6px;
-    overflow-x: auto;
+    overflow-x: hidden;
     padding: 0 8px 8px;
     scrollbar-width: none;
 }
@@ -89,7 +89,8 @@
 }
 
 .weekly-plan-chip {
-    min-height: 56px;
+    min-width: 0;
+    min-height: 52px;
     border: 1px solid var(--md-sys-outline-variant);
     border-radius: var(--md-sys-shape-lg);
     background: var(--md-sys-surface-container-lowest);
@@ -99,6 +100,7 @@
     gap: 2px;
     padding: 6px;
     text-align: center;
+    overflow: hidden;
 }
 
 .weekly-plan-chip.is-today {
@@ -117,6 +119,43 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+@media (max-width: 480px) {
+    .weekly-plan-strip {
+        grid-template-columns: repeat(7, minmax(0, 1fr));
+        gap: 4px;
+        padding: 0 6px 6px;
+    }
+
+    .weekly-plan-chip {
+        min-height: 48px;
+        padding: 5px 2px;
+        border-radius: var(--md-sys-shape-md);
+    }
+
+    .weekly-plan-chip span {
+        font-size: 11px;
+    }
+
+    .weekly-plan-chip small {
+        font-size: 9px;
+    }
+}
+
+@media (max-width: 360px) {
+    .weekly-plan-strip {
+        gap: 3px;
+        padding-inline: 4px;
+    }
+
+    .weekly-plan-chip {
+        min-height: 44px;
+    }
+
+    .weekly-plan-chip span {
+        font-size: 10px;
+    }
 }
 
 .weekly-plan-banner {

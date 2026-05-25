@@ -12,6 +12,7 @@ const ai = {
         provider: 'openai',
         model: '',
         baseUrl: '',
+        extraVisionKeywords: '',
         enabled: false
     },
     models: [],
@@ -27,6 +28,7 @@ const ai = {
             provider: 'openai',
             model: '',
             baseUrl: '',
+            extraVisionKeywords: '',
             enabled: false
         };
         this.models = [];
@@ -182,7 +184,8 @@ const ai = {
             id: this.cfg.activeProfileId || '',
             provider: this.cfg.provider || 'openai',
             model: this.cfg.model || '',
-            baseUrl: this.cfg.baseUrl || ''
+            baseUrl: this.cfg.baseUrl || '',
+            extraVisionKeywords: this.cfg.extraVisionKeywords || ''
         };
         const profileId = this.overrideModel?.profileId || fallback.id || this.cfg.activeProfileId || '';
         const provider = this.overrideModel?.provider || fallback.provider || this.cfg.provider || 'openai';
@@ -192,6 +195,7 @@ const ai = {
             provider,
             model,
             baseUrl: fallback.baseUrl || this.cfg.baseUrl || '',
+            extraVisionKeywords: fallback.extraVisionKeywords || this.cfg.extraVisionKeywords || '',
             enabled: !!((fallback.baseUrl || this.cfg.baseUrl) && model),
             apiKey: profileId ? this.apiKeyFor(profileId) : ''
         };

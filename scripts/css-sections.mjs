@@ -44,7 +44,7 @@ export const cssSections = [
   { file: '47-view-transitions.css', marker: { type: 'exact', value: '/* --- View Transitions --- */' } },
   { file: '48-advice-model-picker.css', marker: { type: 'exact', value: '/* --- Advice Model Picker --- */' } },
   { file: '49-action-history-weekly.css', marker: { type: 'exact', value: '/* --- Action History & Weekly Plan --- */' } },
-  { file: '49-rehab.css', marker: { type: 'exact', value: '/* --- Rehab Daily Plan --- */' } },
+  { file: '49-plan.css', marker: { type: 'exact', value: '/* --- Plan Daily Plan / M3E --- */' } },
   { file: '41-m3e-effects.css', marker: { type: 'exact', value: '/* === M3 Expressive Effects === */' } },
   { file: '40-a11y.css', marker: { type: 'exact', value: '/* --- A11y --- */' } },
 ];

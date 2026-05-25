@@ -118,16 +118,27 @@
 }
 .library-card-actions {
     margin-top: 8px;
-    display: flex;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
     gap: 6px;
-    flex-wrap: wrap;
 }
 .library-card-actions .md-btn {
     min-width: 0;
+    width: 100%;
     white-space: nowrap;
     padding: 0 10px;
     height: 34px;
     flex: none;
+    overflow: hidden;
+}
+.library-card-actions .md-btn .material-symbols-rounded {
+    flex: none;
+    font-size: 17px;
+}
+.library-card-actions .md-btn span:last-child {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 .library-tag-chips {
     display: flex;

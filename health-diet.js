@@ -1,6 +1,42 @@
 // @ts-nocheck
 (function () {
+    let _aiPhotoBusy = false;
+
+    function sanitizeMessage(value) {
+        return window.toast?.sanitize ? toast.sanitize(value) : String(value?.message || value || '');
+    }
+
+    function setButtonContent(button, icon, text, spinning = false) {
+        if (!button) return;
+        button.textContent = '';
+        const iconEl = document.createElement('span');
+        iconEl.className = `material-symbols-rounded${spinning ? ' diet-photo-spin' : ''}`;
+        iconEl.textContent = icon;
+        button.appendChild(iconEl);
+        button.appendChild(document.createTextNode(` ${text}`));
+    }
+
     window.dataHealthDiet = {
+        getDietPhotoSupportInfo() {
+            const cfg = window.ai?.getEffectiveConfig?.() || window.ai?.cfg || {};
+            const provider = String(cfg.provider || '').toLowerCase();
+            const model = String(cfg.model || '').toLowerCase();
+            if (!cfg.enabled) return { supported: false, reason: '请先填写 Base URL 和模型' };
+            if (!cfg.apiKey) return { supported: false, reason: '请先在当前 AI 配置中填写 API Key' };
+            if (!window.aiVisionPure?.isKnownDietPhotoProvider?.(provider)) return { supported: false, reason: '当前提供商暂不支持拍照识别' };
+            const verdict = window.ai?.analyzeVisionModel?.(model, provider) || { vision: false, isImageGen: false, highRes: false };
+            if (verdict.isImageGen) return { supported: false, reason: '图像生成模型不能用于拍照识别', verdict };
+            const failure = window.ai?.getVisionFailure?.(provider, model);
+            if (failure) return { supported: true, warning: `上次识别失败：${failure.reason}，仍可重试`, verdict, failure };
+            if (!verdict.vision) return { supported: true, warning: '该模型未在视觉白名单中，识别可能失败但可尝试', verdict };
+            return { supported: true, reason: '拍照识别', verdict };
+        },
+
+        dietPhotoTitle() {
+            const info = this.getDietPhotoSupportInfo();
+            return info.warning || info.reason || '拍照识别';
+        },
+
         setFoodSource(label = '') {
             this._foodSource = label;
             const el = document.getElementById('foodSourceHint');
@@ -26,7 +62,9 @@
             const mode = this._dietInputMode || this.db.health.dietInputMode || 'ai';
             const meal = this._dietMeal || 'lunch';
             const mealBtn = (key, label) => `<button class="diet-meal-pill ${meal === key ? 'active' : ''}" onclick="data.setDietMeal('${key}')" type="button">${this.escapeHtml(label)}</button>`;
-            const photoSupported = this.isDietPhotoAiSupported();
+            const photoInfo = this.getDietPhotoSupportInfo();
+            const photoSupported = photoInfo.supported;
+            const photoTitle = this.escapeHtml(this.dietPhotoTitle());
             return `
                 <div class="diet-mode-tabs" style="margin-bottom:10px">
                     <button class="diet-mode-tab ${mode === 'ai' ? 'active' : ''}" data-mode="ai" onclick="data.setDietInputMode('ai')" type="button"><span class="material-symbols-rounded">auto_awesome</span> AI</button>
@@ -39,8 +77,8 @@
                     <textarea id="foodAiText" class="diet-ai-input" placeholder="说说你这顿吃了什么，例如：鸡胸肉饭加一杯豆浆" oninput="data.autoResizeDietInput(this)"></textarea>
                     <div class="diet-ai-actions">
                         <button class="md-btn md-btn-filled" onclick="data.aiParseFood()" type="button"><span class="material-symbols-rounded">auto_awesome</span> 文本识别</button>
-                        <button class="md-btn md-btn-tonal" onclick="data.triggerDietPhoto()" type="button" ${photoSupported ? '' : 'disabled'} title="${photoSupported ? '拍照识别' : '当前 AI 模型不支持视觉或未配置'}"><span class="material-symbols-rounded">visibility</span> 拍照识别</button>
-                        <input id="dietPhotoInput" class="hidden" type="file" accept="image/*" capture="environment" onchange="data.handleDietPhoto(this.files?.[0])">
+                        <button id="dietPhotoButton" class="md-btn md-btn-tonal" onclick="data.triggerDietPhoto()" type="button" ${photoSupported ? '' : 'disabled'} title="${photoTitle}"><span class="material-symbols-rounded">visibility</span> 拍照识别</button>
+                        <input id="dietPhotoInput" class="hidden" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" capture="environment" onchange="data.handleDietPhoto(this.files?.[0])">
                     </div>
                     <small id="foodAiStatus" class="food-ai-status"></small>
                     <div id="foodAiResults"></div>
@@ -66,10 +104,11 @@
             `;
         },
 
-        openDietModal() {
+        async openDietModal() {
             const modal = document.getElementById('dietModal');
             const content = document.getElementById('dietModalContent');
             if (!modal || !content) return;
+            await window.ai?.loadVisionWhitelist?.();
             content.innerHTML = this.renderDietModalContent();
             this.syncFoodCalLabel?.();
             this.setDietInputMode(this._dietInputMode || this.db.health.dietInputMode || 'ai');
@@ -94,52 +133,104 @@
         },
 
         isDietPhotoAiSupported() {
-            const cfg = window.ai?.getEffectiveConfig?.() || window.ai?.cfg || {};
-            const provider = String(cfg.provider || '').toLowerCase();
-            const model = String(cfg.model || '').toLowerCase();
-            if (!cfg.enabled || !cfg.apiKey) return false;
-            if (!/openai|openai-responses|claude|gemini/.test(provider)) return false;
-            const cached = (window.ai?.models || []).find(m => String(m.id || '').toLowerCase() === model && (!m.provider || String(m.provider).toLowerCase() === provider));
-            return !!(cached?.vision || window.ai?.isVisionModel?.(model));
+            return !!this.getDietPhotoSupportInfo().supported;
         },
 
         triggerDietPhoto() {
-            if (!this.isDietPhotoAiSupported()) {
-                window.toast?.show?.('当前 AI 模型不支持视觉或未配置', 'info');
+            if (_aiPhotoBusy) return;
+            const info = this.getDietPhotoSupportInfo();
+            if (!info.supported) {
+                window.toast?.show?.(info.reason || '当前 AI 配置不可用', 'info');
                 return;
             }
             document.getElementById('dietPhotoInput')?.click?.();
         },
 
-        async handleDietPhoto(file) {
+        setDietPhotoStatus(stage, text, onCancel = null) {
             const statusEl = document.getElementById('foodAiStatus');
+            if (!statusEl) return;
+            statusEl.textContent = text || '';
+            statusEl.dataset.stage = stage || '';
+            if (onCancel) {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'food-ai-cancel';
+                btn.textContent = '取消';
+                btn.onclick = onCancel;
+                statusEl.appendChild(btn);
+            }
+        },
+
+        async handleDietPhoto(file) {
             const inputEl = document.getElementById('dietPhotoInput');
+            const button = document.getElementById('dietPhotoButton');
             if (!file) return;
-            if (!this.isDietPhotoAiSupported()) {
-                if (statusEl) statusEl.textContent = '当前 AI 模型不支持视觉或未配置';
-                window.toast?.show?.('当前 AI 模型不支持视觉或未配置', 'info');
+            if (_aiPhotoBusy) return;
+            const support = this.getDietPhotoSupportInfo();
+            if (!support.supported) {
+                this.setDietPhotoStatus('failed', support.reason || '当前 AI 配置不可用');
+                window.toast?.show?.(support.reason || '当前 AI 配置不可用', 'info');
                 if (inputEl) inputEl.value = '';
                 return;
             }
             if (!window.ai?.parseFoodFromImage) {
-                if (statusEl) statusEl.textContent = '当前版本未接入图片识别';
+                this.setDietPhotoStatus('failed', '当前版本未接入图片识别');
                 window.toast?.show?.('当前版本未接入图片识别', 'info');
                 if (inputEl) inputEl.value = '';
                 return;
             }
-            if (statusEl) statusEl.textContent = 'AI 识别中...';
+            _aiPhotoBusy = true;
+            const cfg = window.ai?.getEffectiveConfig?.() || {};
+            const isHeic = window.ai?._isHeicFile?.(file);
+            const controller = new AbortController();
+            this._dietPhotoAbortController = controller;
+            if (button) {
+                button.disabled = true;
+                setButtonContent(button, 'progress_activity', '识别中…', true);
+            }
+            this.setDietPhotoStatus('selected', '已选择照片，准备处理', () => controller.abort());
+            window.haptics?.light?.();
+            window.toast?.show?.('正在识别照片…', 'info');
             try {
-                const items = await window.ai.parseFoodFromImage(file);
+                const items = await window.ai.parseFoodFromImage(file, {
+                    signal: controller.signal,
+                    timeoutMs: isHeic ? 45000 : 30000,
+                    onProgress: ({ stage }) => {
+                        if (stage === 'heic') this.setDietPhotoStatus('decode', '正在处理 HEIC 照片…', () => controller.abort());
+                        else if (stage === 'resize') this.setDietPhotoStatus('resize', '正在压缩照片…', () => controller.abort());
+                        else if (stage === 'request') this.setDietPhotoStatus('request', '正在请求 AI 识别…', () => controller.abort());
+                        else if (stage === 'parse') this.setDietPhotoStatus('parse', '正在解析识别结果…');
+                    }
+                });
                 if (!items || !items.length) throw new Error('未识别到食物');
                 this._aiFoodResults = items;
                 this._aiFoodAdded = new Set();
                 const format = typeof this.formatAiDraft === 'function' ? this.formatAiDraft.bind(this) : (v => v);
                 this._aiFoodDrafts = items.map(item => format(item));
                 this.renderAiFoodResults?.();
-                if (statusEl) statusEl.textContent = `AI 已识别 ${items.length} 项，点击逐个添加或批量添加`;
+                this.setDietPhotoStatus('done', `AI 已识别 ${items.length} 项，点击逐个添加或批量添加`);
+                window.ai?.clearVisionFailure?.(cfg.provider, cfg.model);
+                window.haptics?.success?.();
+                window.toast?.show?.(`识别到 ${items.length} 项食物`, 'success');
             } catch (e) {
-                if (statusEl) statusEl.textContent = 'AI 识别失败: ' + (window.toast ? toast.sanitize(e) : (e?.message || String(e)));
+                const classified = window.aiVisionPure?.classifyVisionError?.(e) || { type: 'unknown', message: sanitizeMessage(e), isErrorToast: true };
+                if (classified.cacheVisionFailure) window.ai?.markVisionFailure?.(cfg.provider, cfg.model, classified.message);
+                if (classified.type === 'cancelled') {
+                    this.setDietPhotoStatus('cancelled', '已取消');
+                    return;
+                }
+                const message = sanitizeMessage(classified.message || e);
+                this.setDietPhotoStatus(classified.type || 'failed', `识别失败：${message}`);
+                window.haptics?.error?.();
+                if (classified.isErrorToast !== false) window.toast?.show?.(`识别失败：${message}`, 'error');
             } finally {
+                _aiPhotoBusy = false;
+                this._dietPhotoAbortController = null;
+                if (button) {
+                    button.disabled = false;
+                    setButtonContent(button, 'visibility', '拍照识别');
+                    button.title = this.dietPhotoTitle();
+                }
                 if (inputEl) inputEl.value = '';
             }
         },

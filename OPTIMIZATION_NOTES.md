@@ -181,7 +181,7 @@ Note: PowerShell printed an npm/npx profile warning about denied access to `C:\U
 9. `feat(diet): add camera recognition entry`
    - `health-diet.js`, `css-src/18-health-diet.css`.
 
-## Rehab Daily Plan（v4.1）
+## Plan Daily Plan（v4.1）
 - R1 数据层与内置链: done
 - R2 道具偏好面板: done
 - R3 今日主卡（折叠+紧凑手动记录）: done
@@ -197,8 +197,8 @@ Note: PowerShell printed an npm/npx profile warning about denied access to `C:\U
 - R13 记录页区分: done
 
 涉及文件：
-- 新增 `rehab-chains.js`, `rehab-store.js`, `rehab-ui.js`, `rehab-cooldown.js`, `rehab-feedback.js`, `rehab-weekly.js`, `rehab-ai.js`, `rehab-equipment.js`, `rehab-dock.js`
-- 新增纯模块与测试 `rehab-progression-pure.js`, `rehab-store-pure.js`, `test/rehab-progression.test.mjs`, `test/rehab-store.test.mjs`
+- 新增 `plan-chains.js`, `plan-store.js`, `plan-ui.js`, `plan-cooldown.js`, `plan-feedback.js`, `plan-weekly.js`, `plan-ai.js`, `plan-equipment.js`, `plan-dock.js`
+- 新增纯模块与测试 `plan-progression-pure.js`, `plan-store-pure.js`, `test/plan-progression.test.mjs`, `test/plan-store.test.mjs`
 - 新增样式 `css-src/49-rehab.css`
 - 修改 `data.js`, `data-schema.js`, `data-store.js`, `data-views.js`, `sync.js`, `sync-pure.js`, `history-view.js`, `routine-library.js`, `workout-core.js`, `index.html`, `sw.js`, `scripts/css-sections.mjs`
 
@@ -259,28 +259,28 @@ ai-bundle 38.52 kB / 50 kB
 
 [折叠态主卡 + 紧凑手动记录段 DOM 片段]
 ```html
-<div class="md-card rehab-today-card">
-  <div class="rehab-today-head">
+<div class="md-card plan-today-card">
+  <div class="plan-today-head">
     <div>
       <span class="cardio-kicker">康复计划</span>
       <h3>1/4 已完成</h3>
     </div>
     <span class="material-symbols-rounded">health_and_safety</span>
   </div>
-  <div class="rehab-progress"><i style="width:25%"></i></div>
-  <div class="rehab-current-block">
+  <div class="plan-progress"><i style="width:25%"></i></div>
+  <div class="plan-current-block">
     <strong>康复·桥式保持</strong>
     <small>下一项 · 3组 · 30秒</small>
   </div>
-  <div class="rehab-compact-list">...</div>
-  <button class="rehab-expand-btn" type="button">展开全部 4 项</button>
-  <div class="rehab-manual-strip">
-    <div class="rehab-manual-divider">┄ 手动记录 ┄</div>
-    <div class="rehab-manual-actions">
-      <button class="md-chip rehab-manual-chip">💪 力量</button>
-      <button class="md-chip rehab-manual-chip">🏃 有氧</button>
-      <button class="md-chip rehab-manual-chip">⚖️ 体重</button>
-      <button class="md-chip rehab-manual-chip">🍱 饮食</button>
+  <div class="plan-compact-list">...</div>
+  <button class="plan-expand-btn" type="button">展开全部 4 项</button>
+  <div class="plan-manual-strip">
+    <div class="plan-manual-divider">┄ 手动记录 ┄</div>
+    <div class="plan-manual-actions">
+      <button class="md-chip plan-manual-chip">💪 力量</button>
+      <button class="md-chip plan-manual-chip">🏃 有氧</button>
+      <button class="md-chip plan-manual-chip">⚖️ 体重</button>
+      <button class="md-chip plan-manual-chip">🍱 饮食</button>
     </div>
   </div>
 </div>
@@ -288,10 +288,10 @@ ai-bundle 38.52 kB / 50 kB
 
 [底部常驻栏 DOM 片段]
 ```html
-<div class="rehab-dock" id="rehabDock">
-  <button class="md-chip rehab-dock-chip"><span class="material-symbols-rounded">self_improvement</span>待拉伸 2</button>
-  <button class="md-chip rehab-dock-chip has-alert"><span class="material-symbols-rounded">week</span>本周 12/35</button>
-  <button class="md-chip rehab-dock-chip"><span class="material-symbols-rounded">auto_awesome</span>AI</button>
+<div class="plan-dock" id="rehabDock">
+  <button class="md-chip plan-dock-chip"><span class="material-symbols-rounded">self_improvement</span>待拉伸 2</button>
+  <button class="md-chip plan-dock-chip has-alert"><span class="material-symbols-rounded">week</span>本周 12/35</button>
+  <button class="md-chip plan-dock-chip"><span class="material-symbols-rounded">auto_awesome</span>AI</button>
 </div>
 ```
 
@@ -313,12 +313,143 @@ ai-bundle 38.52 kB / 50 kB
 
 [建议 commit 拆分计划]
 1. `feat(rehab): add rehab data model, builtin progression chains, and sync entities`
-   - `rehab-chains.js`, `rehab-store.js`, `rehab-progression-pure.js`, `rehab-store-pure.js`, `data.js`, `data-schema.js`, `data-store.js`, `sync.js`, `sync-pure.js`, tests
-2. `feat(rehab-ui): add today rehab card, feedback flow, cooldown prompt, and dock`
-   - `rehab-ui.js`, `rehab-feedback.js`, `rehab-cooldown.js`, `rehab-dock.js`, `workout-core.js`, `data-views.js`, `index.html`, `css-src/49-rehab.css`
-3. `feat(rehab-ai): add rehab weekly sheet, equipment prefs, and AI plan generation`
-   - `rehab-weekly.js`, `rehab-equipment.js`, `rehab-ai.js`, `routine-library.js`, `advice-panel.js`, `index.html`
+   - `plan-chains.js`, `plan-store.js`, `plan-progression-pure.js`, `plan-store-pure.js`, `data.js`, `data-schema.js`, `data-store.js`, `sync.js`, `sync-pure.js`, tests
+2. `feat(plan-ui): add today rehab card, feedback flow, cooldown prompt, and dock`
+   - `plan-ui.js`, `plan-feedback.js`, `plan-cooldown.js`, `plan-dock.js`, `workout-core.js`, `data-views.js`, `index.html`, `css-src/49-rehab.css`
+3. `feat(plan-ai): add rehab weekly sheet, equipment prefs, and AI plan generation`
+   - `plan-weekly.js`, `plan-equipment.js`, `plan-ai.js`, `routine-library.js`, `advice-panel.js`, `index.html`
 4. `feat(history): distinguish rehab records in calendar and day detail`
    - `history-view.js`
 5. `chore(pwa): register rehab assets and bump local version to v125`
    - `sw.js`, `scripts/css-sections.mjs`, `build/generated.css`, `build/icons.txt`, `build/icons.csv`, `index.html`
+
+## 拍照识别多通道与 HEIC 兜底
+
+- HEIC/HEIF 入站照片先尝试浏览器原生解码；原生失败时按需加载本地 `assets/heic2any.min.js`，转为 `image/jpeg` 后继续走既有 1024 长边压缩管线。损坏 HEIC 抛 `HEIC_DECODE_FAILED`，UI 映射为“照片解码失败，请换一张或改用 JPEG”。
+- 饮食拍照识别现在有阶段状态：选图、解码/压缩、请求中、解析中、完成、失败、超时、取消。按钮、状态行、toast、触觉同步反馈；请求阶段提供取消按钮；模块级 busy flag 防止连点并发。
+- 视觉模型门禁改为 provider 白名单 + 配置完整即可尝试；视觉能力仅作为徽章和 warning。`assets/vision-models.json` 维护精确模型、兜底关键字、高分辨率模型和图像生成黑名单；`cfg.extraVisionKeywords` 可为小众模型追加关键字。
+- 一次“当前模型可能不支持图片”类失败会写入 24h 本地失败缓存，下次按钮 title 显示 warning 但仍允许重试；成功一次会清除该模型失败标记。
+- 白名单维护：每季度刷新一次；OpenAI、Claude、Gemini 出新一代时立即追加；新图像生成模型优先加入 `exclude_image_gen`，避免误判为视觉理解模型。
+
+## Followups F1-F3
+- F1 康复模块挂载到 data 主对象: done
+- F2 AI 流式输出闪烁与跳底修复: done
+- F3 Android Chrome 凭据保存弹窗修复: done
+
+[控制台自查输出]
+```text
+renderPlanTodaySection function
+ensureTodayPlan function
+renderPlanDock function
+openPlanFeedback function
+openPlanWeeklySheet function
+renderPlanEquipmentPanel function
+
+aiApiKey text credential-masked
+aiEncryptPass text credential-masked
+aiDecryptPass text credential-masked
+s3Secret text credential-masked
+davPass text credential-masked
+```
+
+[ci 日志贴]
+```text
+npm run build:css
+Generated build\generated.css from 49 source files
+
+node scripts/bump-version.js
+Collected 122 icons → build/icons.txt, build/icons.csv
+bumped to v135 (patch)
+
+node scripts/bump-version.js --check
+version sync OK (v135)
+
+npm run lint
+eslint -c .eslintrc.cjs --quiet .
+exit 0
+
+npm run typecheck
+tsc -p tsconfig.check.json
+exit 0
+
+npm run test
+tests 79
+pass 79
+fail 0
+
+npx --yes size-limit
+first-paint-critical-js 22.86 kB / 60 kB
+generated-css 25.35 kB / 80 kB
+workout-bundle 24.64 kB / 50 kB
+ai-bundle 41.37 kB / 50 kB
+
+npm run ci
+tests 79
+pass 79
+fail 0
+first-paint-critical-js 22.94 kB / 60 kB
+generated-css 25.35 kB / 80 kB
+workout-bundle 24.64 kB / 50 kB
+ai-bundle 41.37 kB / 50 kB
+exit 0
+```
+
+备注：PowerShell 的 npm/npx wrapper 在多次命令结束后输出 `Test-Path ... npm-cli.js is denied` warning，但命令退出码均为 0。
+
+用户首次部署后的 Android Chrome 清理步骤：
+1. Android Chrome → 设置 → 密码 → 找到本站点的历史保存项 → 全部删除。
+2. 重新打开 PWA 验证不再弹出保存提示。
+
+[建议 commit 拆分]
+1. `fix(rehab): mount rehab namespaces on data`
+2. `fix(ai): stabilize streaming render and respect scroll intent`
+3. `fix(settings): avoid password-manager handling for credentials`
+4. `chore(pwa): rebuild css and bump local sw version`
+
+## Plan Module Rename + Multi Plan Today M3E（v143）
+- A1 模块与命名空间重命名: done。`plan-*` 模块、`window.dataPlan*`、`window.planWeekly/planChains/planProgression` 已替换，底部 dock 文件删除。
+- A2 db 偏好迁移: done。`prefs.rehab` 首次启动迁到 `prefs.plan`，再次启动幂等；文案改为训练阶段 / 训练装备。
+- A3 DailyPlan type 与同日多 plan: done。支持 `rehab/cut/bulk/maintenance/custom`，同日不同 type 不互相覆盖，旧 `rehab-center` 迁为 `manual + rehab`。
+- A4 进阶链池扩充: done。内置链扩到 30 条以上，并带 `applicableTypes`。
+- A5 schema / sync / test: done。`dailyPlans` 与 `progressionChains` 加入增量同步实体，测试改为 `plan-*` 并新增迁移、多 type、聚合完成率用例。
+- A6 data.js 挂载: done。`Object.assign` 与 `refreshModules` 改挂 `dataPlan*`，移除 dock 挂载。
+- B AI 入口与多类型生成: partial。AI prompt/解析/预览/落库支持 type；AI 教练 chip 有“+ 新建训练计划”。完整的逐条编辑体验沿用现有预览结构。
+- C 今日页 M3E 重构: partial。今日主卡改为双环 + 当前任务 + 多 plan mini tab + 顶部周计划/AI/待拉伸图标；动作中心抽为 `renderTodayActionDock`；时间线加入已完成 plan 任务；底部常驻栏移除。
+- C5 底部常驻栏移除: done。`plan-dock` 从 `index.html` PAGE_DEPS、`sw.js` precache、`data-views.js` 渲染链路移除。
+
+[控制台自查输出]
+```text
+rg "dataRehab|rehabDock|renderRehab|openRehab|ensureRehab" -> no matches
+rg "plan-dock|dataPlanDock|renderPlanDock" -> no matches
+node --test test/plan-store.test.mjs test/plan-progression.test.mjs -> pass 20
+```
+
+[ci 日志贴]
+```text
+npm run build:css
+Generated build\generated.css from 49 source files
+
+node scripts/bump-version.js
+Collected 127 icons -> build/icons.txt, build/icons.csv
+bumped to v143 (patch)
+
+node scripts/bump-version.js --check
+version sync OK (v143)
+
+npm run ci
+tests 83
+pass 83
+fail 0
+first-paint-critical-js 22.92 kB / 60 kB
+generated-css 27.58 kB / 80 kB
+workout-bundle 24.64 kB / 50 kB
+ai-bundle 41.38 kB / 50 kB
+exit 0
+```
+
+[建议 commit 拆分]
+1. `refactor(plan): rename rehab modules and namespaces`
+2. `feat(plan): support typed daily plans and multi-plan completion`
+3. `feat(today): rebuild today plan card with dual rings and action dock`
+4. `feat(ai): generate typed daily plans from AI`
+5. `chore(pwa): update precache, css build, tests, and local version`

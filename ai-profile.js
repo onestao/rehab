@@ -9,6 +9,7 @@ Object.assign(ai, {
             provider: document.getElementById('aiProvider')?.value || 'openai',
             baseUrl: (document.getElementById('aiBaseUrl')?.value || '').trim().replace(/\/+$/, ''),
             model: (document.getElementById('aiModel')?.value || '').trim(),
+            extraVisionKeywords: (document.getElementById('aiExtraVisionKeywords')?.value || '').trim(),
             apiKey: (document.getElementById('aiApiKey')?.value || '').trim() || this.apiKeyFor(activeId)
         };
     },
@@ -37,7 +38,8 @@ Object.assign(ai, {
             name: profile.name,
             provider: profile.provider,
             baseUrl: profile.baseUrl,
-            model: profile.model
+            model: profile.model,
+            extraVisionKeywords: profile.extraVisionKeywords
         };
         if (idx >= 0) this.cfg.profiles[idx] = meta;
         else this.cfg.profiles.push(meta);
@@ -46,6 +48,7 @@ Object.assign(ai, {
         this.cfg.provider = profile.provider;
         this.cfg.baseUrl = profile.baseUrl;
         this.cfg.model = profile.model;
+        this.cfg.extraVisionKeywords = profile.extraVisionKeywords;
         this.cfg.enabled = true;
 
         this.keyMap[profile.id] = profile.apiKey;
@@ -88,11 +91,13 @@ Object.assign(ai, {
             this.cfg.provider = profile.provider || 'openai';
             this.cfg.baseUrl = profile.baseUrl || '';
             this.cfg.model = profile.model || '';
+            this.cfg.extraVisionKeywords = profile.extraVisionKeywords || '';
             this.cfg.enabled = !!(profile.baseUrl && profile.model);
         } else {
             this.cfg.provider = 'openai';
             this.cfg.baseUrl = '';
             this.cfg.model = '';
+            this.cfg.extraVisionKeywords = '';
             this.cfg.enabled = false;
         }
     },
@@ -104,6 +109,7 @@ Object.assign(ai, {
             provider: this.cfg.provider,
             model: this.cfg.model,
             baseUrl: this.cfg.baseUrl,
+            extraVisionKeywords: this.cfg.extraVisionKeywords || '',
             enabled: this.cfg.enabled
         });
         await this.idbSet(this.KEY, payload);
@@ -133,6 +139,7 @@ Object.assign(ai, {
         const p = document.getElementById('aiProvider');
         const b = document.getElementById('aiBaseUrl');
         const m = document.getElementById('aiModel');
+        const extraVisionKeywords = document.getElementById('aiExtraVisionKeywords');
         const k = document.getElementById('aiApiKey');
         const n = document.getElementById('aiProfileName');
         const select = document.getElementById('aiProfileSelect');
@@ -140,6 +147,7 @@ Object.assign(ai, {
         if (p) p.value = this.cfg.provider || 'openai';
         if (b) b.value = this.cfg.baseUrl || '';
         if (m) m.value = this.cfg.model || '';
+        if (extraVisionKeywords) extraVisionKeywords.value = this.cfg.extraVisionKeywords || current?.extraVisionKeywords || '';
         if (k) k.value = this.apiKeyFor(this.cfg.activeProfileId) || '';
         if (n) n.value = current?.name || '';
         if (select) {
@@ -227,7 +235,7 @@ Object.assign(ai, {
         try {
             const plaintext = await this.decryptData(encrypted, password);
             const cfg = JSON.parse(plaintext);
-            this.cfg.profiles = (cfg.profiles || []).map(p => ({ id: p.id, name: p.name, provider: p.provider, baseUrl: p.baseUrl, model: p.model }));
+            this.cfg.profiles = (cfg.profiles || []).map(p => ({ id: p.id, name: p.name, provider: p.provider, baseUrl: p.baseUrl, model: p.model, extraVisionKeywords: p.extraVisionKeywords || '' }));
             this.cfg.activeProfileId = cfg.activeProfileId || this.cfg.profiles[0]?.id || '';
             this.keyMap = {};
             (cfg.profiles || []).forEach(p => { if (p.apiKey) this.keyMap[p.id] = p.apiKey; });

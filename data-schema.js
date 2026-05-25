@@ -45,6 +45,14 @@
             this.db.aiRetryMode = this.db.aiRetryMode || 'versioned';
             this.db.prefs = this.db.prefs && typeof this.db.prefs === 'object' ? this.db.prefs : {};
             if (typeof this.db.prefs.haptics !== 'boolean') this.db.prefs.haptics = true;
+            if (!this.db.prefs.plan && this.db.prefs.rehab) {
+                this.db.prefs.plan = this.db.prefs.rehab;
+                delete this.db.prefs.rehab;
+            } else if (this.db.prefs.rehab) {
+                delete this.db.prefs.rehab;
+            }
+            this.db.dailyPlans = Array.isArray(this.db.dailyPlans) ? this.db.dailyPlans.map(plan => this.ensureDailyPlanShape ? this.ensureDailyPlanShape(plan) : this.ensureRecordMeta(plan, 'daily-plan', nowTs)) : [];
+            this.db.progressionChains = Array.isArray(this.db.progressionChains) ? this.db.progressionChains.map(chain => this.ensureRecordMeta(chain, 'plan-chain', nowTs)) : [];
             this.db.weeklyPlan = this.db.weeklyPlan && typeof this.db.weeklyPlan === 'object' ? this.db.weeklyPlan : {};
             this.db.aiCipher = this.db.aiCipher && typeof this.db.aiCipher === 'object' ? this.db.aiCipher : null;
             if (!this.db.aiCipher && this.db.encryptedAi && typeof this.db.encryptedAi === 'object') {

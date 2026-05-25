@@ -1,7 +1,7 @@
 // @ts-nocheck
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { evaluateProgression } from '../rehab-progression-pure.js';
+import { evaluateProgression } from '../plan-progression-pure.js';
 
 const chain = {
     levels: [

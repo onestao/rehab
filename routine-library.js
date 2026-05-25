@@ -523,7 +523,7 @@
                         <b>${weekDone}/${weekGoal} 次</b>
                         <div class="identity-training-split">
                             <span>有氧 <strong>${cardioSessions}</strong></span>
-                            <span>无氧/康复 <strong>${strengthSessions}</strong></span>
+                            <span>无氧/计划 <strong>${strengthSessions}</strong></span>
                         </div>
                         <div class="identity-bar" role="progressbar"
                              aria-valuenow="${trainPct}" aria-valuemin="0" aria-valuemax="100">
@@ -588,7 +588,7 @@
             content.classList.toggle('profile-view-forward', direction === 'next');
             content.classList.toggle('profile-view-back', direction === 'prev');
             if (view === 'library') {
-                content.innerHTML = tabBar + (this.renderRehabEquipmentCard?.() || '') + this.renderLibrarySegment() + this.renderLibraryDeck();
+                content.innerHTML = tabBar + (this.renderPlanEquipmentCard?.() || '') + this.renderLibrarySegment() + this.renderLibraryDeck();
                 requestAnimationFrame(() => {
                     this.syncLibraryDeckPosition?.(false);
                     this.updateLibraryTabActive?.();

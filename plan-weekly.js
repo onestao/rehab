@@ -1,6 +1,6 @@
 // @ts-nocheck
 (function () {
-    if (window.rehabWeekly) return;
+    if (window.planWeekly) return;
 
     function dayStart(date = new Date()) {
         const copy = new Date(date);
@@ -16,7 +16,14 @@
         return copy;
     }
 
-    window.rehabWeekly = {
+    function statusMeta(item = {}) {
+        if (item.status === 'done') return { label: '已完成', icon: 'check_circle', className: 'is-done' };
+        if (item.status === 'skipped') return { label: '已跳过', icon: 'remove_circle', className: 'is-skipped' };
+        if (item.status === 'in-progress') return { label: '进行中', icon: 'play_circle', className: 'is-current' };
+        return { label: '待执行', icon: 'radio_button_unchecked', className: 'is-todo' };
+    }
+
+    window.planWeekly = {
         selectedDate: '',
 
         range() {
@@ -24,9 +31,9 @@
             return Array.from({ length: 7 }, (_, index) => {
                 const date = addDays(start, index);
                 const key = data.dateKey(date);
-                const plan = data.getDailyPlan?.(key);
-                const rate = data.completionRate?.(plan) || { done: 0, total: 0, rate: 0 };
-                return { date, key, plan, rate };
+                const plans = data.getDailyPlans?.(key) || [];
+                const rate = data.aggregateCompletionRate?.(plans) || { done: 0, total: 0, rate: 0 };
+                return { date, key, plans, plan: plans[0] || null, rate };
             });
         },
 
@@ -39,8 +46,8 @@
         },
 
         open() {
-            const sheet = document.getElementById('rehabWeeklySheet');
-            const body = document.getElementById('rehabWeeklySheetBody');
+            const sheet = document.getElementById('planWeeklySheet');
+            const body = document.getElementById('planWeeklySheetBody');
             if (!sheet || !body) return;
             this.selectedDate = this.selectedDate || data.logicalDateKey?.() || data.dateKey(new Date());
             body.innerHTML = this.render();
@@ -49,13 +56,13 @@
             sheet.setAttribute('aria-hidden', 'false');
             window.navStack?.push?.({
                 type: 'modal',
-                id: 'rehabWeeklySheet',
+                id: 'planWeeklySheet',
                 close: () => this.close()
             });
         },
 
         close() {
-            const sheet = document.getElementById('rehabWeeklySheet');
+            const sheet = document.getElementById('planWeeklySheet');
             sheet?.classList.add('hidden');
             sheet?.setAttribute('aria-hidden', 'true');
             return true;
@@ -63,7 +70,7 @@
 
         select(dateKey) {
             this.selectedDate = dateKey;
-            const body = document.getElementById('rehabWeeklySheetBody');
+            const body = document.getElementById('planWeeklySheetBody');
             if (body) {
                 body.innerHTML = this.render();
                 this.bindDrag(body);
@@ -71,8 +78,8 @@
         },
 
         bindDrag(root) {
-            if (!root || root.dataset.rehabWeeklyDragBound === '1') return;
-            root.dataset.rehabWeeklyDragBound = '1';
+            if (!root || root.dataset.planWeeklyDragBound === '1') return;
+            root.dataset.planWeeklyDragBound = '1';
             let timer = 0;
             let drag = null;
             const clearTimer = () => {
@@ -81,7 +88,7 @@
             };
             const reset = () => {
                 clearTimer();
-                document.querySelectorAll('.rehab-weekly-day.is-drop-target').forEach((el) => el.classList.remove('is-drop-target'));
+                document.querySelectorAll('.plan-weekly-day.is-drop-target').forEach((el) => el.classList.remove('is-drop-target'));
                 if (drag?.row) drag.row.classList.remove('is-dragging');
                 if (drag?.ghost) drag.ghost.remove();
                 drag = null;
@@ -97,7 +104,7 @@
                     ghost: row.cloneNode(true)
                 };
                 row.classList.add('is-dragging');
-                drag.ghost.className = 'rehab-weekly-drag-ghost';
+                drag.ghost.className = 'plan-weekly-drag-ghost';
                 drag.ghost.style.left = `${point.clientX}px`;
                 drag.ghost.style.top = `${point.clientY}px`;
                 document.body.appendChild(drag.ghost);
@@ -110,16 +117,16 @@
                     drag.ghost.style.left = `${point.clientX}px`;
                     drag.ghost.style.top = `${point.clientY}px`;
                 }
-                document.querySelectorAll('.rehab-weekly-day.is-drop-target').forEach((el) => el.classList.remove('is-drop-target'));
-                const target = document.elementFromPoint(point.clientX, point.clientY)?.closest?.('[data-rehab-weekly-date]');
+                document.querySelectorAll('.plan-weekly-day.is-drop-target').forEach((el) => el.classList.remove('is-drop-target'));
+                const target = document.elementFromPoint(point.clientX, point.clientY)?.closest?.('[data-plan-weekly-date]');
                 target?.classList.add('is-drop-target');
                 event.preventDefault?.();
             };
             const finishDrag = (event) => {
                 if (!drag) return reset();
                 const point = event.changedTouches?.[0] || event;
-                const target = document.elementFromPoint(point.clientX, point.clientY)?.closest?.('[data-rehab-weekly-date]');
-                const targetDate = target?.getAttribute('data-rehab-weekly-date') || '';
+                const target = document.elementFromPoint(point.clientX, point.clientY)?.closest?.('[data-plan-weekly-date]');
+                const targetDate = target?.getAttribute('data-plan-weekly-date') || '';
                 const shouldMove = targetDate && targetDate !== drag.startDate;
                 const planId = drag.planId;
                 const taskId = drag.taskId;
@@ -127,7 +134,7 @@
                 if (shouldMove) {
                     data.moveTask?.(planId, taskId, targetDate);
                     this.selectedDate = targetDate;
-                    const body = document.getElementById('rehabWeeklySheetBody');
+                    const body = document.getElementById('planWeeklySheetBody');
                     if (body) {
                         body.innerHTML = this.render();
                         this.bindDrag(body);
@@ -138,7 +145,7 @@
                 }
             };
             root.addEventListener('pointerdown', (event) => {
-                const row = event.target?.closest?.('.rehab-weekly-task');
+                const row = event.target?.closest?.('.plan-weekly-task');
                 if (!row || event.target?.closest?.('button.md-icon-btn')) return;
                 clearTimer();
                 timer = setTimeout(() => startDrag(row, event), 450);
@@ -154,37 +161,44 @@
         render() {
             const list = this.range();
             const selected = this.selectedDate || list[0]?.key || '';
-            return `<div class="rehab-weekly-sheet">
-                <div class="rehab-weekly-list">
-                    ${list.map((item) => `
-                        <button class="rehab-weekly-day ${selected === item.key ? 'active' : ''}" type="button" onclick="rehabWeekly.select('${item.key}')" data-rehab-weekly-date="${item.key}">
+            return `<div class="plan-weekly-sheet">
+                <div class="plan-weekly-list">
+                    ${list.map((item) => {
+                        const percent = Math.round((item.rate.rate || 0) * 100);
+                        return `
+                        <button class="plan-weekly-day ${selected === item.key ? 'active' : ''} ${item.rate.missed ? 'has-alert' : ''}" type="button" onclick="planWeekly.select('${item.key}')" data-plan-weekly-date="${item.key}">
                             <div>
                                 <strong>${item.date.toLocaleDateString('zh-CN', { weekday: 'long', month: 'numeric', day: 'numeric' })}</strong>
                                 <small>${item.rate.done}/${item.rate.total || 0} 完成</small>
                             </div>
+                            <span class="plan-weekly-day-progress"><i style="width:${percent}%"></i></span>
                             <span class="material-symbols-rounded">${item.rate.total && item.rate.done < item.rate.total ? 'warning' : 'check_circle'}</span>
                         </button>
-                    `).join('')}
+                    `; }).join('')}
                 </div>
-                <div class="rehab-weekly-detail">
+                <div class="plan-weekly-detail">
                     ${(() => {
                         const entry = list.find((item) => item.key === selected) || list[0];
-                        const plan = entry?.plan;
-                        if (!plan) return '<div class="empty-state"><span class="material-symbols-rounded">event_note</span><p>当天还没有康复计划</p></div>';
-                        return (plan.items || []).filter((item) => !item.deleted).map((item) => `
-                            <div class="rehab-weekly-task" data-plan-id="${plan.id}" data-task-id="${item.id}" data-date="${plan.date}">
-                                <button class="rehab-weekly-task-main" type="button" onclick="data.handleRehabTaskTap('${plan.id}','${item.id}')">
+                        const plans = entry?.plans || [];
+                        if (!plans.length) return '<div class="empty-state"><span class="material-symbols-rounded">event_note</span><p>当天还没有训练计划</p></div>';
+                        return plans.flatMap((plan) => (plan.items || []).filter((item) => !item.deleted).map((item) => `
+                            ${(() => {
+                                const meta = statusMeta(item);
+                                return `<div class="plan-weekly-task ${meta.className}" data-plan-id="${plan.id}" data-task-id="${item.id}" data-date="${plan.date}">
+                                <button class="plan-weekly-task-main" type="button" onclick="data.handlePlanTaskTap('${plan.id}','${item.id}')">
+                                    <span class="material-symbols-rounded">${meta.icon}</span>
                                     <strong>${data.escapeHtml(item.name || '未命名任务')}</strong>
-                                    <small>${item.status === 'done' ? '已完成' : item.status === 'skipped' ? '已跳过' : '待执行'}</small>
+                                    <small>${meta.label}</small>
                                 </button>
-                                <button class="md-icon-btn" type="button" onclick="data.openRehabTaskMenu('${plan.id}','${item.id}')"><span class="material-symbols-rounded">more_vert</span></button>
-                            </div>
-                        `).join('');
+                                <button class="md-icon-btn" type="button" onclick="data.openPlanTaskMenu('${plan.id}','${item.id}')"><span class="material-symbols-rounded">more_vert</span></button>
+                            </div>`;
+                            })()}
+                        `)).join('');
                     })()}
                 </div>
                 <div class="md-row modal-actions">
-                    <button class="md-btn" type="button" data-modal-close onclick="rehabWeekly.close()">关闭</button>
-                    <button class="md-btn md-btn-tonal" type="button" onclick="data.openRehabAiSheet('week')">+ AI 重排剩余天</button>
+                    <button class="md-btn" type="button" data-modal-close onclick="planWeekly.close()">关闭</button>
+                    <button class="md-btn md-btn-tonal" type="button" onclick="data.openPlanAiSheet('week')">+ AI 重排剩余天</button>
                 </div>
             </div>`;
         }

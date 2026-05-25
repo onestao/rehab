@@ -5,6 +5,7 @@ cloud_off
 cloud_sync
 close_fullscreen
 play_arrow
+play_circle
 pause
 stop
 skip_next
@@ -13,10 +14,12 @@ picture_in_picture_alt
 restart_alt
 replay
 refresh
+progress_activity
 close
 add
 add_circle
 remove
+remove_circle
 delete
 edit
 save
@@ -24,6 +27,7 @@ bookmark_add
 bookmark_border
 check
 check_circle
+radio_button_unchecked
 warning
 error
 info
@@ -72,6 +76,8 @@ monitor_weight
 fitness_center
 exercise
 accessibility_new
+vibration
+linear_scale
 directions_run
 directions_walk
 directions_bike

@@ -1,16 +1,31 @@
 // @ts-nocheck
 (function () {
-    if (window.dataRehabStore) return;
+    if (window.dataPlanStore) return;
 
     const PREF_DEFAULTS = {
         stage: 'unset',
+        customStageLabel: '',
         equipment: [],
+        customEquipment: [],
         cooldownMode: 'attached',
         askOnEdit: 'always',
         askBeforeProgression: true,
         showCooldownDock: true,
         showWeeklyDock: true
     };
+    const PLAN_TYPES = ['rehab', 'cut', 'bulk', 'maintenance', 'custom'];
+
+    function planTypeMeta(type = 'rehab', title = '') {
+        const key = PLAN_TYPES.includes(type) ? type : 'rehab';
+        const map = {
+            rehab: { label: '康复计划', taskLabel: '康复任务', cooldownLabel: '放松', icon: 'self_improvement', className: 'is-rehab' },
+            cut: { label: '减脂日程', taskLabel: '减脂任务', cooldownLabel: '拉伸', icon: 'local_fire_department', className: 'is-cut' },
+            bulk: { label: '增肌日程', taskLabel: '增肌任务', cooldownLabel: '整理组', icon: 'fitness_center', className: 'is-bulk' },
+            maintenance: { label: '综合训练', taskLabel: '训练任务', cooldownLabel: '放松', icon: 'health_and_safety', className: 'is-maintenance' },
+            custom: { label: title || '自定义计划', taskLabel: '任务', cooldownLabel: '放松', icon: 'event_note', className: 'is-custom' }
+        };
+        return map[key];
+    }
 
     function clone(value) {
         return JSON.parse(JSON.stringify(value));
@@ -24,49 +39,90 @@
         return [...new Set((Array.isArray(values) ? values : []).map((value) => String(value || '').trim()).filter(Boolean))];
     }
 
+    function normalizeCustomEquipment(values = []) {
+        return (Array.isArray(values) ? values : [])
+            .map((item) => {
+                if (typeof item === 'string') {
+                    const label = item.trim();
+                    return label ? { id: `custom_${label}`, label, icon: 'inventory_2' } : null;
+                }
+                if (!item || typeof item !== 'object') return null;
+                const label = String(item.label || item.name || '').trim();
+                if (!label) return null;
+                const id = String(item.id || `custom_${label}`).trim();
+                return {
+                    id,
+                    label,
+                    icon: String(item.icon || 'inventory_2').trim() || 'inventory_2'
+                };
+            })
+            .filter(Boolean)
+            .filter((item, index, list) => list.findIndex((candidate) => candidate.id === item.id) === index);
+    }
+
     function todayKey(date = new Date()) {
         return window.data?.dateKey ? data.dateKey(date) : new Date(date).toISOString().slice(0, 10);
     }
 
     function normalizePrefs(raw = {}) {
+        const stage = ['unset', 'post_op', 'post_op_4w', 'post_op_8w', 'cutting', 'bulking', 'maintenance', 'chronic', 'custom'].includes(raw?.stage)
+            ? raw.stage
+            : 'unset';
         return {
             ...PREF_DEFAULTS,
             ...(raw && typeof raw === 'object' ? raw : {}),
-            equipment: uniq(raw?.equipment)
+            stage,
+            customStageLabel: String(raw?.customStageLabel || ''),
+            equipment: uniq(raw?.equipment),
+            customEquipment: normalizeCustomEquipment(raw?.customEquipment)
         };
     }
 
     const api = {
-        rehabTodayExpanded: false,
+        planTodayExpanded: false,
         activeRun: null,
         lastProgressionSuggestion: null,
+        selectedPlanId: '',
+        planTypeMeta,
 
-        ensureRehabPrefs() {
+        ensurePlanPrefs() {
             this.db.prefs = this.db.prefs && typeof this.db.prefs === 'object' ? this.db.prefs : {};
-            this.db.prefs.rehab = normalizePrefs(this.db.prefs.rehab);
-            return this.db.prefs.rehab;
+            if (!this.db.prefs.plan && this.db.prefs.rehab) {
+                this.db.prefs.plan = normalizePrefs(this.db.prefs.rehab);
+                delete this.db.prefs.rehab;
+            } else {
+                this.db.prefs.plan = normalizePrefs(this.db.prefs.plan);
+                delete this.db.prefs.rehab;
+            }
+            return this.db.prefs.plan;
         },
 
-        ensureRehabBootstrap() {
-            this.ensureRehabPrefs();
+        ensurePlanBootstrap() {
+            this.ensurePlanPrefs();
             this.db.dailyPlans = Array.isArray(this.db.dailyPlans) ? this.db.dailyPlans : [];
             this.db.progressionChains = Array.isArray(this.db.progressionChains) ? this.db.progressionChains : [];
-            if (!this.db.progressionChains.length && window.rehabChains?.builtin?.length) {
-                this.db.progressionChains = window.rehabChains.builtin.map((chain) => ({
+            if (!this.db.progressionChains.length && window.planChains?.builtin?.length) {
+                this.db.progressionChains = window.planChains.builtin.map((chain) => ({
                     ...clone(chain),
                     updatedAt: Date.now(),
                     deleted: false
                 }));
             }
+            this.db.dailyPlans = this.db.dailyPlans.map((plan) => this.ensureDailyPlanShape(plan, { save: false }));
         },
 
         ensureDailyPlanShape(plan = {}, options = {}) {
             const nowTs = Number(options.nowTs || Date.now());
-            const items = (Array.isArray(plan.items) ? plan.items : []).map((item) => this.ensureTaskShape(item, { nowTs }));
+            const legacySource = plan.source === 'rehab-center';
+            const type = PLAN_TYPES.includes(plan.type) ? plan.type : 'rehab';
+            const title = String(plan.title || planTypeMeta(type).label);
+            const items = (Array.isArray(plan.items) ? plan.items : []).map((item) => this.ensureTaskShape({ ...item, planType: item.planType || type }, { nowTs, planType: type }));
             const next = {
-                id: plan.id || this.generateRecordId('rehab-plan'),
+                id: plan.id || this.generateRecordId('daily-plan'),
                 date: String(plan.date || todayKey()),
-                source: ['ai', 'manual', 'rehab-center'].includes(plan.source) ? plan.source : 'manual',
+                type,
+                title,
+                source: legacySource ? 'manual' : (['ai', 'manual', 'imported'].includes(plan.source) ? plan.source : 'manual'),
                 notes: String(plan.notes || ''),
                 items,
                 pendingCooldowns: uniq(plan.pendingCooldowns).filter((id) => items.some((item) => item.id === id)),
@@ -75,7 +131,7 @@
                 deleted: !!plan.deleted,
                 __fieldUpdatedAt: plan.__fieldUpdatedAt && typeof plan.__fieldUpdatedAt === 'object' ? plan.__fieldUpdatedAt : {}
             };
-            this.ensureRecordMeta(next, 'rehab-plan', nowTs);
+            this.ensureRecordMeta(next, 'daily-plan', nowTs);
             return next;
         },
 
@@ -83,8 +139,9 @@
             const nowTs = Number(options.nowTs || Date.now());
             const spec = item?.spec && typeof item.spec === 'object' ? item.spec : {};
             const next = {
-                id: item.id || this.generateRecordId('rehab-task'),
+                id: item.id || this.generateRecordId('daily-task'),
                 name: String(item.name || '未命名任务'),
+                planType: PLAN_TYPES.includes(item.planType) ? item.planType : (PLAN_TYPES.includes(options.planType) ? options.planType : 'rehab'),
                 category: item.category === 'cooldown' ? 'cooldown' : 'main',
                 spec: {
                     sets: Math.max(1, Number(spec.sets || 1)),
@@ -115,12 +172,12 @@
                 deleted: !!item.deleted,
                 __fieldUpdatedAt: item.__fieldUpdatedAt && typeof item.__fieldUpdatedAt === 'object' ? item.__fieldUpdatedAt : {}
             };
-            this.ensureRecordMeta(next, 'rehab-task', nowTs);
+            this.ensureRecordMeta(next, 'daily-task', nowTs);
             return next;
         },
 
         createDailyPlan(input = {}, options = {}) {
-            this.ensureRehabBootstrap();
+            this.ensurePlanBootstrap();
             const plan = this.ensureDailyPlanShape({
                 source: 'manual',
                 date: todayKey(),
@@ -129,32 +186,41 @@
                 pendingCooldowns: [],
                 ...clone(input)
             });
-            const existingIndex = this.db.dailyPlans.findIndex((item) => item.id === plan.id || (!item.deleted && item.date === plan.date));
+            const existingIndex = this.db.dailyPlans.findIndex((item) => item.id === plan.id || (!item.deleted && item.date === plan.date && (item.type || 'rehab') === plan.type));
             if (existingIndex >= 0) this.db.dailyPlans[existingIndex] = plan;
             else this.db.dailyPlans.unshift(plan);
-            this.touchRecord(plan, ['date', 'items', 'notes', 'source', 'pendingCooldowns']);
+            this.touchRecord(plan, ['date', 'type', 'title', 'items', 'notes', 'source', 'pendingCooldowns']);
             if (options.save !== false) this.save({ render: options.render !== false });
             return plan;
         },
 
         saveDailyPlan(plan = {}, options = {}) {
-            this.ensureRehabBootstrap();
+            this.ensurePlanBootstrap();
             const next = this.ensureDailyPlanShape(plan);
-            const index = this.db.dailyPlans.findIndex((item) => item.id === next.id || (!item.deleted && item.date === next.date));
+            const index = this.db.dailyPlans.findIndex((item) => item.id === next.id || (!item.deleted && item.date === next.date && (item.type || 'rehab') === next.type));
             if (index >= 0) this.db.dailyPlans[index] = next;
             else this.db.dailyPlans.unshift(next);
-            this.touchRecord(next, ['date', 'items', 'notes', 'source', 'pendingCooldowns']);
+            this.touchRecord(next, ['date', 'type', 'title', 'items', 'notes', 'source', 'pendingCooldowns']);
             if (options.save !== false) this.save();
             return next;
         },
 
         getDailyPlan(date = todayKey()) {
-            this.ensureRehabBootstrap();
+            this.ensurePlanBootstrap();
             return this.activeRecords(this.db.dailyPlans).find((plan) => plan.date === date) || null;
         },
 
+        getDailyPlans(date = todayKey()) {
+            this.ensurePlanBootstrap();
+            return this.activeRecords(this.db.dailyPlans).filter((plan) => plan.date === date);
+        },
+
         getTodayDailyPlan() {
-            return this.getDailyPlan(todayKey());
+            return this.getTodayDailyPlans?.()[0] || null;
+        },
+
+        getTodayDailyPlans(date = todayKey()) {
+            return this.getDailyPlans(date);
         },
 
         ensureTodayPlan() {
@@ -163,6 +229,8 @@
                 plan = this.createDailyPlan({
                     date: todayKey(),
                     source: 'manual',
+                    type: 'rehab',
+                    title: '康复计划',
                     items: this.seedTasksFromPrefs()
                 }, { render: false });
             }
@@ -170,9 +238,9 @@
         },
 
         seedTasksFromPrefs() {
-            const prefs = this.ensureRehabPrefs();
+            const prefs = this.ensurePlanPrefs();
             const equipment = new Set(prefs.equipment || []);
-            const chains = this.activeRecords(this.db.progressionChains || []).slice(0, 4);
+            const chains = this.activeRecords(this.db.progressionChains || []).filter((chain) => !chain.applicableTypes?.length || chain.applicableTypes.includes('rehab')).slice(0, 4);
             return chains.map((chain) => {
                 const levels = Array.isArray(chain.levels) ? chain.levels : [];
                 const level = levels.find((item) => (item.requiredEquipment || []).every((name) => equipment.has(name))) || levels[0];
@@ -245,6 +313,14 @@
             return { done, total: items.length, rate: done / items.length };
         },
 
+        aggregateCompletionRate(plans = this.getTodayDailyPlans?.() || []) {
+            const list = Array.isArray(plans) ? plans : [];
+            const rates = list.map((plan) => this.completionRate(plan));
+            const done = rates.reduce((sum, item) => sum + Number(item.done || 0), 0);
+            const total = rates.reduce((sum, item) => sum + Number(item.total || 0), 0);
+            return { done, total, rate: total ? done / total : 0 };
+        },
+
         pendingCooldownCount(plan = this.getTodayDailyPlan()) {
             return Array.isArray(plan?.pendingCooldowns) ? plan.pendingCooldowns.length : 0;
         },
@@ -259,9 +335,9 @@
         maybeApplyProgression(planId, taskId) {
             const { plan, task } = this.findTask(planId, taskId);
             if (!plan || !task || !task.chainId) return null;
-            const chain = this.activeRecords(this.db.progressionChains || []).find((item) => item.id === task.chainId) || window.rehabChains?.find?.(task.chainId);
+            const chain = this.activeRecords(this.db.progressionChains || []).find((item) => item.id === task.chainId) || window.planChains?.find?.(task.chainId);
             if (!chain) return null;
-            const result = window.rehabProgression?.evaluate?.({
+            const result = window.planProgression?.evaluate?.({
                 taskItem: task,
                 chain,
                 history: this.buildFeedbackHistory(task.chainId),
@@ -283,7 +359,7 @@
                 this.save();
                 window.toast?.show?.(result.reason, 'success');
             };
-            if (this.ensureRehabPrefs().askBeforeProgression) {
+            if (this.ensurePlanPrefs().askBeforeProgression) {
                 this._confirmModal?.({
                     title: '进阶建议',
                     icon: result.suggestion === 'upgrade' ? 'trending_up' : 'trending_down',
@@ -319,8 +395,8 @@
             if (!plan || !task || !targetDate) return false;
             plan.items = (plan.items || []).filter((item) => item.id !== taskId);
             this.touchRecord(plan, ['items']);
-            let target = this.getDailyPlan(targetDate);
-            if (!target) target = this.createDailyPlan({ date: targetDate, source: 'manual', items: [] });
+            let target = this.getDailyPlans(targetDate).find((item) => (item.type || 'rehab') === (plan.type || 'rehab'));
+            if (!target) target = this.createDailyPlan({ date: targetDate, type: plan.type || 'rehab', title: plan.title || planTypeMeta(plan.type).label, source: 'manual', items: [] });
             target.items.push(this.ensureTaskShape({ ...clone(task), status: 'todo', doneSets: 0, feedback: null }));
             this.touchRecord(target, ['items']);
             this.save();
@@ -341,5 +417,5 @@
         esc
     };
 
-    window.dataRehabStore = api;
+    window.dataPlanStore = api;
 })();

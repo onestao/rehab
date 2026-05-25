@@ -57,6 +57,7 @@ keyboard_arrow_right
 keyboard_arrow_up
 library_books
 light_mode
+linear_scale
 local_fire_department
 lock
 lock_open
@@ -75,12 +76,16 @@ pedal_bike
 person
 picture_in_picture_alt
 play_arrow
+play_circle
 playlist_add
 pool
+progress_activity
 psychology
+radio_button_unchecked
 record_voice_over
 refresh
 remove
+remove_circle
 replay
 restart_alt
 restaurant
@@ -112,6 +117,7 @@ trending_up
 tune
 upload
 upload_file
+vibration
 visibility
 visibility_off
 volume_off

@@ -23,6 +23,7 @@
 }
 .ai-model-item:active { background: var(--md-sys-surface-container); }
 .ai-model-item.has-vision { border-left: 3px solid var(--md-sys-primary); }
+.ai-model-item.is-imagegen { border-left: 3px solid var(--md-sys-tertiary); }
 .ai-model-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ai-vision-badge {
     display: inline-flex; align-items: center; gap: 3px; font-size: 10px; font-weight: 700;
@@ -30,6 +31,18 @@
     background: var(--md-sys-primary-container); color: var(--md-sys-on-primary-container); white-space: nowrap;
 }
 .ai-vision-badge .material-symbols-rounded { font-size: 12px; }
+.ai-vision-badge-highres {
+    background: var(--md-sys-secondary-container);
+    color: var(--md-sys-on-secondary-container);
+}
+.ai-vision-badge-imagegen {
+    background: var(--md-sys-tertiary-container);
+    color: var(--md-sys-on-tertiary-container);
+}
+.ai-vision-badge-unverified {
+    background: var(--md-sys-surface-container-high);
+    color: var(--md-sys-on-surface-variant);
+}
 .ai-model-empty { text-align: center; padding: 12px; color: var(--md-sys-on-surface-variant); font-size: 13px; }
 .ai-profile-actions {
     align-items: center;
@@ -485,12 +498,16 @@
 }
 
 .md-field-has-action input {
-    padding-right: 48px;
+    padding-right: 52px;
+}
+
+.md-field-has-action input:focus {
+    padding-right: 51px;
 }
 
 .password-visibility-toggle {
     position: absolute;
-    right: 6px;
+    right: 4px;
     top: 50%;
     transform: translateY(-50%);
     width: 40px;
@@ -505,24 +522,57 @@
     justify-content: center;
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;
+    overflow: hidden;
     transition:
         background var(--md-sys-motion-duration-short) var(--md-sys-motion-emphasized),
         color var(--md-sys-motion-duration-short) var(--md-sys-motion-emphasized),
         transform var(--md-sys-motion-duration-short) var(--md-expressive-spring);
 }
 
+.password-visibility-toggle::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: currentColor;
+    opacity: 0;
+    transition: opacity var(--md-sys-motion-duration-short) var(--md-sys-motion-emphasized);
+}
+
 .password-visibility-toggle:hover,
 .password-visibility-toggle:focus-visible {
-    background: color-mix(in srgb, var(--md-sys-on-surface) 8%, transparent);
-    color: var(--md-sys-on-surface);
+    color: var(--md-sys-primary);
+}
+
+.password-visibility-toggle:hover::after,
+.password-visibility-toggle:focus-visible::after {
+    opacity: var(--md-state-hover);
 }
 
 .password-visibility-toggle:active {
     transform: translateY(-50%) scale(.94);
-    background: color-mix(in srgb, var(--md-sys-on-surface) 12%, transparent);
+}
+
+.password-visibility-toggle:active::after {
+    opacity: var(--md-state-press);
+}
+
+.md-field-has-action:focus-within .password-visibility-toggle {
+    color: var(--md-sys-primary);
 }
 
 .password-visibility-toggle .material-symbols-rounded {
+    position: relative;
+    z-index: 1;
     font-size: 22px;
     line-height: 1;
+}
+
+/* 凭据字段：避开 type=password 触发的密码管理器，靠 CSS 实现密文外观 */
+.credential-masked {
+    -webkit-text-security: disc;
+    text-security: disc;
+    letter-spacing: var(--md-sys-typescale-body-large-letter-spacing, 0);
+    font-family: inherit;
+    caret-color: var(--md-sys-primary);
 }

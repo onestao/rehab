@@ -27,31 +27,167 @@ Object.assign(ai, {
         });
     },
 
+    _visionDebugEnabled() {
+        return !!window.data?._dietPhotoDebug;
+    },
+
+    _debugDietPhoto(payload = {}) {
+        if (!this._visionDebugEnabled()) return;
+        try { console.debug('[diet-photo]', payload); } catch {}
+    },
+
+    _isHeicFile(file) {
+        const type = String(file?.type || '').toLowerCase();
+        const name = String(file?.name || '').toLowerCase();
+        return type.includes('heic') || type.includes('heif') || /\.(heic|heif)$/i.test(name);
+    },
+
+    _isAvifFile(file) {
+        const type = String(file?.type || '').toLowerCase();
+        const name = String(file?.name || '').toLowerCase();
+        return type.includes('avif') || /\.avif$/i.test(name);
+    },
+
+    _withJpegName(file) {
+        const name = String(file?.name || 'diet-photo.heic').replace(/\.(heic|heif)$/i, '') || 'diet-photo';
+        return `${name}.jpg`;
+    },
+
+    _makeAiError(message, props = {}) {
+        const err = new Error(message);
+        Object.assign(err, props);
+        return err;
+    },
+
+    _makeHttpAiError(status, body = '') {
+        return this._makeAiError(`AI 请求失败: ${status} ${String(body).slice(0, 120)}`, {
+            status,
+            body: String(body || '')
+        });
+    },
+
+    _makeTimeoutSignal(externalSignal, timeoutMs = 30000) {
+        const controller = new AbortController();
+        let timedOut = false;
+        const abortFromExternal = () => {
+            try { controller.abort(externalSignal?.reason); } catch {}
+        };
+        if (externalSignal?.aborted) abortFromExternal();
+        else externalSignal?.addEventListener?.('abort', abortFromExternal, { once: true });
+        const timer = setTimeout(() => {
+            timedOut = true;
+            try { controller.abort(); } catch {}
+        }, Math.max(1000, Number(timeoutMs) || 30000));
+        return {
+            signal: controller.signal,
+            wasTimeout: () => timedOut,
+            cleanup: () => {
+                clearTimeout(timer);
+                externalSignal?.removeEventListener?.('abort', abortFromExternal);
+            }
+        };
+    },
+
+    async _loadImageBitmapLike(file) {
+        if (typeof createImageBitmap === 'function') {
+            return await createImageBitmap(file);
+        }
+        const url = URL.createObjectURL(file);
+        try {
+            const img = new Image();
+            img.decoding = 'async';
+            img.src = url;
+            await img.decode();
+            return img;
+        } finally {
+            URL.revokeObjectURL(url);
+        }
+    },
+
+    async _canDecodeImage(file) {
+        let bitmap;
+        try {
+            bitmap = await this._loadImageBitmapLike(file);
+            return true;
+        } catch {
+            return false;
+        } finally {
+            try { bitmap?.close?.(); } catch {}
+        }
+    },
+
+    async _ensureHeicDecoder() {
+        if (typeof window.heic2any === 'function') return window.heic2any;
+        await new Promise((resolve, reject) => {
+            const existing = document.querySelector('script[data-heic2any]');
+            if (existing) {
+                existing.addEventListener('load', resolve, { once: true });
+                existing.addEventListener('error', reject, { once: true });
+                return;
+            }
+            const script = document.createElement('script');
+            script.src = 'assets/heic2any.min.js';
+            script.async = true;
+            script.dataset.heic2any = 'true';
+            script.onload = resolve;
+            script.onerror = () => reject(this._makeAiError('HEIC_DECODE_FAILED', { code: 'HEIC_DECODE_FAILED' }));
+            document.head.appendChild(script);
+        });
+        if (typeof window.heic2any !== 'function') throw this._makeAiError('HEIC_DECODE_FAILED', { code: 'HEIC_DECODE_FAILED' });
+        return window.heic2any;
+    },
+
+    async _transcodeHeicToJpeg(file) {
+        const started = performance.now?.() || Date.now();
+        try {
+            const heic2any = await this._ensureHeicDecoder();
+            const converted = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.9 });
+            const blob = Array.isArray(converted) ? converted[0] : converted;
+            if (!blob) throw new Error('empty converted image');
+            const jpeg = new File([blob], this._withJpegName(file), { type: 'image/jpeg', lastModified: file?.lastModified || Date.now() });
+            this._lastHeicTranscodeMeta = {
+                heicTranscoded: true,
+                transcodeMs: Math.round((performance.now?.() || Date.now()) - started),
+                outputBytes: jpeg.size,
+                outputType: jpeg.type,
+                outputName: jpeg.name
+            };
+            return jpeg;
+        } catch (e) {
+            if (e?.code === 'HEIC_DECODE_FAILED') throw e;
+            throw this._makeAiError('HEIC_DECODE_FAILED', { code: 'HEIC_DECODE_FAILED', cause: e });
+        }
+    },
+
+    async preprocessVisionImageFile(file, opts = {}) {
+        if (!file) throw new Error('缺少图片文件');
+        const isHeic = this._isHeicFile(file);
+        const isAvif = this._isAvifFile(file);
+        this._lastHeicTranscodeMeta = { heicTranscoded: false };
+        if (!isHeic) {
+            if (isAvif) this._debugDietPhoto({ stage: 'avif_input', mime: file.type, bytes: file.size, name: file.name });
+            return file;
+        }
+        opts.onProgress?.({ stage: 'heic' });
+        if (await this._canDecodeImage(file)) return file;
+        return await this._transcodeHeicToJpeg(file);
+    },
+
     async _resizeImageBlob(file, maxDimension = 1024, outMime = 'image/jpeg', quality = 0.85) {
         if (typeof document === 'undefined') return file;
         if (!file) throw new Error('缺少图片文件');
         const safeMax = Math.max(256, Math.min(2048, Number(maxDimension) || 1024));
         const safeQuality = Math.max(0.5, Math.min(0.95, Number(quality) || 0.85));
-        const loadBitmap = async () => {
-            if (typeof createImageBitmap === 'function') {
-                return await createImageBitmap(file);
-            }
-            const url = URL.createObjectURL(file);
-            try {
-                const img = new Image();
-                img.decoding = 'async';
-                img.src = url;
-                await img.decode();
-                return img;
-            } finally {
-                URL.revokeObjectURL(url);
-            }
-        };
-
         let bitmap;
         try {
-            bitmap = await loadBitmap();
+            bitmap = await this._loadImageBitmapLike(file);
         } catch {
+            this._lastResizeImageMeta = {
+                resized: false,
+                decodeFailed: true,
+                inputBytes: file?.size || 0,
+                inputType: file?.type || ''
+            };
             return file;
         }
         try {
@@ -76,32 +212,71 @@ Object.assign(ai, {
                     resolve(null);
                 }
             });
-            return blob || file;
+            const output = blob || file;
+            this._lastResizeImageMeta = {
+                resized: !!blob,
+                decodeFailed: false,
+                inputWidth: w,
+                inputHeight: h,
+                outputWidth: tw,
+                outputHeight: th,
+                inputBytes: file?.size || 0,
+                outputBytes: output?.size || 0,
+                outputType: output?.type || file?.type || ''
+            };
+            return output;
         } finally {
             try { bitmap.close?.(); } catch {}
         }
     },
 
     async prepareVisionImage(file, opts = {}) {
-        const resized = await this._resizeImageBlob(file, opts.maxDimension ?? 1024, opts.outMime ?? 'image/jpeg', opts.quality ?? 0.85);
+        const original = file;
+        const preprocessed = await this.preprocessVisionImageFile(file, opts);
+        opts.onProgress?.({ stage: 'resize' });
+        const resized = await this._resizeImageBlob(preprocessed, opts.maxDimension ?? 1024, opts.outMime ?? 'image/jpeg', opts.quality ?? 0.85);
         const dataUrl = await this._blobToDataUrl(resized);
         const base64 = (dataUrl.split(',')[1] || '').trim();
         const mimeType = resized?.type || opts.outMime || file?.type || 'image/jpeg';
         if (!base64) throw new Error('图片编码失败');
-        return { dataUrl, base64, mimeType };
+        this._debugDietPhoto({
+            stage: 'prepared',
+            originalMime: original?.type || '',
+            originalBytes: original?.size || 0,
+            originalName: original?.name || '',
+            isHeic: this._isHeicFile(original),
+            ...this._lastHeicTranscodeMeta,
+            ...this._lastResizeImageMeta,
+            payloadMime: mimeType,
+            payloadBytes: resized?.size || 0
+        });
+        return { dataUrl, base64, mimeType, fileName: resized?.name || preprocessed?.name || original?.name || '' };
     },
 
-    async callVisionTextImage(promptText, imageFile, maxTokens = 2000, systemText = '') {
+    async callVisionTextImage(promptText, imageFile, maxTokens = 2000, systemText = '', opts = {}) {
         const effective = this.getEffectiveConfig ? this.getEffectiveConfig() : { ...this.cfg, profileId: this.cfg.activeProfileId, apiKey: this.apiKeyFor(this.cfg.activeProfileId) };
         if (!effective.enabled) throw new Error('请先在设置中配置 AI 接口');
         const key = effective.apiKey;
         if (!key) throw new Error('请先在当前 AI 配置中填写 API Key');
         const provider = effective.provider || 'openai';
-        const img = await this.prepareVisionImage(imageFile, { maxDimension: 1024, outMime: 'image/jpeg', quality: 0.85 });
-        if (provider === 'claude') return this._callClaudeVision(promptText, img, maxTokens, key, effective, systemText);
-        if (provider === 'openai-responses') return this._callOpenAIResponsesVision(promptText, img, maxTokens, key, effective, systemText);
-        if (provider === 'gemini') return this._callGeminiVision(promptText, img, maxTokens, key, effective, systemText);
-        return this._callOpenAIChatVision(promptText, img, maxTokens, key, effective, systemText);
+        const timeout = this._makeTimeoutSignal(opts.signal, opts.timeoutMs || 30000);
+        try {
+            const img = await this.prepareVisionImage(imageFile, { maxDimension: 1024, outMime: 'image/jpeg', quality: 0.85, onProgress: opts.onProgress });
+            timeout.signal.throwIfAborted?.();
+            opts.onProgress?.({ stage: 'request' });
+            if (provider === 'claude') return await this._callClaudeVision(promptText, img, maxTokens, key, effective, systemText, timeout.signal);
+            if (provider === 'openai-responses') return await this._callOpenAIResponsesVision(promptText, img, maxTokens, key, effective, systemText, timeout.signal);
+            if (provider === 'gemini') return await this._callGeminiVision(promptText, img, maxTokens, key, effective, systemText, timeout.signal);
+            return await this._callOpenAIChatVision(promptText, img, maxTokens, key, effective, systemText, timeout.signal);
+        } catch (e) {
+            if (e?.name === 'AbortError') {
+                throw this._makeAiError(timeout.wasTimeout() ? 'AI_TIMEOUT' : 'AI_CANCELLED', { code: timeout.wasTimeout() ? 'AI_TIMEOUT' : 'AI_CANCELLED', cause: e });
+            }
+            if (e instanceof TypeError) throw this._makeAiError(e.message || 'NETWORK_ERROR', { code: 'NETWORK_ERROR', cause: e });
+            throw e;
+        } finally {
+            timeout.cleanup();
+        }
     },
 
     async callStream(messages, maxTokens = 2000, onToken = () => {}) {
@@ -116,7 +291,7 @@ Object.assign(ai, {
         return this._callOpenAIChat(messages, maxTokens, key, true, onToken, effective);
     },
 
-    async _callOpenAIChatVision(promptText, img, maxTokens, key, effective, systemText = '') {
+    async _callOpenAIChatVision(promptText, img, maxTokens, key, effective, systemText = '', signal = null) {
         const url = `${effective.baseUrl}/chat/completions`;
         const messages = [
             ...(systemText ? [{ role: 'system', content: systemText }] : []),
@@ -132,17 +307,21 @@ Object.assign(ai, {
         const res = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
-            body: JSON.stringify(body)
+            body: JSON.stringify(body),
+            signal
         });
+        this._debugDietPhoto({ stage: 'response', url, status: res.status });
         if (!res.ok) {
             const txt = await res.text().catch(() => '');
-            throw new Error(`AI 请求失败: ${res.status} ${txt.slice(0, 120)}`);
+            throw this._makeHttpAiError(res.status, txt);
         }
-        const d = await res.json();
+        const raw = await res.text();
+        let d;
+        try { d = JSON.parse(raw); } catch (e) { throw this._makeAiError('AI 返回格式异常', { code: 'AI_JSON_PARSE_FAILED', body: raw.slice(0, 200), cause: e }); }
         return d.choices?.[0]?.message?.content || '';
     },
 
-    async _callOpenAIResponsesVision(promptText, img, maxTokens, key, effective, systemText = '') {
+    async _callOpenAIResponsesVision(promptText, img, maxTokens, key, effective, systemText = '', signal = null) {
         const url = `${effective.baseUrl}/responses`;
         const body = {
             model: effective.model,
@@ -160,13 +339,17 @@ Object.assign(ai, {
         const res = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
-            body: JSON.stringify(body)
+            body: JSON.stringify(body),
+            signal
         });
+        this._debugDietPhoto({ stage: 'response', url, status: res.status });
         if (!res.ok) {
             const txt = await res.text().catch(() => '');
-            throw new Error(`AI 请求失败: ${res.status} ${txt.slice(0, 120)}`);
+            throw this._makeHttpAiError(res.status, txt);
         }
-        const d = await res.json();
+        const raw = await res.text();
+        let d;
+        try { d = JSON.parse(raw); } catch (e) { throw this._makeAiError('AI 返回格式异常', { code: 'AI_JSON_PARSE_FAILED', body: raw.slice(0, 200), cause: e }); }
         if (d.output_text) return d.output_text;
         let txt = '';
         for (const item of (d.output || [])) {
@@ -177,7 +360,7 @@ Object.assign(ai, {
         return txt;
     },
 
-    async _callClaudeVision(promptText, img, maxTokens, key, effective, systemText = '') {
+    async _callClaudeVision(promptText, img, maxTokens, key, effective, systemText = '', signal = null) {
         const url = `${effective.baseUrl}/messages`;
         const body = {
             model: effective.model,
@@ -200,17 +383,21 @@ Object.assign(ai, {
                 'anthropic-version': '2023-06-01',
                 'anthropic-dangerous-direct-browser-access': 'true'
             },
-            body: JSON.stringify(body)
+            body: JSON.stringify(body),
+            signal
         });
+        this._debugDietPhoto({ stage: 'response', url, status: res.status });
         if (!res.ok) {
             const txt = await res.text().catch(() => '');
-            throw new Error(`AI 请求失败: ${res.status} ${txt.slice(0, 120)}`);
+            throw this._makeHttpAiError(res.status, txt);
         }
-        const d = await res.json();
+        const raw = await res.text();
+        let d;
+        try { d = JSON.parse(raw); } catch (e) { throw this._makeAiError('AI 返回格式异常', { code: 'AI_JSON_PARSE_FAILED', body: raw.slice(0, 200), cause: e }); }
         return (d.content || []).filter(c => c.type === 'text').map(c => c.text).join('');
     },
 
-    async _callGeminiVision(promptText, img, maxTokens, key, effective, systemText = '') {
+    async _callGeminiVision(promptText, img, maxTokens, key, effective, systemText = '', signal = null) {
         const action = `generateContent?key=${key}`;
         const url = `${effective.baseUrl}/models/${effective.model}:${action}`;
         const contents = [{
@@ -228,13 +415,17 @@ Object.assign(ai, {
         const res = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body)
+            body: JSON.stringify(body),
+            signal
         });
+        this._debugDietPhoto({ stage: 'response', url: url.replace(/key=[^&]+/i, 'key=***'), status: res.status });
         if (!res.ok) {
             const txt = await res.text().catch(() => '');
-            throw new Error(`AI 请求失败: ${res.status} ${txt.slice(0, 120)}`);
+            throw this._makeHttpAiError(res.status, txt);
         }
-        const d = await res.json();
+        const raw = await res.text();
+        let d;
+        try { d = JSON.parse(raw); } catch (e) { throw this._makeAiError('AI 返回格式异常', { code: 'AI_JSON_PARSE_FAILED', body: raw.slice(0, 200), cause: e }); }
         return d.candidates?.[0]?.content?.parts?.map(p => p.text).join('') || '';
     },
 
@@ -479,12 +670,64 @@ Object.assign(ai, {
         return JSON.parse(match[0]);
     },
 
-    async parseFoodFromImage(file) {
+    _visionFailureCacheKey() {
+        return 'rehab_diet_photo_vision_failures';
+    },
+
+    _visionFailureCacheId(provider, model) {
+        return `${String(provider || '').toLowerCase()}::${String(model || '').toLowerCase()}`;
+    },
+
+    _readVisionFailureCache() {
+        try {
+            const raw = localStorage.getItem(this._visionFailureCacheKey());
+            const parsed = raw ? JSON.parse(raw) : {};
+            const now = Date.now();
+            Object.keys(parsed).forEach(key => {
+                if (!parsed[key]?.expiresAt || parsed[key].expiresAt <= now) delete parsed[key];
+            });
+            return parsed;
+        } catch {
+            return {};
+        }
+    },
+
+    getVisionFailure(provider, model) {
+        const cache = this._readVisionFailureCache();
+        return cache[this._visionFailureCacheId(provider, model)] || null;
+    },
+
+    markVisionFailure(provider, model, reason) {
+        const cache = this._readVisionFailureCache();
+        cache[this._visionFailureCacheId(provider, model)] = {
+            reason: String(reason || '当前模型可能不支持图片').slice(0, 80),
+            at: Date.now(),
+            expiresAt: Date.now() + 24 * 60 * 60 * 1000
+        };
+        try { localStorage.setItem(this._visionFailureCacheKey(), JSON.stringify(cache)); } catch {}
+    },
+
+    clearVisionFailure(provider, model) {
+        const cache = this._readVisionFailureCache();
+        delete cache[this._visionFailureCacheId(provider, model)];
+        try { localStorage.setItem(this._visionFailureCacheKey(), JSON.stringify(cache)); } catch {}
+    },
+
+    async parseFoodFromImage(file, opts = {}) {
         const prompt = `你是营养师助手。用户给出了一张“这顿饭/食物”的照片。请你根据图片内容识别食物，并严格只返回 JSON 数组，不要其他文字。\n每个元素格式：{"name":"食物名","grams":克数,"cal":热量kcal,"pro":蛋白质g,"carb":碳水g,"fat":脂肪g}\n要求：\n- 如果无法判断克数，请用常见份量估算；\n- 如果图片中看不清或不确定，请不要编造，返回空数组 [] 或减少条目；\n- 不要输出 markdown、不要解释。`;
-        const raw = await this.callVisionTextImage(prompt, file, 2000, '你是营养师助手，只返回纯 JSON 数组，不要 markdown，不要解释。');
+        const raw = await this.callVisionTextImage(prompt, file, 2000, '你是营养师助手，只返回纯 JSON 数组，不要 markdown，不要解释。', opts);
+        opts.onProgress?.({ stage: 'parse' });
         const match = String(raw || '').match(/\[[\s\S]*\]/);
-        if (!match) throw new Error('AI 返回格式异常');
-        return JSON.parse(match[0]);
+        if (!match) {
+            console.warn('AI 返回格式异常:', String(raw || '').slice(0, 80));
+            throw this._makeAiError('AI 返回格式异常', { code: 'AI_JSON_PARSE_FAILED', body: String(raw || '').slice(0, 200) });
+        }
+        try {
+            return JSON.parse(match[0]);
+        } catch (e) {
+            console.warn('AI 返回格式异常:', String(raw || '').slice(0, 80));
+            throw this._makeAiError('AI 返回格式异常', { code: 'AI_JSON_PARSE_FAILED', body: String(raw || '').slice(0, 200), cause: e });
+        }
     },
 
     async weightLossPlan(params) {

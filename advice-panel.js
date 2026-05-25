@@ -1,4 +1,4 @@
-﻿// @ts-nocheck
+// @ts-nocheck
 const advicePanel = {
     DRAFT_KEY: 'rehab_advice_draft',
     SETTINGS_KEY: 'rehab_advice_settings',
@@ -868,6 +868,10 @@ const advicePanel = {
     },
 
     useAdvicePrompt(text) {
+        if (String(text || '').includes('新建训练计划')) {
+            this.openNewPlanSheet?.();
+            return;
+        }
         const input = document.getElementById('advicePrompt');
         if (!input) return;
         input.value = text;
@@ -1147,7 +1151,11 @@ const advicePanel = {
         if (input) input.value = '';
         this.clearAdviceDraft();
         this.save();
-        requestAnimationFrame(() => this.scrollAdviceToLatest(true));
+        requestAnimationFrame(() => {
+            if (!this._adviceUserScrollPaused && this._adviceFollowStream) {
+                this.scrollAdviceToLatest(true);
+            }
+        });
         this._activeStreamRenderer = null;
         this._streamRenderers = this._streamRenderers || {};
         this.setAdviceStreamUiState('streaming');
@@ -1219,19 +1227,20 @@ const advicePanel = {
                 const bubble = document.querySelector(`[data-advice-id="${pendingId}"]`);
                 if (bubble) {
                     const contentEl = bubble.querySelector('.advice-bubble-content');
-                    if (contentEl) {
-                        if (contentEl._renderer) {
+                    if (contentEl && contentEl._renderer) {
+                        try { contentEl._renderer.flushAll(); } catch {}
+                        requestAnimationFrame(() => {
                             try { contentEl._renderer.destroy(); } catch {}
                             contentEl._renderer = null;
                             delete this._streamRenderers[pendingId];
-                        }
-                        contentEl.innerHTML = this.renderAdviceMarkdown(full);
-                        contentEl.querySelectorAll('p, li, h1, h2, h3').forEach(el => {
-                            el.classList.add('m3e-token-in');
                         });
+                    } else if (contentEl) {
+                        contentEl.innerHTML = this.renderAdviceMarkdown(full);
                     }
                 }
-                this.scrollAdviceToLatest(true);
+                if (!this._adviceUserScrollPaused && this._adviceFollowStream) {
+                    this.scrollAdviceToLatest(true);
+                }
             });
         } catch (e) {
             const idx = this.db.health.aiAdviceChat.findIndex(msg => msg.id === pendingId);
@@ -1239,12 +1248,14 @@ const advicePanel = {
             if (idx >= 0) this.db.health.aiAdviceChat[idx] = failed;
             else this.db.health.aiAdviceChat.push(failed);
             this.save();
-            requestAnimationFrame(() => this.scrollAdviceToLatest(true));
+            requestAnimationFrame(() => {
+                if (!this._adviceUserScrollPaused && this._adviceFollowStream) {
+                    this.scrollAdviceToLatest(true);
+                }
+            });
         } finally {
             this._adviceSending = false;
-            this._adviceFollowStream = false;
             this._activeStreamRenderer = null;
-            this._adviceUserScrollPaused = false;
             this.setAdviceStreamUiState('idle');
             const send = document.getElementById('adviceSendBtn');
             if (send) send.disabled = true;
@@ -1513,7 +1524,7 @@ const advicePanel = {
         const baseQuicks = isGain
             ? ['分析我最近增肌进展是否正常', '根据今天饮食给我加餐建议', '帮我安排本周力量训练重点', '我今天蛋白质和碳水够不够？']
             : ['分析我最近减重停滞的原因', '根据今天饮食给我晚餐建议', '帮我调整本周训练强度', '我今天蛋白质够不够？'];
-        const quicks = [...(this.rehabAiQuickPrompts?.() || []), ...baseQuicks].slice(0, 7);
+        const quicks = [...(this.planAiQuickPrompts?.() || []), ...baseQuicks].slice(0, 7);
         return `<div class="md-card advice-main-card ${this._adviceSuppressCardAnimation ? 'advice-no-enter' : ''}">
             <div class="advice-chat-shell">
                 <div class="advice-top-chrome">

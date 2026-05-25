@@ -58,8 +58,24 @@ Object.assign(
     window.dataWeeklySummary || {},
     window.dataViews || {},
     window.dataAiTemplates || {},
-    window.adviceTemplateManager || {}
+    window.adviceTemplateManager || {},
+    window['dataPlanStore'] || {},
+    window['dataPlanFeedback'] || {},
+    window['dataPlanCooldown'] || {},
+    window['dataPlanWeekly'] || {},
+    window['dataPlanAi'] || {},
+    window['dataPlanEquipment'] || {},
+    window['dataPlanUi'] || {}
 );
+
+function attachPlanAliases() {
+    data.openPlanWeeklySheet = data.openPlanWeeklySheet || function (...args) {
+        return window['planWeekly']?.open?.(...args);
+    };
+    data.renderPlanEquipmentPanel = data.renderPlanEquipmentPanel || data.renderPlanEquipmentCard;
+}
+
+attachPlanAliases();
 
 data.refreshModules = function () {
     Object.assign(data,
@@ -80,8 +96,16 @@ data.refreshModules = function () {
         window.dataWeeklySummary || {},
         window.dataViews || {},
         window.dataAiTemplates || {},
-        window.adviceTemplateManager || {}
+        window.adviceTemplateManager || {},
+        window['dataPlanStore'] || {},
+        window['dataPlanFeedback'] || {},
+        window['dataPlanCooldown'] || {},
+        window['dataPlanWeekly'] || {},
+        window['dataPlanAi'] || {},
+        window['dataPlanEquipment'] || {},
+        window['dataPlanUi'] || {}
     );
+    attachPlanAliases();
     window.advicePanel?.attach?.(data);
 };
 
