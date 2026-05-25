@@ -15,6 +15,43 @@
         return raw.length > max ? `${raw.slice(0, max)}…` : raw;
     }
 
+    function readNumber(value, fallback = 0) {
+        const number = Number(value);
+        return Number.isFinite(number) ? number : fallback;
+    }
+
+    function readPositiveNumber(value, fallback = 0) {
+        return Math.max(0, readNumber(value, fallback));
+    }
+
+    function readPositiveInteger(value, fallback = 1) {
+        return Math.max(1, Math.round(readNumber(value, fallback)));
+    }
+
+    function parseBoolean(value) {
+        if (typeof value === 'boolean') return value;
+        const text = String(value ?? '').trim().toLowerCase();
+        if (!text) return false;
+        if (['true', '1', 'yes', 'y', '是', '需要', '交替', '双侧', '左右'].some((token) => text.includes(token))) return true;
+        if (['false', '0', 'no', 'n', '否', '不'].some((token) => text.includes(token))) return false;
+        return false;
+    }
+
+    function normalizeAiSpec(item = {}) {
+        const spec = item.spec && typeof item.spec === 'object' ? item.spec : {};
+        const work = readPositiveNumber(spec.work ?? item.work ?? item.seconds ?? item.duration, 0);
+        let reps = readPositiveNumber(spec.reps ?? item.reps ?? item.count ?? item.times ?? item.perSet, 0);
+        if (reps <= 0 && work <= 0) reps = 12;
+        return {
+            sets: readPositiveInteger(spec.sets ?? item.sets, 3),
+            reps,
+            work,
+            repRest: readPositiveNumber(spec.repRest ?? item.repRest ?? item.restBetweenReps, 20),
+            actionRest: readPositiveNumber(spec.actionRest ?? item.actionRest ?? item.restBetweenSets ?? item.groupRest, 60),
+            isAlt: parseBoolean(spec.isAlt ?? item.isAlt ?? item.alternating ?? item.bilateral ?? item.sideMode)
+        };
+    }
+
     function setText(id, text) {
         const el = document.getElementById(id);
         if (el) el.textContent = text;
@@ -96,10 +133,18 @@
             const promptMode = mode === 'week'
                 ? '请为接下来 7 天输出 JSON：{"plans":[{date,type,title,notes,items:[{name,chainHint,spec:{sets,reps,work,repRest,actionRest,isAlt},cooldownRefs,aiReasoning,durationEstHint}]}]}'
                 : '请输出 JSON：{date,type,title,notes,items:[{name,chainHint,spec:{sets,reps,work,repRest,actionRest,isAlt},cooldownRefs,aiReasoning,durationEstHint}]}';
+            const specRules = [
+                '每个训练 item 必须填写 spec.sets/spec.reps/spec.work/spec.repRest/spec.actionRest/spec.isAlt。',
+                '力量/次数动作：reps 必须为每组次数，work=0；静态保持/计时动作：work 必须为每次秒数，reps=0。',
+                '不要用 0 占位；只有不按次数的计时动作才能 reps=0，只有不按时间的次数动作才能 work=0。',
+                'repRest 是同一组内每次/左右侧之间休息秒数，actionRest 是组间休息秒数。',
+                '双侧交替或左右轮换动作必须 isAlt=true，否则 isAlt=false。'
+            ].join('\n');
             const typeInstructions = types.map((type, index) => `${index + 1}. ${type} / ${this.planTypeMeta?.(type)?.label || type}`).join('\n');
             return [
                 '你是训练日程计划助手，只输出 JSON，不要输出解释。',
                 promptMode,
+                specRules,
                 types.length > 1
                     ? `本次需要同时生成多个计划类型，请分别输出到 plans 数组中，每个选中类型各生成 1 个 plan：\n${typeInstructions}`
                     : `计划类型: ${types[0]} / ${metas[0]?.label || '训练计划'}`,
@@ -220,26 +265,22 @@
                 title: String(plan.title || this.planTypeMeta?.(plan.type || allowedTypes[index] || allowedTypes[0])?.label || '训练计划'),
                 notes: String(plan.notes || ''),
                 source: 'ai',
-                items: (Array.isArray(plan.items) ? plan.items : []).map((item) => ({
-                    name: String(item.name || ''),
-                    chainId: String(item.chainId || item.chainHint || ''),
-                    currentLevel: item.currentLevel == null ? null : Number(item.currentLevel),
-                    spec: {
-                        sets: Math.max(1, Number(item.spec?.sets || 1)),
-                        reps: Math.max(0, Number(item.spec?.reps || 0)),
-                        work: Math.max(0, Number(item.spec?.work || 0)),
-                        repRest: Math.max(0, Number(item.spec?.repRest || 0)),
-                        actionRest: Math.max(0, Number(item.spec?.actionRest || 0)),
-                        isAlt: !!item.spec?.isAlt
-                    },
-                    cooldownRefs: Array.isArray(item.cooldownRefs) ? item.cooldownRefs.map((value) => String(value || '')) : [],
-                    aiReasoning: String(item.aiReasoning || ''),
-                    durationEstHint: String(item.durationEstHint || ''),
-                    status: 'todo',
-                    doneSets: 0,
-                    userOverride: false,
-                    excludeFromPr: true
-                })).filter((item) => item.name)
+                items: (Array.isArray(plan.items) ? plan.items : []).map((item) => {
+                    const spec = normalizeAiSpec(item);
+                    return {
+                        name: String(item.name || ''),
+                        chainId: String(item.chainId || item.chainHint || ''),
+                        currentLevel: item.currentLevel == null ? null : Number(item.currentLevel),
+                        spec,
+                        cooldownRefs: Array.isArray(item.cooldownRefs) ? item.cooldownRefs.map((value) => String(value || '')) : [],
+                        aiReasoning: String(item.aiReasoning || ''),
+                        durationEstHint: String(item.durationEstHint || ''),
+                        status: 'todo',
+                        doneSets: 0,
+                        userOverride: false,
+                        excludeFromPr: true
+                    };
+                }).filter((item) => item.name)
             })).filter((plan) => plan.items.length > 0);
             if (!validPlans.length) return { ok: false, reason: 'JSON 缺少可用 items', rawText };
             return { ok: true, plans: validPlans };
@@ -326,17 +367,19 @@
         },
 
         renderPlanAiPreviewItem(planIndex, itemIndex, item = {}) {
-            const spec = item.spec || {};
+            const spec = normalizeAiSpec(item);
             return `<div class="plan-ai-preview-item" data-item-index="${itemIndex}">
                 <div class="md-field plan-ai-preview-name">
                     <input type="text" data-preview-name value="${this.escapeHtml(item.name || '')}" placeholder=" ">
                     <label>动作</label>
                 </div>
                 <div class="plan-ai-preview-spec">
-                    <div class="md-field"><input type="number" min="1" data-preview-sets value="${Number(spec.sets || 1)}" placeholder=" "><label>组</label></div>
-                    <div class="md-field"><input type="number" min="0" data-preview-reps value="${Number(spec.reps || 0)}" placeholder=" "><label>次</label></div>
-                    <div class="md-field"><input type="number" min="0" data-preview-work value="${Number(spec.work || 0)}" placeholder=" "><label>秒</label></div>
-                    <div class="md-field"><input type="number" min="0" data-preview-rest value="${Number(spec.actionRest || 0)}" placeholder=" "><label>休</label></div>
+                    <div class="md-field"><input type="number" min="1" data-preview-sets value="${Number(spec.sets || 3)}" placeholder=" "><label>组数</label></div>
+                    <div class="md-field"><input type="number" min="0" data-preview-reps value="${Number(spec.reps || 0)}" placeholder=" "><label>每组次数</label></div>
+                    <div class="md-field"><input type="number" min="0" data-preview-work value="${Number(spec.work || 0)}" placeholder=" "><label>每次秒数</label></div>
+                    <div class="md-field"><input type="number" min="0" data-preview-rep-rest value="${Number(spec.repRest || 0)}" placeholder=" "><label>次间休息</label></div>
+                    <div class="md-field"><input type="number" min="0" data-preview-rest value="${Number(spec.actionRest || 0)}" placeholder=" "><label>组间休息</label></div>
+                    <label class="plan-ai-preview-alt"><input type="checkbox" data-preview-is-alt ${spec.isAlt ? 'checked' : ''}><span>双侧交替</span></label>
                 </div>
                 <div class="md-field plan-ai-preview-reason">
                     <input type="text" data-preview-reason value="${this.escapeHtml(item.aiReasoning || '')}" placeholder=" ">
@@ -384,15 +427,18 @@
                 planEl.querySelectorAll('.plan-ai-preview-item').forEach((itemEl) => {
                     const name = String(itemEl.querySelector('[data-preview-name]')?.value || '').trim();
                     if (!name) return;
+                    const work = Math.max(0, readNumber(itemEl.querySelector('[data-preview-work]')?.value, 0));
+                    let reps = Math.max(0, readNumber(itemEl.querySelector('[data-preview-reps]')?.value, 0));
+                    if (reps <= 0 && work <= 0) reps = 12;
                     items.push({
                         name,
                         spec: {
-                            sets: Math.max(1, Number(itemEl.querySelector('[data-preview-sets]')?.value || 1)),
-                            reps: Math.max(0, Number(itemEl.querySelector('[data-preview-reps]')?.value || 0)),
-                            work: Math.max(0, Number(itemEl.querySelector('[data-preview-work]')?.value || 0)),
-                            repRest: 20,
-                            actionRest: Math.max(0, Number(itemEl.querySelector('[data-preview-rest]')?.value || 0)),
-                            isAlt: false
+                            sets: Math.max(1, Math.round(readNumber(itemEl.querySelector('[data-preview-sets]')?.value, 3))),
+                            reps,
+                            work,
+                            repRest: Math.max(0, readNumber(itemEl.querySelector('[data-preview-rep-rest]')?.value, 20)),
+                            actionRest: Math.max(0, readNumber(itemEl.querySelector('[data-preview-rest]')?.value, 60)),
+                            isAlt: !!itemEl.querySelector('[data-preview-is-alt]')?.checked
                         },
                         cooldownRefs: [],
                         aiReasoning: String(itemEl.querySelector('[data-preview-reason]')?.value || '').trim(),

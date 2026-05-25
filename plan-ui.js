@@ -25,8 +25,13 @@
 
     function taskSpecText(task = {}) {
         const spec = task.spec || {};
-        const main = Number(spec.reps || 0) > 0 ? `${Number(spec.reps || 0)}次` : `${Number(spec.work || 0)}秒`;
-        return `${Number(spec.sets || 1)}组 · ${main}`;
+        const main = Number(spec.reps || 0) > 0 ? `每组${Number(spec.reps || 0)}次` : `每次${Number(spec.work || 0)}秒`;
+        const details = [
+            Number(spec.repRest || 0) > 0 ? `次休${Number(spec.repRest || 0)}秒` : '',
+            Number(spec.actionRest || 0) > 0 ? `组休${Number(spec.actionRest || 0)}秒` : '',
+            spec.isAlt ? '双侧交替' : ''
+        ].filter(Boolean);
+        return `${Number(spec.sets || 1)}组 · ${main}${details.length ? ` · ${details.join(' · ')}` : ''}`;
     }
 
     function planStatusClass(type = 'rehab') {

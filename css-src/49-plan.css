@@ -1304,6 +1304,26 @@
     gap: 8px;
 }
 
+.plan-ai-preview-alt {
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 10px;
+    border: 1.5px solid var(--md-sys-outline-variant);
+    border-radius: var(--md-sys-shape-sm);
+    background: var(--md-sys-surface-container-lowest);
+    color: var(--md-sys-on-surface-variant);
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.plan-ai-preview-alt input {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--md-sys-primary);
+}
+
 .plan-ai-preview-item > .md-icon-btn {
     grid-column: 2 / 3;
     grid-row: 1 / span 3;

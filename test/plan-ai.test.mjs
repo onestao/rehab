@@ -17,6 +17,9 @@ function loadPlanAi() {
 function createContext(api) {
   return {
     ...api,
+    logicalDateKey() {
+      return '2026-05-25';
+    },
     escapeHtml(value) {
       return String(value ?? '');
     },
@@ -45,4 +48,50 @@ test('plan AI type chips render all plan types with selected chips active', () =
   assert.match(html, /onclick="data\.togglePlanAiType\('bulk'\)"/);
   assert.match(html, /plan-ai-type-chip active[\s\S]*?aria-pressed="true"[\s\S]*?增肌日程/);
   assert.match(html, /plan-ai-type-chip active[\s\S]*?aria-pressed="true"[\s\S]*?减脂日程/);
+});
+
+test('plan AI parser fills usable spec defaults and preserves alternation', () => {
+  const api = loadPlanAi();
+  const ctx = createContext(api);
+  const parsed = api.parsePlanAiPayload.call(ctx, JSON.stringify({
+    date: '2026-05-25',
+    type: 'bulk',
+    items: [
+      { name: '保加利亚分腿蹲', spec: { sets: 4, isAlt: '双侧交替' } },
+      { name: '平板支撑', spec: { sets: 3, work: 40, actionRest: 75 } }
+    ]
+  }), ['bulk']);
+
+  assert.equal(parsed.ok, true);
+  assert.deepEqual(JSON.parse(JSON.stringify(parsed.plans[0].items[0].spec)), {
+    sets: 4,
+    reps: 12,
+    work: 0,
+    repRest: 20,
+    actionRest: 60,
+    isAlt: true
+  });
+  assert.deepEqual(JSON.parse(JSON.stringify(parsed.plans[0].items[1].spec)), {
+    sets: 3,
+    reps: 0,
+    work: 40,
+    repRest: 20,
+    actionRest: 75,
+    isAlt: false
+  });
+});
+
+test('plan AI preview exposes rest and alternation controls', () => {
+  const api = loadPlanAi();
+  const html = api.renderPlanAiPreviewItem.call(createContext(api), 0, 0, {
+    name: '弓步蹲',
+    spec: { sets: 3, reps: 10, repRest: 15, actionRest: 60, isAlt: true }
+  });
+
+  assert.match(html, /data-preview-rep-rest/);
+  assert.match(html, /data-preview-rest/);
+  assert.match(html, /data-preview-is-alt checked/);
+  assert.match(html, /每组次数/);
+  assert.match(html, /组间休息/);
+  assert.match(html, /双侧交替/);
 });
