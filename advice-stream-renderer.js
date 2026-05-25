@@ -26,8 +26,17 @@
         };
     }
 
+    function pendingAccumulatedSuffix(state, accumulated) {
+        const target = String(accumulated || '');
+        const shown = String(state?.shown || '');
+        const buffer = String(state?.buffer || '');
+        const expected = shown + buffer;
+        return target.startsWith(expected) ? target.slice(expected.length) : null;
+    }
+
     function create(target, opts = {}) {
         const scheduler = createScheduler();
+        scheduler.setChunkPerFrame(opts.chunkPerFrame);
         const render = typeof opts.renderMarkdown === 'function'
             ? (text) => String(opts.renderMarkdown(text) || '')
             : renderPlainText;
@@ -177,5 +186,5 @@
         return { enqueue, seed, pause, resume, flushAll, destroy, getState: () => ({ ...state, mode: scheduler.getMode() }) };
     }
 
-    window.adviceStreamRenderer = { create };
+    window.adviceStreamRenderer = { create, pendingAccumulatedSuffix };
 })();

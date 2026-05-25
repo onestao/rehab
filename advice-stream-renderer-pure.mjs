@@ -34,3 +34,11 @@ export function createScheduler(deps) {
         setChunkPerFrame: (n) => { chunkPerFrame = Math.max(1, Number(n) || 8); }
     };
 }
+
+export function pendingAccumulatedSuffix(state, accumulated) {
+    const target = String(accumulated || '');
+    const shown = String(state?.shown || '');
+    const buffer = String(state?.buffer || '');
+    const expected = shown + buffer;
+    return target.startsWith(expected) ? target.slice(expected.length) : null;
+}

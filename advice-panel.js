@@ -587,7 +587,9 @@ const advicePanel = {
             this._adviceTopChromeLastTouchY = y;
             if (!Number.isFinite(lastY)) return;
             const deltaY = y - lastY;
-            if (deltaY > 0 && (list.scrollTop || 0) <= 0) {
+            if (deltaY < 0) {
+                this.applyAdviceTopChromeOffset(list, currentOffset - deltaY);
+            } else if (deltaY > 0 && (list.scrollTop || 0) <= 0) {
                 this.applyAdviceTopChromeOffset(list, currentOffset - deltaY);
             }
             return;
@@ -1195,8 +1197,11 @@ const advicePanel = {
                         this._streamRenderers[pendingId] = contentEl._renderer;
                     }
                     if (contentEl._renderer) {
-                        if (contentEl._renderer.getState?.().shown === accumulated) {
-                            contentEl._renderer.enqueue(delta);
+                        const suffix = window.adviceStreamRenderer?.pendingAccumulatedSuffix
+                            ? window.adviceStreamRenderer.pendingAccumulatedSuffix(contentEl._renderer.getState?.(), accumulated)
+                            : null;
+                        if (suffix !== null) {
+                            if (suffix) contentEl._renderer.enqueue(suffix);
                         } else {
                             contentEl._renderer.seed(accumulated);
                         }
