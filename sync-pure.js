@@ -50,6 +50,35 @@ function buildS3ObjectKey(remotePath, prefix = 'rehab') {
     return `${cleanPrefix}/${cleanPath}`;
 }
 
+/** @param {any} profile */
+function hasMeaningfulHealthProfile(profile) {
+    if (!profile || typeof profile !== 'object') return false;
+    const conditions = Array.isArray(profile.conditions) ? profile.conditions : [];
+    const allergies = Array.isArray(profile.allergies) ? profile.allergies : [];
+    const prefs = profile.preferences && typeof profile.preferences === 'object' ? profile.preferences : {};
+    const equipment = Array.isArray(prefs.equipment) ? prefs.equipment : [];
+    const sports = Array.isArray(prefs.sports) ? prefs.sports : [];
+    const vitals = profile.vitals && typeof profile.vitals === 'object' ? profile.vitals : {};
+    return !!(
+        Number(profile.age || 0) ||
+        profile.gender === 'female' ||
+        conditions.length ||
+        allergies.length ||
+        equipment.length ||
+        sports.length ||
+        Number(vitals.restingHR || 0)
+    );
+}
+
+/** @param {any} local @param {any} remote */
+function mergeHealthProfileRecord(local, remote) {
+    const localHas = hasMeaningfulHealthProfile(local);
+    const remoteHas = hasMeaningfulHealthProfile(remote);
+    if (localHas && !remoteHas) return local;
+    if (remoteHas && !localHas) return remote;
+    return Number(remote?.updatedAt || 0) >= Number(local?.updatedAt || 0) ? remote : local;
+}
+
 /**
  * Fieldwise merge: only uses per-field timestamps when present, otherwise falls back to LWW by record updatedAt.
  * @param {{updatedAt?: number, __fieldUpdatedAt?: Record<string, string>, [k: string]: any}} local
@@ -183,6 +212,8 @@ export {
     computeRetryDelay,
     isRetryableError,
     buildS3ObjectKey,
+    hasMeaningfulHealthProfile,
+    mergeHealthProfileRecord,
     mergeRecordsFieldwise,
     takeQueueBatch,
     mergeAdviceVersions,
@@ -197,7 +228,7 @@ if (typeof window !== 'undefined') {
     win.syncPure = win.syncPure || {};
     Object.assign(win.syncPure, {
         mergeIncremental, computeRetryDelay, isRetryableError,
-        buildS3ObjectKey,
+        buildS3ObjectKey, hasMeaningfulHealthProfile, mergeHealthProfileRecord,
         mergeRecordsFieldwise, takeQueueBatch,
         mergeAdviceVersions, mergeAdviceRecord,
         validatePayload, compareCounts, prepareRemoteSnapshotDb

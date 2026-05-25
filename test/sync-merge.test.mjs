@@ -1,6 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mergeIncremental, computeRetryDelay, isRetryableError, buildS3ObjectKey, prepareRemoteSnapshotDb } from '../sync-pure.js';
+import {
+    mergeIncremental,
+    computeRetryDelay,
+    isRetryableError,
+    buildS3ObjectKey,
+    hasMeaningfulHealthProfile,
+    mergeHealthProfileRecord,
+    prepareRemoteSnapshotDb
+} from '../sync-pure.js';
 
 test('mergeIncremental applies LWW by updatedAt', () => {
     const local = [{ id: 'a', value: 1, updatedAt: 10 }, { id: 'b', value: 2, updatedAt: 20 }];
@@ -35,6 +43,39 @@ test('buildS3ObjectKey scopes sync and backup files under rehab prefix', () => {
 test('buildS3ObjectKey does not duplicate existing rehab prefix', () => {
     assert.equal(buildS3ObjectKey('/rehab/manifest.json'), 'rehab/manifest.json');
     assert.equal(buildS3ObjectKey('manifest.json', '/rehab/'), 'rehab/manifest.json');
+});
+
+test('health profile merge keeps meaningful profile over newer empty default', () => {
+    const realProfile = {
+        id: 'profile',
+        updatedAt: 100,
+        gender: 'male',
+        age: 38,
+        conditions: [{ label: '膝伤' }],
+        allergies: [],
+        preferences: { equipment: ['弹力带'], sports: [] },
+        vitals: { restingHR: 62 }
+    };
+    const emptyDefault = {
+        id: 'profile',
+        updatedAt: 200,
+        gender: 'male',
+        age: null,
+        conditions: [],
+        allergies: [],
+        preferences: { equipment: [], sports: [] },
+        vitals: { restingHR: null }
+    };
+
+    assert.equal(hasMeaningfulHealthProfile(realProfile), true);
+    assert.equal(hasMeaningfulHealthProfile(emptyDefault), false);
+    assert.equal(mergeHealthProfileRecord(realProfile, emptyDefault), realProfile);
+});
+
+test('health profile merge uses LWW when both profiles have content', () => {
+    const oldProfile = { id: 'profile', updatedAt: 100, age: 30 };
+    const newProfile = { id: 'profile', updatedAt: 200, age: 31 };
+    assert.equal(mergeHealthProfileRecord(oldProfile, newProfile), newProfile);
 });
 
 test('prepareRemoteSnapshotDb preserves voice engine configuration', () => {

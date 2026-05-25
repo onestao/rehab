@@ -239,6 +239,17 @@ const sync = {
         return Array.from(merged.values());
     },
 
+    mergeHealthProfileLists(localList, remoteList) {
+        const pure = window.syncPure || {};
+        const local = (localList || []).find(item => item && !item.deleted) || (localList || [])[0] || null;
+        const remote = (remoteList || []).find(item => item && !item.deleted) || (remoteList || [])[0] || null;
+        if (!local && !remote) return [];
+        const merged = typeof pure.mergeHealthProfileRecord === 'function'
+            ? pure.mergeHealthProfileRecord(local, remote)
+            : (Number(remote?.updatedAt || 0) >= Number(local?.updatedAt || 0) ? remote : local);
+        return merged ? [merged] : [];
+    },
+
     getEntityRef(dbObj, entity) {
         const db = dbObj || data.db;
         switch (entity) {
@@ -356,6 +367,10 @@ const sync = {
             this.saveSyncMeta();
             return true;
         }
+        if (entity === 'healthProfile') {
+            ref.set(this.mergeHealthProfileLists(ref.get(), remoteRecords || []));
+            return true;
+        }
         const merged = this.mergeRecordLists(ref.get(), remoteRecords || []);
         ref.set(merged);
         return true;
@@ -452,7 +467,8 @@ const sync = {
             const localRef = this.getEntityRef(localBefore, entity);
             const remoteRef = this.getEntityRef(data.db, entity);
             if (!localRef || !remoteRef) return;
-            remoteRef.set(this.mergeRecordLists(localRef.get(), remoteRef.get()));
+            if (entity === 'healthProfile') remoteRef.set(this.mergeHealthProfileLists(localRef.get(), remoteRef.get()));
+            else remoteRef.set(this.mergeRecordLists(localRef.get(), remoteRef.get()));
         });
         data.normalizeDb();
     },
