@@ -44,6 +44,15 @@
     justify-content: center;
     gap: 2px;
     border-radius: var(--md-sys-shape-full);
+    overflow: hidden;
+    isolation: isolate;
+}
+/* Ripple inside the bottom-nav pill: subtle tonal layer instead of grey rectangle */
+.nav-item .nav-content > .ripple {
+    background: color-mix(in srgb, var(--md-sys-on-surface) 14%, transparent);
+}
+.nav-item.active .nav-content > .ripple {
+    background: color-mix(in srgb, var(--md-sys-on-secondary-container) 18%, transparent);
 }
 .nav-item .material-symbols-rounded {
     font-size: 24px;
@@ -97,4 +106,13 @@
     border-radius: 24px;
 }
 .nav-item.active small { font-weight: 700; color: var(--md-sys-on-secondary-container); }
+
+.nav-item.active .nav-content > .material-symbols-rounded {
+    view-transition-name: nav-pill;
+}
+::view-transition-old(nav-pill),
+::view-transition-new(nav-pill) {
+    animation-duration: 350ms;
+    animation-timing-function: var(--md-sys-motion-spring);
+}
 

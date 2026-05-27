@@ -5,6 +5,11 @@
    CSS snapshot for rollback / current-branch parity
    ============================================ */
 
+@property --plan-progress { syntax: '<angle>'; inherits: true; initial-value: 0deg; }
+@property --pro-stop      { syntax: '<angle>'; inherits: true; initial-value: 0deg; }
+@property --carb-stop     { syntax: '<angle>'; inherits: true; initial-value: 0deg; }
+@property --fat-stop      { syntax: '<angle>'; inherits: true; initial-value: 0deg; }
+
 /* --- Design Tokens --- */
 :root {
     /* Primary — Default Blue */
@@ -171,12 +176,24 @@
     --glass-border: color-mix(in srgb, var(--md-sys-surface-container-lowest) 64%, transparent);
     --glass-shadow-inset: inset 0 1px 0 color-mix(in srgb, var(--md-sys-surface-container-lowest) 70%, transparent);
     --glass-shadow-out: 0 2px 10px color-mix(in srgb, var(--md-sys-on-surface) 6%, transparent);
-    --glass-blur: blur(20px) saturate(160%);
 
-    /* Macro Colors */
-    --c-carb: #7AB8FF;
-    --c-pro: #FFB66E;
-    --c-fat: #A78BFA;
+    /* Glass Layered Blur */
+    --glass-blur-sm: blur(12px) saturate(150%);
+    --glass-blur-md: blur(20px) saturate(160%);
+    --glass-blur-lg: blur(28px) saturate(180%);
+
+    /* Liquid Glass edge */
+    --glass-edge: linear-gradient(135deg,
+        color-mix(in srgb, var(--md-sys-surface-container-lowest) 80%, transparent) 0%,
+        color-mix(in srgb, var(--md-sys-surface-container-lowest) 30%, transparent) 50%,
+        color-mix(in srgb, var(--md-sys-surface-container-lowest) 70%, transparent) 100%);
+
+    --glass-blur: var(--glass-blur-md);
+
+    /* Macro Colors — must match record/diet tabs (17-record-tabs-health.css) */
+    --c-pro: #0061a4;   /* 蛋白质 protein → 蓝 */
+    --c-carb: #8b5cf6;  /* 碳水 carb → 紫 */
+    --c-fat: #f59e0b;   /* 脂肪 fat → 黄 */
 }
 
 
@@ -186,11 +203,7 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; }
 
 body {
-    background:
-        radial-gradient(circle at 12% 0%, color-mix(in srgb, var(--md-sys-primary-container) 50%, transparent) 0%, transparent 38%),
-        radial-gradient(circle at 88% 22%, color-mix(in srgb, var(--md-sys-tertiary-container) 50%, transparent) 0%, transparent 42%),
-        radial-gradient(circle at 50% 100%, color-mix(in srgb, var(--md-sys-secondary-container) 40%, transparent) 0%, transparent 50%),
-        #dde1ea;
+    background: #dde1ea;
     transition: background 0.8s var(--md-sys-motion-emphasized);
     font-family: 'Roboto', 'Noto Sans SC', system-ui, -apple-system, sans-serif;
     color: var(--md-sys-on-surface);
@@ -237,9 +250,10 @@ html {
     justify-content: space-between;
     padding: 6px 0;
     background: transparent;
-    position: relative;
+    position: static;
     flex: none;
-    transition: box-shadow var(--md-sys-motion-duration-short) var(--md-sys-motion-emphasized);
+    transition: background .3s var(--md-sys-motion-emphasized),
+                box-shadow .3s var(--md-sys-motion-emphasized);
 }
 .workout-only-bar { margin-bottom: 0; }
 .bar-leading {
@@ -587,6 +601,44 @@ mark.ai-hit {
 .session-time {
     color: var(--md-sys-amber) !important;
     text-shadow: 0 0 12px rgba(245,158,11,0.35);
+}
+
+/* Timer Tweak ±15s chips — dark glass context inside timer-panel */
+.timer-tweak {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    position: relative;
+    z-index: 1;
+}
+.timer-tweak .md-chip {
+    font-size: 13px;
+    font-weight: 700;
+    padding: 6px 20px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    background: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.85);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 72px;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    transition: transform 0.15s var(--md-sys-motion-spring),
+                background 0.15s ease;
+    -webkit-tap-highlight-color: transparent;
+}
+.timer-tweak .md-chip:hover {
+    background: rgba(255, 255, 255, 0.18);
+}
+.timer-tweak .md-chip:active {
+    transform: scale(0.94);
+    background: rgba(255, 255, 255, 0.26);
 }
 
 
@@ -1114,12 +1166,12 @@ mark.ai-hit {
     background:
         conic-gradient(
             from -90deg,
-            #0061a4 0deg var(--pro-stop),
-            color-mix(in srgb, #0061a4 18%, var(--md-sys-surface-container-highest)) var(--pro-stop) 120deg,
-            #8b5cf6 120deg var(--carb-stop),
-            color-mix(in srgb, #8b5cf6 18%, var(--md-sys-surface-container-highest)) var(--carb-stop) 240deg,
-            #f59e0b 240deg var(--fat-stop),
-            color-mix(in srgb, #f59e0b 20%, var(--md-sys-surface-container-highest)) var(--fat-stop) 360deg
+            var(--c-pro) 0deg var(--pro-stop, 0deg),
+            color-mix(in srgb, var(--c-pro) 18%, var(--md-sys-surface-container-highest)) var(--pro-stop, 0deg) 120deg,
+            var(--c-carb) 120deg var(--carb-stop, 120deg),
+            color-mix(in srgb, var(--c-carb) 18%, var(--md-sys-surface-container-highest)) var(--carb-stop, 120deg) 240deg,
+            var(--c-fat) 240deg var(--fat-stop, 240deg),
+            color-mix(in srgb, var(--c-fat) 20%, var(--md-sys-surface-container-highest)) var(--fat-stop, 240deg) 360deg
         );
 }
 .today-focus-ring::after {
@@ -3056,7 +3108,7 @@ mark.ai-hit {
 .ai-profile-actions {
     align-items: center;
     gap: 8px;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     margin-bottom: 8px;
 }
 .ai-profile-actions .md-field {
@@ -3065,7 +3117,8 @@ mark.ai-hit {
     flex: 1 1 160px;
     min-width: 0;
 }
-.ai-profile-actions .md-field input {
+.ai-profile-actions .md-field input,
+.ai-profile-actions .md-field select {
     height: 48px;
     box-sizing: border-box;
 }
@@ -3674,9 +3727,6 @@ mark.ai-hit {
     .mode-tab { font-size: 12px; gap: 4px; height: 38px; }
     .mode-tab .material-symbols-rounded { font-size: 18px; }
 }
-
-.timer-tweak { display: flex; gap: 8px; justify-content: center; margin-top: 8px; }
-.timer-tweak .md-chip { font-weight: 800; }
 
 }
 @layer components {
@@ -4331,6 +4381,15 @@ body.is-cardio-paused .cardio-card {
     justify-content: center;
     gap: 2px;
     border-radius: var(--md-sys-shape-full);
+    overflow: hidden;
+    isolation: isolate;
+}
+/* Ripple inside the bottom-nav pill: subtle tonal layer instead of grey rectangle */
+.nav-item .nav-content > .ripple {
+    background: color-mix(in srgb, var(--md-sys-on-surface) 14%, transparent);
+}
+.nav-item.active .nav-content > .ripple {
+    background: color-mix(in srgb, var(--md-sys-on-secondary-container) 18%, transparent);
 }
 .nav-item .material-symbols-rounded {
     font-size: 24px;
@@ -4384,6 +4443,15 @@ body.is-cardio-paused .cardio-card {
     border-radius: 24px;
 }
 .nav-item.active small { font-weight: 700; color: var(--md-sys-on-secondary-container); }
+
+.nav-item.active .nav-content > .material-symbols-rounded {
+    view-transition-name: nav-pill;
+}
+::view-transition-old(nav-pill),
+::view-transition-new(nav-pill) {
+    animation-duration: 350ms;
+    animation-timing-function: var(--md-sys-motion-spring);
+}
 
 
 }
@@ -8755,13 +8823,35 @@ body.is-training .fab-pip.active {
 .ring em { font-size: 10px; font-style: normal; font-weight: 600; color: var(--md-sys-on-surface-variant); margin-top: 1px; white-space: nowrap; }
 .ring > div { position: relative; z-index: 1; display: grid; justify-items: center; }
 .ring::before { content: ''; position: absolute; inset: 0; border-radius: 50%; padding: 8px; -webkit-mask: linear-gradient(#000,#000) content-box, linear-gradient(#000,#000); mask: linear-gradient(#000,#000) content-box, linear-gradient(#000,#000); -webkit-mask-composite: xor; mask-composite: exclude; }
+.ring::before { transition: --plan-progress .8s var(--md-sys-motion-emphasized), --pro-stop .8s var(--md-sys-motion-emphasized), --carb-stop .8s var(--md-sys-motion-emphasized), --fat-stop .8s var(--md-sys-motion-emphasized), background .6s var(--md-sys-motion-emphasized); }
 .ring::after { content: ''; position: absolute; inset: 8px; border-radius: 50%; background: rgba(255,255,255,0.6); backdrop-filter: blur(12px) saturate(155%); -webkit-backdrop-filter: blur(12px) saturate(155%); box-shadow: inset 0 1px 1px rgba(255,255,255,0.95), inset 0 -1px 2px rgba(0,29,54,0.06); }
-[data-theme-mode="dark"] .ring::after { background: color-mix(in srgb, var(--md-sys-surface-container-high) 62%, transparent); box-shadow: inset 0 1px 1px color-mix(in srgb, var(--md-sys-on-surface) 10%, transparent); }
-[data-theme-mode="dark"] .ring b { color: var(--md-sys-primary); }
-[data-theme-mode="dark"] .ring small { color: var(--md-sys-on-surface); }
-[data-theme-mode="dark"] .ring em { color: var(--md-sys-on-surface); opacity: 0.8; }
+[data-theme-mode="dark"] .ring::after,
+[data-theme-mode="auto"] .ring::after { background: color-mix(in srgb, var(--md-sys-surface-container-high) 62%, transparent); box-shadow: inset 0 1px 1px color-mix(in srgb, var(--md-sys-on-surface) 10%, transparent); }
+[data-theme-mode="dark"] .ring b,
+[data-theme-mode="auto"] .ring b { color: var(--md-sys-on-primary-container); }
+[data-theme-mode="dark"] .ring small,
+[data-theme-mode="auto"] .ring small { color: var(--md-sys-on-surface); opacity: 0.92; }
+[data-theme-mode="dark"] .ring em,
+[data-theme-mode="auto"] .ring em { color: var(--md-sys-on-surface); opacity: 0.8; }
+[data-theme-mode="dark"] .ring-diet b,
+[data-theme-mode="auto"] .ring-diet b { color: var(--md-sys-on-surface); }
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme-mode="light"]) .ring::after { background: color-mix(in srgb, var(--md-sys-surface-container-high) 62%, transparent); box-shadow: inset 0 1px 1px color-mix(in srgb, var(--md-sys-on-surface) 10%, transparent); }
+    :root:not([data-theme-mode="light"]) .ring b { color: var(--md-sys-on-primary-container); }
+    :root:not([data-theme-mode="light"]) .ring-diet b { color: var(--md-sys-on-surface); }
+    :root:not([data-theme-mode="light"]) .ring small { color: var(--md-sys-on-surface); opacity: 0.92; }
+    :root:not([data-theme-mode="light"]) .ring em { color: var(--md-sys-on-surface); opacity: 0.8; }
+}
 .ring-train::before { background: conic-gradient(from -90deg, var(--md-sys-primary) 0deg var(--plan-progress, 0deg), color-mix(in srgb, var(--md-sys-primary) 18%, var(--md-sys-surface-container-highest)) var(--plan-progress, 0deg) 360deg); }
-.ring-diet::before { background: conic-gradient(from -90deg, var(--c-pro) 0deg var(--pro-stop, 120deg), var(--c-carb) var(--pro-stop, 120deg) var(--carb-stop, 240deg), var(--c-fat) var(--carb-stop, 240deg) var(--fat-stop, 330deg), color-mix(in srgb, var(--md-sys-outline-variant) 40%, var(--md-sys-surface-container-highest)) var(--fat-stop, 330deg) 360deg); }
+.ring-diet::before {
+    background: conic-gradient(from -90deg,
+        var(--c-pro) 0deg var(--pro-stop, 0deg),
+        color-mix(in srgb, var(--md-sys-outline-variant) 40%, var(--md-sys-surface-container-highest)) var(--pro-stop, 0deg) 120deg,
+        var(--c-carb) 120deg var(--carb-stop, 120deg),
+        color-mix(in srgb, var(--md-sys-outline-variant) 40%, var(--md-sys-surface-container-highest)) var(--carb-stop, 120deg) 240deg,
+        var(--c-fat) 240deg var(--fat-stop, 240deg),
+        color-mix(in srgb, var(--md-sys-outline-variant) 40%, var(--md-sys-surface-container-highest)) var(--fat-stop, 240deg) 360deg);
+}
 .ring-diet b { color: var(--md-sys-on-surface); }
 
 .quick-dock { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 12px; }
@@ -8801,9 +8891,13 @@ body.is-training .fab-pip.active {
 .stack-bar .b3 { background: var(--c-fat); animation: bar-grow 1.2s var(--md-sys-motion-emphasized) 0.2s both; }
 
 .macros { display: flex; justify-content: space-between; }
-.macro { text-align: center; }
+.macro { text-align: center; position: relative; }
 .macro small { font-size: 10px; color: var(--md-sys-on-surface-variant); display: block; }
 .macro b { font-size: 14px; font-weight: 600; color: var(--md-sys-on-surface); }
+.macro::before { content: ''; display: inline-block; width: 6px; height: 6px; border-radius: 50%; vertical-align: middle; margin-right: 4px; background: var(--md-sys-outline-variant); }
+.macro.p::before { background: var(--c-pro); }
+.macro.c::before { background: var(--c-carb); }
+.macro.f::before { background: var(--c-fat); }
 
 .timeline-card { padding: 6px 0 8px; }
 .tl-item { display: grid; grid-template-columns: 36px 36px 1fr auto; align-items: center; gap: 8px; padding: 6px 10px; }
@@ -8841,12 +8935,15 @@ body.is-training .fab-pip.active {
     box-shadow: 0 12px 32px color-mix(in srgb, var(--md-sys-primary) 35%, transparent);
     transition: background 0.6s var(--md-sys-motion-emphasized);
 }
-.timer-panel:hover,
-.timer-panel:active,
-.timer-panel:focus {
-    background: linear-gradient(160deg, color-mix(in srgb, var(--md-sys-primary) 90%, #000) 0%, var(--md-sys-primary) 40%, var(--md-sys-primary-container) 100%);
-    outline: none;
+.timer-panel:hover {
+    box-shadow: 0 12px 32px color-mix(in srgb, var(--md-sys-primary) 35%, transparent),
+                inset 0 0 0 9999px rgba(255, 255, 255, 0.05);
 }
+.timer-panel:active {
+    box-shadow: 0 12px 32px color-mix(in srgb, var(--md-sys-primary) 35%, transparent),
+                inset 0 0 0 9999px rgba(255, 255, 255, 0.1);
+}
+.timer-panel:focus { outline: none; }
 .timer-panel .timer-tts-btn,
 .timer-panel .skip-btn,
 .timer-panel .timer-wakelock-btn {
@@ -8931,7 +9028,13 @@ body.is-training .fab-pip.active {
 .cal-day.dim { opacity: 0.5; }
 .cal-day.has::after { content: ''; position: absolute; bottom: 3px; left: 50%; transform: translateX(-50%); width: 4px; height: 4px; border-radius: 50%; background: var(--md-sys-primary); }
 .cal-day.full { background: var(--md-sys-primary-container); color: var(--md-sys-on-primary-container); font-weight: 700; }
-.cal-day.today { outline: 2px solid var(--md-sys-primary); outline-offset: -2px; }
+.cal-day.today {
+    box-shadow: inset 0 0 0 2px var(--md-sys-primary);
+    outline: none;
+}
+.cal-day.today.full {
+    box-shadow: inset 0 0 0 2px var(--md-sys-on-primary-container);
+}
 .cal-day.selected { background: var(--md-sys-primary-container); border-color: var(--md-sys-primary); box-shadow: 0 0 0 2px var(--md-sys-primary-container); }
 
 .health-swipe-deck,
@@ -9190,6 +9293,16 @@ body.is-training .md-fab.fab-play {
 @keyframes m3e-ripple {
     to { transform: translate(-50%, -50%) scale(20); opacity: 0; }
 }
+.ripple {
+    position: absolute;
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    background: color-mix(in srgb, currentColor 22%, transparent);
+    transform: translate(-50%, -50%) scale(0);
+    pointer-events: none;
+    animation: m3e-ripple .55s ease-out forwards;
+    z-index: 0;
+}
 
 /* TASK-19: AI教练气泡逐字流入动画 */
 @keyframes m3e-token-in {
@@ -9199,11 +9312,22 @@ body.is-training .md-fab.fab-play {
 .m3e-token-in { animation: m3e-token-in .26s var(--md-expressive-spring) both; }
 
 /* TASK-20: 主题切换液态过渡 */
-:root { transition: background-color .35s ease, color .35s ease; }
+:root {
+    transition:
+        background-color .6s var(--md-sys-motion-emphasized),
+        color .35s ease;
+}
 .md-card, .md-btn, .md-chip, .md-fab, .nav-item, .calendar-day,
-.advice-bubble, .day-detail-item, .list-item {
-    transition: background-color .35s ease, color .35s ease,
-                border-color .35s ease, box-shadow .35s ease;
+.advice-bubble, .day-detail-item, .list-item,
+.glass-card, .hero, .timer-panel, .ai-hero, .profile-hero,
+.stat-tile, .record-quick-btn, .mode-tabs, .record-tabs,
+.md-field, .ai-msg.ai, .ring::after, .plan-chip, .streak-chip,
+.setting-row .ico {
+    transition:
+        background .6s var(--md-sys-motion-emphasized),
+        color .35s ease,
+        border-color .35s ease,
+        box-shadow .6s var(--md-sys-motion-emphasized);
 }
 
 /* TASK-21: AI教练快捷预设chip横滑 */
