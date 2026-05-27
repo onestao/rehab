@@ -1,7 +1,7 @@
 # css overlap report
 # real-conflict threshold: 220
 
-## REAL CONFLICTS (same selector + same property, different value): 214
+## REAL CONFLICTS (same selector + same property, different value): 213
 :root
   files: 01-vars.css, 37-dark-mode.css, 49-plan.css, 41-m3e-effects.css
     --md-sys-primary: #0061a4 | #a0cafd (01-vars.css / 37-dark-mode.css)
@@ -572,10 +572,6 @@ mark.ai-hit
   files: 33-workout-input-card.css, 36-responsive.css
     padding: 14px | 10px (33-workout-input-card.css / 36-responsive.css)
 
-.strength-input-grid
-  files: 33-workout-input-card.css, 36-responsive.css
-    gap: 8px | 6px (33-workout-input-card.css / 33-workout-input-card.css / 33-workout-input-card.css)
-
 .strength-input-grid .md-field label
   files: 33-workout-input-card.css
     max-width: calc(100% - 18px) | calc(100% - 14px) | calc(100% - 12px) (33-workout-input-card.css / 33-workout-input-card.css / 33-workout-input-card.css)
@@ -1141,7 +1137,7 @@ mark.ai-hit
   files: 57-weight-report.css
     animation: none | weight-chart-range-zoom var(--md-sys-motion-duration-medium, 220ms) var(--md-sys-motion-emphasized, cubic-bezier(0.2, 0, 0, 1)) both (57-weight-report.css / 57-weight-report.css)
 
-## DUPLICATES (same selector + same property + same value): 31
+## DUPLICATES (same selector + same property + same value): 32
 .md-top-app-bar
   files: 04-layout-appbar.css, 37-dark-mode.css
     background: transparent (04-layout-appbar.css / 37-dark-mode.css)
@@ -1255,6 +1251,10 @@ mark.ai-hit
 .strength-presets::-webkit-scrollbar
   files: 33-workout-input-card.css, 52-v6-workout.css
     display: none (33-workout-input-card.css / 52-v6-workout.css)
+
+.strength-input-grid
+  files: 33-workout-input-card.css, 36-responsive.css
+    gap: 6px (33-workout-input-card.css / 33-workout-input-card.css)
 
 .health-swipe-page
   files: 38-record-page.css, 53-v6-records.css

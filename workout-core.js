@@ -28,7 +28,7 @@ Object.assign(workout, {
         this.renderPip();
         const prev = document.getElementById('prevBtn');
         if (prev) prev.classList.toggle('hidden', !this.isPlaying);
-        window.data?.updateRehabWorkoutBanner?.();
+        window.data?.updatePlanWorkoutBanner?.();
         window.rehabDock?.render?.(document.querySelector('.page.active')?.id || 'workout');
     },
 
@@ -280,7 +280,7 @@ Object.assign(workout, {
                 const ctx = window.data.activeRun;
                 if (ctx.previousPlan && window.data?._replacePlanActions) window.data._replacePlanActions(ctx.previousPlan);
                 window.data.activeRun = null;
-                window.data.updateRehabWorkoutBanner?.();
+                window.data.updatePlanWorkoutBanner?.();
             }
             this.speak("训练时间过短，无法记录");
             alert("训练时间低于20秒，无法保存记录");
@@ -303,7 +303,7 @@ Object.assign(workout, {
         } else {
             data.db.history.unshift(historyRecord);
         }
-        window.data?.handleRehabWorkoutFinished?.(historyRecord);
+        window.data?.handlePlanWorkoutFinished?.(historyRecord);
         data.db.actualSetsBuffer = [];
         data.saveAndBackup();
         this.resetMainPanel();

@@ -207,6 +207,10 @@
     gap: 12px;
 }
 
+#planFeedbackSheet {
+    z-index: 240;
+}
+
 .plan-sheet-head {
     justify-content: flex-start;
 }

@@ -4,16 +4,51 @@
 body {
     background: #dde1ea;
     transition: background 0.8s var(--md-sys-motion-emphasized);
-    font-family: 'Roboto', 'Noto Sans SC', system-ui, -apple-system, sans-serif;
+    /* 字体回退链：优先使用各平台自带的高质量系统字体，避免硬塞未托管的 Roboto。
+       Android：Roboto / Noto Sans CJK SC（AOSP/Pixel）→ MiSans VF（小米/红米 HyperOS）
+                → OPPO Sans（OPPO/OnePlus/realme）→ HarmonyOS Sans SC（华为/荣耀，含 OPPO 部分机型回退）
+                → Source Han Sans SC（部分定制 ROM 自带思源黑体子集）。
+       iOS / macOS：-apple-system / BlinkMacSystemFont → PingFang SC。
+       Windows：Segoe UI Variable / Segoe UI → Microsoft YaHei UI。 */
+    font-family:
+        -apple-system, BlinkMacSystemFont,
+        "Segoe UI Variable Text", "Segoe UI",
+        Roboto, "Noto Sans CJK SC", "Noto Sans SC",
+        "MiSans VF", "MiSans", "OPPO Sans", "HarmonyOS Sans SC",
+        "Source Han Sans SC", "Source Han Sans CN",
+        "PingFang SC", "Hiragino Sans GB",
+        "Microsoft YaHei UI", "Microsoft YaHei",
+        system-ui, sans-serif;
     color: var(--md-sys-on-surface);
     min-height: 100vh;
     padding: 0;
     overflow: hidden;
     -webkit-tap-highlight-color: transparent;
     line-height: 1.5;
+    font-feature-settings: "kern", "ss01";
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
 }
 
 html {
     min-height: 100%;
+}
+
+/* 训练助手 UI 中数字密集（卡路里/秒数/组数/重量）。统一启用 tabular figures，
+   让数字等宽对齐，主流系统字体（PingFang、Segoe UI、HarmonyOS Sans、MiSans、Roboto）都支持。 */
+.num,
+.val,
+.unit,
+input[type="number"],
+input[type="date"],
+input[type="time"],
+.timer,
+[class*="ring-"] .num,
+[class*="-num"],
+[class*="-value"],
+[class*="-count"] {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum", "cv11";
 }
 

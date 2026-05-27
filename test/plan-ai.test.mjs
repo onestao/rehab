@@ -102,15 +102,15 @@ test('plan AI parser fills usable spec defaults and preserves alternation', () =
     sets: 4,
     reps: 12,
     work: 3,
-    repRest: 20,
-    actionRest: 60,
+    repRest: 15,
+    actionRest: 45,
     isAlt: true
   });
   assert.deepEqual(JSON.parse(JSON.stringify(parsed.plans[0].items[1].spec)), {
     sets: 3,
     reps: 0,
     work: 40,
-    repRest: 20,
+    repRest: 10,
     actionRest: 75,
     isAlt: false
   });
@@ -130,20 +130,37 @@ test('plan AI parser supplies hold duration and caps very long rests', () => {
   assert.equal(parsed.ok, true);
   assert.equal(parsed.plans[0].items[0].spec.reps, 0);
   assert.equal(parsed.plans[0].items[0].spec.work, 30);
-  assert.equal(parsed.plans[0].items[0].spec.actionRest, 120);
+  assert.equal(parsed.plans[0].items[0].spec.actionRest, 45);
 });
 
-test('plan AI parser rejects rep actions without explicit AI work seconds', () => {
+test('plan AI parser supplies fallback work seconds for rep actions missing work', () => {
   const api = loadPlanAi();
   const ctx = createContext(api);
   const parsed = api.parsePlanAiPayload.call(ctx, JSON.stringify({
     date: '2026-05-25',
     type: 'bulk',
-    items: [{ name: '俯卧撑', category: 'main', spec: { sets: 3, reps: 10 } }]
+    items: [{ name: '俯卧撑', category: 'main', spec: { sets: 3, reps: 10, repRest: 0, actionRest: 60 } }]
   }), ['bulk']);
 
-  assert.equal(parsed.ok, false);
-  assert.match(parsed.reason, /缺少 AI 明确给出的 spec\.work/);
+  assert.equal(parsed.ok, true);
+  assert.equal(parsed.plans[0].items[0].spec.reps, 10);
+  assert.equal(parsed.plans[0].items[0].spec.work, 3);
+  assert.ok(Array.isArray(parsed.warnings));
+  assert.match(parsed.warnings.join('\n'), /spec\.work/);
+});
+
+test('plan AI parser warns when AI omits rest fields entirely', () => {
+  const api = loadPlanAi();
+  const ctx = createContext(api);
+  const parsed = api.parsePlanAiPayload.call(ctx, JSON.stringify({
+    date: '2026-05-25',
+    type: 'bulk',
+    items: [{ name: '哑铃肩推', category: 'main', spec: { sets: 3, reps: 10, work: 3 } }]
+  }), ['bulk']);
+
+  assert.equal(parsed.ok, true);
+  assert.match(parsed.warnings.join('\n'), /repRest/);
+  assert.match(parsed.warnings.join('\n'), /actionRest/);
 });
 
 test('plan AI parser allows short rests for low-level rehab actions', () => {
@@ -160,7 +177,7 @@ test('plan AI parser allows short rests for low-level rehab actions', () => {
 
   assert.equal(parsed.ok, true);
   assert.equal(parsed.plans[0].items[0].spec.actionRest, 10);
-  assert.equal(parsed.plans[0].items[1].spec.actionRest, 15);
+  assert.equal(parsed.plans[0].items[1].spec.actionRest, 20);
 });
 
 test('plan AI context includes today completed workouts and manual exercises', () => {

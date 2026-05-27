@@ -44,14 +44,8 @@
 
     function isTimedAiAction(item = {}) {
         const text = `${item.name || ''} ${item.category || ''} ${item.phase || ''} ${item.section || ''}`.toLowerCase();
-        return /保持|支撑|平板|静蹲|拉伸|伸展|放松|hold|plank|stretch|mobility|wall\s*sit/.test(text)
+        return /保持|支撑|平板|静蹲|静态|靠墙|拉伸|伸展|放松|呼吸|hold|plank|stretch|mobility|wall\s*sit|isometric|brace/.test(text)
             || normalizeAiCategory(item.category || item.phase || item.section) === 'cooldown';
-    }
-
-    function hasExplicitWork(item = {}) {
-        const spec = item.spec && typeof item.spec === 'object' ? item.spec : {};
-        const raw = spec.work ?? item.work ?? item.seconds ?? item.duration;
-        return raw !== undefined && raw !== null && String(raw).trim() !== '';
     }
 
     function isLowLevelRehabAction(item = {}, planType = '') {
@@ -69,21 +63,34 @@
         const defaultWork = timed ? 30 : 3;
         let work = readCappedPositiveNumber(spec.work ?? item.work ?? item.seconds ?? item.duration, 0, 90);
         let reps = readPositiveNumber(spec.reps ?? item.reps ?? item.count ?? item.times ?? item.perSet, 0);
+        const errors = [];
         if (reps <= 0 && work <= 0) {
+            errors.push(`${item.name || '未命名动作'} 缺少 spec.work（每次执行/保持秒数），AI 必须显式给出，不能用 0 或空值占位`);
             if (timed) work = defaultWork;
-            else return { error: `${item.name || '未命名动作'} 缺少 reps 或 work，无法判断是次数动作还是计时动作` };
+            else { reps = 12; work = defaultWork; }
+        } else if (reps > 0 && work <= 0) {
+            errors.push(`${item.name || '未命名动作'} 是次数动作，但缺少 AI 明确给出的 spec.work 执行秒数`);
+            work = defaultWork;
         }
-        if (reps > 0 && (!hasExplicitWork(item) || work <= 0)) {
-            return { error: `${item.name || '未命名动作'} 是次数动作，但缺少 AI 明确给出的 spec.work 执行秒数` };
+        const repRestDefault = lowLevelRehab ? 0 : (timed ? 10 : 15);
+        const actionRestDefault = lowLevelRehab ? 20 : (timed ? 30 : 45);
+        if (spec.repRest === undefined && item.repRest === undefined && item.restBetweenReps === undefined) {
+            errors.push(`${item.name || '未命名动作'} 缺少 spec.repRest（次/侧间休息秒数），AI 必须显式给出`);
         }
-        return { spec: {
-            sets: readPositiveInteger(spec.sets ?? item.sets, 3),
-            reps,
-            work,
-            repRest: readCappedPositiveNumber(spec.repRest ?? item.repRest ?? item.restBetweenReps, 20, 60),
-            actionRest: readCappedPositiveNumber(spec.actionRest ?? item.actionRest ?? item.restBetweenSets ?? item.groupRest, lowLevelRehab ? 15 : (timed ? 45 : 60), 120),
-            isAlt: parseBoolean(spec.isAlt ?? item.isAlt ?? item.alternating ?? item.bilateral ?? item.sideMode)
-        } };
+        if (spec.actionRest === undefined && item.actionRest === undefined && item.restBetweenSets === undefined && item.groupRest === undefined) {
+            errors.push(`${item.name || '未命名动作'} 缺少 spec.actionRest（组间休息秒数），AI 必须显式给出`);
+        }
+        return {
+            spec: {
+                sets: readPositiveInteger(spec.sets ?? item.sets, 3),
+                reps,
+                work,
+                repRest: readCappedPositiveNumber(spec.repRest ?? item.repRest ?? item.restBetweenReps, repRestDefault, 30),
+                actionRest: readCappedPositiveNumber(spec.actionRest ?? item.actionRest ?? item.restBetweenSets ?? item.groupRest, actionRestDefault, lowLevelRehab ? 45 : 75),
+                isAlt: parseBoolean(spec.isAlt ?? item.isAlt ?? item.alternating ?? item.bilateral ?? item.sideMode)
+            },
+            warnings: errors
+        };
     }
 
     function normalizeAiCategory(value = 'main') {
@@ -239,23 +246,26 @@
                 }))
             }));
             const promptMode = mode === 'week'
-                ? '请为接下来 7 天输出 JSON：{"plans":[{date,type,title,notes,items:[{name,category,chainHint,spec:{sets,reps,work,repRest,actionRest,isAlt},cooldownRefs,aiReasoning,durationEstHint}]}]}'
-                : '请输出 JSON：{date,type,title,notes,items:[{name,category,chainHint,spec:{sets,reps,work,repRest,actionRest,isAlt},cooldownRefs,aiReasoning,durationEstHint}]}';
+                ? '请为接下来 7 天输出严格 JSON，结构为：{"plans":[{"date":"YYYY-MM-DD","type":"<rehab|cut|bulk|maintenance|custom>","title":"...","notes":"...","items":[{"name":"...","category":"<warmup|main|cooldown>","chainHint":"","spec":{"sets":<int>,"reps":<int>,"work":<int>,"repRest":<int>,"actionRest":<int>,"isAlt":<bool>},"cooldownRefs":[],"aiReasoning":"...","durationEstHint":""}]}]}'
+                : '请输出严格 JSON，结构为：{"date":"YYYY-MM-DD","type":"<rehab|cut|bulk|maintenance|custom>","title":"...","notes":"...","items":[{"name":"...","category":"<warmup|main|cooldown>","chainHint":"","spec":{"sets":<int>,"reps":<int>,"work":<int>,"repRest":<int>,"actionRest":<int>,"isAlt":<bool>},"cooldownRefs":[],"aiReasoning":"...","durationEstHint":""}]}';
             const specRules = [
-                '每个 item 必须填写 category，且只能是 warmup / main / cooldown：热身用 warmup，主训练用 main，拉伸/放松用 cooldown。',
-                '每个训练 item 必须填写 spec.sets/spec.reps/spec.work/spec.repRest/spec.actionRest/spec.isAlt。',
-                'work 是每次动作执行/保持秒数，所有动作都必须给出：力量/次数动作通常 2-5 秒，静态保持/拉伸通常 20-60 秒。',
-                '力量/次数动作：reps 必须为每组次数，work 必须由 AI 明确给出每次执行秒数，不能省略，不能为 0；静态保持/计时动作：reps=0，work 必须为每次保持秒数。',
-                '不要用 0 占位；只有纯计时动作才能 reps=0，但 work 不能为 0。',
-                'repRest 是同一组内每次/左右侧之间休息秒数，actionRest 是组间休息秒数。常规 actionRest 控制在 30-90 秒，除非用户明确要求，不要超过 120 秒；低阶康复/激活/活动度动作可以压缩到 5-15 秒。',
+                '只输出 JSON 本体，不要使用 Markdown 代码块、不要前后加自然语言、不要注释。所有数值字段必须是 number 类型，布尔字段必须是 true/false，禁止用字符串如 "3"、"true"。',
+                '每个 item 必须填齐：name(string)、category(枚举 warmup/main/cooldown)、spec.sets(int≥1)、spec.reps(int≥0)、spec.work(int>0)、spec.repRest(int≥0)、spec.actionRest(int≥0)、spec.isAlt(bool)。任一字段缺失或为 0/空都视为不合规，必须重填。',
+                'category 只能是 warmup（热身）/ main（主训练）/ cooldown（拉伸放松）三选一；不要使用其他词。',
+                'spec.work 是每次动作的执行/保持秒数，必须 >0：力量/次数动作 2-5 秒；静态保持/拉伸/呼吸/支撑 20-45 秒。识别不出来时按"次数动作 reps=12, work=3"兜底，绝对禁止 work=0 或省略。',
+                '次数动作：reps>0 表示每组次数；静态/计时动作：reps=0 且 work=每次保持秒数。',
+                'spec.repRest 是同一组内每次/左右侧之间的休息秒数：常规力量 0-10、慢速/高强度最多 15、连续次数动作直接 0；上限 20。必须显式给出该字段。',
+                'spec.actionRest 是组间休息秒数：康复/激活/活动度/拉伸 15-30、常规主训 30-60、大重量复合最多 75；严禁 >90。必须显式给出该字段。',
                 '双侧交替或左右轮换动作必须 isAlt=true，否则 isAlt=false。',
+                '示例（仅作字段格式参考，不要照抄内容）：{"name":"靠墙静蹲","category":"main","chainHint":"","spec":{"sets":3,"reps":0,"work":40,"repRest":0,"actionRest":30,"isAlt":false},"cooldownRefs":[],"aiReasoning":"等长收缩激活股四头","durationEstHint":""}',
                 '必须参考今日已完成运动摘要；如果今天已经高强度训练过同动作或同部位，后续计划应降低重复负荷、改为恢复/拉伸/低强度技术练习，除非用户明确要求继续加量。'
             ].join('\n');
             const typeInstructions = types.map((type, index) => `${index + 1}. ${type} / ${this.planTypeMeta?.(type)?.label || type}`).join('\n');
             return [
-                '你是训练日程计划助手，只输出 JSON，不要输出解释。',
+                '你是训练日程计划助手。只输出严格 JSON 文本，不要 Markdown 代码块、不要解释、不要追加任何说明。',
                 promptMode,
                 specRules,
+                '所有 spec 字段（sets/reps/work/repRest/actionRest/isAlt）都必须由你显式填写，不能依赖客户端推断；如果你拿不准就按规则中的默认值填上，但绝不能省略字段或填 0/空。',
                 types.length > 1
                     ? `本次需要同时生成多个计划类型，请分别输出到 plans 数组中，每个选中类型各生成 1 个 plan：\n${typeInstructions}`
                     : `计划类型: ${types[0]} / ${metas[0]?.label || '训练计划'}`,
@@ -371,7 +381,7 @@
             const parsed = safeJsonParse(String(rawText || '').trim());
             if (!parsed || typeof parsed !== 'object') return { ok: false, reason: 'AI 返回不是有效 JSON', rawText };
             const plans = Array.isArray(parsed.plans) ? parsed.plans : [parsed];
-            const errors = [];
+            const warnings = [];
             const validPlans = plans.map((plan, index) => ({
                 date: String(plan.date || this.logicalDateKey?.() || this.dateKey(new Date())),
                 type: ['rehab', 'cut', 'bulk', 'maintenance', 'custom'].includes(plan.type) ? plan.type : (allowedTypes[index] || allowedTypes[0] || 'rehab'),
@@ -381,10 +391,7 @@
                 items: (Array.isArray(plan.items) ? plan.items : []).map((item) => {
                     const planType = ['rehab', 'cut', 'bulk', 'maintenance', 'custom'].includes(plan.type) ? plan.type : (allowedTypes[index] || allowedTypes[0] || 'rehab');
                     const result = normalizeAiSpec(item, { planType });
-                    if (result.error) {
-                        errors.push(result.error);
-                        return null;
-                    }
+                    if (Array.isArray(result.warnings) && result.warnings.length) warnings.push(...result.warnings);
                     const spec = result.spec;
                     return {
                         name: String(item.name || ''),
@@ -402,9 +409,8 @@
                     };
                 }).filter((item) => item && item.name)
             })).filter((plan) => plan.items.length > 0);
-            if (errors.length) return { ok: false, reason: errors.join('；'), rawText };
             if (!validPlans.length) return { ok: false, reason: 'JSON 缺少可用 items', rawText };
-            return { ok: true, plans: validPlans };
+            return { ok: true, plans: validPlans, warnings };
         },
 
         async submitPlanAi(mode = 'today') {
@@ -445,6 +451,10 @@
                     return;
                 }
                 this.setPlanAiStatus?.('计划草稿已生成，请在预览中确认。', 'success');
+                if (Array.isArray(parsed.warnings) && parsed.warnings.length) {
+                    const head = parsed.warnings.slice(0, 3).join('；');
+                    window.toast?.show?.(`AI 漏填字段已用默认值兜底：${head}${parsed.warnings.length > 3 ? '…' : ''}`, 'info', 5200);
+                }
                 this.previewPlanAiPlans(parsed.plans);
             } catch (error) {
                 this.setPlanAiStatus?.(`生成失败：${window.toast?.sanitize ? toast.sanitize(error) : error?.message || error}`, 'error');
@@ -530,7 +540,7 @@
             plan.items.push({
                 name: '新训练动作',
                 category: 'main',
-                spec: { sets: 3, reps: 12, work: 3, repRest: 20, actionRest: 60, isAlt: false },
+                spec: { sets: 3, reps: 12, work: 3, repRest: 0, actionRest: 45, isAlt: false },
                 cooldownRefs: [],
                 aiReasoning: '',
                 durationEstHint: '',
@@ -570,8 +580,8 @@
                             sets: Math.max(1, Math.round(readNumber(itemEl.querySelector('[data-preview-sets]')?.value, 3))),
                             reps,
                             work,
-                            repRest: Math.max(0, readNumber(itemEl.querySelector('[data-preview-rep-rest]')?.value, 20)),
-                            actionRest: Math.max(0, readNumber(itemEl.querySelector('[data-preview-rest]')?.value, 60)),
+                            repRest: Math.max(0, readNumber(itemEl.querySelector('[data-preview-rep-rest]')?.value, 0)),
+                            actionRest: Math.max(0, readNumber(itemEl.querySelector('[data-preview-rest]')?.value, 45)),
                             isAlt: !!itemEl.querySelector('[data-preview-is-alt]')?.checked
                         },
                         cooldownRefs: [],
