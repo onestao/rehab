@@ -3,6 +3,11 @@
    CSS snapshot for rollback / current-branch parity
    ============================================ */
 
+@property --plan-progress { syntax: '<angle>'; inherits: true; initial-value: 0deg; }
+@property --pro-stop      { syntax: '<angle>'; inherits: true; initial-value: 0deg; }
+@property --carb-stop     { syntax: '<angle>'; inherits: true; initial-value: 0deg; }
+@property --fat-stop      { syntax: '<angle>'; inherits: true; initial-value: 0deg; }
+
 /* --- Design Tokens --- */
 :root {
     /* Primary — Default Blue */
@@ -169,11 +174,23 @@
     --glass-border: color-mix(in srgb, var(--md-sys-surface-container-lowest) 64%, transparent);
     --glass-shadow-inset: inset 0 1px 0 color-mix(in srgb, var(--md-sys-surface-container-lowest) 70%, transparent);
     --glass-shadow-out: 0 2px 10px color-mix(in srgb, var(--md-sys-on-surface) 6%, transparent);
-    --glass-blur: blur(20px) saturate(160%);
 
-    /* Macro Colors */
-    --c-carb: #7AB8FF;
-    --c-pro: #FFB66E;
-    --c-fat: #A78BFA;
+    /* Glass Layered Blur */
+    --glass-blur-sm: blur(12px) saturate(150%);
+    --glass-blur-md: blur(20px) saturate(160%);
+    --glass-blur-lg: blur(28px) saturate(180%);
+
+    /* Liquid Glass edge */
+    --glass-edge: linear-gradient(135deg,
+        color-mix(in srgb, var(--md-sys-surface-container-lowest) 80%, transparent) 0%,
+        color-mix(in srgb, var(--md-sys-surface-container-lowest) 30%, transparent) 50%,
+        color-mix(in srgb, var(--md-sys-surface-container-lowest) 70%, transparent) 100%);
+
+    --glass-blur: var(--glass-blur-md);
+
+    /* Macro Colors — must match record/diet tabs (17-record-tabs-health.css) */
+    --c-pro: #0061a4;   /* 蛋白质 protein → 蓝 */
+    --c-carb: #8b5cf6;  /* 碳水 carb → 紫 */
+    --c-fat: #f59e0b;   /* 脂肪 fat → 黄 */
 }
 

@@ -1,0 +1,429 @@
+/* --- Plan AI / Weekly / Feedback / Cooldown --- */
+.plan-feedback-sheet,
+.plan-ai-sheet,
+.plan-weekly-sheet,
+.plan-ai-preview {
+    display: grid;
+    gap: 12px;
+}
+
+.plan-ai-status {
+    min-height: 34px;
+    display: flex;
+    align-items: center;
+    padding: 8px 10px;
+    border: 1px solid color-mix(in srgb, var(--md-sys-outline-variant) 72%, transparent);
+    border-radius: var(--md-sys-shape-md);
+    background: var(--md-sys-surface-container-low);
+    color: var(--md-sys-on-surface-variant);
+    font-size: 12px;
+    line-height: 1.35;
+}
+
+.plan-ai-status.is-busy {
+    border-color: color-mix(in srgb, var(--md-sys-primary) 36%, transparent);
+    background: color-mix(in srgb, var(--md-sys-primary-container) 52%, var(--md-sys-surface-container-low));
+    color: var(--md-sys-on-primary-container);
+}
+
+.plan-ai-status.is-error {
+    border-color: color-mix(in srgb, var(--md-sys-error) 48%, transparent);
+    background: color-mix(in srgb, var(--md-sys-error-container) 54%, var(--md-sys-surface-container-low));
+    color: var(--md-sys-on-error-container);
+}
+
+.plan-feedback-grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.plan-feedback-btn {
+    position: relative;
+    min-height: 88px;
+    border: 1px solid transparent;
+    border-radius: var(--md-sys-shape-xl);
+    display: grid;
+    gap: 6px;
+    place-items: center;
+    overflow: hidden;
+    background: var(--md-sys-surface-container-low);
+    color: var(--md-sys-on-surface);
+    font-weight: 800;
+    transition:
+        transform var(--md-sys-motion-duration-short) var(--md-expressive-spring),
+        background var(--md-sys-motion-duration-short) var(--md-sys-motion-emphasized),
+        border-color var(--md-sys-motion-duration-short) var(--md-sys-motion-emphasized);
+}
+
+.plan-feedback-btn::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: currentColor;
+    opacity: 0;
+    transition: opacity var(--md-sys-motion-duration-short);
+}
+
+.plan-feedback-btn:active {
+    transform: scale(.94);
+}
+
+.plan-feedback-btn:active::after {
+    opacity: var(--md-state-press);
+}
+
+.plan-feedback-btn.active {
+    border-color: color-mix(in srgb, var(--md-sys-primary) 36%, transparent);
+    background: var(--md-sys-primary-container);
+    color: var(--md-sys-on-primary-container);
+}
+
+.plan-feedback-emoji {
+    position: relative;
+    z-index: 1;
+    font-size: 28px;
+    line-height: 1;
+}
+
+.plan-feedback-btn strong {
+    position: relative;
+    z-index: 1;
+}
+
+.plan-feedback-sheet .md-field textarea,
+.plan-ai-sheet .md-field textarea {
+    width: 100%;
+    min-height: 108px;
+    padding: 18px 12px 8px;
+    border: 1.5px solid var(--md-sys-outline-variant);
+    border-radius: var(--md-sys-shape-sm);
+    background: var(--md-sys-surface-container-lowest);
+    color: var(--md-sys-on-surface);
+    font: inherit;
+    font-size: 16px;
+    line-height: 1.45;
+    resize: vertical;
+    outline: none;
+    transition:
+        border-color var(--md-sys-motion-duration-short) var(--md-sys-motion-emphasized),
+        box-shadow var(--md-sys-motion-duration-short) var(--md-sys-motion-emphasized),
+        background var(--md-sys-motion-duration-short) var(--md-sys-motion-emphasized);
+}
+
+.plan-feedback-sheet .md-field textarea:focus,
+.plan-ai-sheet .md-field textarea:focus {
+    border-color: var(--md-sys-primary);
+    border-width: 2px;
+    padding: 17px 11px 7px;
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--md-sys-primary) 14%, transparent);
+}
+
+.plan-feedback-sheet .md-field textarea::placeholder,
+.plan-ai-sheet .md-field textarea::placeholder {
+    color: transparent;
+}
+
+.plan-feedback-sheet .md-field textarea:focus + label,
+.plan-feedback-sheet .md-field textarea:not(:placeholder-shown) + label,
+.plan-ai-sheet .md-field textarea:focus + label,
+.plan-ai-sheet .md-field textarea:not(:placeholder-shown) + label {
+    top: 5px;
+    transform: translateY(0);
+    color: var(--md-sys-primary);
+    font-size: 10px;
+    font-weight: 600;
+}
+
+.plan-cooldown-toast {
+    position: fixed;
+    left: 12px;
+    right: 12px;
+    bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+    z-index: 36;
+    display: grid;
+    gap: 10px;
+    padding: 14px;
+    border: 1px solid color-mix(in srgb, var(--md-sys-outline-variant) 62%, transparent);
+    border-radius: var(--md-sys-shape-xl);
+    background: color-mix(in srgb, var(--md-sys-surface-container-low) 88%, transparent);
+    backdrop-filter: blur(20px);
+    box-shadow: var(--md-sys-elevation-3);
+    animation: m3e-card-rise .32s var(--md-expressive-spring) both;
+}
+
+.plan-cooldown-toast-head {
+    display: grid;
+    gap: 4px;
+}
+
+.plan-cooldown-toast-head small {
+    color: var(--md-sys-on-surface-variant);
+}
+
+.plan-cooldown-actions {
+    flex-wrap: wrap;
+}
+
+.plan-cooldown-progress {
+    height: 5px;
+}
+
+.plan-workout-banner {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 8px auto 0;
+    padding: 8px 12px;
+    width: fit-content;
+    max-width: 100%;
+    border-radius: var(--md-sys-shape-full);
+    background: var(--md-sys-primary-container);
+    color: var(--md-sys-on-primary-container);
+    box-shadow: var(--md-sys-elevation-1);
+}
+
+.plan-workout-banner .material-symbols-rounded {
+    font-size: 20px;
+    font-variation-settings: 'FILL' 1;
+}
+
+.plan-workout-banner small {
+    color: inherit;
+    opacity: .76;
+}
+
+.plan-weekly-list {
+    grid-template-columns: repeat(7, minmax(112px, 1fr));
+    overflow-x: auto;
+    padding-bottom: 2px;
+    scrollbar-width: none;
+}
+
+.plan-weekly-list::-webkit-scrollbar {
+    display: none;
+}
+
+.plan-weekly-day {
+    position: relative;
+    width: 100%;
+    min-height: 82px;
+    border: 1px solid transparent;
+    border-radius: var(--md-sys-shape-lg);
+    padding: 10px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 24px;
+    gap: 8px;
+    align-items: start;
+    overflow: hidden;
+    background: var(--md-sys-surface-container-low);
+    color: var(--md-sys-on-surface);
+    text-align: left;
+    scroll-snap-align: start;
+    transition:
+        transform var(--md-sys-motion-duration-short) var(--md-expressive-spring),
+        background var(--md-sys-motion-duration-short) var(--md-sys-motion-emphasized),
+        border-color var(--md-sys-motion-duration-short) var(--md-sys-motion-emphasized);
+}
+
+.plan-weekly-day:active {
+    transform: scale(.96);
+}
+
+.plan-weekly-day.active {
+    border-color: color-mix(in srgb, var(--md-sys-primary) 36%, transparent);
+    background: var(--md-sys-primary-container);
+    color: var(--md-sys-on-primary-container);
+}
+
+.plan-weekly-day.is-drop-target {
+    outline: 3px solid color-mix(in srgb, var(--md-sys-primary) 42%, transparent);
+    outline-offset: 2px;
+}
+
+.plan-weekly-day strong,
+.plan-weekly-day small {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.plan-weekly-day small {
+    margin-top: 2px;
+    color: inherit;
+    opacity: .74;
+}
+
+.plan-weekly-day > .material-symbols-rounded {
+    justify-self: end;
+    font-size: 20px;
+    color: inherit;
+    opacity: .82;
+}
+
+.plan-weekly-day-progress {
+    grid-column: 1 / -1;
+    align-self: end;
+    height: 5px;
+    border-radius: var(--md-sys-shape-full);
+    overflow: hidden;
+    background: color-mix(in srgb, currentColor 13%, transparent);
+}
+
+.plan-weekly-day-progress i {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: currentColor;
+    opacity: .82;
+}
+
+.plan-weekly-detail {
+    min-height: 72px;
+}
+
+.plan-weekly-task-main {
+    display: grid;
+    grid-template-columns: 24px minmax(0, 1fr) auto;
+    gap: 8px;
+}
+
+.plan-weekly-task-main > .material-symbols-rounded {
+    color: var(--md-sys-primary);
+    font-size: 21px;
+}
+
+.plan-weekly-task-main small {
+    height: 22px;
+    padding: 0 8px;
+    border-radius: var(--md-sys-shape-full);
+    display: inline-flex;
+    align-items: center;
+    background: color-mix(in srgb, var(--md-sys-surface-container-highest) 76%, transparent);
+    color: var(--md-sys-on-surface-variant);
+    font-size: 11px;
+    font-weight: 800;
+}
+
+.plan-weekly-drag-ghost {
+    position: fixed;
+    z-index: 80;
+    pointer-events: none;
+    width: min(280px, calc(100vw - 32px));
+    transform: translate(-50%, -50%) scale(.98);
+    opacity: .94;
+    border-radius: var(--md-sys-shape-lg);
+    background: var(--md-sys-primary-container);
+    color: var(--md-sys-on-primary-container);
+    box-shadow: var(--md-sys-elevation-3);
+    padding: 6px;
+}
+
+.plan-ai-chip-row {
+    display: flex;
+    overflow-x: auto;
+    padding-bottom: 2px;
+    scrollbar-width: none;
+}
+
+.plan-ai-chip-row::-webkit-scrollbar {
+    display: none;
+}
+
+.plan-ai-chip-row .md-chip {
+    flex: none;
+}
+
+.plan-ai-type-chip {
+    border: 1px solid transparent;
+}
+
+.plan-ai-type-chip.active {
+    border-color: color-mix(in srgb, var(--md-sys-primary) 44%, transparent);
+    background: var(--md-sys-primary-container);
+    color: var(--md-sys-on-primary-container);
+}
+
+.plan-ai-type-chip .material-symbols-rounded {
+    font-size: 16px;
+}
+
+.plan-ai-preview-plan {
+    display: grid;
+    gap: 10px;
+    padding: 12px;
+    border: 1px solid var(--md-sys-outline-variant);
+    border-radius: var(--md-sys-shape-xl);
+    background: var(--md-sys-surface-container-low);
+}
+
+.plan-ai-preview-plan-head {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 44px;
+    gap: 8px;
+    align-items: center;
+}
+
+.plan-ai-preview-item {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 40px;
+    gap: 10px;
+    align-items: start;
+    padding: 10px;
+    border: 1px solid color-mix(in srgb, var(--md-sys-outline-variant) 72%, transparent);
+    border-radius: var(--md-sys-shape-lg);
+    background: var(--md-sys-surface-container-lowest);
+}
+
+.plan-ai-preview-name,
+.plan-ai-preview-category,
+.plan-ai-preview-reason,
+.plan-ai-preview-spec {
+    grid-column: 1 / 2;
+}
+
+.plan-ai-preview-spec {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+    gap: 8px;
+}
+
+.plan-ai-preview-alt {
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 10px;
+    border: 1.5px solid var(--md-sys-outline-variant);
+    border-radius: var(--md-sys-shape-sm);
+    background: var(--md-sys-surface-container-lowest);
+    color: var(--md-sys-on-surface-variant);
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.plan-ai-preview-alt input {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--md-sys-primary);
+}
+
+.plan-ai-preview-item > .md-icon-btn {
+    grid-column: 2 / 3;
+    grid-row: 1 / span 3;
+}
+
+.plan-save-routine-sheet {
+    display: grid;
+    gap: 6px;
+    color: var(--md-sys-on-surface-variant);
+    font-size: 14px;
+}
+
+.plan-ai-raw pre {
+    max-height: 240px;
+    overflow: auto;
+    border-radius: var(--md-sys-shape-lg);
+    background: var(--md-sys-surface-container-low);
+    padding: 10px;
+    white-space: pre-wrap;
+}

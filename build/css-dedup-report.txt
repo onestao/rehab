@@ -2,58 +2,73 @@
   01-vars.css, 37-dark-mode.css, 49-plan.css, 41-m3e-effects.css
 
 .advice-bubble
-  18-health-diet.css, 41-m3e-effects.css
+  46-advice-ai.css, 41-m3e-effects.css
 
 .advice-bubble-content
-  18-health-diet.css, 36-responsive.css
+  36-responsive.css, 46-advice-ai.css
 
 .advice-bubble.assistant
-  18-health-diet.css, 36-responsive.css
+  36-responsive.css, 46-advice-ai.css
 
 .advice-model-claude
-  18-health-diet.css, 37-dark-mode.css
+  37-dark-mode.css, 46-advice-ai.css
 
 .advice-model-deepseek
-  18-health-diet.css, 37-dark-mode.css
+  37-dark-mode.css, 46-advice-ai.css
 
 .advice-model-doubao
-  18-health-diet.css, 37-dark-mode.css
+  37-dark-mode.css, 46-advice-ai.css
 
 .advice-model-gemini
-  18-health-diet.css, 37-dark-mode.css
+  37-dark-mode.css, 46-advice-ai.css
 
 .advice-model-generic
-  18-health-diet.css, 37-dark-mode.css
+  37-dark-mode.css, 46-advice-ai.css
 
 .advice-model-glm
-  18-health-diet.css, 37-dark-mode.css
+  37-dark-mode.css, 46-advice-ai.css
 
 .advice-model-grok
-  18-health-diet.css, 37-dark-mode.css
+  37-dark-mode.css, 46-advice-ai.css
 
 .advice-model-kimi
-  18-health-diet.css, 37-dark-mode.css
+  37-dark-mode.css, 46-advice-ai.css
 
 .advice-model-mark
-  18-health-diet.css, 37-dark-mode.css
+  37-dark-mode.css, 46-advice-ai.css
 
 .advice-model-mimo
-  18-health-diet.css, 37-dark-mode.css
+  37-dark-mode.css, 46-advice-ai.css
 
 .advice-model-minimax
-  18-health-diet.css, 37-dark-mode.css
+  37-dark-mode.css, 46-advice-ai.css
 
 .advice-model-openai
-  18-health-diet.css, 37-dark-mode.css
+  37-dark-mode.css, 46-advice-ai.css
 
 .advice-model-qwen
-  18-health-diet.css, 37-dark-mode.css
+  37-dark-mode.css, 46-advice-ai.css
 
 .advice-quick-prompts
-  18-health-diet.css, 41-m3e-effects.css
+  46-advice-ai.css, 41-m3e-effects.css
 
 .advice-quick-prompts::-webkit-scrollbar
-  18-health-diet.css, 41-m3e-effects.css
+  46-advice-ai.css, 41-m3e-effects.css
+
+.ai-hero
+  50-v6-ui.css, 54-v6-ai.css, 41-m3e-effects.css
+
+.ai-hero p
+  50-v6-ui.css, 54-v6-ai.css
+
+.ai-input
+  50-v6-ui.css, 54-v6-ai.css
+
+.ai-msg
+  50-v6-ui.css, 54-v6-ai.css
+
+.ai-msg.ai
+  54-v6-ai.css, 41-m3e-effects.css
 
 .ai-template-actions .material-symbols-rounded
   20-settings-ai.css, 36-responsive.css
@@ -109,6 +124,9 @@
 .calendar-toolbar
   16-history-hero-calendar.css, 36-responsive.css
 
+.calorie-head
+  50-v6-ui.css, 51-v6-today.css
+
 .collapsible-card
   17-record-tabs-health.css, 19-health-weightloss-ai.css
 
@@ -137,10 +155,10 @@
   18-health-diet.css, 37-dark-mode.css
 
 .fab-play
-  28-workout-fab.css, 50-v6-ui.css
+  28-workout-fab.css, 52-v6-workout.css
 
 .fab-play .material-symbols-rounded
-  28-workout-fab.css, 50-v6-ui.css
+  28-workout-fab.css, 52-v6-workout.css
 
 .food-result-item
   18-health-diet.css, 37-dark-mode.css
@@ -148,53 +166,23 @@
 .food-result-item:active
   18-health-diet.css, 37-dark-mode.css
 
+.glass-card
+  50-v6-ui.css, 41-m3e-effects.css
+
 .health-swipe-deck
-  38-record-page.css, 50-v6-ui.css
+  38-record-page.css, 53-v6-records.css
 
 .health-swipe-page
-  38-record-page.css, 50-v6-ui.css
+  38-record-page.css, 53-v6-records.css
+
+.hero
+  50-v6-ui.css, 51-v6-today.css, 41-m3e-effects.css
 
 .hero-stat
   16-history-hero-calendar.css, 36-responsive.css
 
 .hero-stat-row
   16-history-hero-calendar.css, 36-responsive.css
-
-.history-month-content
-  15-components-lists.css, 99-custom-overrides.css
-
-.history-month-group
-  15-components-lists.css, 99-custom-overrides.css
-
-.history-month-group.collapsed .history-month-content
-  15-components-lists.css, 99-custom-overrides.css
-
-.history-month-head
-  15-components-lists.css, 99-custom-overrides.css
-
-.history-month-head .material-symbols-rounded
-  15-components-lists.css, 99-custom-overrides.css
-
-.history-month-head small
-  15-components-lists.css, 99-custom-overrides.css
-
-.history-month-head strong
-  15-components-lists.css, 99-custom-overrides.css
-
-.history-month-head::after
-  15-components-lists.css, 99-custom-overrides.css
-
-.history-month-head:active
-  15-components-lists.css, 99-custom-overrides.css
-
-.history-month-head:active::after
-  15-components-lists.css, 99-custom-overrides.css
-
-.history-month-head:hover
-  15-components-lists.css, 99-custom-overrides.css
-
-.history-month-head:hover::after
-  15-components-lists.css, 99-custom-overrides.css
 
 .input-card
   33-workout-input-card.css, 36-responsive.css
@@ -215,10 +203,10 @@
   24-routines-cards.css, 45-library-segment.css
 
 .library-swipe-deck
-  45-library-segment.css, 50-v6-ui.css
+  45-library-segment.css, 53-v6-records.css
 
 .library-swipe-page
-  45-library-segment.css, 50-v6-ui.css
+  45-library-segment.css, 53-v6-records.css
 
 .list-item
   15-components-lists.css, 36-responsive.css, 37-dark-mode.css, 41-m3e-effects.css
@@ -239,22 +227,22 @@
   08-components-cards.css, 36-responsive.css, 37-dark-mode.css, 50-v6-ui.css, 41-m3e-effects.css
 
 .md-chip
-  05-layout-chip.css, 50-v6-ui.css, 41-m3e-effects.css
+  05-layout-chip.css, 50-v6-ui.css, 52-v6-workout.css, 41-m3e-effects.css
 
 .md-chip:active
-  50-v6-ui.css, 41-m3e-effects.css
+  52-v6-workout.css, 41-m3e-effects.css
 
 .md-fab
-  28-workout-fab.css, 50-v6-ui.css, 41-m3e-effects.css
+  28-workout-fab.css, 52-v6-workout.css, 41-m3e-effects.css
 
 .md-fab:active
-  28-workout-fab.css, 50-v6-ui.css
+  28-workout-fab.css, 52-v6-workout.css
 
 .md-field
-  10-components-fields.css, 50-v6-ui.css
+  10-components-fields.css, 50-v6-ui.css, 52-v6-workout.css, 41-m3e-effects.css
 
 .md-field input
-  10-components-fields.css, 37-dark-mode.css, 50-v6-ui.css
+  10-components-fields.css, 37-dark-mode.css, 52-v6-workout.css
 
 .md-field input:focus
   10-components-fields.css, 37-dark-mode.css
@@ -266,10 +254,10 @@
   10-components-fields.css, 37-dark-mode.css
 
 .md-field label
-  10-components-fields.css, 50-v6-ui.css
+  10-components-fields.css, 52-v6-workout.css
 
 .md-field select
-  10-components-fields.css, 37-dark-mode.css, 50-v6-ui.css
+  10-components-fields.css, 37-dark-mode.css, 52-v6-workout.css
 
 .md-field select:focus
   10-components-fields.css, 37-dark-mode.css
@@ -278,7 +266,7 @@
   10-components-fields.css, 37-dark-mode.css
 
 .md-grid
-  11-components-grid.css, 36-responsive.css, 50-v6-ui.css
+  11-components-grid.css, 36-responsive.css, 52-v6-workout.css
 
 .md-modal-sheet
   35-components-modal.css, 38-record-page.css
@@ -287,25 +275,25 @@
   35-components-modal.css, 38-record-page.css
 
 .md-nav-rail
-  27-layout-nav.css, 36-responsive.css, 37-dark-mode.css, 50-v6-ui.css
+  27-layout-nav.css, 36-responsive.css, 37-dark-mode.css, 56-v6-nav.css
 
 .md-top-app-bar
   04-layout-appbar.css, 37-dark-mode.css
 
 .mode-tab
-  22-workout-mode-tabs.css, 50-v6-ui.css
+  22-workout-mode-tabs.css, 50-v6-ui.css, 52-v6-workout.css
 
 .mode-tab .material-symbols-rounded
-  22-workout-mode-tabs.css, 50-v6-ui.css
+  22-workout-mode-tabs.css, 52-v6-workout.css
 
 .mode-tab:active
   22-workout-mode-tabs.css, 41-m3e-effects.css
 
 .mode-tab.active
-  22-workout-mode-tabs.css, 50-v6-ui.css
+  22-workout-mode-tabs.css, 52-v6-workout.css
 
 .mode-tabs
-  22-workout-mode-tabs.css, 50-v6-ui.css
+  22-workout-mode-tabs.css, 52-v6-workout.css, 41-m3e-effects.css
 
 .nav-content
   27-layout-nav.css, 50-v6-ui.css
@@ -321,6 +309,60 @@
 
 .nav-item.active .material-symbols-rounded
   27-layout-nav.css, 37-dark-mode.css
+
+.nav-item.active .nav-content > .material-symbols-rounded
+  27-layout-nav.css, 56-v6-nav.css
+
+.plan-ai-chip-row
+  49-plan.css, 49-plan-ai.css
+
+.plan-ai-preview-item > .md-icon-btn
+  49-plan.css, 49-plan-ai.css
+
+.plan-ai-preview-spec
+  49-plan.css, 49-plan-ai.css
+
+.plan-card .plan-head
+  50-v6-ui.css, 51-v6-today.css
+
+.plan-card .pn
+  50-v6-ui.css, 51-v6-today.css
+
+.plan-chip
+  50-v6-ui.css, 51-v6-today.css, 41-m3e-effects.css
+
+.plan-cooldown-actions
+  49-plan.css, 49-plan-ai.css
+
+.plan-cooldown-progress
+  49-plan.css, 49-plan-ai.css
+
+.plan-feedback-grid
+  49-plan.css, 49-plan-ai.css
+
+.plan-weekly-detail
+  49-plan.css, 49-plan-ai.css
+
+.plan-weekly-list
+  49-plan.css, 49-plan-ai.css
+
+.plan-weekly-task-main
+  49-plan.css, 49-plan-ai.css
+
+.plan-weekly-task-main small
+  49-plan.css, 49-plan-ai.css
+
+.profile-hero
+  50-v6-ui.css, 55-v6-profile.css, 41-m3e-effects.css
+
+.profile-info
+  50-v6-ui.css, 55-v6-profile.css
+
+.profile-info h2
+  50-v6-ui.css, 55-v6-profile.css
+
+.profile-info small
+  50-v6-ui.css, 55-v6-profile.css
 
 .record-icon
   15-components-lists.css, 17-record-tabs-health.css
@@ -341,28 +383,28 @@
   38-record-page.css, 36-responsive.css
 
 .record-quick-btn
-  38-record-page.css, 36-responsive.css, 50-v6-ui.css
+  38-record-page.css, 36-responsive.css, 51-v6-today.css, 41-m3e-effects.css
 
 .record-quick-btn .material-symbols-rounded
-  38-record-page.css, 36-responsive.css, 50-v6-ui.css
+  38-record-page.css, 36-responsive.css, 51-v6-today.css
 
 .record-quick-btn:active
-  38-record-page.css, 50-v6-ui.css, 41-m3e-effects.css
+  38-record-page.css, 51-v6-today.css, 41-m3e-effects.css
 
 .record-section-title
   16-history-hero-calendar.css, 36-responsive.css
 
 .record-tab
-  17-record-tabs-health.css, 50-v6-ui.css
+  17-record-tabs-health.css, 50-v6-ui.css, 53-v6-records.css
 
 .record-tab .material-symbols-rounded
-  17-record-tabs-health.css, 50-v6-ui.css
+  17-record-tabs-health.css, 53-v6-records.css
 
 .record-tab.active
-  17-record-tabs-health.css, 50-v6-ui.css
+  17-record-tabs-health.css, 53-v6-records.css
 
 .record-tabs
-  17-record-tabs-health.css, 50-v6-ui.css
+  17-record-tabs-health.css, 53-v6-records.css, 41-m3e-effects.css
 
 .record-tabs-scroll
   38-record-page.css, 36-responsive.css
@@ -370,41 +412,71 @@
 .record-tabs-scroll .record-tab
   38-record-page.css, 36-responsive.css
 
+.ring::after
+  51-v6-today.css, 41-m3e-effects.css
+
 .session-time
   09-workout-timer.css, 37-dark-mode.css
 
+.setting-row
+  50-v6-ui.css, 55-v6-profile.css
+
+.setting-row .copy
+  50-v6-ui.css, 55-v6-profile.css
+
+.setting-row .copy small
+  50-v6-ui.css, 55-v6-profile.css
+
+.setting-row .copy strong
+  50-v6-ui.css, 55-v6-profile.css
+
+.setting-row .ico
+  55-v6-profile.css, 41-m3e-effects.css
+
 .stat-item
-  09-workout-timer.css, 50-v6-ui.css
+  09-workout-timer.css, 52-v6-workout.css
 
 .stat-label
-  09-workout-timer.css, 50-v6-ui.css
+  09-workout-timer.css, 52-v6-workout.css
+
+.stat-tile
+  50-v6-ui.css, 53-v6-records.css, 41-m3e-effects.css
+
+.stat-tile .delta
+  50-v6-ui.css, 53-v6-records.css
+
+.stat-tile .val
+  50-v6-ui.css, 53-v6-records.css
+
+.streak-chip
+  50-v6-ui.css, 51-v6-today.css, 41-m3e-effects.css
 
 .strength-input-grid
   33-workout-input-card.css, 36-responsive.css
 
 .strength-presets
-  33-workout-input-card.css, 50-v6-ui.css
+  33-workout-input-card.css, 52-v6-workout.css
 
 .strength-presets::-webkit-scrollbar
-  33-workout-input-card.css, 50-v6-ui.css
+  33-workout-input-card.css, 52-v6-workout.css
 
 .timer-panel
-  09-workout-timer.css, 37-dark-mode.css, 50-v6-ui.css
+  09-workout-timer.css, 37-dark-mode.css, 50-v6-ui.css, 52-v6-workout.css, 41-m3e-effects.css
 
 .timer-panel::after
-  09-workout-timer.css, 50-v6-ui.css
+  09-workout-timer.css, 52-v6-workout.css
 
 .timer-panel::before
-  09-workout-timer.css, 50-v6-ui.css
+  09-workout-timer.css, 52-v6-workout.css
 
 .timer-panel:active
-  09-workout-timer.css, 50-v6-ui.css
+  09-workout-timer.css, 52-v6-workout.css
 
 .timer-panel:hover
-  09-workout-timer.css, 50-v6-ui.css
+  09-workout-timer.css, 52-v6-workout.css
 
 .timer-stats
-  09-workout-timer.css, 50-v6-ui.css
+  09-workout-timer.css, 52-v6-workout.css
 
 .timer-stats b
   09-workout-timer.css, 36-responsive.css
@@ -433,50 +505,14 @@
 .weight-card
   17-record-tabs-health.css, 19-health-weightloss-ai.css, 36-responsive.css
 
-.weight-history-card
-  15-components-lists.css, 99-custom-overrides.css
-
-.weight-history-card.collapsed .weight-history-content
-  15-components-lists.css, 99-custom-overrides.css
-
-.weight-history-content
-  15-components-lists.css, 99-custom-overrides.css
-
-.weight-history-head
-  15-components-lists.css, 99-custom-overrides.css
-
-.weight-history-head .material-symbols-rounded
-  15-components-lists.css, 99-custom-overrides.css
-
-.weight-history-head small
-  15-components-lists.css, 99-custom-overrides.css
-
-.weight-history-head strong
-  15-components-lists.css, 99-custom-overrides.css
-
-.weight-history-head::after
-  15-components-lists.css, 99-custom-overrides.css
-
-.weight-history-head:active
-  15-components-lists.css, 99-custom-overrides.css
-
-.weight-history-head:active::after
-  15-components-lists.css, 99-custom-overrides.css
-
-.weight-history-head:hover
-  15-components-lists.css, 99-custom-overrides.css
-
-.weight-history-head:hover::after
-  15-components-lists.css, 99-custom-overrides.css
-
 .weight-range
-  17-record-tabs-health.css, 20-settings-ai.css
+  17-record-tabs-health.css, 57-weight-report.css
 
 .weight-range-tabs
-  17-record-tabs-health.css, 20-settings-ai.css
+  17-record-tabs-health.css, 57-weight-report.css
 
 .weight-range.active
-  17-record-tabs-health.css, 20-settings-ai.css
+  17-record-tabs-health.css, 57-weight-report.css
 
 .weightloss-option
   19-health-weightloss-ai.css, 37-dark-mode.css
@@ -488,7 +524,7 @@
   19-health-weightloss-ai.css, 37-dark-mode.css
 
 .workout-controls
-  28-workout-fab.css, 37-dark-mode.css, 50-v6-ui.css
+  28-workout-fab.css, 37-dark-mode.css, 52-v6-workout.css
 
 .workout-plan-card
   39-workout-plan.css, 36-responsive.css
@@ -512,7 +548,7 @@
   39-workout-plan.css, 36-responsive.css
 
 .workout-plan-toolbar
-  39-workout-plan.css, 50-v6-ui.css
+  39-workout-plan.css, 52-v6-workout.css
 
 *
   02-base.css, 36-responsive.css, 50-v6-ui.css, 40-a11y.css
@@ -524,7 +560,7 @@
   02-base.css, 36-responsive.css, 50-v6-ui.css, 40-a11y.css
 
 #ai-coach.page.active
-  06-layout-page.css, 18-health-diet.css
+  06-layout-page.css, 46-advice-ai.css
 
 #app
   06-layout-page.css, 36-responsive.css
@@ -545,25 +581,28 @@ body
   02-base.css, 06-layout-page.css, 37-dark-mode.css
 
 from
-  06-layout-page.css, 18-health-diet.css, 20-settings-ai.css, 38-record-page.css, 43-identity-card.css, 47-view-transitions.css, 50-v6-ui.css, 41-m3e-effects.css
+  06-layout-page.css, 38-record-page.css, 43-identity-card.css, 46-advice-ai.css, 47-view-transitions.css, 50-v6-ui.css, 57-weight-report.css, 41-m3e-effects.css
 
 media (max-width: 360px)
   18-health-diet.css, 19-health-weightloss-ai.css, 24-routines-cards.css, 33-workout-input-card.css, 36-responsive.css, 43-identity-card.css, 49-action-history-weekly.css, 49-plan.css
+
+media (max-width: 380px)
+  51-v6-today.css, 52-v6-workout.css, 55-v6-profile.css
 
 media (max-width: 480px)
   19-health-weightloss-ai.css, 22-workout-mode-tabs.css, 24-routines-cards.css, 36-responsive.css, 49-action-history-weekly.css, 49-plan.css
 
 media (max-width: 520px)
-  20-settings-ai.css, 26-settings-sync.css
+  26-settings-sync.css, 57-weight-report.css
 
 media (min-width: 600px)
   06-layout-page.css, 36-responsive.css
 
 media (prefers-color-scheme: dark)
-  08-components-cards.css, 16-history-hero-calendar.css, 37-dark-mode.css, 50-v6-ui.css
+  08-components-cards.css, 16-history-hero-calendar.css, 37-dark-mode.css, 50-v6-ui.css, 51-v6-today.css
 
 media (prefers-reduced-motion: reduce)
   36-responsive.css, 50-v6-ui.css, 40-a11y.css
 
 to
-  06-layout-page.css, 18-health-diet.css, 20-settings-ai.css, 38-record-page.css, 43-identity-card.css, 47-view-transitions.css, 50-v6-ui.css, 41-m3e-effects.css
+  06-layout-page.css, 18-health-diet.css, 38-record-page.css, 43-identity-card.css, 46-advice-ai.css, 47-view-transitions.css, 50-v6-ui.css, 57-weight-report.css, 41-m3e-effects.css

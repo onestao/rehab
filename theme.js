@@ -83,14 +83,6 @@ const theme = {
 
     apply(seed) {
         const themeName = this.seedMap?.[this.cfg.mode] || '';
-        if (themeName) {
-            document.documentElement.setAttribute('data-theme', themeName);
-        } else {
-            document.documentElement.removeAttribute('data-theme');
-        }
-        document.documentElement.classList.add('theme-transitioning');
-        clearTimeout(this._tT);
-        this._tT = setTimeout(() => document.documentElement.classList.remove('theme-transitioning'), 400);
         const rgb = this.hexToRgb(seed);
         const hsl = this.rgbToHsl(rgb.r, rgb.g, rgb.b);
         const systemDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -109,8 +101,7 @@ const theme = {
         const darkTertiary = this.hslToHex((hsl.h + 60) % 360, 0.48, 0.78);
         const darkTertiaryContainer = this.hslToHex((hsl.h + 60) % 360, 0.38, 0.30);
         const surfaceHue = hsl.h;
-
-        this.setVars({
+        const vars = {
             '--md-sys-primary': dark ? darkPrimary : primary,
             '--md-sys-on-primary': dark ? this.hslToHex(hsl.h, 0.78, 0.14) : '#ffffff',
             '--md-sys-primary-container': dark ? darkPrimaryContainer : primaryContainer,
@@ -136,9 +127,25 @@ const theme = {
             '--timer-time-color': this.hslToHex(hsl.h, 0.88, dark ? 0.84 : 0.84),
             '--timer-orb': this.hexToRgba(dark ? darkPrimary : primaryContainer, dark ? 0.10 : 0.15),
             '--theme-seed': seed
-        });
-        document.querySelector('meta[name="theme-color"]')?.setAttribute('content', primary);
-        try { data?.applyPickerThemeFromCache?.(); } catch {}
+        };
+        const run = () => {
+            if (themeName) {
+                document.documentElement.setAttribute('data-theme', themeName);
+            } else {
+                document.documentElement.removeAttribute('data-theme');
+            }
+            document.documentElement.classList.add('theme-transitioning');
+            clearTimeout(this._tT);
+            this._tT = setTimeout(() => document.documentElement.classList.remove('theme-transitioning'), 400);
+            this.setVars(vars);
+            document.querySelector('meta[name="theme-color"]')?.setAttribute('content', primary);
+            try { data?.applyPickerThemeFromCache?.(); } catch {}
+        };
+        if (document.startViewTransition) {
+            document.startViewTransition(run);
+        } else {
+            run();
+        }
     },
 
     setVars(vars) {

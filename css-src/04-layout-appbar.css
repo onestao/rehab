@@ -6,9 +6,10 @@
     justify-content: space-between;
     padding: 6px 0;
     background: transparent;
-    position: relative;
+    position: static;
     flex: none;
-    transition: box-shadow var(--md-sys-motion-duration-short) var(--md-sys-motion-emphasized);
+    transition: background .3s var(--md-sys-motion-emphasized),
+                box-shadow .3s var(--md-sys-motion-emphasized);
 }
 .workout-only-bar { margin-bottom: 0; }
 .bar-leading {

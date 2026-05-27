@@ -166,3 +166,41 @@
     text-shadow: 0 0 12px rgba(245,158,11,0.35);
 }
 
+/* Timer Tweak ±15s chips — dark glass context inside timer-panel */
+.timer-tweak {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    position: relative;
+    z-index: 1;
+}
+.timer-tweak .md-chip {
+    font-size: 13px;
+    font-weight: 700;
+    padding: 6px 20px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    background: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.85);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 72px;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    transition: transform 0.15s var(--md-sys-motion-spring),
+                background 0.15s ease;
+    -webkit-tap-highlight-color: transparent;
+}
+.timer-tweak .md-chip:hover {
+    background: rgba(255, 255, 255, 0.18);
+}
+.timer-tweak .md-chip:active {
+    transform: scale(0.94);
+    background: rgba(255, 255, 255, 0.26);
+}
+

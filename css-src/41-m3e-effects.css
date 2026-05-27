@@ -46,6 +46,16 @@ body.is-training .md-fab.fab-play {
 @keyframes m3e-ripple {
     to { transform: translate(-50%, -50%) scale(20); opacity: 0; }
 }
+.ripple {
+    position: absolute;
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    background: color-mix(in srgb, currentColor 22%, transparent);
+    transform: translate(-50%, -50%) scale(0);
+    pointer-events: none;
+    animation: m3e-ripple .55s ease-out forwards;
+    z-index: 0;
+}
 
 /* TASK-19: AI教练气泡逐字流入动画 */
 @keyframes m3e-token-in {
@@ -55,11 +65,22 @@ body.is-training .md-fab.fab-play {
 .m3e-token-in { animation: m3e-token-in .26s var(--md-expressive-spring) both; }
 
 /* TASK-20: 主题切换液态过渡 */
-:root { transition: background-color .35s ease, color .35s ease; }
+:root {
+    transition:
+        background-color .6s var(--md-sys-motion-emphasized),
+        color .35s ease;
+}
 .md-card, .md-btn, .md-chip, .md-fab, .nav-item, .calendar-day,
-.advice-bubble, .day-detail-item, .list-item {
-    transition: background-color .35s ease, color .35s ease,
-                border-color .35s ease, box-shadow .35s ease;
+.advice-bubble, .day-detail-item, .list-item,
+.glass-card, .hero, .timer-panel, .ai-hero, .profile-hero,
+.stat-tile, .record-quick-btn, .mode-tabs, .record-tabs,
+.md-field, .ai-msg.ai, .ring::after, .plan-chip, .streak-chip,
+.setting-row .ico {
+    transition:
+        background .6s var(--md-sys-motion-emphasized),
+        color .35s ease,
+        border-color .35s ease,
+        box-shadow .6s var(--md-sys-motion-emphasized);
 }
 
 /* TASK-21: AI教练快捷预设chip横滑 */

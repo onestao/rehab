@@ -95,12 +95,12 @@
     background:
         conic-gradient(
             from -90deg,
-            #0061a4 0deg var(--pro-stop),
-            color-mix(in srgb, #0061a4 18%, var(--md-sys-surface-container-highest)) var(--pro-stop) 120deg,
-            #8b5cf6 120deg var(--carb-stop),
-            color-mix(in srgb, #8b5cf6 18%, var(--md-sys-surface-container-highest)) var(--carb-stop) 240deg,
-            #f59e0b 240deg var(--fat-stop),
-            color-mix(in srgb, #f59e0b 20%, var(--md-sys-surface-container-highest)) var(--fat-stop) 360deg
+            var(--c-pro) 0deg var(--pro-stop, 0deg),
+            color-mix(in srgb, var(--c-pro) 18%, var(--md-sys-surface-container-highest)) var(--pro-stop, 0deg) 120deg,
+            var(--c-carb) 120deg var(--carb-stop, 120deg),
+            color-mix(in srgb, var(--c-carb) 18%, var(--md-sys-surface-container-highest)) var(--carb-stop, 120deg) 240deg,
+            var(--c-fat) 240deg var(--fat-stop, 240deg),
+            color-mix(in srgb, var(--c-fat) 20%, var(--md-sys-surface-container-highest)) var(--fat-stop, 240deg) 360deg
         );
 }
 .today-focus-ring::after {

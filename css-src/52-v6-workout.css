@@ -1,0 +1,88 @@
+/* --- V6 Workout (timer-panel V6 / mode-tabs V6 / md-fab V6 / md-field V6 / md-chip V6) --- */
+
+.timer-panel {
+    background: linear-gradient(160deg, color-mix(in srgb, var(--md-sys-primary) 90%, #000) 0%, var(--md-sys-primary) 40%, var(--md-sys-primary-container) 100%);
+    border-radius: 28px;
+    padding: 24px 20px;
+    margin-bottom: 12px;
+    color: var(--md-sys-on-primary);
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 12px 32px color-mix(in srgb, var(--md-sys-primary) 35%, transparent);
+    transition: background 0.6s var(--md-sys-motion-emphasized);
+}
+.timer-panel:hover {
+    box-shadow: 0 12px 32px color-mix(in srgb, var(--md-sys-primary) 35%, transparent),
+                inset 0 0 0 9999px rgba(255, 255, 255, 0.05);
+}
+.timer-panel:active {
+    box-shadow: 0 12px 32px color-mix(in srgb, var(--md-sys-primary) 35%, transparent),
+                inset 0 0 0 9999px rgba(255, 255, 255, 0.1);
+}
+.timer-panel:focus { outline: none; }
+.timer-panel .timer-tts-btn,
+.timer-panel .skip-btn,
+.timer-panel .timer-wakelock-btn {
+    max-width: calc(100% - 20px);
+}
+.timer-panel .timer-tts-btn {
+    left: 10px;
+}
+.timer-panel .skip-btn,
+.timer-panel .timer-wakelock-btn {
+    right: 10px;
+}
+.timer-panel::before, .timer-panel::after { content: ''; position: absolute; border-radius: 50%; pointer-events: none; }
+.timer-panel::before { width: 120px; height: 120px; background: color-mix(in srgb, var(--md-sys-on-primary) 8%, transparent); top: -30px; right: -20px; animation: orb 8s ease-in-out infinite; }
+.timer-panel::after { width: 80px; height: 80px; background: color-mix(in srgb, var(--md-sys-on-primary) 6%, transparent); bottom: -20px; left: 20px; animation: orb 10s ease-in-out infinite reverse; }
+.status-text,
+.timer-panel #statusText { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 3px; opacity: 0.7; color: var(--md-sys-on-primary); }
+.main-time,
+.timer-panel #mainTime { font-size: clamp(68px, 20vw, 88px); font-weight: 300; letter-spacing: -3px; line-height: 1; margin: 4px 0; color: var(--md-sys-on-primary); text-shadow: 0 2px 12px rgba(0,0,0,0.15); }
+.sub-text,
+.timer-panel #subText { font-size: 13px; opacity: 0.85; margin-bottom: 12px; color: var(--md-sys-on-primary); }
+.timer-stats { display: flex; gap: 8px; background: color-mix(in srgb, var(--md-sys-on-primary) 12%, transparent); border: 1px solid color-mix(in srgb, var(--md-sys-on-primary) 18%, transparent); border-radius: 16px; padding: 10px; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+.stat-item { flex: 1; text-align: center; }
+.stat-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.7; display: block; }
+.stat-item b { font-size: 16px; font-weight: 600; }
+
+.mode-tabs { display: flex; background: var(--glass-bg); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border: 1px solid var(--glass-border); border-radius: 999px; padding: 4px; margin-bottom: 12px; }
+.mode-tab { flex: 1 1 0; display: flex; align-items: center; justify-content: center; gap: 4px; padding: 8px 6px; border-radius: 999px; border: none; background: transparent; cursor: pointer; font-size: 12px; font-weight: 600; color: var(--md-sys-on-surface-variant); transition: all 0.2s; -webkit-tap-highlight-color: transparent; }
+.mode-tab.active { background: var(--md-sys-primary); color: var(--md-sys-on-primary); box-shadow: var(--md-sys-elevation-1); }
+.mode-tab .material-symbols-rounded { font-size: 18px; }
+
+.strength-presets { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; margin-bottom: 10px; }
+.strength-presets::-webkit-scrollbar { display: none; }
+.md-chip { flex: none; padding: 6px 12px; border-radius: 999px; background: var(--glass-bg); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid var(--glass-border); font-size: 11px; font-weight: 600; color: var(--md-sys-on-primary-container); cursor: pointer; white-space: nowrap; transition: transform 0.15s var(--md-sys-motion-spring); }
+.md-chip:active { transform: scale(0.95); }
+
+.md-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.md-field { background: var(--glass-bg); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid var(--glass-border); border-radius: 12px; padding: 8px 12px; position: relative; }
+.md-field.span-full { grid-column: 1 / -1; }
+.md-field label { font-size: 10px; font-weight: 600; color: var(--md-sys-on-surface-variant); display: block; margin-bottom: 2px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.md-field input,
+.md-field select,
+.md-field textarea { width: 100%; min-width: 0; border: none; background: transparent; font-size: 14px; font-weight: 500; color: var(--md-sys-on-surface); outline: none; }
+
+.workout-controls { display: inline-flex; justify-content: center; align-items: center; gap: 14px; margin: 12px auto; padding: 10px 16px; border-radius: 999px; background: var(--glass-bg); backdrop-filter: blur(18px) saturate(1.45); -webkit-backdrop-filter: blur(18px) saturate(1.45); border: 1px solid var(--glass-border); box-shadow: var(--glass-shadow-inset); }
+.md-fab { width: 56px; height: 56px; border-radius: 50%; border: none; background: var(--glass-bg); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); border: 1px solid var(--glass-border); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: var(--md-sys-elevation-2); transition: transform 0.2s var(--md-sys-motion-spring); -webkit-tap-highlight-color: transparent; }
+.md-fab:active { transform: scale(0.94); }
+.fab-play { width: auto; min-width: 132px; height: 56px; border-radius: 28px; background: var(--md-sys-primary); color: var(--md-sys-on-primary); gap: 6px; padding-inline: 18px; font-size: 13px; font-weight: 600; animation: fab-glow 2.5s ease-in-out infinite; }
+.fab-play .material-symbols-rounded { flex: none; }
+.fab-play .fab-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.workout-plan-toolbar,
+.strength-presets {
+    max-width: 100%;
+    contain: inline-size;
+}
+
+@media (max-width: 380px) {
+    .main-time,
+    .timer-panel #mainTime { font-size: 64px; }
+    .timer-panel { padding: 20px 16px; }
+    .mode-tab { font-size: 11px; gap: 2px; }
+    .mode-tab .material-symbols-rounded { font-size: 16px; }
+    .workout-controls { gap: 10px; padding-inline: 12px; }
+    .fab-play { min-width: 116px; padding-inline: 12px; }
+}
