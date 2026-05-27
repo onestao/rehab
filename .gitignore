@@ -1,4 +1,6 @@
 .kilo/
+.codegraph/
+.cursor/
 archive/
 node_modules
 *.tsbuildinfo

@@ -13,7 +13,11 @@
     "lint": "npm run lint:js",
     "typecheck": "tsc -p tsconfig.check.json",
     "test": "node --test test/*.test.mjs",
-    "ci": "npm run lint && npm run typecheck && npm run test && npx --yes size-limit"
+    "check:css-markers": "node scripts/check-css-section-markers.mjs",
+    "check:css-overlap": "node scripts/css-overlap-report.mjs",
+    "check:99-targets": "node scripts/check-99-targets.mjs",
+    "check:css": "npm run check:css-markers && npm run check:99-targets && npm run check:css-overlap",
+    "ci": "npm run lint && npm run typecheck && npm run test && npm run check:css && npx --yes size-limit"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

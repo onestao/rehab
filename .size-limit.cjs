@@ -14,8 +14,7 @@ module.exports = [
       'data-views.js',
       'data.js',
       'app-update.js',
-      'sync-status.js',
-      'onboarding.js'
+      'sync-status.js'
     ],
     limit: '60 KB'
   },

@@ -55,7 +55,9 @@ export const cssSections = [
   { file: '55-v6-profile.css', marker: { type: 'exact', value: '/* --- V6 Profile' } },
   { file: '56-v6-nav.css', marker: { type: 'exact', value: '/* --- V6 Bottom Navigation Rail' } },
   { file: '57-weight-report.css', marker: { type: 'exact', value: '/* --- Weight Report / Chart --- */' } },
-  { file: '41-m3e-effects.css', marker: { type: 'exact', value: '/* === M3 Expressive Effects === */' } },
+  { file: '58-skeleton.css', marker: { type: 'exact', value: '/* --- Skeleton (shimmer placeholder) --- */' } },
+  { file: '59-global-training-bar.css', marker: { type: 'exact', value: '/* --- Global Training Progress Bar --- */' } },
+  { file: '41-m3e-effects.css', marker: { type: 'exact', value: '/* === M3 Expressive Effects ===' } },
   { file: '40-a11y.css', marker: { type: 'exact', value: '/* --- A11y --- */' } },
 ];
 

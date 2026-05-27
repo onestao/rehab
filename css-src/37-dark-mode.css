@@ -1,5 +1,10 @@
 /* ============================================
    Dark Mode (M3 Expressive)
+   Single source of truth for [data-theme-mode="dark"]
+   and prefers-color-scheme: dark token overrides.
+   Module-level dark adjustments may live alongside their
+   host file ONLY for selectors that already need other
+   dark-only properties (e.g. .hero gradient swap).
    ============================================ */
 @media (prefers-color-scheme: dark) {
     :root {
@@ -44,6 +49,13 @@
         --md-sys-error: #ffb4ab;
         --md-sys-error-container: #93000a;
         --md-sys-on-error-container: #ffdad6;
+
+        /* V6 glass tokens — dark variant */
+        --glass-bg: color-mix(in srgb, var(--md-sys-surface-container-high) 62%, transparent);
+        --glass-bg-strong: color-mix(in srgb, var(--md-sys-surface-container-highest) 78%, transparent);
+        --glass-border: color-mix(in srgb, var(--md-sys-on-surface) 14%, transparent);
+        --glass-shadow-inset: inset 0 1px 0 color-mix(in srgb, var(--md-sys-on-surface) 8%, transparent);
+        --glass-shadow-out: 0 2px 14px rgba(0,0,0,0.42);
     }
 
     body { background: var(--md-sys-surface); }
@@ -133,4 +145,13 @@
     .advice-model-mark {
         background: var(--advice-model-mark-bg, color-mix(in srgb, var(--md-sys-surface-container-highest) 60%, transparent));
     }
+}
+
+/* Explicit dark theme override (matches the @media block above). */
+[data-theme-mode="dark"] {
+    --glass-bg: color-mix(in srgb, var(--md-sys-surface-container-high) 62%, transparent);
+    --glass-bg-strong: color-mix(in srgb, var(--md-sys-surface-container-highest) 78%, transparent);
+    --glass-border: color-mix(in srgb, var(--md-sys-on-surface) 14%, transparent);
+    --glass-shadow-inset: inset 0 1px 0 color-mix(in srgb, var(--md-sys-on-surface) 8%, transparent);
+    --glass-shadow-out: 0 2px 14px rgba(0,0,0,0.42);
 }

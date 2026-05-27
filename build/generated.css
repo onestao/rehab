@@ -838,6 +838,56 @@ mark.ai-hit {
 }
 .md-btn-tonal:hover { box-shadow: var(--md-sys-elevation-1); }
 
+.md-icon-btn {
+    position: relative;
+    width: 40px;
+    height: 40px;
+    min-width: 40px;
+    border: 0;
+    border-radius: var(--md-sys-shape-full);
+    padding: 0;
+    margin: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    overflow: hidden;
+    background: transparent;
+    color: var(--md-sys-on-surface-variant);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition:
+        transform var(--md-sys-motion-duration-short) var(--md-expressive-spring),
+        color var(--md-sys-motion-duration-short) var(--md-sys-motion-emphasized);
+}
+.md-icon-btn::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: currentColor;
+    opacity: 0;
+    transition: opacity var(--md-sys-motion-duration-short) var(--md-sys-motion-emphasized);
+}
+.md-icon-btn:hover { color: var(--md-sys-on-surface); }
+.md-icon-btn:hover::after { opacity: var(--md-state-hover, 0.08); }
+.md-icon-btn:active { transform: scale(0.92); }
+.md-icon-btn:active::after { opacity: var(--md-state-press, 0.12); }
+.md-icon-btn:focus-visible {
+    outline: 3px solid color-mix(in srgb, var(--md-sys-primary) 45%, transparent);
+    outline-offset: 2px;
+}
+.md-icon-btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.38;
+}
+.md-icon-btn:disabled::after { display: none; }
+.md-icon-btn .material-symbols-rounded {
+    position: relative;
+    z-index: 1;
+    font-size: 22px;
+}
+
 .md-row { display: flex; gap: 8px; margin-top: 8px; }
 
 @media (max-width: 420px) {
@@ -1067,6 +1117,15 @@ mark.ai-hit {
     width: max-content;
 }
 
+
+/* TASK-22: List item swipe-open delete reveal (M3 Expressive) */
+.list-item {
+    transition: transform .28s var(--md-expressive-spring);
+    touch-action: pan-y;
+}
+.list-item.swipe-open .delete-btn {
+    background: var(--md-sys-error, #b3261e); color: #fff;
+}
 }
 @layer components {
 /* --- Record Calendar --- */
@@ -1410,6 +1469,18 @@ mark.ai-hit {
 }
 
 
+
+/* TASK-16: Today focus ring pulse (M3 Expressive) */
+@keyframes m3e-ring-pulse {
+    0%, 100% { transform: scale(1); filter: saturate(1) drop-shadow(0 0 0 transparent); }
+    50% { transform: scale(1.03); filter: saturate(1.15) drop-shadow(0 6px 18px var(--md-sys-primary-container)); }
+}
+.today-focus-ring {
+    animation: m3e-ring-pulse 4.8s var(--md-expressive-spring, cubic-bezier(.34,1.56,.64,1)) infinite;
+    will-change: transform, filter;
+}
+.today-focus-ring > div { transition: transform .35s var(--md-expressive-spring); }
+.today-focus-ring:hover > div { transform: scale(1.06); }
 }
 @layer components {
 /* --- Record Tabs & Health --- */
@@ -1654,6 +1725,15 @@ mark.ai-hit {
 }
 
 
+
+/* TASK-22: Day-detail item swipe-open (M3 Expressive) */
+.day-detail-item {
+    transition: transform .28s var(--md-expressive-spring);
+    touch-action: pan-y;
+}
+.day-detail-item.swipe-open .delete-btn {
+    background: var(--md-sys-error, #b3261e); color: #fff;
+}
 }
 @layer components {
 /* --- Diet Card --- */
@@ -3458,16 +3538,21 @@ body.is-training .fab-pip.active {
 /* --- Input Card --- */
 .input-card .md-grid { margin: 8px 0 4px; }
 .input-card { padding: 14px; }
-.strength-input-grid {
+.md-grid.strength-input-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
 }
 .strength-input-grid .md-field {
     min-width: 0;
 }
-.strength-name-field {
+.strength-input-grid > .span-full,
+.strength-input-grid .md-switch.span-full {
+    grid-column: 1 / -1;
+}
+.md-grid.strength-input-grid .strength-name-field {
     grid-column: span 2;
 }
-.strength-phase-field {
+.md-grid.strength-input-grid .strength-phase-field {
     grid-column: span 1;
 }
 .strength-input-grid .md-field label {
@@ -3580,6 +3665,26 @@ body.is-training .fab-pip.active {
     margin-top: 0;
     height: 48px;
 }
+@media (max-width: 480px) {
+    .strength-input-grid { gap: 6px; }
+    .strength-input-grid .md-field input,
+    .strength-input-grid .md-field select {
+        padding-left: 8px;
+        padding-right: 8px;
+        font-size: 15px;
+    }
+    .strength-input-grid .md-field label {
+        left: 9px;
+        font-size: 12px;
+        max-width: calc(100% - 14px);
+    }
+    .strength-input-grid .md-field input:focus + label,
+    .strength-input-grid .md-field input:not(:placeholder-shown) + label,
+    .strength-input-grid .md-field select:focus + label,
+    .strength-input-grid .md-field select:valid + label {
+        font-size: 9.5px;
+    }
+}
 @media (max-width: 360px) {
     .strength-input-grid { gap: 6px; }
     .strength-input-grid .md-field label { left: 8px; font-size: 11px; max-width: calc(100% - 12px); }
@@ -3587,7 +3692,7 @@ body.is-training .fab-pip.active {
     .strength-input-grid .md-field select {
         padding-left: 7px;
         padding-right: 7px;
-        font-size: 15px;
+        font-size: 14px;
     }
     .strength-input-grid .md-field input:focus + label,
     .strength-input-grid .md-field input:not(:placeholder-shown) + label,
@@ -4358,6 +4463,15 @@ body.is-training .fab-pip.active {
     opacity: 0.92;
 }
 
+
+/* TASK-22: Today-timeline item swipe-open (M3 Expressive) */
+.today-timeline-item {
+    transition: transform .28s var(--md-expressive-spring);
+    touch-action: pan-y;
+}
+.today-timeline-item.swipe-open .delete-btn {
+    background: var(--md-sys-error, #b3261e); color: #fff;
+}
 }
 @layer components {
 /* ============================================
@@ -4788,6 +4902,11 @@ body.is-training .fab-pip.active {
 @layer components {
 /* ============================================
    Dark Mode (M3 Expressive)
+   Single source of truth for [data-theme-mode="dark"]
+   and prefers-color-scheme: dark token overrides.
+   Module-level dark adjustments may live alongside their
+   host file ONLY for selectors that already need other
+   dark-only properties (e.g. .hero gradient swap).
    ============================================ */
 @media (prefers-color-scheme: dark) {
     :root {
@@ -4832,6 +4951,13 @@ body.is-training .fab-pip.active {
         --md-sys-error: #ffb4ab;
         --md-sys-error-container: #93000a;
         --md-sys-on-error-container: #ffdad6;
+
+        /* V6 glass tokens — dark variant */
+        --glass-bg: color-mix(in srgb, var(--md-sys-surface-container-high) 62%, transparent);
+        --glass-bg-strong: color-mix(in srgb, var(--md-sys-surface-container-highest) 78%, transparent);
+        --glass-border: color-mix(in srgb, var(--md-sys-on-surface) 14%, transparent);
+        --glass-shadow-inset: inset 0 1px 0 color-mix(in srgb, var(--md-sys-on-surface) 8%, transparent);
+        --glass-shadow-out: 0 2px 14px rgba(0,0,0,0.42);
     }
 
     body { background: var(--md-sys-surface); }
@@ -4921,6 +5047,15 @@ body.is-training .fab-pip.active {
     .advice-model-mark {
         background: var(--advice-model-mark-bg, color-mix(in srgb, var(--md-sys-surface-container-highest) 60%, transparent));
     }
+}
+
+/* Explicit dark theme override (matches the @media block above). */
+[data-theme-mode="dark"] {
+    --glass-bg: color-mix(in srgb, var(--md-sys-surface-container-high) 62%, transparent);
+    --glass-bg-strong: color-mix(in srgb, var(--md-sys-surface-container-highest) 78%, transparent);
+    --glass-border: color-mix(in srgb, var(--md-sys-on-surface) 14%, transparent);
+    --glass-shadow-inset: inset 0 1px 0 color-mix(in srgb, var(--md-sys-on-surface) 8%, transparent);
+    --glass-shadow-out: 0 2px 14px rgba(0,0,0,0.42);
 }
 
 }
@@ -6227,6 +6362,21 @@ body.is-training .fab-pip.active {
 }
 
 
+
+/* TASK-21: AI advice quick-prompts horizontal snap (M3 Expressive) */
+.advice-quick-prompts {
+    display: flex !important; gap: 8px;
+    overflow-x: auto; scroll-snap-type: x mandatory;
+    padding-bottom: 4px; -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+}
+.advice-quick-prompts::-webkit-scrollbar { display: none; }
+.advice-quick-prompts > button {
+    flex: none; scroll-snap-align: start;
+    transition: transform .25s var(--md-expressive-spring),
+                background .25s ease;
+}
+.advice-quick-prompts > button:active { transform: scale(.92) rotate(-1deg); }
 }
 @layer components {
 /* --- View Transitions --- */
@@ -6458,8 +6608,12 @@ body.is-training .fab-pip.active {
 
 .sl-name-row {
     display: grid;
-    grid-template-columns: 1fr 48px;
+    grid-template-columns: 1fr 40px;
     gap: 8px;
+    align-items: center;
+}
+.sl-name-row > .md-icon-btn {
+    align-self: center;
 }
 
 .weekly-plan-strip {
@@ -6574,6 +6728,9 @@ body.is-training .fab-pip.active {
     gap: 8px;
 }
 
+
+/* TASK-24: Weekly summary card rise (M3 Expressive) */
+.weekly-summary-card { animation: m3e-card-rise .42s var(--md-expressive-spring) both; }
 }
 @layer components {
 /* --- Plan Daily Plan / M3E --- */
@@ -8196,28 +8353,12 @@ body.is-training .fab-pip.active {
 /* ============================================
    V6 UI — Glass language + Global safety nets + Animations
    Page-level styles moved to 51..56 v6 partials.
+   Dark glass tokens live in 37-dark-mode.css.
    ============================================ */
 
 /* ======================
-   GLOBAL — glass tokens & safety nets
+   GLOBAL — glass safety nets
    ====================== */
-
-[data-theme-mode="dark"] {
-    --glass-bg: color-mix(in srgb, var(--md-sys-surface-container-high) 62%, transparent);
-    --glass-bg-strong: color-mix(in srgb, var(--md-sys-surface-container-highest) 78%, transparent);
-    --glass-border: color-mix(in srgb, var(--md-sys-on-surface) 14%, transparent);
-    --glass-shadow-inset: inset 0 1px 0 color-mix(in srgb, var(--md-sys-on-surface) 8%, transparent);
-    --glass-shadow-out: 0 2px 14px rgba(0,0,0,0.42);
-}
-@media (prefers-color-scheme: dark) {
-    :root:not([data-theme-mode="light"]) {
-        --glass-bg: color-mix(in srgb, var(--md-sys-surface-container-high) 62%, transparent);
-        --glass-bg-strong: color-mix(in srgb, var(--md-sys-surface-container-highest) 78%, transparent);
-        --glass-border: color-mix(in srgb, var(--md-sys-on-surface) 14%, transparent);
-        --glass-shadow-inset: inset 0 1px 0 color-mix(in srgb, var(--md-sys-on-surface) 8%, transparent);
-        --glass-shadow-out: 0 2px 14px rgba(0,0,0,0.42);
-    }
-}
 
 .md-card { transition: background 0.6s var(--md-sys-motion-emphasized), box-shadow 0.6s var(--md-sys-motion-emphasized); }
 
@@ -9261,19 +9402,48 @@ body.is-training .fab-pip.active {
 }
 }
 @layer components {
-/* === M3 Expressive Effects === */
+/* --- Skeleton (shimmer placeholder) --- */
+.skeleton {
+    background: linear-gradient(90deg,
+        var(--md-sys-surface-container) 0%,
+        var(--md-sys-surface-container-high) 50%,
+        var(--md-sys-surface-container) 100%);
+    background-size: 200% 100%;
+    border-radius: var(--md-sys-shape-sm);
+    animation: m3e-shimmer 1.4s ease-in-out infinite;
+    color: transparent !important;
+}
+@keyframes m3e-shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+.skeleton-line { height: 12px; margin: 6px 0; }
 
-/* TASK-16: 首屏进度环形变动画 */
-@keyframes m3e-ring-pulse {
-    0%, 100% { transform: scale(1); filter: saturate(1) drop-shadow(0 0 0 transparent); }
-    50% { transform: scale(1.03); filter: saturate(1.15) drop-shadow(0 6px 18px var(--md-sys-primary-container)); }
 }
-.today-focus-ring {
-    animation: m3e-ring-pulse 4.8s var(--md-expressive-spring, cubic-bezier(.34,1.56,.64,1)) infinite;
-    will-change: transform, filter;
+@layer components {
+/* --- Global Training Progress Bar --- */
+.global-training-bar {
+    position: fixed; top: 0; left: 0; right: 0; height: 3px;
+    background: var(--md-sys-surface-container); z-index: 10000;
+    transition: opacity .3s ease;
 }
-.today-focus-ring > div { transition: transform .35s var(--md-expressive-spring); }
-.today-focus-ring:hover > div { transform: scale(1.06); }
+.global-training-bar > span {
+    display: block; height: 100%; width: 0%;
+    background: linear-gradient(90deg, var(--md-sys-primary), var(--md-sys-tertiary));
+    transition: width .42s var(--md-expressive-spring);
+}
+.global-training-bar.hidden { opacity: 0; pointer-events: none; }
+
+}
+@layer components {
+/* === M3 Expressive Effects ===
+   Design-language level: card-rise + chip-press + token-in keyframes,
+   global theme transition envelope, FAB morph + ripple animation.
+   Module-specific effects have been moved to their host files:
+     - today-focus-ring pulse → 16-history-hero-calendar.css
+     - advice-quick-prompts horizontal snap → 46-advice-ai.css
+     - list-item / day-detail / today-timeline swipe-open → host modules
+     - weekly-summary-card rise → 49-action-history-weekly.css
+     - skeleton shimmer → 58-skeleton.css
+     - global-training-bar → 59-global-training-bar.css
+*/
 
 @keyframes m3e-card-rise {
     from { opacity: 0; transform: translateY(8px) scale(.985); }
@@ -9288,7 +9458,7 @@ body.is-training .fab-pip.active {
 }
 .md-chip:active, .mode-tab:active, .record-quick-btn:active { animation: m3e-chip-press .35s var(--md-expressive-spring); }
 
-/* TASK-18: FAB启动训练morph+涟漪 */
+/* TASK-18: FAB morph + ripple on training start */
 .md-fab.fab-play {
     overflow: hidden; position: relative;
     transition: border-radius .42s var(--md-expressive-spring),
@@ -9320,14 +9490,14 @@ body.is-training .md-fab.fab-play {
     z-index: 0;
 }
 
-/* TASK-19: AI教练气泡逐字流入动画 */
+/* TASK-19: AI advice token-in stream animation */
 @keyframes m3e-token-in {
     from { opacity: 0; transform: translateY(4px); }
     to { opacity: 1; transform: translateY(0); }
 }
 .m3e-token-in { animation: m3e-token-in .26s var(--md-expressive-spring) both; }
 
-/* TASK-20: 主题切换液态过渡 */
+/* TASK-20: Liquid theme switch envelope */
 :root {
     transition:
         background-color .6s var(--md-sys-motion-emphasized),
@@ -9345,62 +9515,6 @@ body.is-training .md-fab.fab-play {
         border-color .35s ease,
         box-shadow .6s var(--md-sys-motion-emphasized);
 }
-
-/* TASK-21: AI教练快捷预设chip横滑 */
-.advice-quick-prompts {
-    display: flex !important; gap: 8px;
-    overflow-x: auto; scroll-snap-type: x mandatory;
-    padding-bottom: 4px; -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-}
-.advice-quick-prompts::-webkit-scrollbar { display: none; }
-.advice-quick-prompts > button {
-    flex: none; scroll-snap-align: start;
-    transition: transform .25s var(--md-expressive-spring),
-                background .25s ease;
-}
-.advice-quick-prompts > button:active { transform: scale(.92) rotate(-1deg); }
-
-/* TASK-23: 骨架屏Shimmer加载占位 */
-.skeleton {
-    background: linear-gradient(90deg,
-        var(--md-sys-surface-container) 0%,
-        var(--md-sys-surface-container-high) 50%,
-        var(--md-sys-surface-container) 100%);
-    background-size: 200% 100%;
-    border-radius: var(--md-sys-shape-sm);
-    animation: m3e-shimmer 1.4s ease-in-out infinite;
-    color: transparent !important;
-}
-@keyframes m3e-shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
-.skeleton-line { height: 12px; margin: 6px 0; }
-
-/* TASK-25: 训练总进度全局指示条 */
-.global-training-bar {
-    position: fixed; top: 0; left: 0; right: 0; height: 3px;
-    background: var(--md-sys-surface-container); z-index: 10000;
-    transition: opacity .3s ease;
-}
-.global-training-bar > span {
-    display: block; height: 100%; width: 0%;
-    background: linear-gradient(90deg, var(--md-sys-primary), var(--md-sys-tertiary));
-    transition: width .42s var(--md-expressive-spring);
-}
-.global-training-bar.hidden { opacity: 0; pointer-events: none; }
-
-/* TASK-22: 记录条目滑动删除 */
-.day-detail-item, .today-timeline-item, .list-item {
-    transition: transform .28s var(--md-expressive-spring);
-    touch-action: pan-y;
-}
-.day-detail-item.swipe-open .delete-btn,
-.today-timeline-item.swipe-open .delete-btn,
-.list-item.swipe-open .delete-btn {
-    background: var(--md-sys-error, #b3261e); color: #fff;
-}
-
-/* TASK-24: 每周总结卡片 */
-.weekly-summary-card { animation: m3e-card-rise .42s var(--md-expressive-spring) both; }
 
 }
 @layer components {

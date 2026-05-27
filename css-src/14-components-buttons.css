@@ -62,6 +62,56 @@
 }
 .md-btn-tonal:hover { box-shadow: var(--md-sys-elevation-1); }
 
+.md-icon-btn {
+    position: relative;
+    width: 40px;
+    height: 40px;
+    min-width: 40px;
+    border: 0;
+    border-radius: var(--md-sys-shape-full);
+    padding: 0;
+    margin: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    overflow: hidden;
+    background: transparent;
+    color: var(--md-sys-on-surface-variant);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition:
+        transform var(--md-sys-motion-duration-short) var(--md-expressive-spring),
+        color var(--md-sys-motion-duration-short) var(--md-sys-motion-emphasized);
+}
+.md-icon-btn::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: currentColor;
+    opacity: 0;
+    transition: opacity var(--md-sys-motion-duration-short) var(--md-sys-motion-emphasized);
+}
+.md-icon-btn:hover { color: var(--md-sys-on-surface); }
+.md-icon-btn:hover::after { opacity: var(--md-state-hover, 0.08); }
+.md-icon-btn:active { transform: scale(0.92); }
+.md-icon-btn:active::after { opacity: var(--md-state-press, 0.12); }
+.md-icon-btn:focus-visible {
+    outline: 3px solid color-mix(in srgb, var(--md-sys-primary) 45%, transparent);
+    outline-offset: 2px;
+}
+.md-icon-btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.38;
+}
+.md-icon-btn:disabled::after { display: none; }
+.md-icon-btn .material-symbols-rounded {
+    position: relative;
+    z-index: 1;
+    font-size: 22px;
+}
+
 .md-row { display: flex; gap: 8px; margin-top: 8px; }
 
 @media (max-width: 420px) {

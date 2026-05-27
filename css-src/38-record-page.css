@@ -366,3 +366,13 @@
     transform: scale(1.06);
     opacity: 0.92;
 }
+
+
+/* TASK-22: Today-timeline item swipe-open (M3 Expressive) */
+.today-timeline-item {
+    transition: transform .28s var(--md-expressive-spring);
+    touch-action: pan-y;
+}
+.today-timeline-item.swipe-open .delete-btn {
+    background: var(--md-sys-error, #b3261e); color: #fff;
+}

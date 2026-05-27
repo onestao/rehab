@@ -338,3 +338,16 @@
     flex: none;
 }
 
+
+
+/* TASK-16: Today focus ring pulse (M3 Expressive) */
+@keyframes m3e-ring-pulse {
+    0%, 100% { transform: scale(1); filter: saturate(1) drop-shadow(0 0 0 transparent); }
+    50% { transform: scale(1.03); filter: saturate(1.15) drop-shadow(0 6px 18px var(--md-sys-primary-container)); }
+}
+.today-focus-ring {
+    animation: m3e-ring-pulse 4.8s var(--md-expressive-spring, cubic-bezier(.34,1.56,.64,1)) infinite;
+    will-change: transform, filter;
+}
+.today-focus-ring > div { transition: transform .35s var(--md-expressive-spring); }
+.today-focus-ring:hover > div { transform: scale(1.06); }

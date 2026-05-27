@@ -1,0 +1,13 @@
+/* --- Skeleton (shimmer placeholder) --- */
+.skeleton {
+    background: linear-gradient(90deg,
+        var(--md-sys-surface-container) 0%,
+        var(--md-sys-surface-container-high) 50%,
+        var(--md-sys-surface-container) 100%);
+    background-size: 200% 100%;
+    border-radius: var(--md-sys-shape-sm);
+    animation: m3e-shimmer 1.4s ease-in-out infinite;
+    color: transparent !important;
+}
+@keyframes m3e-shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+.skeleton-line { height: 12px; margin: 6px 0; }

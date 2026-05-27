@@ -1,28 +1,12 @@
 /* ============================================
    V6 UI — Glass language + Global safety nets + Animations
    Page-level styles moved to 51..56 v6 partials.
+   Dark glass tokens live in 37-dark-mode.css.
    ============================================ */
 
 /* ======================
-   GLOBAL — glass tokens & safety nets
+   GLOBAL — glass safety nets
    ====================== */
-
-[data-theme-mode="dark"] {
-    --glass-bg: color-mix(in srgb, var(--md-sys-surface-container-high) 62%, transparent);
-    --glass-bg-strong: color-mix(in srgb, var(--md-sys-surface-container-highest) 78%, transparent);
-    --glass-border: color-mix(in srgb, var(--md-sys-on-surface) 14%, transparent);
-    --glass-shadow-inset: inset 0 1px 0 color-mix(in srgb, var(--md-sys-on-surface) 8%, transparent);
-    --glass-shadow-out: 0 2px 14px rgba(0,0,0,0.42);
-}
-@media (prefers-color-scheme: dark) {
-    :root:not([data-theme-mode="light"]) {
-        --glass-bg: color-mix(in srgb, var(--md-sys-surface-container-high) 62%, transparent);
-        --glass-bg-strong: color-mix(in srgb, var(--md-sys-surface-container-highest) 78%, transparent);
-        --glass-border: color-mix(in srgb, var(--md-sys-on-surface) 14%, transparent);
-        --glass-shadow-inset: inset 0 1px 0 color-mix(in srgb, var(--md-sys-on-surface) 8%, transparent);
-        --glass-shadow-out: 0 2px 14px rgba(0,0,0,0.42);
-    }
-}
 
 .md-card { transition: background 0.6s var(--md-sys-motion-emphasized), box-shadow 0.6s var(--md-sys-motion-emphasized); }
 

@@ -49,12 +49,6 @@
 .advice-model-qwen
   37-dark-mode.css, 46-advice-ai.css
 
-.advice-quick-prompts
-  46-advice-ai.css, 41-m3e-effects.css
-
-.advice-quick-prompts::-webkit-scrollbar
-  46-advice-ai.css, 41-m3e-effects.css
-
 .ai-hero
   50-v6-ui.css, 54-v6-ai.css, 41-m3e-effects.css
 
@@ -487,12 +481,6 @@
 .today-focus-hint
   16-history-hero-calendar.css, 36-responsive.css
 
-.today-focus-ring
-  16-history-hero-calendar.css, 41-m3e-effects.css
-
-.today-focus-ring > div
-  16-history-hero-calendar.css, 41-m3e-effects.css
-
 .today-timeline-card
   38-record-page.css, 36-responsive.css
 
@@ -500,7 +488,7 @@
   38-record-page.css, 36-responsive.css
 
 .today-timeline-item
-  38-record-page.css, 36-responsive.css, 41-m3e-effects.css
+  38-record-page.css, 36-responsive.css
 
 .weight-card
   17-record-tabs-health.css, 19-health-weightloss-ai.css, 36-responsive.css
@@ -569,13 +557,13 @@
   09-workout-timer.css, 37-dark-mode.css
 
 0%
-  50-v6-ui.css, 41-m3e-effects.css
+  16-history-hero-calendar.css, 50-v6-ui.css, 58-skeleton.css, 41-m3e-effects.css
 
 100%
-  50-v6-ui.css, 41-m3e-effects.css
+  16-history-hero-calendar.css, 50-v6-ui.css, 58-skeleton.css, 41-m3e-effects.css
 
 50%
-  50-v6-ui.css, 41-m3e-effects.css
+  16-history-hero-calendar.css, 50-v6-ui.css
 
 body
   02-base.css, 06-layout-page.css, 37-dark-mode.css
@@ -590,7 +578,7 @@ media (max-width: 380px)
   51-v6-today.css, 52-v6-workout.css, 55-v6-profile.css
 
 media (max-width: 480px)
-  19-health-weightloss-ai.css, 22-workout-mode-tabs.css, 24-routines-cards.css, 36-responsive.css, 49-action-history-weekly.css, 49-plan.css
+  19-health-weightloss-ai.css, 22-workout-mode-tabs.css, 24-routines-cards.css, 33-workout-input-card.css, 36-responsive.css, 49-action-history-weekly.css, 49-plan.css
 
 media (max-width: 520px)
   26-settings-sync.css, 57-weight-report.css
@@ -599,7 +587,7 @@ media (min-width: 600px)
   06-layout-page.css, 36-responsive.css
 
 media (prefers-color-scheme: dark)
-  08-components-cards.css, 16-history-hero-calendar.css, 37-dark-mode.css, 50-v6-ui.css, 51-v6-today.css
+  08-components-cards.css, 16-history-hero-calendar.css, 37-dark-mode.css, 51-v6-today.css
 
 media (prefers-reduced-motion: reduce)
   36-responsive.css, 50-v6-ui.css, 40-a11y.css

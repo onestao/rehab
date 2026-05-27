@@ -71,8 +71,12 @@
 
 .sl-name-row {
     display: grid;
-    grid-template-columns: 1fr 48px;
+    grid-template-columns: 1fr 40px;
     gap: 8px;
+    align-items: center;
+}
+.sl-name-row > .md-icon-btn {
+    align-self: center;
 }
 
 .weekly-plan-strip {
@@ -186,3 +190,7 @@
     display: grid;
     gap: 8px;
 }
+
+
+/* TASK-24: Weekly summary card rise (M3 Expressive) */
+.weekly-summary-card { animation: m3e-card-rise .42s var(--md-expressive-spring) both; }

@@ -1,0 +1,12 @@
+/* --- Global Training Progress Bar --- */
+.global-training-bar {
+    position: fixed; top: 0; left: 0; right: 0; height: 3px;
+    background: var(--md-sys-surface-container); z-index: 10000;
+    transition: opacity .3s ease;
+}
+.global-training-bar > span {
+    display: block; height: 100%; width: 0%;
+    background: linear-gradient(90deg, var(--md-sys-primary), var(--md-sys-tertiary));
+    transition: width .42s var(--md-expressive-spring);
+}
+.global-training-bar.hidden { opacity: 0; pointer-events: none; }

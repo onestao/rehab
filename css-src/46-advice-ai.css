@@ -828,3 +828,19 @@
     z-index: 4;
 }
 
+
+
+/* TASK-21: AI advice quick-prompts horizontal snap (M3 Expressive) */
+.advice-quick-prompts {
+    display: flex !important; gap: 8px;
+    overflow-x: auto; scroll-snap-type: x mandatory;
+    padding-bottom: 4px; -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+}
+.advice-quick-prompts::-webkit-scrollbar { display: none; }
+.advice-quick-prompts > button {
+    flex: none; scroll-snap-align: start;
+    transition: transform .25s var(--md-expressive-spring),
+                background .25s ease;
+}
+.advice-quick-prompts > button:active { transform: scale(.92) rotate(-1deg); }

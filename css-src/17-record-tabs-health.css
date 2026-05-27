@@ -239,3 +239,13 @@
     color: var(--md-sys-on-secondary-container); white-space: nowrap; overflow: visible; text-overflow: unset;
 }
 
+
+
+/* TASK-22: Day-detail item swipe-open (M3 Expressive) */
+.day-detail-item {
+    transition: transform .28s var(--md-expressive-spring);
+    touch-action: pan-y;
+}
+.day-detail-item.swipe-open .delete-btn {
+    background: var(--md-sys-error, #b3261e); color: #fff;
+}

@@ -214,4 +214,13 @@
     background: var(--md-sys-surface-container);
     width: max-content;
 }
-
+
+
+/* TASK-22: List item swipe-open delete reveal (M3 Expressive) */
+.list-item {
+    transition: transform .28s var(--md-expressive-spring);
+    touch-action: pan-y;
+}
+.list-item.swipe-open .delete-btn {
+    background: var(--md-sys-error, #b3261e); color: #fff;
+}

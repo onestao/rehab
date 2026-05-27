@@ -1,16 +1,14 @@
-/* === M3 Expressive Effects === */
-
-/* TASK-16: 首屏进度环形变动画 */
-@keyframes m3e-ring-pulse {
-    0%, 100% { transform: scale(1); filter: saturate(1) drop-shadow(0 0 0 transparent); }
-    50% { transform: scale(1.03); filter: saturate(1.15) drop-shadow(0 6px 18px var(--md-sys-primary-container)); }
-}
-.today-focus-ring {
-    animation: m3e-ring-pulse 4.8s var(--md-expressive-spring, cubic-bezier(.34,1.56,.64,1)) infinite;
-    will-change: transform, filter;
-}
-.today-focus-ring > div { transition: transform .35s var(--md-expressive-spring); }
-.today-focus-ring:hover > div { transform: scale(1.06); }
+/* === M3 Expressive Effects ===
+   Design-language level: card-rise + chip-press + token-in keyframes,
+   global theme transition envelope, FAB morph + ripple animation.
+   Module-specific effects have been moved to their host files:
+     - today-focus-ring pulse → 16-history-hero-calendar.css
+     - advice-quick-prompts horizontal snap → 46-advice-ai.css
+     - list-item / day-detail / today-timeline swipe-open → host modules
+     - weekly-summary-card rise → 49-action-history-weekly.css
+     - skeleton shimmer → 58-skeleton.css
+     - global-training-bar → 59-global-training-bar.css
+*/
 
 @keyframes m3e-card-rise {
     from { opacity: 0; transform: translateY(8px) scale(.985); }
@@ -25,7 +23,7 @@
 }
 .md-chip:active, .mode-tab:active, .record-quick-btn:active { animation: m3e-chip-press .35s var(--md-expressive-spring); }
 
-/* TASK-18: FAB启动训练morph+涟漪 */
+/* TASK-18: FAB morph + ripple on training start */
 .md-fab.fab-play {
     overflow: hidden; position: relative;
     transition: border-radius .42s var(--md-expressive-spring),
@@ -57,14 +55,14 @@ body.is-training .md-fab.fab-play {
     z-index: 0;
 }
 
-/* TASK-19: AI教练气泡逐字流入动画 */
+/* TASK-19: AI advice token-in stream animation */
 @keyframes m3e-token-in {
     from { opacity: 0; transform: translateY(4px); }
     to { opacity: 1; transform: translateY(0); }
 }
 .m3e-token-in { animation: m3e-token-in .26s var(--md-expressive-spring) both; }
 
-/* TASK-20: 主题切换液态过渡 */
+/* TASK-20: Liquid theme switch envelope */
 :root {
     transition:
         background-color .6s var(--md-sys-motion-emphasized),
@@ -82,59 +80,3 @@ body.is-training .md-fab.fab-play {
         border-color .35s ease,
         box-shadow .6s var(--md-sys-motion-emphasized);
 }
-
-/* TASK-21: AI教练快捷预设chip横滑 */
-.advice-quick-prompts {
-    display: flex !important; gap: 8px;
-    overflow-x: auto; scroll-snap-type: x mandatory;
-    padding-bottom: 4px; -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-}
-.advice-quick-prompts::-webkit-scrollbar { display: none; }
-.advice-quick-prompts > button {
-    flex: none; scroll-snap-align: start;
-    transition: transform .25s var(--md-expressive-spring),
-                background .25s ease;
-}
-.advice-quick-prompts > button:active { transform: scale(.92) rotate(-1deg); }
-
-/* TASK-23: 骨架屏Shimmer加载占位 */
-.skeleton {
-    background: linear-gradient(90deg,
-        var(--md-sys-surface-container) 0%,
-        var(--md-sys-surface-container-high) 50%,
-        var(--md-sys-surface-container) 100%);
-    background-size: 200% 100%;
-    border-radius: var(--md-sys-shape-sm);
-    animation: m3e-shimmer 1.4s ease-in-out infinite;
-    color: transparent !important;
-}
-@keyframes m3e-shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
-.skeleton-line { height: 12px; margin: 6px 0; }
-
-/* TASK-25: 训练总进度全局指示条 */
-.global-training-bar {
-    position: fixed; top: 0; left: 0; right: 0; height: 3px;
-    background: var(--md-sys-surface-container); z-index: 10000;
-    transition: opacity .3s ease;
-}
-.global-training-bar > span {
-    display: block; height: 100%; width: 0%;
-    background: linear-gradient(90deg, var(--md-sys-primary), var(--md-sys-tertiary));
-    transition: width .42s var(--md-expressive-spring);
-}
-.global-training-bar.hidden { opacity: 0; pointer-events: none; }
-
-/* TASK-22: 记录条目滑动删除 */
-.day-detail-item, .today-timeline-item, .list-item {
-    transition: transform .28s var(--md-expressive-spring);
-    touch-action: pan-y;
-}
-.day-detail-item.swipe-open .delete-btn,
-.today-timeline-item.swipe-open .delete-btn,
-.list-item.swipe-open .delete-btn {
-    background: var(--md-sys-error, #b3261e); color: #fff;
-}
-
-/* TASK-24: 每周总结卡片 */
-.weekly-summary-card { animation: m3e-card-rise .42s var(--md-expressive-spring) both; }
