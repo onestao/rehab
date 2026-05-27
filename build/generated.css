@@ -1974,7 +1974,7 @@ mark.ai-hit {
 .exercise-grid { margin: 0; }
 .manual-ex-list { display: grid; gap: 4px; }
 #ai-coach.page {
-    padding: 0 14px 14px;
+    padding: 0 14px 0;
     height: 100%;
     min-height: 0;
     max-height: none;
@@ -9041,16 +9041,13 @@ body.is-training .fab-pip.active {
 .advice-v6-suggestions button { padding: 8px 12px; border-radius: 12px; background: var(--glass-bg); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid var(--glass-border); font-size: 12px; font-weight: 500; color: var(--md-sys-on-surface); cursor: pointer; text-align: left; transition: transform 0.15s var(--md-sys-motion-spring); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .advice-v6-suggestions button:active { transform: scale(0.95); }
 
-.ai-input { display: flex; gap: 6px; align-items: center; background: var(--md-sys-surface-container); padding: 8px 14px; position: sticky; bottom: 24px; z-index: 10; margin: 0 -14px; }
+.ai-input { display: flex; gap: 6px; align-items: center; background: var(--md-sys-surface-container); padding: 8px 14px max(8px, env(safe-area-inset-bottom)); position: sticky; bottom: 0; z-index: 20; margin: 0 -14px -14px; box-shadow: 0 -10px 24px color-mix(in srgb, var(--md-sys-surface) 84%, transparent); }
 .ai-input .advice-model-chip { flex: none; }
 .ai-input textarea { flex: 1 1 auto; min-width: 0; border: none; background: transparent; font-size: 13px; color: var(--md-sys-on-surface); outline: none; resize: none; min-height: 24px; max-height: 80px; font-family: inherit; overflow-wrap: anywhere; }
 .ai-input textarea::placeholder { color: var(--md-sys-on-surface-variant); }
 .ai-send { width: 36px; height: 36px; border-radius: 50%; border: none; background: var(--md-sys-primary); color: var(--md-sys-on-primary); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: var(--md-sys-elevation-1); transition: transform 0.2s var(--md-sys-motion-spring); flex: none; }
 .ai-send:active { transform: scale(0.92); }
 .ai-send .material-symbols-rounded { font-size: 18px; }
-
-.advice-status-line { text-align: center; font-size: 11px; color: var(--md-sys-on-surface-variant); position: sticky; bottom: 0; z-index: 10; background: var(--md-sys-surface-container); padding: 4px 14px 14px; border: none; margin: 0 -14px; }
-
 /* ======================
    PROFILE
    ====================== */
@@ -9087,6 +9084,14 @@ body.is-training .fab-pip.active {
 .setting-row .copy strong { display: block; font-size: 13px; font-weight: 500; color: var(--md-sys-on-surface); }
 .setting-row .copy small { display: block; font-size: 11px; color: var(--md-sys-on-surface-variant); }
 .setting-row .arrow { color: var(--md-sys-outline); font-size: 20px; }
+
+.profile-v6-back-row { display: flex; align-items: center; gap: 4px; padding: 4px 0 12px; }
+.profile-v6-back-btn { width: 36px; height: 36px; border-radius: 50%; border: none; background: transparent; color: var(--md-sys-on-surface); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; -webkit-tap-highlight-color: transparent; transition: background 0.15s; flex: none; }
+.profile-v6-back-btn::after { content: ''; position: absolute; inset: 0; border-radius: 50%; background: var(--md-sys-on-surface); opacity: 0; transition: opacity 0.15s; }
+.profile-v6-back-btn:hover::after { opacity: 0.08; }
+.profile-v6-back-btn:active { transform: scale(0.92); }
+.profile-v6-back-btn .material-symbols-rounded { font-size: 22px; position: relative; z-index: 1; }
+.profile-v6-back-title { font-size: 18px; font-weight: 600; color: var(--md-sys-on-surface); letter-spacing: -0.2px; }
 
 /* ======================
    NAV

@@ -530,32 +530,36 @@
             const content  = document.getElementById('profileContent');
             const settings = document.getElementById('profileSettings');
 
-            if (overview) overview.innerHTML = this.renderProfileIdentityCard() + this.renderProfileV6Cards();
-
-            this.routineView = this.normalizeRoutineView?.(this.routineView) || 'library';
+            this.routineView = this.normalizeRoutineView?.(this.routineView) || 'home';
             const view = this.routineView;
             const direction = this._routineSwipeDirection || '';
             this._routineSwipeDirection = '';
+
+            if (overview) {
+                overview.innerHTML = view === 'home' ? this.renderProfileIdentityCard() + this.renderProfileV6Cards() : '';
+                overview.classList.toggle('hidden', view !== 'home');
+            }
 
             if (!content) return;
 
             const showSettings = view === 'ai' || view === 'sync';
             const showContent = view === 'library' || view === 'weightloss';
-            if (overview) overview.classList.toggle('hidden', showSettings);
             if (settings) {
                 settings.classList.toggle('hidden', !showSettings);
                 const aiCard   = settings.querySelector('[data-settings="ai"]');
                 const syncCard = settings.querySelector('[data-settings="sync"]');
                 aiCard?.classList.toggle('hidden',   view !== 'ai');
                 syncCard?.classList.toggle('hidden', view !== 'sync');
+                settings.querySelectorAll('.profile-v6-back-row').forEach(el => el.remove());
             }
 
             this.bindProfileSwipe?.(content);
             content.classList.toggle('hidden', !showContent);
             if (showContent) {
-                const backBtn = `<div class="profile-v6-back-row"><button class="md-btn md-btn-tonal" onclick="data.setRoutineView('library');data.renderProfilePage?.()" type="button"><span class="material-symbols-rounded">arrow_back</span>返回</button></div>`;
+                const pageTitle = view === 'weightloss' ? '目标指导' : '方案 / 动作库';
+                const backBtn = `<div class="profile-v6-back-row"><button class="profile-v6-back-btn" onclick="data.setRoutineView('home');data.renderProfilePage?.()" type="button" aria-label="返回"><span class="material-symbols-rounded">arrow_back</span></button><strong class="profile-v6-back-title">${pageTitle}</strong></div>`;
                 if (view === 'library') {
-                    content.innerHTML = (this.renderPlanEquipmentCard?.() || '') + this.renderLibrarySegment() + this.renderLibraryDeck();
+                    content.innerHTML = backBtn + (this.renderPlanEquipmentCard?.() || '') + this.renderLibrarySegment() + this.renderLibraryDeck();
                     requestAnimationFrame(() => {
                         this.syncLibraryDeckPosition?.(false);
                         this.updateLibraryTabActive?.();
@@ -567,16 +571,13 @@
             }
             if (showSettings) {
                 const settingTitle = view === 'ai' ? 'AI 设置' : '云端同步';
-                const backBtn = `<div class="profile-v6-back-row"><button class="md-btn md-btn-tonal" onclick="data.setRoutineView('library');data.renderProfilePage?.()" type="button"><span class="material-symbols-rounded">arrow_back</span>返回</button><strong style="margin-left:8px;font-size:16px">${settingTitle}</strong></div>`;
-                const existingBack = settings.querySelector('.profile-v6-back-row');
-                if (!existingBack) settings.insertAdjacentHTML('afterbegin', backBtn);
+                const backBtn = `<div class="profile-v6-back-row"><button class="profile-v6-back-btn" onclick="data.setRoutineView('home');data.renderProfilePage?.()" type="button" aria-label="返回"><span class="material-symbols-rounded">arrow_back</span></button><strong class="profile-v6-back-title">${settingTitle}</strong></div>`;
+                settings.insertAdjacentHTML('afterbegin', backBtn);
             }
             clearTimeout(this._routineViewAnimationTimer);
             this._routineViewAnimationTimer = setTimeout(() => {
                 content.classList.remove('profile-view-forward', 'profile-view-back');
                 settings?.classList.remove('profile-view-forward', 'profile-view-back');
-                const extraBack = settings?.querySelectorAll('.profile-v6-back-row');
-                if (extraBack) extraBack.forEach((el, i) => { if (i > 0) el.remove(); });
             }, 360);
         },
 

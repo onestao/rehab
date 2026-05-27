@@ -55,9 +55,6 @@
 .advice-quick-prompts::-webkit-scrollbar
   18-health-diet.css, 41-m3e-effects.css
 
-.advice-status-line
-  18-health-diet.css, 50-v6-ui.css
-
 .ai-template-actions .material-symbols-rounded
   20-settings-ai.css, 36-responsive.css
 

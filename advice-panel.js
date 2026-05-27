@@ -1538,7 +1538,6 @@ const advicePanel = {
         const visibleMessages = this.visibleAdviceMessages(messages);
         const rawDraft = this.restoreAdviceDraft();
         const draft = this.escapeHtml(rawDraft);
-        const sendHint = this.escapeHtml(this.isMobileAdviceInput() ? '回车换行，点击发送按钮提交' : 'Enter 发送，Shift + Enter 换行');
         const goalType = this.db.health.dietGoal?.goalType || this.db.health.goalType || 'loss';
         const isGain = goalType === 'gain';
         const baseQuicks = isGain
@@ -1577,7 +1576,6 @@ const advicePanel = {
                 <textarea id="advicePrompt" class="advice-composer-input" rows="1" placeholder="问 AI 关于训练 / 饮食..." oninput="data.onAdvicePromptInput(this)" onkeydown="data.onAdvicePromptKeydown(event)">${draft}</textarea>
                 <button id="adviceSendBtn" class="ai-send" onclick="data.sendAiAdvice()" type="button" ${String(rawDraft || '').trim() ? '' : 'disabled'} aria-label="发送问题"><span class="material-symbols-rounded">send</span></button>
             </div>
-            <div id="adviceStatus" class="advice-status-line"><span class="advice-status-text">${sendHint}</span></div>
         </div>`;
     }
 };

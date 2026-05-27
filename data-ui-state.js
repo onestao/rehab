@@ -42,13 +42,13 @@
         },
 
         routineViewOrder() {
-            return ['library', 'weightloss', 'ai', 'sync'];
+            return ['home', 'library', 'weightloss', 'ai', 'sync'];
         },
 
         normalizeRoutineView(view) {
             if (view === 'settings') return 'ai';
             const order = this.routineViewOrder();
-            return order.includes(view) ? view : 'library';
+            return order.includes(view) ? view : 'home';
         },
 
         shiftRoutineView(delta) {

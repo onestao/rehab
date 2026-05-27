@@ -368,7 +368,7 @@
 .exercise-grid { margin: 0; }
 .manual-ex-list { display: grid; gap: 4px; }
 #ai-coach.page {
-    padding: 0 14px 14px;
+    padding: 0 14px 0;
     height: 100%;
     min-height: 0;
     max-height: none;
