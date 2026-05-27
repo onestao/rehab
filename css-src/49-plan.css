@@ -628,13 +628,14 @@
 .plan-task-title {
     min-width: 0;
     display: flex;
-    align-items: center;
-    gap: 8px;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 4px 8px;
 }
 
 .plan-task-title strong {
     min-width: 0;
-    flex: 1;
+    flex: 1 1 100%;
 }
 
 .plan-task-title em {

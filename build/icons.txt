@@ -1,6 +1,7 @@
 accessibility_new
 add
 add_circle
+arrow_back
 assignment
 auto_awesome
 backup
@@ -14,6 +15,7 @@ brightness_auto
 calendar_month
 check
 check_circle
+checklist
 chevron_left
 chevron_right
 clinical_notes
@@ -38,6 +40,7 @@ edit_note
 egg_alt
 error
 event
+event_busy
 event_note
 exercise
 expand_less
@@ -113,6 +116,7 @@ timeline
 timer
 today
 trending_down
+trending_flat
 trending_up
 tune
 upload

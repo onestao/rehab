@@ -3,11 +3,14 @@ const theme = {
     KEY: 'rehab_pro_theme_cfg',
     presets: {
         blue: '#0061a4',
-        purple: '#6750a4',
-        green: '#1a5e1f',
-        orange: '#9a4600',
-        rose: '#ba005c'
+        purple: '#7B4F9D',
+        green: '#386a20',
+        amber: '#a4570d',
+        rose: '#b71c5c',
+        teal: '#006a6a',
+        orange: '#9a4600'
     },
+    seedMap: { blue: '', purple: 'purple', green: 'green', amber: 'amber', rose: 'rose', teal: 'teal', orange: '' },
     cfg: { mode: 'blue', seed: '#0061a4', colorMode: 'auto' },
 
     init() {
@@ -47,7 +50,7 @@ const theme = {
 
     setPreset(name) {
         const seed = this.presets[name] || this.presets.blue;
-        this.cfg = { mode: name, seed };
+        this.cfg = { ...this.cfg, mode: name, seed };
         this.persist();
         this.apply(seed);
         this.syncUI();
@@ -79,6 +82,12 @@ const theme = {
     },
 
     apply(seed) {
+        const themeName = this.seedMap?.[this.cfg.mode] || '';
+        if (themeName) {
+            document.documentElement.setAttribute('data-theme', themeName);
+        } else {
+            document.documentElement.removeAttribute('data-theme');
+        }
         document.documentElement.classList.add('theme-transitioning');
         clearTimeout(this._tT);
         this._tT = setTimeout(() => document.documentElement.classList.remove('theme-transitioning'), 400);

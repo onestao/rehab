@@ -4,7 +4,7 @@ export const cssSections = [
   { file: '03-banner.css', marker: { type: 'exact', value: '.app-update-banner {' } },
   { file: '04-layout-appbar.css', marker: { type: 'exact', value: '/* --- Top App Bar --- */' } },
   { file: '05-layout-chip.css', marker: { type: 'exact', value: '/* --- Chip --- */' } },
-  { file: '06-layout-page.css', marker: { type: 'exact', value: '/* --- Page --- */' } },
+  { file: '06-layout-page.css', marker: { type: 'exact', value: '/* --- App Shell / Page --- */' } },
   { file: '07-layout-page-header.css', marker: { type: 'exact', value: '/* --- Page Header --- */' } },
   { file: '08-components-cards.css', marker: { type: 'exact', value: '/* --- Cards --- */' } },
   { file: '09-workout-timer.css', marker: { type: 'exact', value: '/* --- Timer Panel (Expressive) --- */' } },
@@ -45,6 +45,7 @@ export const cssSections = [
   { file: '48-advice-model-picker.css', marker: { type: 'exact', value: '/* --- Advice Model Picker --- */' } },
   { file: '49-action-history-weekly.css', marker: { type: 'exact', value: '/* --- Action History & Weekly Plan --- */' } },
   { file: '49-plan.css', marker: { type: 'exact', value: '/* --- Plan Daily Plan / M3E --- */' } },
+  { file: '50-v6-ui.css', marker: { type: 'exact', value: '/* ============================================\n   V6 UI' } },
   { file: '41-m3e-effects.css', marker: { type: 'exact', value: '/* === M3 Expressive Effects === */' } },
   { file: '40-a11y.css', marker: { type: 'exact', value: '/* --- A11y --- */' } },
 ];

@@ -129,8 +129,8 @@
 }
 @media (min-width: 600px) {
     .md-grid { grid-template-columns: repeat(3, 1fr); }
-    #app { max-width: 520px; margin: 0 auto; }
-    .md-nav-rail { max-width: 520px; left: 50%; transform: translateX(-50%); border-radius: var(--md-sys-shape-lg) var(--md-sys-shape-lg) 0 0; }
+    #app { max-width: none; margin: 0; }
+    .md-nav-rail { max-width: none; left: auto; transform: none; border-radius: 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -60,45 +60,41 @@
             const aggregate = this.aggregateCompletionRate?.(todayPlans) || { done: 0, total: 0, rate: 0 };
             const selected = todayPlans.find((item) => item.id === this.selectedPlanId) || todayPlans[0] || null;
             if (selected) this.selectedPlanId = selected.id;
-            const completion = this.completionRate?.(selected) || { done: 0, total: 0, rate: 0 };
             const plan = selected;
-            const planMeta = this.planTypeMeta?.(plan?.type || 'rehab', plan?.title) || { label: '训练计划', taskLabel: '任务', icon: 'event_note' };
-            const items = (plan.items || []).filter((item) => !item.deleted).sort((a, b) => taskSort(a) - taskSort(b));
-            const current = items.find((item) => item.status === 'in-progress') || items.find((item) => item.status === 'todo') || null;
+            const planMeta = this.planTypeMeta?.(plan?.type || 'rehab', plan?.title) || { label: '训练计划', icon: 'event_note' };
             const percent = Math.round((aggregate.rate || 0) * 100);
-            const pending = items.filter((item) => item.status === 'todo' || item.status === 'in-progress').length;
-            const currentMeta = taskStatusMeta(current || {});
             const today = this.logicalDateKey?.() || this.dateKey(new Date());
-            const prefs = this.ensurePlanPrefs?.() || {};
-            const cooldownCount = todayPlans.reduce((sum, item) => sum + Number(this.pendingCooldownCount?.(item) || 0), 0);
             const weekdays = ['周日','周一','周二','周三','周四','周五','周六'];
             const weekday = weekdays[this.dateFromKey(today).getDay()];
             const weight = this.activeRecords?.(this.db.health?.weights || []).find((item) => item.date === today) || this.sortedWeights?.().slice(-1)[0] || null;
             const exerciseCal = Math.round(this.todayTrainingCalories?.() || 0);
-            const metricText = [
-                weight ? `体重 ${Number(weight.weight || 0).toFixed(1)} kg` : '',
-                `${exerciseCal} kcal 消耗`
-            ].filter(Boolean).join(' · ');
-            return `<div class="md-card plan-today-card plan-hero-card">
-                <div class="plan-today-head">
+            const intake = this.todayCalories?.() || 0;
+            const goalCal = this.db.health?.dietGoal?.dailyCal || 0;
+            const remaining = goalCal ? goalCal - intake : 0;
+            const heroTitle = goalCal ? `距目标还差 ${remaining} 千卡` : (weight ? `体重 ${Number(weight.weight || 0).toFixed(1)} kg` : '开始今日训练');
+            const streakDays = this.computeStreakDays?.() || 0;
+            const prefs = this.ensurePlanPrefs?.() || {};
+            const weeklySummary = window.planWeekly?.summary?.() || { done: 0, total: 0 };
+            return `<div class="hero">
+                <div class="hero-head">
                     <div>
-                        <h3>${today.slice(5, 7)}月${today.slice(8, 10)}日 ${weekday}</h3>
-                        <small class="plan-today-metrics">${this.escapeHtml(metricText || '现在 / 今天 / 接下来')}</small>
-                        ${plan?.notes ? `<small>${this.escapeHtml(plan.notes)}</small>` : ''}
+                        <div class="hero-label">今日概览</div>
+                        <div class="hero-title">${this.escapeHtml(heroTitle)}</div>
                     </div>
-                    <div class="plan-card-actions">
-                        ${prefs.showCooldownDock === false ? '' : `<button class="md-icon-btn" type="button" ${cooldownCount ? 'onclick="data.openPlanPendingCooldownSheet?.()"' : 'disabled'} aria-label="${cooldownCount ? `待集中拉伸 ${cooldownCount} 项` : '暂无待集中拉伸'}" title="${cooldownCount ? `待集中拉伸 ${cooldownCount} 项` : '暂无待集中拉伸'}"><span class="material-symbols-rounded">self_improvement</span>${cooldownCount ? `<b>${cooldownCount}</b>` : ''}</button>`}
-                        <button class="md-icon-btn" type="button" onclick="planWeekly.open()" aria-label="本周计划"><span class="material-symbols-rounded">calendar_month</span></button>
-                        <button class="md-icon-btn" type="button" onclick="data.openPlanTodayAiSheet?.()" aria-label="AI 重排训练计划"><span class="material-symbols-rounded">auto_awesome</span></button>
+                    <div style="display:flex;align-items:center;gap:6px">
+                        ${streakDays > 0 ? `<span class="streak-chip"><span class="material-symbols-rounded">local_fire_department</span>连续 ${streakDays} 天</span>` : ''}
+                        ${prefs.showWeeklyDock === false ? '' : `<button class="md-icon-btn-bar today-weekly-plan-btn" type="button" onclick="window.planWeekly?.open?.()" aria-label="本周计划" title="本周计划 · ${weeklySummary.done}/${weeklySummary.total || 0} 完成"><span class="material-symbols-rounded">calendar_month</span></button>`}
+                        <button class="md-icon-btn-bar" type="button" onclick="data.openPlanTodayAiSheet?.()" aria-label="AI 重排训练计划"><span class="material-symbols-rounded">auto_awesome</span></button>
                     </div>
                 </div>
-                <div class="plan-ring-row">
+                <div class="rings">
                     ${this.renderPlanIntakeRing?.() || ''}
-                    <button class="today-focus-ring plan-progress-ring ${plan ? planStatusClass(plan.type) : 'is-empty'}" style="--plan-progress:${percent * 3.6}deg" type="button" onclick="${plan ? `data.openPlanTaskDrawer('${plan.id}')` : 'data.openNewPlanSheet()'}">
+                    <span class="ring-divider"></span>
+                    <button class="ring ring-train ${plan ? planStatusClass(plan.type) : 'is-empty'}" style="--plan-progress:${percent * 3.6}deg" type="button" onclick="${plan ? `data.openPlanTaskDrawer('${plan.id}')` : 'data.openNewPlanSheet()'}">
                         <div>
                             <b>${aggregate.total ? `${aggregate.done}/${aggregate.total}` : '+'}</b>
-                            <small>${aggregate.total ? '计划' : '新建'}</small>
-                            <em>${plan ? this.escapeHtml(plan.title || planMeta.label) : '添加计划'}</em>
+                            <small>训练</small>
+                            <em>${percent}% · ${exerciseCal} 分钟</em>
                         </div>
                     </button>
                 </div>
@@ -106,23 +102,88 @@
                     const meta = this.planTypeMeta?.(item.type, item.title) || { label: item.title || '计划', icon: 'event_note' };
                     return `<button class="plan-type-tab ${item.id === plan.id ? 'active' : ''} ${planStatusClass(item.type)}" type="button" onclick="data.selectTodayPlan('${item.id}')"><span class="material-symbols-rounded">${meta.icon}</span>${this.escapeHtml(item.title || meta.label)}</button>`;
                 }).join('')}</div>` : ''}
-                <div class="plan-current-block ${planStatusClass(plan?.type)}">
-                    <span class="material-symbols-rounded plan-current-icon">${currentMeta.icon}</span>
-                    <span class="plan-current-copy">
-                        <strong>${current ? `下一项：${this.escapeHtml(current.name || '暂无任务')}` : this.escapeHtml(plan?.title || planMeta.label)}</strong>
-                        <small>${current ? `${taskSpecText(current)}${current.currentLevel ? ` · Lv${current.currentLevel}` : ''}` : '点击 + 新建训练计划或让 AI 排程'}</small>
-                    </span>
-                    ${current ? `<div class="plan-current-actions">
-                        <button class="md-btn md-btn-filled" type="button" onclick="data.handlePlanTaskTap('${plan.id}','${current.id}')"><span class="material-symbols-rounded">play_arrow</span>开始</button>
-                        <button class="md-btn md-btn-tonal" type="button" onclick="data.updateItemStatus('${plan.id}','${current.id}','skipped');data.renderTodayPage?.()">跳过</button>
-                        <button class="md-btn md-btn-tonal" type="button" onclick="data.markPlanTaskDone('${plan.id}','${current.id}')">完成</button>
-                    </div>` : `<button class="md-btn md-btn-tonal" type="button" onclick="data.openNewPlanSheet()"><span class="material-symbols-rounded">add</span>新建训练计划</button>`}
-                    <button class="plan-current-list-btn" type="button" onclick="${plan ? `data.openPlanTaskDrawer('${plan.id}')` : 'data.openNewPlanSheet()'}" aria-label="查看今日任务">
-                        <span class="material-symbols-rounded">playlist_add</span>
-                        ${pending ? `<b>${pending}</b>` : ''}
-                    </button>
+            </div>`;
+        },
+
+        renderTodayV6PlanCard() {
+            const todayPlans = this.getTodayDailyPlans?.() || [];
+            const selected = todayPlans.find((item) => item.id === this.selectedPlanId) || todayPlans[0] || null;
+            if (!selected) return '';
+            const plan = selected;
+            const planMeta = this.planTypeMeta?.(plan.type || 'rehab', plan.title) || { label: '训练计划', icon: 'event_note' };
+            const completion = this.completionRate?.(plan) || { done: 0, total: 0, rate: 0 };
+            const items = (plan.items || []).filter((item) => !item.deleted).sort((a, b) => taskSort(a) - taskSort(b));
+            const current = items.find((item) => item.status === 'in-progress') || items.find((item) => item.status === 'todo') || null;
+            const pending = items.filter((item) => item.status === 'todo' || item.status === 'in-progress').length;
+            const totalItems = items.length || 1;
+            const elapsed = current ? this.estimateElapsed?.(current) : null;
+            return `<div class="sect-head"><span class="t">当前训练计划</span><button class="a" onclick="data.openPlanTaskDrawer('${plan.id}')" type="button">查看全部</button></div>
+            <div class="glass-card plan-card">
+                <div class="plan-head">
+                    <div>
+                        <div class="pt">进行中 · ${this.escapeHtml(planMeta.label)}</div>
+                        <div class="pn">${this.escapeHtml(plan.title || planMeta.label)}</div>
+                    </div>
+                    <div class="plan-chip"><span class="material-symbols-rounded">play_circle</span>${completion.done}/${completion.total}</div>
+                </div>
+                <div class="seg-bar">${items.map((item) => {
+                    const cls = item.status === 'done' ? 'done' : (current && item.id === current.id ? 'cur' : '');
+                    return `<span class="seg ${cls}" style="width:${100/totalItems}%"></span>`;
+                }).join('')}</div>
+                ${current ? `<div class="plan-meta"><span>${taskSpecText(current)}${current.currentLevel ? ` · Lv${current.currentLevel}` : ''}</span>${pending ? `<span>${pending} 项待完成</span>` : ''}</div>` : ''}
+                <div class="plan-actions">
+                    ${current ? `<button class="md-btn md-btn-filled" type="button" onclick="data.handlePlanTaskTap('${plan.id}','${current.id}')"><span class="material-symbols-rounded">play_arrow</span>继续训练</button>` : `<button class="md-btn md-btn-tonal" type="button" onclick="data.openPlanTaskDrawer('${plan.id}')"><span class="material-symbols-rounded">checklist</span>查看完成</button>`}
+                    <button class="md-btn md-btn-tonal" type="button" onclick="data.openPlanTaskDrawer('${plan.id}')">查看动作</button>
                 </div>
             </div>`;
+        },
+
+        renderTodayV6DietCard() {
+            const intake = this.todayCalories?.() || 0;
+            const macros = this.todayMacros?.() || { pro: 0, carb: 0, fat: 0 };
+            const goalCal = this.db.health?.dietGoal?.dailyCal || 0;
+            const goals = this.defaultDietGoals?.() || { pro: 0, carb: 0, fat: 0 };
+            const remaining = goalCal ? goalCal - intake : 0;
+            const pct = goalCal ? Math.min(100, Math.round((intake / goalCal) * 100)) : 0;
+            const proPct = goals.pro ? Math.min(100, Math.round((macros.pro / goals.pro) * 100)) : 0;
+            const carbPct = goals.carb ? Math.min(100, Math.round((macros.carb / goals.carb) * 100)) : 0;
+            const fatPct = goals.fat ? Math.min(100, Math.round((macros.fat / goals.fat) * 100)) : 0;
+            return `<div class="sect-head"><span class="t">饮食摄入</span><button class="a" onclick="data.openDietModal()" type="button">添加记录 ›</button></div>
+            <div class="glass-card">
+                <div class="calorie-head">
+                    <div>
+                        <span class="num">${goalCal ? remaining : '--'}</span>
+                        <span class="unit">${goalCal ? 'kcal 剩余' : ''}</span>
+                    </div>
+                    ${goalCal ? `<div class="right"><div class="lab">已摄入 / 目标</div><div class="val">${intake} / ${goalCal}</div></div>` : ''}
+                </div>
+                ${goalCal ? `<div class="stack-bar">
+                    <i class="b1" style="width:${carbPct}%"></i>
+                    <i class="b2" style="width:${proPct}%"></i>
+                    <i class="b3" style="width:${fatPct}%"></i>
+                </div>
+                <div class="macros">
+                    <span class="macro c"><small>碳水</small><b>${macros.carb.toFixed(0)}g</b></span>
+                    <span class="macro p"><small>蛋白</small><b>${macros.pro.toFixed(0)}g</b></span>
+                    <span class="macro f"><small>脂肪</small><b>${macros.fat.toFixed(0)}g</b></span>
+                    <span class="macro r"><small>余</small><b>${remaining}</b></span>
+                </div>` : ''}
+            </div>`;
+        },
+
+        updateTodayV6Greet() {
+            const greetLine = document.querySelector('.today-v6-greet-line');
+            const greetSub = document.querySelector('.today-v6-greet-sub');
+            if (!greetLine) return;
+            const hour = new Date().getHours();
+            const greet = hour < 6 ? '凌晨好' : hour < 12 ? '早上好' : hour < 18 ? '下午好' : '晚上好';
+            const name = this.db.profile?.name || '';
+            greetLine.textContent = name ? `${greet}，${name}` : greet;
+            if (greetSub) {
+                const now = new Date();
+                const weekdays = ['周日','周一','周二','周三','周四','周五','周六'];
+                greetSub.textContent = `${now.getMonth()+1}月${now.getDate()}日 · ${weekdays[now.getDay()]}`;
+            }
         },
 
         renderPlanIntakeRing() {
@@ -138,8 +199,8 @@
                 carb: 120 + Math.min(120, this.ratio(macros.carb, goals.carb) * 1.2),
                 fat: 240 + Math.min(120, this.ratio(macros.fat, goals.fat) * 1.2)
             };
-            if (!goalCal) return '<div class="today-focus-ring macro-focus-ring plan-intake-ring"><div><b>--</b><small>摄入</small></div></div>';
-            return `<div class="today-focus-ring macro-focus-ring plan-intake-ring" style="--progress:${progress};--pro-stop:${macroStops.pro}deg;--carb-stop:${macroStops.carb}deg;--fat-stop:${macroStops.fat}deg"><div><b>${progress}%</b><small>摄入</small><em>${remainingText}</em></div></div>`;
+            if (!goalCal) return '<div class="ring ring-diet"><div><b>--</b><small>饮食</small></div></div>';
+            return `<div class="ring ring-diet" style="--progress:${progress};--pro-stop:${macroStops.pro}deg;--carb-stop:${macroStops.carb}deg;--fat-stop:${macroStops.fat}deg"><div><b>${progress}%</b><small>饮食</small><em>${intake}/${goalCal}</em></div></div>`;
         },
 
         selectTodayPlan(planId) {
@@ -221,11 +282,11 @@
         },
 
         renderTodayActionDock() {
-            return `<div class="today-action-dock">
-                <button class="record-quick-btn" type="button" data-plan-quick="diet" onclick="data.openDietModal()"><span class="material-symbols-rounded">restaurant</span><span>记饮食</span></button>
-                <button class="record-quick-btn" type="button" data-plan-quick="cardio" onclick="data.openExerciseModal()"><span class="material-symbols-rounded">fitness_center</span><span>记运动</span></button>
-                <button class="record-quick-btn" type="button" data-plan-quick="weight" onclick="data.openWeightModal()"><span class="material-symbols-rounded">monitor_weight</span><span>记体重</span></button>
-                <button class="record-quick-btn record-quick-btn-ai context-ai-btn" type="button" data-ai-ctx="today" data-ai-idx="0"><span class="material-symbols-rounded">psychology</span><span>问 AI</span></button>
+            return `<div class="quick-dock">
+                <button class="record-quick-btn" type="button" data-q="weight" onclick="data.openWeightModal()"><span class="material-symbols-rounded">monitor_weight</span><span>记体重</span></button>
+                <button class="record-quick-btn" type="button" data-q="diet" onclick="data.openDietModal()"><span class="material-symbols-rounded">restaurant</span><span>记饮食</span></button>
+                <button class="record-quick-btn" type="button" data-q="cardio" onclick="data.openExerciseModal()"><span class="material-symbols-rounded">fitness_center</span><span>记运动</span></button>
+                <button class="record-quick-btn record-quick-btn-ai context-ai-btn" type="button" data-q="ai" data-ai-ctx="today" data-ai-idx="0"><span class="material-symbols-rounded">psychology</span><span>问 AI</span></button>
             </div>`;
         },
 

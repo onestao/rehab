@@ -47,7 +47,7 @@
     }
 
     body { background: var(--md-sys-surface); }
-    .md-top-app-bar { background: var(--md-sys-surface); }
+    .md-top-app-bar { background: transparent; }
     .md-nav-rail { background: var(--md-sys-surface-container); backdrop-filter: blur(20px); }
 
     .timer-panel {

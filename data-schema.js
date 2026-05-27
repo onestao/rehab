@@ -76,7 +76,7 @@
             this.db.deviceId = this.db.deviceId || `dev-${Math.random().toString(36).slice(2,10)}`;
             this.db.lastActionDraft = this.db.lastActionDraft || null;
             this.db.actualSetsBuffer = this.db.actualSetsBuffer || [];
-            this.db.onboarded = !!this.db.onboarded;
+            this.db.onboarded = true;
             this.db.aiProfiles = this.db.aiProfiles || [];
             this.db.aiActiveId = this.db.aiActiveId || '';
             this.db.aiModels = this.db.aiModels || [];

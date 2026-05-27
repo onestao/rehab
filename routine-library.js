@@ -501,49 +501,26 @@
                 ? `坚持训练 ${weeksTraining} 周`
                 : '开启训练之旅';
 
-            return `<div class="md-card identity-card">
-                <div class="identity-row">
-                    <span class="material-symbols-rounded identity-icon">fitness_center</span>
-                    <div class="identity-text">
-                        <strong>${titleText}</strong>
-                        <small>累计 ${totalSessions} 次</small>
+            const latestWeight = sortedW.length ? sortedW[sortedW.length - 1] : null;
+            const height = this.db.profile?.height || '';
+            const goalWeight = goal?.targetWeight || '';
+            const profileSubtitle = goalWeight
+                ? `${height ? '身高 ' + height + ' cm · ' : ''}目标体重 ${goalWeight} kg`
+                : titleText;
+
+            return `<div class="profile-hero">
+                <div class="profile-hero-main">
+                    <div class="avatar"><span class="material-symbols-rounded">monitoring</span></div>
+                    <div class="profile-info">
+                        <h2>训练档案</h2>
+                        <small>${this.escapeHtml(profileSubtitle)}</small>
                     </div>
-                    <button class="md-btn md-btn-tonal identity-action"
-                            onclick="data.setRoutineView('weightloss')" type="button">
-                        <span class="material-symbols-rounded">tune</span>
-                        调整目标
-                    </button>
                 </div>
-                <div class="identity-metrics">
-                    <div class="identity-metric">
-                        <div class="identity-metric-head">
-                            <span class="material-symbols-rounded">exercise</span>
-                            <span>本周训练</span>
-                        </div>
-                        <b>${weekDone}/${weekGoal} 次</b>
-                        <div class="identity-training-split">
-                            <span>有氧 <strong>${cardioSessions}</strong></span>
-                            <span>无氧/计划 <strong>${strengthSessions}</strong></span>
-                        </div>
-                        <div class="identity-bar" role="progressbar"
-                             aria-valuenow="${trainPct}" aria-valuemin="0" aria-valuemax="100">
-                            <i style="width:${trainPct}%"></i>
-                        </div>
-                    </div>
-                    <div class="identity-metric weight-${weightColor}">
-                        <div class="identity-metric-head">
-                            <span class="material-symbols-rounded">monitor_weight</span>
-                            <span>近 7 天体重</span>
-                        </div>
-                        <b>${weightText}</b>
-                        <small>${goalText}</small>
-                        ${weightPct !== null
-                            ? `<div class="identity-bar" role="progressbar"
-                                    aria-valuenow="${weightPct}" aria-valuemin="0" aria-valuemax="100">
-                                    <i style="width:${weightPct}%"></i>
-                                </div>`
-                            : ''}
-                    </div>
+                <div class="profile-stats">
+                    <div class="ps-item"><b>${latestWeight ? Number(latestWeight.weight).toFixed(1) : '--'}</b><small>kg 当前</small></div>
+                    <div class="ps-item"><b>${weightDelta !== null ? (weightDelta > 0 ? '+' : '') + weightDelta.toFixed(1) : '--'}</b><small>kg 7天</small></div>
+                    <div class="ps-item"><b>${weekDone}/${weekGoal}</b><small>次/周</small></div>
+                    <div class="ps-item"><b>${totalSessions}</b><small>累计</small></div>
                 </div>
             </div>`;
         },
@@ -553,30 +530,20 @@
             const content  = document.getElementById('profileContent');
             const settings = document.getElementById('profileSettings');
 
-            if (overview) overview.innerHTML = this.renderProfileIdentityCard();
+            if (overview) overview.innerHTML = this.renderProfileIdentityCard() + this.renderProfileV6Cards();
 
             this.routineView = this.normalizeRoutineView?.(this.routineView) || 'library';
             const view = this.routineView;
             const direction = this._routineSwipeDirection || '';
             this._routineSwipeDirection = '';
 
-            const tabs = [
-                ['library',    'library_books', '库'],
-                ['weightloss', 'trending_down', '目标指导'],
-                ['ai',         'psychology',    'AI'],
-                ['sync',       'cloud_sync',    '同步'],
-            ];
-            const tabBar = `<div class="record-tabs" role="tablist" aria-label="我的视图">
-                ${tabs.map(([k, i, l]) => `<button class="record-tab ${view === k ? 'active' : ''}" data-routine-view="${k}" onclick="data.setRoutineView('${k}')" type="button" role="tab" aria-selected="${view === k}" aria-pressed="${view === k}"><span class="material-symbols-rounded">${i}</span><span class="profile-tab-label">${l}</span></button>`).join('')}
-            </div>`;
-
             if (!content) return;
 
             const showSettings = view === 'ai' || view === 'sync';
+            const showContent = view === 'library' || view === 'weightloss';
+            if (overview) overview.classList.toggle('hidden', showSettings);
             if (settings) {
                 settings.classList.toggle('hidden', !showSettings);
-                settings.classList.toggle('profile-view-forward', direction === 'next');
-                settings.classList.toggle('profile-view-back', direction === 'prev');
                 const aiCard   = settings.querySelector('[data-settings="ai"]');
                 const syncCard = settings.querySelector('[data-settings="sync"]');
                 aiCard?.classList.toggle('hidden',   view !== 'ai');
@@ -584,26 +551,63 @@
             }
 
             this.bindProfileSwipe?.(content);
-            content.classList.remove('hidden');
-            content.classList.toggle('profile-view-forward', direction === 'next');
-            content.classList.toggle('profile-view-back', direction === 'prev');
-            if (view === 'library') {
-                content.innerHTML = tabBar + (this.renderPlanEquipmentCard?.() || '') + this.renderLibrarySegment() + this.renderLibraryDeck();
-                requestAnimationFrame(() => {
-                    this.syncLibraryDeckPosition?.(false);
-                    this.updateLibraryTabActive?.();
-                    this.updateLibrarySwipeEffects?.();
-                });
-            } else if (view === 'weightloss') {
-                content.innerHTML = tabBar + this.renderWeightLossPlanCard();
-            } else {
-                content.innerHTML = tabBar;
+            content.classList.toggle('hidden', !showContent);
+            if (showContent) {
+                const backBtn = `<div class="profile-v6-back-row"><button class="md-btn md-btn-tonal" onclick="data.setRoutineView('library');data.renderProfilePage?.()" type="button"><span class="material-symbols-rounded">arrow_back</span>返回</button></div>`;
+                if (view === 'library') {
+                    content.innerHTML = (this.renderPlanEquipmentCard?.() || '') + this.renderLibrarySegment() + this.renderLibraryDeck();
+                    requestAnimationFrame(() => {
+                        this.syncLibraryDeckPosition?.(false);
+                        this.updateLibraryTabActive?.();
+                        this.updateLibrarySwipeEffects?.();
+                    });
+                } else if (view === 'weightloss') {
+                    content.innerHTML = backBtn + this.renderWeightLossPlanCard();
+                }
+            }
+            if (showSettings) {
+                const settingTitle = view === 'ai' ? 'AI 设置' : '云端同步';
+                const backBtn = `<div class="profile-v6-back-row"><button class="md-btn md-btn-tonal" onclick="data.setRoutineView('library');data.renderProfilePage?.()" type="button"><span class="material-symbols-rounded">arrow_back</span>返回</button><strong style="margin-left:8px;font-size:16px">${settingTitle}</strong></div>`;
+                const existingBack = settings.querySelector('.profile-v6-back-row');
+                if (!existingBack) settings.insertAdjacentHTML('afterbegin', backBtn);
             }
             clearTimeout(this._routineViewAnimationTimer);
             this._routineViewAnimationTimer = setTimeout(() => {
                 content.classList.remove('profile-view-forward', 'profile-view-back');
                 settings?.classList.remove('profile-view-forward', 'profile-view-back');
+                const extraBack = settings?.querySelectorAll('.profile-v6-back-row');
+                if (extraBack) extraBack.forEach((el, i) => { if (i > 0) el.remove(); });
             }, 360);
+        },
+
+        renderProfileV6Cards() {
+            const goal = this.db.health?.dietGoal;
+            const goalType = goal?.goalType || this.db.health?.goalType || 'loss';
+            const goalLabel = goalType === 'gain' ? '增肌' : goalType === 'maintain' ? '维持体重' : '减脂';
+            const goalCal = goal?.dailyCal || 0;
+            return `<div class="sect-head"><span class="t">设置</span></div>
+            <div class="glass-card setting-list">
+                <div class="setting-row" onclick="data.setRoutineView('ai')" role="button" tabindex="0">
+                    <span class="material-symbols-rounded ico">psychology</span>
+                    <div class="copy"><strong>AI 设置</strong><small>模型 / API Key</small></div>
+                    <span class="material-symbols-rounded arrow">chevron_right</span>
+                </div>
+                <div class="setting-row" onclick="data.setRoutineView('sync')" role="button" tabindex="0">
+                    <span class="material-symbols-rounded ico">cloud_sync</span>
+                    <div class="copy"><strong>云端同步</strong><small>S3 / WebDAV</small></div>
+                    <span class="material-symbols-rounded arrow">chevron_right</span>
+                </div>
+                <div class="setting-row" onclick="data.setRoutineView('weightloss')" role="button" tabindex="0">
+                    <span class="material-symbols-rounded ico">flag</span>
+                    <div class="copy"><strong>目标 &amp; 体型</strong><small>${this.escapeHtml(goalLabel)}${goalCal ? ' · ' + goalCal + ' kcal/日' : ''}</small></div>
+                    <span class="material-symbols-rounded arrow">chevron_right</span>
+                </div>
+                <div class="setting-row" onclick="data.setRoutineView('library')" role="button" tabindex="0">
+                    <span class="material-symbols-rounded ico">library_books</span>
+                    <div class="copy"><strong>方案 / 动作库</strong><small>自定义动作与计划</small></div>
+                    <span class="material-symbols-rounded arrow">chevron_right</span>
+                </div>
+            </div>`;
         },
 
         renderRoutines() {

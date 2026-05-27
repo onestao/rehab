@@ -28,13 +28,18 @@
             const ctx = window.data || this;
             const overview = document.getElementById('todayOverview');
             const quickActions = document.getElementById('todayQuickActions');
+            const planStatus = document.getElementById('todayPlanStatus');
+            const dietStatus = document.getElementById('todayDietStatus');
             const timeline = document.getElementById('todayTimeline');
             const aiCard = document.getElementById('todayAiCard');
             if (overview) overview.innerHTML = ctx.renderPlanTodaySection?.() || ctx.renderRecordOverview?.() || '';
             if (quickActions) quickActions.innerHTML = ctx.renderTodayActionDock?.() || ctx.renderRecordQuickActions?.() || '';
+            if (planStatus) planStatus.innerHTML = ctx.renderTodayV6PlanCard?.() || '';
+            if (dietStatus) dietStatus.innerHTML = ctx.renderTodayV6DietCard?.() || '';
             if (timeline) timeline.innerHTML = ctx.renderTodayTimeline?.() || '';
             if (aiCard) aiCard.innerHTML = ctx.renderTodayAiReminder?.() || ctx.renderContextAiCard?.('today') || '';
             ctx.bindPlanQuickRepeat?.();
+            ctx.updateTodayV6Greet?.();
         },
 
         renderDietPage() {
@@ -48,7 +53,7 @@
         renderRecordsPage() {
             const overview = document.getElementById('recordsOverview');
             const content = document.getElementById('recordsContent');
-            if (overview) overview.innerHTML = '';
+            if (overview) overview.innerHTML = this.renderRecordsV6Overview?.() || '';
             if (content) {
                 content.innerHTML = `
                 ${this.renderHealthTabs()}

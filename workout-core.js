@@ -101,7 +101,7 @@ Object.assign(workout, {
     resetMainPanel() {
         document.getElementById('statusText').innerText = this.mode === 'cardio' ? 'CARDIO' : 'READY';
         document.getElementById('mainTime').innerText = this.mode === 'cardio' ? '00:00' : '00';
-        document.getElementById('subText').innerText = this.mode === 'cardio' ? '准备有氧训练' : '准备就绪';
+        document.getElementById('subText').innerText = this.mode === 'cardio' ? '准备有氧训练' : this.nextStrengthActionLabel?.() || '准备就绪';
         if (this.mode === 'cardio') {
             const plan = cardio.currentPlan();
             document.querySelectorAll('.stat-label')[0].innerText = '热量';
@@ -124,6 +124,20 @@ Object.assign(workout, {
         document.getElementById('totalRep').innerText = '0';
     },
 
+    nextStrengthActionLabel() {
+        const planActions = data._planActions ? data._planActions() : data.activeRecords(data.db.actions || []).filter(a => !a.libOnly);
+        const action = planActions.find(a => a && !a.deleted && !a.libOnly);
+        if (action?.name) return action.name;
+        const todayPlans = data.getTodayDailyPlans?.() || [];
+        const task = todayPlans
+            .flatMap(plan => (plan.items || []).filter(item => !item.deleted && item.status !== 'done' && item.status !== 'skipped'))
+            .sort((a, b) => {
+                const order = { 'in-progress': 0, todo: 1 };
+                return (order[a.status] ?? 9) - (order[b.status] ?? 9);
+            })[0];
+        return task?.name || '';
+    },
+
     async toggle() {
         window.haptics?.light?.();
         const fab = document.getElementById('playBtn');
@@ -140,6 +154,11 @@ Object.assign(workout, {
             this.isPlaying = true; this.isPaused = false; this.totalSec = 0;
             if (window.workoutEngine) workoutEngine.state = workoutEngine.createInitialState();
             this.updateStateClasses();
+            const firstAction = this.nextStrengthActionLabel?.();
+            if (firstAction) {
+                document.getElementById('statusText').innerText = 'NEXT';
+                document.getElementById('subText').innerText = firstAction;
+            }
             document.getElementById('playIcon').innerText = 'pause';
             document.getElementById('stopBtn').classList.remove('hidden');
             await this.acquireWakeLock();

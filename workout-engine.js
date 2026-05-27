@@ -25,9 +25,57 @@ const workoutEngine = {
         return this.state ? JSON.parse(JSON.stringify(this.state)) : null;
     },
 
+    panelLabelFor(phase = this.state?.phase || '') {
+        const actions = this.currentActions();
+        const action = this.state?.activeAction || actions[this.state?.actionIndex || 0] || null;
+        const nextAction = actions[(this.state?.actionIndex || 0) + 1] || null;
+        const actionName = action?.name || '当前动作';
+        const nextName = nextAction?.name || '下一项';
+        const setNo = Number(this.state?.setIndex || 0) + 1;
+        const repNo = Number(this.state?.repIndex || 0) + 1;
+        const side = action?.isAlt ? (this.state?.sideIndex === 1 ? '右侧' : '左侧') : '';
+        const prefix = side ? `${side} · ` : '';
+        switch (phase) {
+            case 'intro':
+                return { statusText: 'NEXT', subText: actionName };
+            case 'announceSet':
+                return { statusText: 'SET', subText: `${prefix}${actionName} · 第 ${setNo} 组` };
+            case 'announceRep':
+                return { statusText: 'READY', subText: `${prefix}${actionName} · 第 ${repNo} 次` };
+            case 'hold':
+                return { statusText: 'HOLD', subText: `${prefix}${actionName}` };
+            case 'restAfterRep':
+            case 'repRest':
+                return { statusText: 'REST', subText: `${actionName} · 次间休息` };
+            case 'afterReps':
+                return { statusText: 'DONE', subText: `${actionName} · 本组完成` };
+            case 'switchRest':
+            case 'switchSide':
+                return { statusText: 'SWITCH', subText: `${actionName} · 准备换边` };
+            case 'setRest':
+            case 'nextSet':
+                return { statusText: 'SET REST', subText: `${actionName} · 组间休息` };
+            case 'actionBreak':
+                return { statusText: 'BREAK', subText: nextAction ? `下一项：${nextName}` : `${actionName} · 已完成` };
+            case 'completed':
+                return { statusText: 'DONE', subText: nextAction ? `下一项：${nextName}` : '本轮训练完成' };
+            default:
+                return { statusText: this.state?.phaseStatus || 'READY', subText: actionName };
+        }
+    },
+
+    syncPanelLabels(phase = this.state?.phase || '') {
+        const labels = this.panelLabelFor(phase);
+        const statusEl = document.getElementById('statusText');
+        const subEl = document.getElementById('subText');
+        if (statusEl && labels.statusText) statusEl.innerText = labels.statusText;
+        if (subEl && labels.subText) subEl.innerText = labels.subText;
+    },
+
     transition(phase, patch = {}) {
         if (!this.state) return;
         Object.assign(this.state, patch, { phase });
+        this.syncPanelLabels(phase);
         if (window.workoutState) workoutState.markActive();
         try {
             window.dispatchEvent(new CustomEvent('workout:state', {
@@ -110,6 +158,11 @@ const workoutEngine = {
 
     async start() {
         this.state = this.createInitialState();
+        const firstAction = this.currentActions()[0] || null;
+        if (firstAction) {
+            this.state.activeAction = JSON.parse(JSON.stringify(firstAction));
+            this.syncPanelLabels('intro');
+        }
         await this.run();
     },
 

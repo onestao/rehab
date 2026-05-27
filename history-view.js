@@ -67,6 +67,88 @@
         </div>`;
         },
 
+        renderRecordsV6Overview() {
+            const sorted = (this.sortedWeights?.() || []).slice().sort(
+                (a, b) => this.dateFromKey(a.date) - this.dateFromKey(b.date)
+            );
+            const latest = sorted.length ? sorted[sorted.length - 1] : null;
+            const prev = sorted.length >= 2 ? sorted[sorted.length - 2] : null;
+            const weightVal = latest ? Number(latest.weight).toFixed(1) : '--';
+            const weightDelta = (latest && prev) ? (latest.weight - prev.weight) : null;
+            const weightDeltaText = weightDelta !== null
+                ? `${weightDelta > 0 ? '+' : ''}${weightDelta.toFixed(1)} kg`
+                : '--';
+            const weightDeltaClass = weightDelta !== null
+                ? (weightDelta < -0.05 ? 'is-down' : weightDelta > 0.05 ? 'is-up' : '')
+                : '';
+
+            const intake = this.todayCalories?.() || 0;
+            const goalCal = this.db.health?.dietGoal?.dailyCal || 0;
+            const remaining = goalCal ? goalCal - intake : 0;
+            const calText = goalCal ? `${intake} kcal` : '--';
+            const calDeltaText = goalCal ? `剩余 ${remaining}` : '未设目标';
+
+            const recentWeights = sorted.slice(-14);
+            const wPoints = recentWeights.map(w => Number(w.weight));
+            const wSvg = this.renderRecordsV6MiniChart(wPoints);
+            const calPoints = [];
+            const today = this.logicalDateKey();
+            for (let i = 6; i >= 0; i--) {
+                const d = new Date(); d.setDate(d.getDate() - i);
+                const key = this.dateKey(d);
+                const logs = this.activeRecords(this.db.health.foodLogs || []).filter(f => f.date === key);
+                calPoints.push(logs.reduce((s, f) => s + Number(f.cal || 0), 0));
+            }
+            const cSvg = this.renderRecordsV6MiniChart(calPoints);
+
+            return `<div class="stat-grid">
+                <div class="stat-tile">
+                    <span class="material-symbols-rounded" style="position:absolute;top:8px;right:8px;opacity:.5;font-size:28px">monitor_weight</span>
+                    <div class="lab">体重</div>
+                    <div class="val">${weightVal} kg</div>
+                    <div class="delta ${weightDeltaClass}">${weightDelta !== null ? `<span class="material-symbols-rounded" style="font-size:12px">${weightDelta < -0.05 ? 'trending_down' : weightDelta > 0.05 ? 'trending_up' : 'trending_flat'}</span>` : ''}${weightDeltaText}</div>
+                    ${wSvg}
+                </div>
+                <div class="stat-tile">
+                    <span class="material-symbols-rounded" style="position:absolute;top:8px;right:8px;opacity:.5;font-size:28px">local_fire_department</span>
+                    <div class="lab">今日热量</div>
+                    <div class="val">${calText}</div>
+                    <div class="delta">${goalCal ? `<span class="material-symbols-rounded" style="font-size:12px">trending_down</span>` : ''}${calDeltaText}</div>
+                    ${cSvg}
+                </div>
+            </div>`;
+        },
+
+        renderRecordsV6MiniChart(points) {
+            if (!points || points.length < 2) return '<svg class="records-v6-mini-chart" viewBox="0 0 100 40"></svg>';
+            const min = Math.min(...points);
+            const max = Math.max(...points);
+            const range = max - min || 1;
+            const w = 100, h = 40, pad = 4;
+            const stepX = (w - pad * 2) / (points.length - 1);
+            const coords = points.map((v, i) => ({
+                x: pad + i * stepX,
+                y: h - pad - ((v - min) / range) * (h - pad * 2)
+            }));
+            const smoothPath = coords.map((p, i) => {
+                if (i === 0) return `M${p.x},${p.y}`;
+                const prev = coords[i - 1];
+                const cpx1 = prev.x + (p.x - prev.x) * 0.4;
+                const cpx2 = prev.x + (p.x - prev.x) * 0.6;
+                return `C${cpx1},${prev.y} ${cpx2},${p.y} ${p.x},${p.y}`;
+            }).join(' ');
+            const lastX = coords[coords.length - 1].x;
+            const firstX = coords[0].x;
+            const fillPath = `${smoothPath} L${lastX},${h - pad} L${firstX},${h - pad} Z`;
+            const dots = coords.map(p => `<circle cx="${p.x}" cy="${p.y}" r="2" fill="var(--md-sys-primary)" opacity="0.7"/>`).join('');
+            return `<svg class="records-v6-mini-chart" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
+                <defs><linearGradient id="cg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="var(--md-sys-primary)" stop-opacity="0.25"/><stop offset="100%" stop-color="var(--md-sys-primary)" stop-opacity="0.02"/></linearGradient></defs>
+                <path d="${fillPath}" fill="url(#cg)"/>
+                <path d="${smoothPath}" fill="none" stroke="var(--md-sys-primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                ${dots}
+            </svg>`;
+        },
+
         summarizeAiUsage() {
             const messages = this.activeRecords(this.db.health?.aiAdviceChat || []);
             const now = new Date();

@@ -115,21 +115,5 @@ body.is-training .md-fab.fab-play {
     background: var(--md-sys-error, #b3261e); color: #fff;
 }
 
-/* TASK-26: 首次启动引导 */
-.onboarding-root {
-    position: fixed; inset: 0; z-index: 99999;
-    background: var(--md-sys-surface);
-    display: flex; flex-direction: column; align-items: center; justify-content: center;
-    animation: m3e-card-rise .4s var(--md-expressive-spring) both;
-}
-.onboarding-page { display: none; flex-direction: column; align-items: center; gap: 14px; padding: 32px; text-align: center; }
-.onboarding-page.active { display: flex; animation: m3e-card-rise .4s var(--md-expressive-spring) both; }
-.onboarding-icon { font-size: 72px !important; color: var(--md-sys-primary); }
-.onboarding-controls { position: fixed; bottom: 32px; left: 0; right: 0; display: flex; flex-direction: column; align-items: center; gap: 14px; }
-.onboarding-dots { display: flex; gap: 8px; }
-.onboarding-dots span { width: 8px; height: 8px; border-radius: 50%; background: var(--md-sys-surface-container-high); transition: width .3s var(--md-expressive-spring), background .3s ease; }
-.onboarding-dots span.active { width: 24px; background: var(--md-sys-primary); }
-.onboarding-root.fade-out { opacity: 0; transition: opacity .3s ease; }
-
 /* TASK-24: 每周总结卡片 */
 .weekly-summary-card { animation: m3e-card-rise .42s var(--md-expressive-spring) both; }

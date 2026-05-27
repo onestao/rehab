@@ -33,6 +33,7 @@ const advicePanel = {
             holdAdviceTopChrome: this.holdAdviceTopChrome,
             rerenderAdvicePanel: this.rerenderAdvicePanel,
             renderAdviceTopChromeInner: this.renderAdviceTopChromeInner,
+            renderAdviceFilterControls: this.renderAdviceFilterControls,
             _handleAdviceTopChromeScroll: this._handleAdviceTopChromeScroll,
             _handleAdviceTopChromePull: this._handleAdviceTopChromePull,
             restoreAdviceDraft: this.restoreAdviceDraft,
@@ -54,6 +55,7 @@ const advicePanel = {
             setAdviceRange: this.setAdviceRange,
             toggleAdviceContext: this.toggleAdviceContext,
             toggleAdviceContextPanel: this.toggleAdviceContextPanel,
+            toggleAdviceV6Insights: this.toggleAdviceV6Insights,
             toggleAdviceSearch: this.toggleAdviceSearch,
             onAdviceSearchInput: this.onAdviceSearchInput,
             clearAdviceSearch: this.clearAdviceSearch,
@@ -869,6 +871,13 @@ const advicePanel = {
         this.rerenderAdvicePanel({ expandChrome: this.adviceContextOpen, refreshMessages: false });
     },
 
+    toggleAdviceV6Insights() {
+        this.adviceV6InsightsOpen = !this.adviceV6InsightsOpen;
+        this.captureAdviceDraft();
+        this.captureAdviceScroll();
+        this.rerenderAdvicePanel({ refreshMessages: false });
+    },
+
     useAdvicePrompt(text) {
         if (String(text || '').includes('新建训练计划')) {
             this.openNewPlanSheet?.();
@@ -1469,13 +1478,6 @@ const advicePanel = {
     renderAdviceTopChromeInner() {
         const messages = this.activeRecords(this.db.health.aiAdviceChat || []);
         const visibleMessages = this.visibleAdviceMessages(messages);
-        const contexts = { diet: true, training: true, weight: true, goal: true, ...(this.adviceContexts || {}) };
-        const ctxOpen = !!this.adviceContextOpen;
-        const enabledCount = ['diet','training','weight','goal'].filter(k => contexts[k]).length;
-        const range = this.adviceRange || 'today';
-        const rawSearchQuery = this.adviceSearchQuery || '';
-        const searchQuery = this.escapeHtml(rawSearchQuery);
-        const searchOpen = !!this.adviceSearchOpen || !!this.adviceSearchQuery;
         const messageSummary = this.adviceMessageSummary(messages, visibleMessages);
         return `<div class="advice-chat-header">
             <div>
@@ -1492,6 +1494,19 @@ const advicePanel = {
                 const activeId = this.db.aiTemplateActiveId || templates[0]?.id || '';
                 return `<div class="advice-template-row">${templates.map(t => `<button class="advice-pill ${t.id === activeId ? 'active' : ''}" onclick="data.selectAdviceTemplate('${this.escapeHtml(t.id)}')" type="button">${this.escapeHtml(t.name)}</button>`).join('')}</div>`;
             })()}
+            ${this.renderAdviceFilterControls()}
+        </div>`;
+    },
+
+    renderAdviceFilterControls() {
+        const contexts = { diet: true, training: true, weight: true, goal: true, ...(this.adviceContexts || {}) };
+        const ctxOpen = !!this.adviceContextOpen;
+        const enabledCount = ['diet','training','weight','goal'].filter(k => contexts[k]).length;
+        const range = this.adviceRange || 'today';
+        const rawSearchQuery = this.adviceSearchQuery || '';
+        const searchQuery = this.escapeHtml(rawSearchQuery);
+        const searchOpen = !!this.adviceSearchOpen || !!this.adviceSearchQuery;
+        return `
             <div class="advice-filter-row">
                 <div class="advice-range-tabs">${[['today','今日'],['week','7天'],['month','30天'],['all','全部']].map(([key, label]) => `<button class="advice-pill ${range === key ? 'active' : ''}" onclick="data.setAdviceRange('${key}')" type="button">${label}</button>`).join('')}</div>
                 <div class="advice-filter-actions">
@@ -1515,7 +1530,7 @@ const advicePanel = {
                 <div class="advice-context-toggles">${[['diet','饮食','restaurant'],['training','训练','fitness_center'],['weight','体重','monitor_weight'],['goal','目标','flag']].map(([key, label, icon]) => `<button class="advice-pill ${contexts[key] ? 'active' : ''}" onclick="data.toggleAdviceContext('${key}')" type="button"><span class="material-symbols-rounded">${icon}</span>${label}</button>`).join('')}</div>
                 <small class="advice-context-hint">关闭后该维度的记录不会发给 AI，回答会更聚焦</small>
             </div>` : ''}
-        </div>`;
+        `;
     },
 
     renderAdvicePanel() {
@@ -1529,28 +1544,40 @@ const advicePanel = {
         const baseQuicks = isGain
             ? ['分析我最近增肌进展是否正常', '根据今天饮食给我加餐建议', '帮我安排本周力量训练重点', '我今天蛋白质和碳水够不够？']
             : ['分析我最近减重停滞的原因', '根据今天饮食给我晚餐建议', '帮我调整本周训练强度', '我今天蛋白质够不够？'];
-        const quicks = [...(this.planAiQuickPrompts?.() || []), ...baseQuicks].slice(0, 7);
-        return `<div class="md-card advice-main-card ${this._adviceSuppressCardAnimation ? 'advice-no-enter' : ''}">
-            <div class="advice-chat-shell">
-                <div class="advice-top-chrome">
-                    <div class="advice-top-chrome-inner">
-                        ${this.renderAdviceTopChromeInner()}
-                    </div>
-                </div>
-                <div class="advice-chat-list">${this.renderAdviceMessages(visibleMessages)}</div>
-                <button id="adviceNewMessageBtn" class="advice-new-message-btn hidden" onclick="data.jumpAdviceToLatest()" type="button" aria-hidden="true">↓ 新消息</button>
-                <div class="advice-composer-tail">
-                    <div class="advice-quick-prompts">${quicks.map(q => `<button onclick="data.useAdvicePrompt('${this.escapeHtml(q)}')" type="button">${this.escapeHtml(q)}</button>`).join('')}</div>
-                    <div class="advice-composer">
-                        ${this.renderAdviceModelChip()}
-                        <textarea id="advicePrompt" class="advice-composer-input" rows="1" placeholder="向 AI 提问…" oninput="data.onAdvicePromptInput(this)" onkeydown="data.onAdvicePromptKeydown(event)">${draft}</textarea>
-                        <button id="adviceSendBtn" class="advice-send-btn" onclick="data.sendAiAdvice()" type="button" ${String(rawDraft || '').trim() ? '' : 'disabled'} aria-label="发送问题"><span class="material-symbols-rounded">send</span></button>
-                    </div>
-                    <div id="adviceStatus" class="food-ai-status advice-status-line">
-                        <span class="advice-status-text">${sendHint}</span>
-                    </div>
-                </div>
+        const quicks = [...(this.planAiQuickPrompts?.() || []), ...baseQuicks].slice(0, 4);
+
+        const aiIntake = this.todayCalories?.() || 0;
+        const aiGoal = this.db.health?.dietGoal?.dailyCal || 0;
+        const plans = this.getTodayDailyPlans?.() || [];
+        const agg = this.aggregateCompletionRate?.(plans) || { done: 0, total: 0 };
+        const sorted = this.sortedWeights?.() || [];
+        const latest = sorted.length ? sorted[sorted.length - 1] : null;
+        const latestWeight = latest ? Number(latest.weight).toFixed(1) : '--';
+        const remaining = aiGoal ? aiGoal - aiIntake : 0;
+        const heroText = aiGoal
+            ? `你今天已完成 ${agg.done}/${agg.total} 训练 · ${aiIntake}/${aiGoal} kcal 饮食，剩余 ${remaining} kcal。${latestWeight !== '--' ? '当前体重 ' + latestWeight + ' kg。' : ''}`
+            : '设置饮食目标后可获得更精准建议。';
+
+        return `<div class="advice-v6-page ${this._adviceSuppressCardAnimation ? 'advice-no-enter' : ''}">
+            <div class="ai-hero">
+                <div class="ai-avatar"><span class="material-symbols-rounded">psychology</span></div>
+                <h2>今日建议</h2>
+                <p>${this.escapeHtml(heroText)}</p>
             </div>
+            <div class="advice-v6-filter-bar">${this.renderAdviceFilterControls()}</div>
+            <div class="sect-head"><span class="t">对话</span><button class="a" onclick="data.clearAdviceChat?.()" type="button">清空</button></div>
+            <div class="ai-msg-list">${this.renderAdviceMessages(visibleMessages)}</div>
+            <button id="adviceNewMessageBtn" class="advice-new-message-btn hidden" onclick="data.jumpAdviceToLatest()" type="button" aria-hidden="true">↓ 新消息</button>
+            <div class="glass-card advice-v6-suggestions-card">
+                <div class="sect-head" style="padding:0 0 8px;margin:0"><span class="t">快速建议</span></div>
+                <div class="advice-v6-suggestions">${quicks.map(q => `<button onclick="data.useAdvicePrompt('${this.escapeHtml(q)}')" type="button">${this.escapeHtml(q)}</button>`).join('')}</div>
+            </div>
+            <div class="ai-input">
+                ${this.renderAdviceModelChip()}
+                <textarea id="advicePrompt" class="advice-composer-input" rows="1" placeholder="问 AI 关于训练 / 饮食..." oninput="data.onAdvicePromptInput(this)" onkeydown="data.onAdvicePromptKeydown(event)">${draft}</textarea>
+                <button id="adviceSendBtn" class="ai-send" onclick="data.sendAiAdvice()" type="button" ${String(rawDraft || '').trim() ? '' : 'disabled'} aria-label="发送问题"><span class="material-symbols-rounded">send</span></button>
+            </div>
+            <div id="adviceStatus" class="advice-status-line"><span class="advice-status-text">${sendHint}</span></div>
         </div>`;
     }
 };
