@@ -24,3 +24,13 @@ test('diet photo button remains clickable when support checks fail', async () =>
     assert.doesNotMatch(healthDiet, /id="dietPhotoButton"[^>]*disabled/);
     assert.match(healthDiet, /setDietPhotoStatus\('blocked', info\.reason \|\| '当前 AI 配置不可用'\)/);
 });
+
+test('diet photo file picker is bound with event listeners and fallback statuses', async () => {
+    const healthDiet = await readFile(new URL('../health-diet.js', import.meta.url), 'utf8');
+
+    assert.doesNotMatch(healthDiet, /onchange="data\.handleDietPhoto/);
+    assert.match(healthDiet, /bindDietPhotoControls\(\)/);
+    assert.match(healthDiet, /addEventListener\('change', \(\) => this\.handleDietPhoto\(input\.files && input\.files\[0\]\)\)/);
+    assert.match(healthDiet, /setDietPhotoStatus\('waiting', '请选择或拍摄一张照片'\)/);
+    assert.match(healthDiet, /setDietPhotoStatus\('empty', '没有收到照片，请重新选择'\)/);
+});

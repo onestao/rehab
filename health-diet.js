@@ -76,8 +76,8 @@
                     <textarea id="foodAiText" class="diet-ai-input" placeholder="说说你这顿吃了什么，例如：鸡胸肉饭加一杯豆浆" oninput="data.autoResizeDietInput(this)"></textarea>
                     <div class="diet-ai-actions">
                         <button class="md-btn md-btn-filled" onclick="data.aiParseFood()" type="button"><span class="material-symbols-rounded">auto_awesome</span> 文本识别</button>
-                        <button id="dietPhotoButton" class="md-btn md-btn-tonal" onclick="data.triggerDietPhoto()" type="button" title="${photoTitle}"><span class="material-symbols-rounded">visibility</span> 拍照识别</button>
-                        <input id="dietPhotoInput" class="hidden" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" capture="environment" onchange="data.handleDietPhoto(this.files?.[0])">
+                        <button id="dietPhotoButton" class="md-btn md-btn-tonal" type="button" title="${photoTitle}"><span class="material-symbols-rounded">visibility</span> 拍照识别</button>
+                        <input id="dietPhotoInput" class="hidden" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" capture="environment">
                     </div>
                     <small id="foodAiStatus" class="food-ai-status"></small>
                     <div id="foodAiResults"></div>
@@ -110,6 +110,7 @@
             content.innerHTML = this.renderDietModalContent();
             this.syncFoodCalLabel?.();
             this.setDietInputMode(this._dietInputMode || this.db.health.dietInputMode || 'ai');
+            this.bindDietPhotoControls?.();
             modal.classList.remove('hidden');
             modal.setAttribute('aria-hidden', 'false');
             window.navStack?.replaceOrPush?.({
@@ -121,6 +122,20 @@
                 const button = document.getElementById('dietPhotoButton');
                 if (button) button.title = this.dietPhotoTitle();
             }).catch(() => {});
+        },
+
+        bindDietPhotoControls() {
+            const button = document.getElementById('dietPhotoButton');
+            const input = document.getElementById('dietPhotoInput');
+            if (button && !button.dataset.bound) {
+                button.dataset.bound = 'true';
+                button.addEventListener('click', () => this.triggerDietPhoto());
+            }
+            if (input && !input.dataset.bound) {
+                input.dataset.bound = 'true';
+                input.addEventListener('change', () => this.handleDietPhoto(input.files && input.files[0]));
+                input.addEventListener('cancel', () => this.setDietPhotoStatus('cancelled', '未选择照片'));
+            }
         },
 
         closeDietModal() {
@@ -139,14 +154,23 @@
         },
 
         triggerDietPhoto() {
-            if (_aiPhotoBusy) return;
+            if (_aiPhotoBusy) {
+                this.setDietPhotoStatus('busy', '上一张照片仍在识别中');
+                return;
+            }
             const info = this.getDietPhotoSupportInfo();
             if (!info.supported) {
                 this.setDietPhotoStatus('blocked', info.reason || '当前 AI 配置不可用');
                 window.toast?.show?.(info.reason || '当前 AI 配置不可用', 'info');
                 return;
             }
-            document.getElementById('dietPhotoInput')?.click?.();
+            const input = document.getElementById('dietPhotoInput');
+            if (!input) {
+                this.setDietPhotoStatus('failed', '拍照入口未加载，请重新打开饮食记录');
+                return;
+            }
+            this.setDietPhotoStatus('waiting', '请选择或拍摄一张照片');
+            input.click?.();
         },
 
         setDietPhotoStatus(stage, text, onCancel = null) {
@@ -167,8 +191,15 @@
         async handleDietPhoto(file) {
             const inputEl = document.getElementById('dietPhotoInput');
             const button = document.getElementById('dietPhotoButton');
-            if (!file) return;
-            if (_aiPhotoBusy) return;
+            if (!file) {
+                this.setDietPhotoStatus('empty', '没有收到照片，请重新选择');
+                if (inputEl) inputEl.value = '';
+                return;
+            }
+            if (_aiPhotoBusy) {
+                this.setDietPhotoStatus('busy', '上一张照片仍在识别中');
+                return;
+            }
             const support = this.getDietPhotoSupportInfo();
             if (!support.supported) {
                 this.setDietPhotoStatus('failed', support.reason || '当前 AI 配置不可用');
