@@ -344,15 +344,15 @@ Object.assign(advicePanel, {
 
             const isTableLine = line.trim().startsWith('|') && line.trim().endsWith('|');
             if (isTableLine) {
-                const table = this._parseMarkdownTable(lines, li);
+                const table = advicePanel._parseMarkdownTable(lines, li);
                 if (table) {
                     if (inList) { out.push('</ul>'); inList = false; }
-                    if (this._isComparisonTable(table)) {
-                        out.push(this._renderComparisonCards(table, renderInline));
+                    if (advicePanel._isComparisonTable(table)) {
+                        out.push(advicePanel._renderComparisonCards(table, renderInline));
                     } else if (table.colCount <= 4 && table.rowCount <= 6) {
-                        out.push(`<div class="ai-cmp-cards">${this._renderDimensionCards(table, renderInline)}</div>`);
+                        out.push(`<div class="ai-cmp-cards">${advicePanel._renderDimensionCards(table, renderInline)}</div>`);
                     } else {
-                        out.push(this._renderScrollTable(table, renderInline));
+                        out.push(advicePanel._renderScrollTable(table, renderInline));
                     }
                     li = table.endIdx - 1;
                     continue;
