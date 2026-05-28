@@ -191,6 +191,8 @@ const workoutEngine = {
             this.transition('completed');
             return;
         }
+        // 计时/保持类动作可能 reps=0 + work>0，引擎需要至少 1 次循环
+        if ((action.reps|0) <= 0 && (action.work|0) > 0) action.reps = 1;
         const actions = this.currentActions();
         const sides = action.isAlt ? ['左侧', '右侧'] : [''];
         let totalSetsAll = 0;

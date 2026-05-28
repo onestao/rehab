@@ -109,7 +109,7 @@ test('plan AI parser fills usable spec defaults and preserves alternation', () =
   });
   assert.deepEqual(JSON.parse(JSON.stringify(parsed.plans[0].items[1].spec)), {
     sets: 3,
-    reps: 0,
+    reps: 1,
     work: 40,
     repRest: 10,
     actionRest: 75,
@@ -130,7 +130,7 @@ test('plan AI parser supplies hold duration and caps very long rests', () => {
   }), ['rehab']);
 
   assert.equal(parsed.ok, true);
-  assert.equal(parsed.plans[0].items[0].spec.reps, 0);
+  assert.equal(parsed.plans[0].items[0].spec.reps, 1);
   assert.equal(parsed.plans[0].items[0].spec.work, 30);
   assert.equal(parsed.plans[0].items[0].spec.actionRest, 45);
 });

@@ -109,8 +109,9 @@ export function normalizeTaskItem(item = {}, options = {}) {
     const nowTs = Number(options.nowTs || Date.now());
     const idFactory = typeof options.idFactory === 'function' ? options.idFactory : (prefix) => `${prefix}-${nowTs}`;
     const spec = item?.spec && typeof item.spec === 'object' ? item.spec : {};
-    const reps = Math.max(0, Number(spec.reps || 0));
+    let reps = Math.max(0, Number(spec.reps || 0));
     const work = Math.max(0, Number(spec.work || 0));
+    if (reps <= 0 && work > 0) reps = 1;
     const invalidSpec = !item.deleted && (reps <= 0 && work <= 0);
     return touchRecord({
         id: item.id || idFactory('plan-task'),

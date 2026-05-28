@@ -105,10 +105,13 @@
         let work = readCappedPositiveNumber(spec.work ?? item.work ?? item.seconds ?? item.duration, 0, 90);
 
         if (reps <= 0 && work <= 0) {
-            if (timed) { work = 30; autoFilled.push('work'); }
+            if (timed) { work = 30; reps = 1; autoFilled.push('work', 'reps'); }
             else { reps = 12; work = 3; autoFilled.push('reps', 'work'); }
         } else if (reps > 0 && work <= 0) {
             work = 3; autoFilled.push('work');
+        } else if (timed && reps <= 0) {
+            // 计时/保持类动作引擎要求 reps>=1（每组至少做 1 次保持）
+            reps = 1; autoFilled.push('reps');
         }
 
         const mode = isAlt ? (timed ? 'alt-hold' : 'alt-reps') : (timed ? 'hold' : 'reps');

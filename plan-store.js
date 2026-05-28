@@ -145,8 +145,10 @@
         ensureTaskShape(item = {}, options = {}) {
             const nowTs = Number(options.nowTs || Date.now());
             const spec = item?.spec && typeof item.spec === 'object' ? item.spec : {};
-            const reps = Math.max(0, Number(spec.reps || 0));
+            let reps = Math.max(0, Number(spec.reps || 0));
             const work = Math.max(0, Number(spec.work || 0));
+            // 计时/保持型动作（reps=0 但 work>0）需要至少 1 次循环，否则训练引擎会直接跳过
+            if (reps <= 0 && work > 0) reps = 1;
             const invalidSpec = !item.deleted && (reps <= 0 && work <= 0);
             const next = {
                 id: item.id || this.generateRecordId('daily-task'),
