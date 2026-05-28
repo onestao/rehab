@@ -76,15 +76,15 @@ const planAnalytics = {
     },
 
     weekCalorieDeficit(db) {
-        const foods = db?.health?.foods || [];
+        const foods = db?.health?.foodLogs || [];
         const today = new Date();
         const weekAgo = new Date(today);
         weekAgo.setDate(weekAgo.getDate() - 7);
         const weekKey = weekAgo.toISOString().slice(0, 10);
-        const recentFoods = foods.filter(f => !f.deleted && f.date >= weekKey);
+        const recentFoods = foods.filter(f => !f.deleted && f.date && f.date >= weekKey);
         if (!recentFoods.length) return null;
-        const totalCal = recentFoods.reduce((s, f) => s + (f.cal || 0), 0);
-        const goal = db?.health?.dietGoal?.dailyCal || 0;
+        const totalCal = recentFoods.reduce((s, f) => s + Number(f.cal || 0), 0);
+        const goal = Number(db?.health?.dietGoal?.dailyCal || 0);
         if (!goal) return null;
         return Math.round((totalCal / 7) - goal);
     },
@@ -115,18 +115,38 @@ const planAnalytics = {
         const daysSince = this.daysSinceLastTrainedMuscle(db, primaryGroup);
 
         const plans = (db?.dailyPlans || []).filter(p => !p.deleted);
-        const todayPlan = plans.find(p => p.date === new Date().toISOString().slice(0, 10));
+        const today = new Date().toISOString().slice(0, 10);
+        const todayPlans = plans.filter(p => p.date === today);
+        const todayPlan = todayPlans[0] || null;
+        const allTodayItems = todayPlans.flatMap(p => (p.items || []).filter(i => i && !i.deleted && i.category !== 'cooldown'));
         const items = (todayPlan?.items || []).filter(i => i && !i.deleted && i.category !== 'cooldown');
         const done = items.filter(i => i.status === 'done').length;
+        const totalDone = allTodayItems.filter(i => i.status === 'done').length;
+        const totalCount = allTodayItems.length;
         const nextItem = items.find(i => i.status !== 'done');
         const planTitle = todayPlan?.title || '今日计划';
-        const planProgress = items.length ? done + '/' + items.length : '';
+        const planProgress = totalCount ? totalDone + '/' + totalCount : '';
         const planCompact = items.length
-            ? `<div class="ai-plan-shared"><div class="ai-plan-row"><span class="ai-plan-tag">紧凑</span><span class="ai-plan-name">${planTitle} · ${nextItem ? nextItem.name + ' →' : '已完成'}</span><span class="ai-plan-meta">${planProgress}</span></div><div class="ai-plan-bar">${items.map((_, i) => '<div class="ai-plan-seg' + (i < done ? ' done' : '') + (i === done ? ' active' : '') + '"></div>').join('')}</div></div>`
+            ? `<div class="ai-plan-shared"><div class="ai-plan-row"><span class="ai-plan-tag">紧凑</span><span class="ai-plan-name">${planTitle} · ${nextItem ? nextItem.name + ' →' : '已完成'}</span><span class="ai-plan-meta">${done}/${items.length}</span></div><div class="ai-plan-bar">${items.map((_, i) => '<div class="ai-plan-seg' + (i < done ? ' done' : '') + (i === done ? ' active' : '') + '"></div>').join('')}</div></div>`
             : '';
+
+        const foodLogs = (db?.health?.foodLogs || []).filter(f => !f.deleted && f.date === today);
+        const todayMacros = foodLogs.reduce((acc, f) => {
+            acc.cal += Number(f.cal || 0);
+            acc.pro += Number(f.pro || 0);
+            return acc;
+        }, { cal: 0, pro: 0 });
+        const dietGoal = db?.health?.dietGoal || {};
+        const calGoal = Number(dietGoal.dailyCal || 0);
+        const proGoal = Number(dietGoal.dailyPro || 0);
 
         return {
             metrics: {
+                trainProgress: totalCount ? { done: totalDone, total: totalCount } : null,
+                proIntake: todayMacros.pro,
+                proGoal: proGoal || null,
+                calIntake: todayMacros.cal,
+                calGoal: calGoal || null,
                 volumeDelta: vol?.delta ?? null,
                 daysSinceMuscle: daysSince,
                 weekDeficit: deficit,

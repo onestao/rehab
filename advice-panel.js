@@ -124,6 +124,8 @@ const advicePanel = {
             scrollAdviceToNextBubble: this.scrollAdviceToNextBubble,
             _adviceScrollHost: this._adviceScrollHost,
             _adviceBubbleAnchors: this._adviceBubbleAnchors,
+            _adviceHostScrollTop: this._adviceHostScrollTop,
+            _adviceHostViewportTop: this._adviceHostViewportTop,
             _handleAdviceStreamScroll: this._handleAdviceStreamScroll,
             getAdviceVersionGroup: this.getAdviceVersionGroup,
             setActiveAdviceVersion: this.setActiveAdviceVersion,
@@ -356,21 +358,46 @@ const advicePanel = {
         if (list && list.scrollHeight > list.clientHeight + 4) return list;
         const page = document.getElementById('ai-coach');
         if (page && page.scrollHeight > page.clientHeight + 4) return page;
+        if (page) return page;
         return document.scrollingElement || document.documentElement;
+    },
+
+    _adviceHostScrollTop(host) {
+        if (!host) return 0;
+        if (host === document.scrollingElement || host === document.documentElement) {
+            return window.scrollY || document.documentElement.scrollTop || 0;
+        }
+        return host.scrollTop || 0;
+    },
+
+    _adviceHostViewportTop(host) {
+        if (!host || host === document.scrollingElement || host === document.documentElement) return 0;
+        return host.getBoundingClientRect().top;
     },
 
     scrollAdviceToTop() {
         const host = this._adviceScrollHost();
-        if (host && typeof host.scrollTo === 'function') host.scrollTo({ top: 0, behavior: 'smooth' });
-        else if (host) host.scrollTop = 0;
+        if (!host) return;
+        if (host === document.scrollingElement || host === document.documentElement) {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        } else if (typeof host.scrollTo === 'function') {
+            host.scrollTo({ top: 0, behavior: 'smooth' });
+        } else {
+            host.scrollTop = 0;
+        }
     },
 
     scrollAdviceToBottom() {
         const host = this._adviceScrollHost();
         if (!host) return;
         const target = host.scrollHeight;
-        if (typeof host.scrollTo === 'function') host.scrollTo({ top: target, behavior: 'smooth' });
-        else host.scrollTop = target;
+        if (host === document.scrollingElement || host === document.documentElement) {
+            window.scrollTo({ top: target, behavior: 'smooth' });
+        } else if (typeof host.scrollTo === 'function') {
+            host.scrollTo({ top: target, behavior: 'smooth' });
+        } else {
+            host.scrollTop = target;
+        }
     },
 
     _adviceBubbleAnchors() {
@@ -382,13 +409,16 @@ const advicePanel = {
         if (!host) return;
         const bubbles = this._adviceBubbleAnchors();
         if (!bubbles.length) return this.scrollAdviceToTop();
-        const hostRect = host.getBoundingClientRect();
-        const hostTop = host === document.scrollingElement || host === document.documentElement ? 0 : hostRect.top;
-        let target = bubbles[0];
+        const hostTop = this._adviceHostViewportTop(host);
+        let target = null;
         for (const el of bubbles) {
             const top = el.getBoundingClientRect().top - hostTop;
             if (top < -8) target = el;
             else break;
+        }
+        if (!target) {
+            this.scrollAdviceToTop();
+            return;
         }
         target.scrollIntoView({ behavior: 'smooth', block: 'start' });
     },
@@ -398,8 +428,7 @@ const advicePanel = {
         if (!host) return;
         const bubbles = this._adviceBubbleAnchors();
         if (!bubbles.length) return this.scrollAdviceToBottom();
-        const hostRect = host.getBoundingClientRect();
-        const hostTop = host === document.scrollingElement || host === document.documentElement ? 0 : hostRect.top;
+        const hostTop = this._adviceHostViewportTop(host);
         for (const el of bubbles) {
             const top = el.getBoundingClientRect().top - hostTop;
             if (top > 8) {

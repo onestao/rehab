@@ -44,16 +44,15 @@ const adviceRules = {
     renderInsightBaseline(ctx) {
         const esc = window.renderSafe?.escapeHtml || window.data?.escapeHtml || (s => s);
         const m = ctx.metrics || {};
-        const up = (v) => `<span class="ai-metric-up">${esc(String(v))}</span>`;
-        const warn = (v) => `<span class="ai-metric-warn">${esc(String(v))}</span>`;
-        const val = (v) => esc(String(v));
 
-        const volumeDelta = m.volumeDelta != null
-            ? (m.volumeDelta > 0 ? up('+' + m.volumeDelta + '%') : val(m.volumeDelta + '%'))
+        const fmtTrain = m.trainProgress
+            ? `${m.trainProgress.done}<span class="ai-im-u">/${m.trainProgress.total}</span>`
             : '--';
-        const daysSince = m.daysSinceMuscle != null ? val(m.daysSinceMuscle) : '--';
-        const weekDeficit = m.weekDeficit != null
-            ? (m.weekDeficit < -500 ? warn(m.weekDeficit) : val(m.weekDeficit))
+        const fmtPro = (m.proIntake != null)
+            ? `${Math.round(m.proIntake)}${m.proGoal ? '<span class="ai-im-u">/' + Math.round(m.proGoal) + 'g</span>' : '<span class="ai-im-u">g</span>'}`
+            : '--';
+        const fmtCal = (m.calIntake != null)
+            ? `${Math.round(m.calIntake)}${m.calGoal ? '<span class="ai-im-u">/' + Math.round(m.calGoal) + '</span>' : '<span class="ai-im-u">kcal</span>'}`
             : '--';
 
         const planLine = ctx.planCompact || '';
@@ -61,9 +60,9 @@ const adviceRules = {
         return `
             <div class="ai-insight-baseline">
                 <div class="ai-insight-metrics">
-                    <div class="ai-im"><div class="ai-im-l">本周训练量</div><div class="ai-im-v">${volumeDelta}</div></div>
-                    <div class="ai-im"><div class="ai-im-l">部位间隔</div><div class="ai-im-v">${daysSince}<span class="ai-im-u">天</span></div></div>
-                    <div class="ai-im"><div class="ai-im-l">7天热量</div><div class="ai-im-v">${weekDeficit}</div></div>
+                    <div class="ai-im"><div class="ai-im-l">今日训练</div><div class="ai-im-v">${fmtTrain}</div></div>
+                    <div class="ai-im"><div class="ai-im-l">今日蛋白</div><div class="ai-im-v">${fmtPro}</div></div>
+                    <div class="ai-im"><div class="ai-im-l">今日热量</div><div class="ai-im-v">${fmtCal}</div></div>
                 </div>
                 ${planLine}
             </div>`;
