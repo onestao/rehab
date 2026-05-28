@@ -298,6 +298,9 @@ Object.assign(workout, {
             updatedAt: Date.now(),
             deleted: false
         };
+        if (window.data?.activeRun) {
+            historyRecord.__planCtx = JSON.parse(JSON.stringify(window.data.activeRun));
+        }
         if (data.history) {
             data.history.append(historyRecord);
         } else {

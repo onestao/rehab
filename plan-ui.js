@@ -32,7 +32,8 @@
     function taskSpecText(task = {}) {
         const spec = task.spec || {};
         const category = taskCategoryMeta(task);
-        const main = Number(spec.reps || 0) > 0 ? `每组${Number(spec.reps || 0)}次` : `每次${Number(spec.work || 0)}秒`;
+        const noData = (Number(spec.reps || 0) <= 0 && Number(spec.work || 0) <= 0);
+        const main = noData ? '参数不完整' : (Number(spec.reps || 0) > 0 ? `每组${Number(spec.reps || 0)}次` : `每次${Number(spec.work || 0)}秒`);
         const details = [
             Number(spec.repRest || 0) > 0 ? `次休${Number(spec.repRest || 0)}秒` : '',
             Number(spec.actionRest || 0) > 0 ? `组休${Number(spec.actionRest || 0)}秒` : '',
@@ -398,7 +399,7 @@
                             <strong>${this.escapeHtml(task.name || '未命名任务')}</strong>
                             <em><span class="material-symbols-rounded">${meta.icon}</span>${meta.label}</em>
                         </span>
-                        <small>${taskSpecText(task)}${task.currentLevel ? ` · Lv${task.currentLevel}` : ''}${task.userOverride ? ' · 已锁定' : ''}</small>
+                        <small>${taskSpecText(task)}${task.currentLevel ? ` · Lv${task.currentLevel}` : ''}${task.userOverride ? ' · 已锁定' : ''}${task.invalidSpec ? ' · ⚠️ 参数不完整' : ''}</small>
                         ${!compact && doneMeta}
                     </span>
                 </button>
@@ -452,6 +453,8 @@
                         <div class="md-field"><input id="planEditReps" type="number" placeholder=" " value="${Number(current.reps || 0)}"><label>次数</label></div>
                         <div class="md-field"><input id="planEditWork" type="number" placeholder=" " value="${Number(current.work || 0)}"><label>时长（秒）</label></div>
                         <div class="md-field"><input id="planEditRest" type="number" placeholder=" " value="${Number(current.actionRest || 0)}"><label>组间休息</label></div>
+                        <div class="md-field"><input id="planEditRepRest" type="number" min="0" placeholder=" " value="${Number(current.repRest || 0)}"><label>次/侧间休息（秒）</label></div>
+                        <label class="plan-edit-alt"><input id="planEditIsAlt" type="checkbox" ${current.isAlt ? 'checked' : ''}><span>双侧交替（左右换边）</span></label>
                     </div>`,
                 actionsHtml: `
                     <button class="md-btn" type="button" data-modal-close>取消</button>
@@ -468,8 +471,11 @@
                 sets: Math.max(1, Number(document.getElementById('planEditSets')?.value || task.spec.sets || 1)),
                 reps: Math.max(0, Number(document.getElementById('planEditReps')?.value || task.spec.reps || 0)),
                 work: Math.max(0, Number(document.getElementById('planEditWork')?.value || task.spec.work || 0)),
-                actionRest: Math.max(0, Number(document.getElementById('planEditRest')?.value || task.spec.actionRest || 0))
+                actionRest: Math.max(0, Number(document.getElementById('planEditRest')?.value || task.spec.actionRest || 0)),
+                repRest: Math.max(0, Number(document.getElementById('planEditRepRest')?.value || task.spec.repRest || 0)),
+                isAlt: !!document.getElementById('planEditIsAlt')?.checked
             };
+            task.invalidSpec = (task.spec.reps <= 0 && task.spec.work <= 0);
             const prefs = this.ensurePlanPrefs?.() || {};
             if (prefs.askOnEdit === 'lock_default') task.userOverride = true;
             if (prefs.askOnEdit === 'pass_default') task.userOverride = false;
@@ -605,11 +611,11 @@
         },
 
         handlePlanWorkoutFinished(historyRecord) {
-            const ctx = this.activeRun;
+            const ctx = this.activeRun || historyRecord.__planCtx || null;
             if (!ctx) return;
             const { plan, task } = this.findTask?.(ctx.planId, ctx.taskId) || {};
             if (!plan || !task) {
-                this.activeRun = null;
+                if (this.activeRun) this.activeRun = null;
                 this.updatePlanWorkoutBanner?.();
                 return;
             }

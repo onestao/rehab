@@ -109,6 +109,9 @@ export function normalizeTaskItem(item = {}, options = {}) {
     const nowTs = Number(options.nowTs || Date.now());
     const idFactory = typeof options.idFactory === 'function' ? options.idFactory : (prefix) => `${prefix}-${nowTs}`;
     const spec = item?.spec && typeof item.spec === 'object' ? item.spec : {};
+    const reps = Math.max(0, Number(spec.reps || 0));
+    const work = Math.max(0, Number(spec.work || 0));
+    const invalidSpec = !item.deleted && (reps <= 0 && work <= 0);
     return touchRecord({
         id: item.id || idFactory('plan-task'),
         name: String(item.name || '未命名任务'),
@@ -116,14 +119,16 @@ export function normalizeTaskItem(item = {}, options = {}) {
         category: normalizeTaskCategory(item.category || item.phase),
         spec: {
             sets: Math.max(1, Number(spec.sets || 1)),
-            reps: Math.max(0, Number(spec.reps || 0)),
-            work: Math.max(0, Number(spec.work || 0)),
+            reps,
+            work,
             repRest: Math.max(0, Number(spec.repRest || 0)),
             actionRest: Math.max(0, Number(spec.actionRest || 0)),
             isAlt: !!spec.isAlt,
+            ...(spec.mode ? { mode: String(spec.mode) } : {}),
             ...(spec.weight != null ? { weight: Number(spec.weight || 0) } : {})
         },
         chainId: item.chainId ? String(item.chainId) : '',
+        invalidSpec,
         currentLevel: item.currentLevel == null ? null : Math.max(1, Number(item.currentLevel || 1)),
         status: ['todo', 'in-progress', 'done', 'skipped'].includes(item.status) ? item.status : 'todo',
         doneSets: Math.max(0, Number(item.doneSets || 0)),

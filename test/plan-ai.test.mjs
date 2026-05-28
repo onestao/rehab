@@ -104,7 +104,8 @@ test('plan AI parser fills usable spec defaults and preserves alternation', () =
     work: 3,
     repRest: 15,
     actionRest: 45,
-    isAlt: true
+    isAlt: true,
+    mode: 'alt-reps'
   });
   assert.deepEqual(JSON.parse(JSON.stringify(parsed.plans[0].items[1].spec)), {
     sets: 3,
@@ -112,7 +113,8 @@ test('plan AI parser fills usable spec defaults and preserves alternation', () =
     work: 40,
     repRest: 10,
     actionRest: 75,
-    isAlt: false
+    isAlt: false,
+    mode: 'hold'
   });
 });
 
@@ -146,7 +148,7 @@ test('plan AI parser supplies fallback work seconds for rep actions missing work
   assert.equal(parsed.plans[0].items[0].spec.reps, 10);
   assert.equal(parsed.plans[0].items[0].spec.work, 3);
   assert.ok(Array.isArray(parsed.warnings));
-  assert.match(parsed.warnings.join('\n'), /spec\.work/);
+  assert.match(parsed.warnings.join('\n'), /work/);
 });
 
 test('plan AI parser warns when AI omits rest fields entirely', () => {

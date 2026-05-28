@@ -407,6 +407,40 @@
     accent-color: var(--md-sys-primary);
 }
 
+[data-auto-filled] {
+    border-color: var(--md-sys-error) !important;
+    box-shadow: inset 0 0 0 1px var(--md-sys-error);
+}
+
+[data-auto-filled] label {
+    color: var(--md-sys-error);
+}
+
+.plan-ai-preview-mode {
+    grid-column: 1 / 2;
+}
+
+.plan-edit-alt {
+    grid-column: 1 / -1;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 10px;
+    border: 1.5px solid var(--md-sys-outline-variant);
+    border-radius: var(--md-sys-shape-sm);
+    background: var(--md-sys-surface-container-lowest);
+    color: var(--md-sys-on-surface-variant);
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.plan-edit-alt input {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--md-sys-primary);
+}
+
 .plan-ai-preview-item > .md-icon-btn {
     grid-column: 2 / 3;
     grid-row: 1 / span 3;

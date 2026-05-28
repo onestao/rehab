@@ -42,6 +42,41 @@
         return false;
     }
 
+    const VALID_MODES = ['reps', 'hold', 'alt-reps', 'alt-hold'];
+
+    function inferSpecMode(spec = {}, item = {}) {
+        if (spec.mode && VALID_MODES.includes(spec.mode)) return spec.mode;
+        const alt = parseBoolean(spec.isAlt ?? item.isAlt ?? item.alternating ?? item.bilateral ?? item.sideMode);
+        const timed = isTimedAiAction(item);
+        if (alt) return timed ? 'alt-hold' : 'alt-reps';
+        return timed ? 'hold' : 'reps';
+    }
+
+    function validateAiSpec(spec, name) {
+        const errs = [];
+        if (!spec || typeof spec !== 'object') { errs.push(`${name}: spec 缺失`); return errs; }
+        const { sets, reps, work, mode, repRest, actionRest } = spec;
+        if (!Number.isInteger(sets) || sets < 1) errs.push(`${name}.spec.sets 必须 ≥1 整数`);
+        if (!mode || !VALID_MODES.includes(mode)) errs.push(`${name}.spec.mode 必须为 reps|hold|alt-reps|alt-hold`);
+        if (mode === 'reps' || mode === 'alt-reps') {
+            if (!Number.isInteger(reps) || reps < 1) errs.push(`${name}.spec.reps (mode=${mode}) 必须 ≥1`);
+            if (!Number.isInteger(work) || work < 1) errs.push(`${name}.spec.work (mode=${mode}) 必须 ≥1 秒`);
+        }
+        if (mode === 'hold' || mode === 'alt-hold') {
+            if (!Number.isInteger(work) || work < 1) errs.push(`${name}.spec.work (mode=${mode}) 必须 ≥1 秒`);
+        }
+        if ((mode === 'alt-reps' || mode === 'alt-hold') && spec.isAlt !== true) {
+            errs.push(`${name}.spec.isAlt (mode=${mode}) 必须为 true`);
+        }
+        if (repRest != null && (!Number.isInteger(repRest) || repRest < 0 || repRest > 30)) {
+            errs.push(`${name}.spec.repRest 必须 0..30`);
+        }
+        if (actionRest != null && (!Number.isInteger(actionRest) || actionRest < 0 || actionRest > 90)) {
+            errs.push(`${name}.spec.actionRest 必须 0..90`);
+        }
+        return errs;
+    }
+
     function isTimedAiAction(item = {}) {
         const text = `${item.name || ''} ${item.category || ''} ${item.phase || ''} ${item.section || ''}`.toLowerCase();
         return /保持|支撑|平板|静蹲|静态|靠墙|拉伸|伸展|放松|呼吸|hold|plank|stretch|mobility|wall\s*sit|isometric|brace/.test(text)
@@ -56,40 +91,43 @@
             || /踝泵|股四头肌|等长|激活|活动度|低阶|初级|mobility|activation|isometric/.test(text);
     }
 
-    function normalizeAiSpec(item = {}, options = {}) {
-        const spec = item.spec && typeof item.spec === 'object' ? item.spec : {};
+    function coerceAiSpec(item = {}, options = {}) {
+        const spec = item.spec && typeof item.spec === 'object' ? { ...item.spec } : {};
         const timed = isTimedAiAction(item);
         const lowLevelRehab = isLowLevelRehabAction(item, options.planType || item.planType || '');
-        const defaultWork = timed ? 30 : 3;
-        let work = readCappedPositiveNumber(spec.work ?? item.work ?? item.seconds ?? item.duration, 0, 90);
+        const autoFilled = [];
+        const isAlt = parseBoolean(spec.isAlt ?? item.isAlt ?? item.alternating ?? item.bilateral ?? item.sideMode);
+
+        let sets = readPositiveInteger(spec.sets ?? item.sets, 0);
+        if (sets < 1) { sets = 3; autoFilled.push('sets'); }
+
         let reps = readPositiveNumber(spec.reps ?? item.reps ?? item.count ?? item.times ?? item.perSet, 0);
-        const errors = [];
+        let work = readCappedPositiveNumber(spec.work ?? item.work ?? item.seconds ?? item.duration, 0, 90);
+
         if (reps <= 0 && work <= 0) {
-            errors.push(`${item.name || '未命名动作'} 缺少 spec.work（每次执行/保持秒数），AI 必须显式给出，不能用 0 或空值占位`);
-            if (timed) work = defaultWork;
-            else { reps = 12; work = defaultWork; }
+            if (timed) { work = 30; autoFilled.push('work'); }
+            else { reps = 12; work = 3; autoFilled.push('reps', 'work'); }
         } else if (reps > 0 && work <= 0) {
-            errors.push(`${item.name || '未命名动作'} 是次数动作，但缺少 AI 明确给出的 spec.work 执行秒数`);
-            work = defaultWork;
+            work = 3; autoFilled.push('work');
         }
+
+        const mode = isAlt ? (timed ? 'alt-hold' : 'alt-reps') : (timed ? 'hold' : 'reps');
+
         const repRestDefault = lowLevelRehab ? 0 : (timed ? 10 : 15);
         const actionRestDefault = lowLevelRehab ? 20 : (timed ? 30 : 45);
+        const repRest = readCappedPositiveNumber(spec.repRest ?? item.repRest ?? item.restBetweenReps, repRestDefault, 30);
         if (spec.repRest === undefined && item.repRest === undefined && item.restBetweenReps === undefined) {
-            errors.push(`${item.name || '未命名动作'} 缺少 spec.repRest（次/侧间休息秒数），AI 必须显式给出`);
+            autoFilled.push('repRest');
         }
+        const actionRest = readCappedPositiveNumber(spec.actionRest ?? item.actionRest ?? item.restBetweenSets ?? item.groupRest, actionRestDefault, lowLevelRehab ? 45 : 75);
         if (spec.actionRest === undefined && item.actionRest === undefined && item.restBetweenSets === undefined && item.groupRest === undefined) {
-            errors.push(`${item.name || '未命名动作'} 缺少 spec.actionRest（组间休息秒数），AI 必须显式给出`);
+            autoFilled.push('actionRest');
         }
+
         return {
-            spec: {
-                sets: readPositiveInteger(spec.sets ?? item.sets, 3),
-                reps,
-                work,
-                repRest: readCappedPositiveNumber(spec.repRest ?? item.repRest ?? item.restBetweenReps, repRestDefault, 30),
-                actionRest: readCappedPositiveNumber(spec.actionRest ?? item.actionRest ?? item.restBetweenSets ?? item.groupRest, actionRestDefault, lowLevelRehab ? 45 : 75),
-                isAlt: parseBoolean(spec.isAlt ?? item.isAlt ?? item.alternating ?? item.bilateral ?? item.sideMode)
-            },
-            warnings: errors
+            spec: { sets, reps, work, repRest, actionRest, isAlt, mode },
+            autoFilled,
+            warnings: autoFilled.length ? [`${item.name || '未命名动作'} 以下字段由默认值补全: ${autoFilled.join(', ')}`] : []
         };
     }
 
@@ -246,18 +284,24 @@
                 }))
             }));
             const promptMode = mode === 'week'
-                ? '请为接下来 7 天输出严格 JSON，结构为：{"plans":[{"date":"YYYY-MM-DD","type":"<rehab|cut|bulk|maintenance|custom>","title":"...","notes":"...","items":[{"name":"...","category":"<warmup|main|cooldown>","chainHint":"","spec":{"sets":<int>,"reps":<int>,"work":<int>,"repRest":<int>,"actionRest":<int>,"isAlt":<bool>},"cooldownRefs":[],"aiReasoning":"...","durationEstHint":""}]}]}'
-                : '请输出严格 JSON，结构为：{"date":"YYYY-MM-DD","type":"<rehab|cut|bulk|maintenance|custom>","title":"...","notes":"...","items":[{"name":"...","category":"<warmup|main|cooldown>","chainHint":"","spec":{"sets":<int>,"reps":<int>,"work":<int>,"repRest":<int>,"actionRest":<int>,"isAlt":<bool>},"cooldownRefs":[],"aiReasoning":"...","durationEstHint":""}]}';
+                ? '请为接下来 7 天输出严格 JSON，结构为：{"plans":[{"date":"YYYY-MM-DD","type":"<rehab|cut|bulk|maintenance|custom>","title":"...","notes":"...","items":[{"name":"...","category":"<warmup|main|cooldown>","chainHint":"","spec":{"sets":<int>,"reps":<int>,"work":<int>,"repRest":<int>,"actionRest":<int>,"isAlt":<bool>,"mode":"<reps|hold|alt-reps|alt-hold>"},"cooldownRefs":[],"aiReasoning":"...","durationEstHint":""}]}]}'
+                : '请输出严格 JSON，结构为：{"date":"YYYY-MM-DD","type":"<rehab|cut|bulk|maintenance|custom>","title":"...","notes":"...","items":[{"name":"...","category":"<warmup|main|cooldown>","chainHint":"","spec":{"sets":<int>,"reps":<int>,"work":<int>,"repRest":<int>,"actionRest":<int>,"isAlt":<bool>,"mode":"<reps|hold|alt-reps|alt-hold>"},"cooldownRefs":[],"aiReasoning":"...","durationEstHint":""}]}';
             const specRules = [
                 '只输出 JSON 本体，不要使用 Markdown 代码块、不要前后加自然语言、不要注释。所有数值字段必须是 number 类型，布尔字段必须是 true/false，禁止用字符串如 "3"、"true"。',
-                '每个 item 必须填齐：name(string)、category(枚举 warmup/main/cooldown)、spec.sets(int≥1)、spec.reps(int≥0)、spec.work(int>0)、spec.repRest(int≥0)、spec.actionRest(int≥0)、spec.isAlt(bool)。任一字段缺失或为 0/空都视为不合规，必须重填。',
+                '每个 item 必须填齐：name(string)、category(枚举 warmup/main/cooldown)、spec.sets(int≥1)、spec.reps(int≥0)、spec.work(int>0)、spec.repRest(int 0..30)、spec.actionRest(int 0..90)、spec.isAlt(bool)、spec.mode(枚举 reps/hold/alt-reps/alt-hold)。任一字段缺失或为 0/空都视为不合规，必须重填。',
+                'spec.mode 决定动作类型，必须从以下四选一：',
+                '  mode="reps"：次数动作（如深蹲、俯卧撑）→ reps≥1, work≥1（每次动作秒数）, isAlt=false',
+                '  mode="hold"：静态保持（如靠墙静蹲、平板支撑）→ reps=0, work≥15（保持秒数）, isAlt=false',
+                '  mode="alt-reps"：双侧交替次数（如侧弓步、单臂划船）→ reps≥1, work≥1, isAlt=true',
+                '  mode="alt-hold"：双侧交替保持（如单腿站立）→ reps=0, work≥15, isAlt=true',
                 'category 只能是 warmup（热身）/ main（主训练）/ cooldown（拉伸放松）三选一；不要使用其他词。',
                 'spec.work 是每次动作的执行/保持秒数，必须 >0：力量/次数动作 2-5 秒；静态保持/拉伸/呼吸/支撑 20-45 秒。识别不出来时按"次数动作 reps=12, work=3"兜底，绝对禁止 work=0 或省略。',
-                '次数动作：reps>0 表示每组次数；静态/计时动作：reps=0 且 work=每次保持秒数。',
                 'spec.repRest 是同一组内每次/左右侧之间的休息秒数：常规力量 0-10、慢速/高强度最多 15、连续次数动作直接 0；上限 20。必须显式给出该字段。',
                 'spec.actionRest 是组间休息秒数：康复/激活/活动度/拉伸 15-30、常规主训 30-60、大重量复合最多 75；严禁 >90。必须显式给出该字段。',
-                '双侧交替或左右轮换动作必须 isAlt=true，否则 isAlt=false。',
-                '示例（仅作字段格式参考，不要照抄内容）：{"name":"靠墙静蹲","category":"main","chainHint":"","spec":{"sets":3,"reps":0,"work":40,"repRest":0,"actionRest":30,"isAlt":false},"cooldownRefs":[],"aiReasoning":"等长收缩激活股四头","durationEstHint":""}',
+                '示例（仅作字段格式参考，不要照抄内容）：',
+                '  次数动作: {"name":"深蹲","category":"main","spec":{"sets":3,"reps":12,"work":3,"repRest":0,"actionRest":45,"isAlt":false,"mode":"reps"}}',
+                '  静态保持: {"name":"靠墙静蹲","category":"main","spec":{"sets":3,"reps":0,"work":40,"repRest":0,"actionRest":30,"isAlt":false,"mode":"hold"}}',
+                '  双侧交替: {"name":"侧弓步","category":"main","spec":{"sets":3,"reps":10,"work":3,"repRest":0,"actionRest":45,"isAlt":true,"mode":"alt-reps"}}',
                 '必须参考今日已完成运动摘要；如果今天已经高强度训练过同动作或同部位，后续计划应降低重复负荷、改为恢复/拉伸/低强度技术练习，除非用户明确要求继续加量。'
             ].join('\n');
             const typeInstructions = types.map((type, index) => `${index + 1}. ${type} / ${this.planTypeMeta?.(type)?.label || type}`).join('\n');
@@ -265,7 +309,7 @@
                 '你是训练日程计划助手。只输出严格 JSON 文本，不要 Markdown 代码块、不要解释、不要追加任何说明。',
                 promptMode,
                 specRules,
-                '所有 spec 字段（sets/reps/work/repRest/actionRest/isAlt）都必须由你显式填写，不能依赖客户端推断；如果你拿不准就按规则中的默认值填上，但绝不能省略字段或填 0/空。',
+                '所有 spec 字段（sets/reps/work/repRest/actionRest/isAlt/mode）都必须由你显式填写，不能依赖客户端推断；如果你拿不准就按规则中的默认值填上，但绝不能省略字段或填 0/空。mode 必须根据动作类型正确选择 reps/hold/alt-reps/alt-hold。',
                 types.length > 1
                     ? `本次需要同时生成多个计划类型，请分别输出到 plans 数组中，每个选中类型各生成 1 个 plan：\n${typeInstructions}`
                     : `计划类型: ${types[0]} / ${metas[0]?.label || '训练计划'}`,
@@ -381,36 +425,60 @@
             const parsed = safeJsonParse(String(rawText || '').trim());
             if (!parsed || typeof parsed !== 'object') return { ok: false, reason: 'AI 返回不是有效 JSON', rawText };
             const plans = Array.isArray(parsed.plans) ? parsed.plans : [parsed];
-            const warnings = [];
-            const validPlans = plans.map((plan, index) => ({
-                date: String(plan.date || this.logicalDateKey?.() || this.dateKey(new Date())),
-                type: ['rehab', 'cut', 'bulk', 'maintenance', 'custom'].includes(plan.type) ? plan.type : (allowedTypes[index] || allowedTypes[0] || 'rehab'),
-                title: String(plan.title || this.planTypeMeta?.(plan.type || allowedTypes[index] || allowedTypes[0])?.label || '训练计划'),
-                notes: String(plan.notes || ''),
-                source: 'ai',
-                items: (Array.isArray(plan.items) ? plan.items : []).map((item) => {
-                    const planType = ['rehab', 'cut', 'bulk', 'maintenance', 'custom'].includes(plan.type) ? plan.type : (allowedTypes[index] || allowedTypes[0] || 'rehab');
-                    const result = normalizeAiSpec(item, { planType });
-                    if (Array.isArray(result.warnings) && result.warnings.length) warnings.push(...result.warnings);
-                    const spec = result.spec;
+            const validPlans = plans.map((plan, index) => {
+                const planType = ['rehab', 'cut', 'bulk', 'maintenance', 'custom'].includes(plan.type) ? plan.type : (allowedTypes[index] || allowedTypes[0] || 'rehab');
+                const items = (Array.isArray(plan.items) ? plan.items : []).map((item) => {
+                    const name = String(item.name || '');
+                    if (!name) return null;
+                    const coerced = coerceAiSpec(item, { planType });
                     return {
-                        name: String(item.name || ''),
+                        name,
                         category: normalizeAiCategory(item.category || item.phase || item.section),
                         chainId: String(item.chainId || item.chainHint || ''),
                         currentLevel: item.currentLevel == null ? null : Number(item.currentLevel),
-                        spec,
+                        spec: coerced.spec,
                         cooldownRefs: Array.isArray(item.cooldownRefs) ? item.cooldownRefs.map((value) => String(value || '')) : [],
                         aiReasoning: String(item.aiReasoning || ''),
                         durationEstHint: String(item.durationEstHint || ''),
                         status: 'todo',
                         doneSets: 0,
                         userOverride: false,
-                        excludeFromPr: true
+                        excludeFromPr: true,
+                        autoFilled: coerced.autoFilled.length ? coerced.autoFilled : undefined
                     };
-                }).filter((item) => item && item.name)
-            })).filter((plan) => plan.items.length > 0);
+                }).filter(Boolean);
+                return {
+                    date: String(plan.date || this.logicalDateKey?.() || this.dateKey(new Date())),
+                    type: planType,
+                    title: String(plan.title || this.planTypeMeta?.(planType)?.label || '训练计划'),
+                    notes: String(plan.notes || ''),
+                    source: 'ai',
+                    items
+                };
+            }).filter((plan) => plan.items.length > 0);
             if (!validPlans.length) return { ok: false, reason: 'JSON 缺少可用 items', rawText };
+            const warnings = validPlans.flatMap((plan) => plan.items).flatMap((item) => item.autoFilled?.length ? [`${item.name} 字段已自动补全: ${item.autoFilled.join(', ')}`] : []);
             return { ok: true, plans: validPlans, warnings };
+        },
+
+        validatePlanAiPayload(rawText, fallbackTypes = 'rehab') {
+            const allowedTypes = normalizePlanTypes(fallbackTypes);
+            const parsed = safeJsonParse(String(rawText || '').trim());
+            if (!parsed || typeof parsed !== 'object') return { ok: false, errors: ['AI 返回不是有效 JSON'] };
+            const plans = Array.isArray(parsed.plans) ? parsed.plans : [parsed];
+            const allErrors = [];
+            plans.forEach((plan, index) => {
+                void (['rehab', 'cut', 'bulk', 'maintenance', 'custom'].includes(plan.type) ? plan.type : (allowedTypes[index] || allowedTypes[0] || 'rehab'));
+                (Array.isArray(plan.items) ? plan.items : []).forEach((item) => {
+                    const name = String(item.name || '');
+                    if (!name) return;
+                    const rawSpec = item.spec && typeof item.spec === 'object' ? item.spec : {};
+                    const mode = inferSpecMode(rawSpec, item);
+                    const itemErrors = validateAiSpec({ ...rawSpec, mode }, name);
+                    if (itemErrors.length) allErrors.push(...itemErrors);
+                });
+            });
+            return { ok: allErrors.length === 0, errors: allErrors };
         },
 
         async submitPlanAi(mode = 'today') {
@@ -429,17 +497,34 @@
                 this.setPlanAiPending?.(true);
                 this.setPlanAiStatus?.('正在发送训练档案和最近计划摘要…', 'busy');
                 window.toast?.show?.('AI 正在生成训练计划…', 'info', 4200);
+                const MAX_ATTEMPTS = 2;
                 let text = '';
-                if (typeof window.ai.callStream === 'function') {
-                    text = await window.ai.callStream(messages, 1800, (_delta, accumulated) => {
-                        const length = String(accumulated || '').length;
-                        this.setPlanAiStatus?.(length ? `正在接收计划草稿：${length} 字` : 'AI 已响应，正在等待内容…', 'busy');
-                    });
-                } else {
-                    text = await window.ai.call(messages, 1800);
+                let parsed = null;
+                for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+                    if (attempt > 0) {
+                        this.setPlanAiStatus?.(`第 ${attempt + 1} 次尝试：AI 正在修正 spec 字段…`, 'busy');
+                    }
+                    if (typeof window.ai.callStream === 'function') {
+                        text = await window.ai.callStream(messages, 1800, (_delta, accumulated) => {
+                            const length = String(accumulated || '').length;
+                            this.setPlanAiStatus?.(length ? `正在接收计划草稿：${length} 字` : 'AI 已响应，正在等待内容…', 'busy');
+                        });
+                    } else {
+                        text = await window.ai.call(messages, 1800);
+                    }
+                    this.setPlanAiStatus?.('已收到计划草稿，正在校验 JSON…', 'busy');
+                    const validation = this.validatePlanAiPayload(text, types);
+                    if (validation.ok) break;
+                    if (validation.errors?.length && attempt < MAX_ATTEMPTS - 1) {
+                        messages.push({ role: 'assistant', content: text });
+                        messages.push({
+                            role: 'user',
+                            content: `上一次输出不符合 schema 要求，以下是具体问题，请只针对这些问题修正后输出完整 JSON：\n- ${validation.errors.slice(0, 15).join('\n- ')}`
+                        });
+                        continue;
+                    }
                 }
-                this.setPlanAiStatus?.('已收到计划草稿，正在校验 JSON…', 'busy');
-                const parsed = this.parsePlanAiPayload(text, types);
+                parsed = this.parsePlanAiPayload(text, types);
                 if (!parsed.ok) {
                     this.setPlanAiStatus?.('AI 返回内容无法解析，请调整提示后重试。', 'error');
                     this._openModal?.({
@@ -453,7 +538,7 @@
                 this.setPlanAiStatus?.('计划草稿已生成，请在预览中确认。', 'success');
                 if (Array.isArray(parsed.warnings) && parsed.warnings.length) {
                     const head = parsed.warnings.slice(0, 3).join('；');
-                    window.toast?.show?.(`AI 漏填字段已用默认值兜底：${head}${parsed.warnings.length > 3 ? '…' : ''}`, 'info', 5200);
+                    window.toast?.show?.(`AI 漏填字段已用默认值补全：${head}${parsed.warnings.length > 3 ? '…' : ''}`, 'info', 5200);
                 }
                 this.previewPlanAiPlans(parsed.plans);
             } catch (error) {
@@ -498,7 +583,10 @@
         },
 
         renderPlanAiPreviewItem(planIndex, itemIndex, item = {}) {
-            const spec = normalizeAiSpec(item).spec || { sets: 3, reps: 0, work: 30, repRest: 20, actionRest: 60, isAlt: false };
+            const coerced = coerceAiSpec(item);
+            const spec = coerced.spec;
+            const autoSet = new Set(item.autoFilled || []);
+            const af = (field) => autoSet.has(field) ? ' data-auto-filled' : '';
             const category = normalizeAiCategory(item.category || item.phase);
             return `<div class="plan-ai-preview-item" data-item-index="${itemIndex}">
                 <div class="md-field plan-ai-preview-name">
@@ -515,12 +603,18 @@
                     </select>
                     <label>阶段</label>
                 </div>
+                <div class="md-field plan-ai-preview-mode">
+                    <select data-preview-mode>
+                        ${VALID_MODES.map((m) => `<option value="${m}" ${spec.mode === m ? 'selected' : ''}>${m}</option>`).join('')}
+                    </select>
+                    <label>模式</label>
+                </div>
                 <div class="plan-ai-preview-spec">
-                    <div class="md-field"><input type="number" min="1" data-preview-sets value="${Number(spec.sets || 3)}" placeholder=" "><label>组数</label></div>
-                    <div class="md-field"><input type="number" min="0" data-preview-reps value="${Number(spec.reps || 0)}" placeholder=" "><label>每组次数</label></div>
-                    <div class="md-field"><input type="number" min="0" data-preview-work value="${Number(spec.work || 0)}" placeholder=" "><label>每次秒数</label></div>
-                    <div class="md-field"><input type="number" min="0" data-preview-rep-rest value="${Number(spec.repRest || 0)}" placeholder=" "><label>次间休息</label></div>
-                    <div class="md-field"><input type="number" min="0" data-preview-rest value="${Number(spec.actionRest || 0)}" placeholder=" "><label>组间休息</label></div>
+                    <div class="md-field"${af('sets')}><input type="number" min="1" data-preview-sets value="${Number(spec.sets || 3)}" placeholder=" "><label>组数</label></div>
+                    <div class="md-field"${af('reps')}><input type="number" min="0" data-preview-reps value="${Number(spec.reps || 0)}" placeholder=" "><label>每组次数</label></div>
+                    <div class="md-field"${af('work')}><input type="number" min="0" data-preview-work value="${Number(spec.work || 0)}" placeholder=" "><label>每次秒数</label></div>
+                    <div class="md-field"${af('repRest')}><input type="number" min="0" data-preview-rep-rest value="${Number(spec.repRest || 0)}" placeholder=" "><label>次间休息</label></div>
+                    <div class="md-field"${af('actionRest')}><input type="number" min="0" data-preview-rest value="${Number(spec.actionRest || 0)}" placeholder=" "><label>组间休息</label></div>
                     <label class="plan-ai-preview-alt"><input type="checkbox" data-preview-is-alt ${spec.isAlt ? 'checked' : ''}><span>双侧交替</span></label>
                 </div>
                 <div class="md-field plan-ai-preview-reason">
@@ -540,7 +634,7 @@
             plan.items.push({
                 name: '新训练动作',
                 category: 'main',
-                spec: { sets: 3, reps: 12, work: 3, repRest: 0, actionRest: 45, isAlt: false },
+                spec: { sets: 3, reps: 12, work: 3, repRest: 0, actionRest: 45, isAlt: false, mode: 'reps' },
                 cooldownRefs: [],
                 aiReasoning: '',
                 durationEstHint: '',
@@ -573,6 +667,19 @@
                     const work = Math.max(0, readNumber(itemEl.querySelector('[data-preview-work]')?.value, 0));
                     let reps = Math.max(0, readNumber(itemEl.querySelector('[data-preview-reps]')?.value, 0));
                     if (reps <= 0 && work <= 0) reps = 12;
+                    const isAlt = !!itemEl.querySelector('[data-preview-is-alt]')?.checked;
+                    const rawMode = String(itemEl.querySelector('[data-preview-mode]')?.value || '').trim();
+                    const mode = VALID_MODES.includes(rawMode) ? rawMode : (isAlt ? 'alt-reps' : 'reps');
+                    const autoFilledEls = itemEl.querySelectorAll('[data-auto-filled]');
+                    const autoFilled = Array.from(autoFilledEls).map((el) => {
+                        const input = el.querySelector('input');
+                        if (input?.hasAttribute('data-preview-sets')) return 'sets';
+                        if (input?.hasAttribute('data-preview-reps')) return 'reps';
+                        if (input?.hasAttribute('data-preview-work')) return 'work';
+                        if (input?.hasAttribute('data-preview-rep-rest')) return 'repRest';
+                        if (input?.hasAttribute('data-preview-rest')) return 'actionRest';
+                        return '';
+                    }).filter(Boolean);
                     items.push({
                         name,
                         category: normalizeAiCategory(itemEl.querySelector('[data-preview-category]')?.value || 'main'),
@@ -582,7 +689,8 @@
                             work,
                             repRest: Math.max(0, readNumber(itemEl.querySelector('[data-preview-rep-rest]')?.value, 0)),
                             actionRest: Math.max(0, readNumber(itemEl.querySelector('[data-preview-rest]')?.value, 45)),
-                            isAlt: !!itemEl.querySelector('[data-preview-is-alt]')?.checked
+                            isAlt,
+                            mode
                         },
                         cooldownRefs: [],
                         aiReasoning: String(itemEl.querySelector('[data-preview-reason]')?.value || '').trim(),
@@ -590,7 +698,8 @@
                         status: 'todo',
                         doneSets: 0,
                         userOverride: false,
-                        excludeFromPr: true
+                        excludeFromPr: true,
+                        ...(autoFilled.length ? { autoFilled } : {})
                     });
                 });
                 const typeText = String(planEl.querySelector('.plan-ai-preview-type')?.textContent || '').trim();
@@ -636,7 +745,21 @@
                 window.toast?.show?.('预览里没有可保存的训练动作', 'error');
                 return;
             }
+            const hasAutoFilled = plans.some((plan) => plan.items.some((item) => item.autoFilled?.length));
+            if (hasAutoFilled) {
+                window.toast?.show?.('有字段由默认值补全（红色边框），请检查后再次确认', 'info', 4000);
+                return;
+            }
             plans.forEach((plan) => {
+                const sameDay = this.activeRecords(this.db.dailyPlans || []).filter((p) => p.date === plan.date && !p.deleted);
+                sameDay.forEach((old) => {
+                    const sameType = (old.type || 'rehab') === (plan.type || 'rehab');
+                    const hasLocked = (old.items || []).some((it) => it.userOverride && !it.deleted);
+                    if (sameType || hasLocked) return;
+                    old.deleted = true;
+                    this.touchRecord?.(old, ['deleted']);
+                    if (this.selectedPlanId === old.id) this.selectedPlanId = '';
+                });
                 const current = this.getDailyPlans?.(plan.date)?.find((item) => (item.type || 'rehab') === (plan.type || 'rehab'));
                 const locked = (current?.items || []).filter((item) => item.userOverride && !item.deleted);
                 const aiItems = plan.items.map((item) => this.ensureTaskShape({

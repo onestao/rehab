@@ -186,6 +186,11 @@ const workoutEngine = {
     },
 
     async stepAction(action) {
+        if ((action.sets|0) < 1 || ((action.reps|0) <= 0 && (action.work|0) <= 0)) {
+            window.toast?.show?.(`「${action.name || '未命名'}」参数不完整（组数/次数/时长为0），已跳过`, 'error');
+            this.transition('completed');
+            return;
+        }
         const actions = this.currentActions();
         const sides = action.isAlt ? ['左侧', '右侧'] : [''];
         let totalSetsAll = 0;
