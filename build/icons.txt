@@ -114,6 +114,7 @@ sync_problem
 system_update
 timeline
 timer
+tips_and_updates
 today
 trending_down
 trending_flat
@@ -121,6 +122,8 @@ trending_up
 tune
 upload
 upload_file
+vertical_align_bottom
+vertical_align_top
 vibration
 visibility
 visibility_off

@@ -103,9 +103,14 @@ const adviceRules = {
             ? `<div class="ai-recovery-row"><span class="ai-recovery-l">恢复指数</span><div class="ai-recovery-bar"><div class="ai-recovery-fill" style="width:${Math.min(100, Math.max(0, a.recoveryIndex))}%"></div></div><span class="ai-recovery-v">${esc(String(a.recoveryIndex))}%</span></div>`
             : '';
 
-        const llmBlock = ctx.llmHtml
-            ? ctx.llmHtml
-            : `<div class="ai-llm-block ai-llm-skeleton"><div class="ai-llm-label"><span class="ai-llm-dot"></span> AI 正在生成具体建议…</div><div class="ai-llm-line"></div><div class="ai-llm-line"></div><div class="ai-llm-line ai-llm-short"></div></div>`;
+        let llmBlock;
+        if (ctx.llmHtml) {
+            llmBlock = ctx.llmHtml;
+        } else if (ctx.llmStreaming) {
+            llmBlock = `<div class="ai-llm-block ai-llm-skeleton"><div class="ai-llm-label"><span class="ai-llm-dot"></span> AI 正在生成具体建议…</div><div class="ai-llm-line"></div><div class="ai-llm-line"></div><div class="ai-llm-line ai-llm-short"></div></div>`;
+        } else {
+            llmBlock = `<div class="ai-llm-block ai-llm-empty"><div class="ai-llm-label"><span class="material-symbols-rounded" style="font-size:14px">tips_and_updates</span> 暂无规则告警</div><div>当前没有触发本地规则。可在下方对话区直接向 AI 提问，或点击"快速建议"按钮。</div></div>`;
+        }
 
         const offlineNote = ctx.offline
             ? '<div class="ai-offline-note"><span class="material-symbols-rounded" style="font-size:16px">cloud_off</span>暂时无法连接 AI 服务，已切换到本地建议库。</div>'

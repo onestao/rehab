@@ -118,6 +118,12 @@ const advicePanel = {
             showAdviceNewMessageButton: this.showAdviceNewMessageButton,
             hideAdviceNewMessageButton: this.hideAdviceNewMessageButton,
             jumpAdviceToLatest: this.jumpAdviceToLatest,
+            scrollAdviceToTop: this.scrollAdviceToTop,
+            scrollAdviceToBottom: this.scrollAdviceToBottom,
+            scrollAdviceToPrevBubble: this.scrollAdviceToPrevBubble,
+            scrollAdviceToNextBubble: this.scrollAdviceToNextBubble,
+            _adviceScrollHost: this._adviceScrollHost,
+            _adviceBubbleAnchors: this._adviceBubbleAnchors,
             _handleAdviceStreamScroll: this._handleAdviceStreamScroll,
             getAdviceVersionGroup: this.getAdviceVersionGroup,
             setActiveAdviceVersion: this.setActiveAdviceVersion,
@@ -343,6 +349,65 @@ const advicePanel = {
         this._adviceUserScrollPaused = false;
         this.hideAdviceNewMessageButton();
         this.scrollAdviceToLatest(true, 'smooth');
+    },
+
+    _adviceScrollHost() {
+        const list = document.querySelector('.advice-chat-list');
+        if (list && list.scrollHeight > list.clientHeight + 4) return list;
+        const page = document.getElementById('ai-coach');
+        if (page && page.scrollHeight > page.clientHeight + 4) return page;
+        return document.scrollingElement || document.documentElement;
+    },
+
+    scrollAdviceToTop() {
+        const host = this._adviceScrollHost();
+        if (host && typeof host.scrollTo === 'function') host.scrollTo({ top: 0, behavior: 'smooth' });
+        else if (host) host.scrollTop = 0;
+    },
+
+    scrollAdviceToBottom() {
+        const host = this._adviceScrollHost();
+        if (!host) return;
+        const target = host.scrollHeight;
+        if (typeof host.scrollTo === 'function') host.scrollTo({ top: target, behavior: 'smooth' });
+        else host.scrollTop = target;
+    },
+
+    _adviceBubbleAnchors() {
+        return Array.from(document.querySelectorAll('#ai-coach .advice-bubble'));
+    },
+
+    scrollAdviceToPrevBubble() {
+        const host = this._adviceScrollHost();
+        if (!host) return;
+        const bubbles = this._adviceBubbleAnchors();
+        if (!bubbles.length) return this.scrollAdviceToTop();
+        const hostRect = host.getBoundingClientRect();
+        const hostTop = host === document.scrollingElement || host === document.documentElement ? 0 : hostRect.top;
+        let target = bubbles[0];
+        for (const el of bubbles) {
+            const top = el.getBoundingClientRect().top - hostTop;
+            if (top < -8) target = el;
+            else break;
+        }
+        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    },
+
+    scrollAdviceToNextBubble() {
+        const host = this._adviceScrollHost();
+        if (!host) return;
+        const bubbles = this._adviceBubbleAnchors();
+        if (!bubbles.length) return this.scrollAdviceToBottom();
+        const hostRect = host.getBoundingClientRect();
+        const hostTop = host === document.scrollingElement || host === document.documentElement ? 0 : hostRect.top;
+        for (const el of bubbles) {
+            const top = el.getBoundingClientRect().top - hostTop;
+            if (top > 8) {
+                el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                return;
+            }
+        }
+        this.scrollAdviceToBottom();
     },
 
     captureAdviceDraft() {
@@ -966,7 +1031,12 @@ const advicePanel = {
             if (merged.includes(msg)) return;
             merged.push(msg);
         });
-        return merged.slice(-Math.max(limit, todayMessages.length)).map(msg => ({
+        // Drop the trailing user message — sendAiAdvice will append the same prompt as the
+        // final {role:'user'} entry, so keeping it here would duplicate the question.
+        const trimmed = merged.length && merged[merged.length - 1].role === 'user'
+            ? merged.slice(0, -1)
+            : merged;
+        return trimmed.slice(-Math.max(limit, todayMessages.length)).map(msg => ({
             role: msg.role === 'assistant' ? 'assistant' : 'user',
             content: msg.content
         }));
@@ -1578,6 +1648,12 @@ const advicePanel = {
             <div class="advice-v6-filter-bar">${this.renderAdviceFilterControls()}</div>
             <div class="sect-head"><span class="t">对话</span><button class="a" onclick="data.clearAdviceChat?.()" type="button">清空</button></div>
             <div class="ai-msg-list">${this.renderAdviceMessages(visibleMessages)}</div>
+            <div class="advice-scroll-rail" aria-label="对话快速跳转">
+                <button class="advice-rail-btn" onclick="data.scrollAdviceToTop()" type="button" aria-label="跳到最顶端" title="跳到最顶端"><span class="material-symbols-rounded">vertical_align_top</span></button>
+                <button class="advice-rail-btn" onclick="data.scrollAdviceToPrevBubble()" type="button" aria-label="上一段对话" title="上一段对话"><span class="material-symbols-rounded">expand_less</span></button>
+                <button class="advice-rail-btn" onclick="data.scrollAdviceToNextBubble()" type="button" aria-label="下一段对话" title="下一段对话"><span class="material-symbols-rounded">expand_more</span></button>
+                <button class="advice-rail-btn" onclick="data.scrollAdviceToBottom()" type="button" aria-label="跳到最下端" title="跳到最下端"><span class="material-symbols-rounded">vertical_align_bottom</span></button>
+            </div>
             <button id="adviceNewMessageBtn" class="advice-new-message-btn hidden" onclick="data.jumpAdviceToLatest()" type="button" aria-hidden="true">↓ 新消息</button>
             <div class="glass-card advice-v6-suggestions-card">
                 <div class="sect-head" style="padding:0 0 8px;margin:0"><span class="t">快速建议</span></div>
@@ -1604,8 +1680,8 @@ const advicePanel = {
             if (!this._insightBodyRendered) {
                 const diagCtx = this._lastInsightCtx || {};
                 const diag = diagCtx.diag || null;
-                const llmHtml = this.renderLocalAdvice?.(diag) || '';
-                const expandableHtml = this.renderInsightExpandable?.({ ...diagCtx, llmHtml }) || '';
+                const llmHtml = diag ? (this.renderLocalAdvice?.(diag) || '') : '';
+                const expandableHtml = this.renderInsightExpandable?.({ ...diagCtx, llmHtml, llmStreaming: false }) || '';
                 body.innerHTML = expandableHtml;
                 this._insightBodyRendered = true;
                 requestAnimationFrame(() => { body.style.maxHeight = body.scrollHeight + 40 + 'px'; });

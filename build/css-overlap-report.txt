@@ -1,7 +1,7 @@
 # css overlap report
 # real-conflict threshold: 220
 
-## REAL CONFLICTS (same selector + same property, different value): 212
+## REAL CONFLICTS (same selector + same property, different value): 215
 :root
   files: 01-vars.css, 37-dark-mode.css, 49-plan.css, 41-m3e-effects.css
     --md-sys-primary: #0061a4 | #a0cafd (01-vars.css / 37-dark-mode.css)
@@ -1096,6 +1096,20 @@ mark.ai-hit
 .timer-panel #mainTime
   files: 52-v6-workout.css
     font-size: clamp(68px, 20vw, 88px) | 64px (52-v6-workout.css / 52-v6-workout.css)
+
+.advice-scroll-rail
+  files: 54-v6-ai.css
+    right: 6px | 4px (54-v6-ai.css / 54-v6-ai.css)
+    gap: 6px | 4px (54-v6-ai.css / 54-v6-ai.css)
+
+.advice-rail-btn
+  files: 54-v6-ai.css
+    width: 34px | 30px (54-v6-ai.css / 54-v6-ai.css)
+    height: 34px | 30px (54-v6-ai.css / 54-v6-ai.css)
+
+.advice-rail-btn .material-symbols-rounded
+  files: 54-v6-ai.css
+    font-size: 18px | 16px (54-v6-ai.css / 54-v6-ai.css)
 
 .profile-hero-main
   files: 55-v6-profile.css

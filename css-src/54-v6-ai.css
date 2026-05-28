@@ -202,3 +202,45 @@
 .ai-table tr:last-child td { border-bottom: none; }
 .ai-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
 .ai-table-hint { font-size: 10px; color: var(--md-sys-on-surface-variant); text-align: center; padding: 3px 0; }
+
+/* ── Empty / fallback variant of LLM block ── */
+.ai-llm-empty { background: var(--md-sys-surface-container); }
+.ai-llm-empty .ai-llm-label { color: var(--md-sys-tertiary); }
+
+/* ── Edge scroll rail (top / prev / next / bottom) ── */
+.advice-scroll-rail {
+    position: fixed;
+    right: 6px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    z-index: 25;
+    pointer-events: auto;
+}
+#ai-coach.page:not(.active) .advice-scroll-rail,
+.page:not(.active) .advice-scroll-rail { display: none; }
+.advice-rail-btn {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    border: 1px solid var(--glass-border);
+    background: color-mix(in srgb, var(--md-sys-surface-container) 86%, transparent);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    color: var(--md-sys-on-surface-variant);
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    box-shadow: var(--glass-shadow-out);
+    transition: transform 0.15s var(--md-sys-motion-spring), background 0.15s ease;
+}
+.advice-rail-btn:hover { background: var(--md-sys-surface-container-high); color: var(--md-sys-on-surface); }
+.advice-rail-btn:active { transform: scale(0.92); }
+.advice-rail-btn .material-symbols-rounded { font-size: 18px; }
+@media (max-width: 380px) {
+    .advice-scroll-rail { right: 4px; gap: 4px; }
+    .advice-rail-btn { width: 30px; height: 30px; }
+    .advice-rail-btn .material-symbols-rounded { font-size: 16px; }
+}

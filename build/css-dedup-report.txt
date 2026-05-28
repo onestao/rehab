@@ -572,7 +572,7 @@ media (max-width: 360px)
   18-health-diet.css, 19-health-weightloss-ai.css, 24-routines-cards.css, 33-workout-input-card.css, 36-responsive.css, 43-identity-card.css, 49-action-history-weekly.css, 49-plan.css
 
 media (max-width: 380px)
-  51-v6-today.css, 52-v6-workout.css, 55-v6-profile.css
+  51-v6-today.css, 52-v6-workout.css, 54-v6-ai.css, 55-v6-profile.css
 
 media (max-width: 480px)
   19-health-weightloss-ai.css, 22-workout-mode-tabs.css, 24-routines-cards.css, 33-workout-input-card.css, 36-responsive.css, 49-action-history-weekly.css, 49-plan.css

@@ -144,6 +144,8 @@ Object.assign(advicePanel, {
             blocks.push(`【饮食目标】\n每日 ${dietGoal.dailyCal} kcal · 目标类型：${dietGoal.goalType === 'gain' ? '增肌' : '减重'}`);
         }
 
+        const conversation = this.adviceConversationContext();
+
         const template = this.getActiveAdviceTemplate?.() || null;
         if (template) {
             const templateVars = this.buildAdviceTemplateVars?.({
@@ -162,10 +164,9 @@ Object.assign(advicePanel, {
             }) || {};
             const sysText = String(template.system || '').trim() || sys;
             const userText = this.applyAdviceTemplate?.(template.user || '{prompt}', templateVars) || blocks.join('\n\n');
-            return [{ role: 'system', content: sysText }, { role: 'user', content: userText }];
+            return [{ role: 'system', content: sysText }, ...conversation, { role: 'user', content: userText }];
         }
 
-        const conversation = this.adviceConversationContext();
         return [{ role: 'system', content: sys }, ...conversation, { role: 'user', content: blocks.join('\n\n') }];
     },
 
