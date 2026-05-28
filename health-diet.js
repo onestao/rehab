@@ -76,8 +76,8 @@
                     <textarea id="foodAiText" class="diet-ai-input" placeholder="说说你这顿吃了什么，例如：鸡胸肉饭加一杯豆浆" oninput="data.autoResizeDietInput(this)"></textarea>
                     <div class="diet-ai-actions">
                         <button class="md-btn md-btn-filled" onclick="data.aiParseFood()" type="button"><span class="material-symbols-rounded">auto_awesome</span> 文本识别</button>
-                        <button id="dietPhotoButton" class="md-btn md-btn-tonal" type="button" title="${photoTitle}"><span class="material-symbols-rounded">visibility</span> 拍照识别</button>
-                        <input id="dietPhotoInput" class="hidden" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" capture="environment">
+                        <button id="dietPhotoButton" class="md-btn md-btn-tonal" type="button" title="${photoTitle}"><span class="material-symbols-rounded">visibility</span> 图片识别</button>
+                        <input id="dietPhotoInput" class="hidden" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif">
                     </div>
                     <small id="foodAiStatus" class="food-ai-status"></small>
                     <div id="foodAiResults"></div>
@@ -133,35 +133,8 @@
             }
             if (input && !input.dataset.bound) {
                 input.dataset.bound = 'true';
-                input.addEventListener('change', () => {
-                    this._stopDietPhotoPoll();
-                    this.handleDietPhoto(input.files && input.files[0]);
-                });
+                input.addEventListener('change', () => this.handleDietPhoto(input.files && input.files[0]));
             }
-        },
-
-        _stopDietPhotoPoll() {
-            if (this._dietPhotoPollTimer) {
-                clearInterval(this._dietPhotoPollTimer);
-                this._dietPhotoPollTimer = null;
-            }
-        },
-
-        _startDietPhotoPoll(input) {
-            this._stopDietPhotoPoll();
-            let elapsed = 0;
-            this._dietPhotoPollTimer = setInterval(() => {
-                elapsed += 500;
-                if (elapsed >= 40000) {
-                    this._stopDietPhotoPoll();
-                    this.setDietPhotoStatus('timeout', '等待照片超时，请重试');
-                    return;
-                }
-                if (input.files && input.files[0]) {
-                    this._stopDietPhotoPoll();
-                    this.handleDietPhoto(input.files[0]);
-                }
-            }, 500);
         },
 
         closeDietModal() {
@@ -197,7 +170,6 @@
             }
             this.setDietPhotoStatus('waiting', '请选择或拍摄一张照片');
             input.click?.();
-            this._startDietPhotoPoll(input);
         },
 
         setDietPhotoStatus(stage, text, onCancel = null) {
