@@ -12,6 +12,7 @@ bookmark_add
 bookmark_border
 bookmarks
 brightness_auto
+bug_report
 calendar_month
 check
 check_circle

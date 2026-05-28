@@ -122,13 +122,17 @@ const advicePanel = {
             scrollAdviceToBottom: this.scrollAdviceToBottom,
             scrollAdviceToPrevBubble: this.scrollAdviceToPrevBubble,
             scrollAdviceToNextBubble: this.scrollAdviceToNextBubble,
-            _adviceScrollHost: this._adviceScrollHost,
-            _adviceScrollableAncestors: this._adviceScrollableAncestors,
+            _adviceScrollContainer: this._adviceScrollContainer,
+            _adviceCurrentScrollY: this._adviceCurrentScrollY,
+            _adviceMaxScrollY: this._adviceMaxScrollY,
+            _adviceSetScrollY: this._adviceSetScrollY,
+            _adviceAnchorOffsetIn: this._adviceAnchorOffsetIn,
             _adviceBubbleAnchors: this._adviceBubbleAnchors,
-            _adviceHostScrollTop: this._adviceHostScrollTop,
-            _adviceHostViewportTop: this._adviceHostViewportTop,
-            _adviceJumpToAnchor: this._adviceJumpToAnchor,
-            _adviceScrollHostTo: this._adviceScrollHostTo,
+            _adviceDebugLog: this._adviceDebugLog,
+            showAdviceDebugOverlay: this.showAdviceDebugOverlay,
+            toggleDebugTools: this.toggleDebugTools,
+            initDebugTools: this.initDebugTools,
+            _mountDebugFab: this._mountDebugFab,
             _handleAdviceStreamScroll: this._handleAdviceStreamScroll,
             getAdviceVersionGroup: this.getAdviceVersionGroup,
             setActiveAdviceVersion: this.setActiveAdviceVersion,
@@ -356,163 +360,323 @@ const advicePanel = {
         this.scrollAdviceToLatest(true, 'smooth');
     },
 
-    _adviceScrollableAncestors(seed) {
-        // Walk up from `seed` collecting every ancestor that *could* scroll on iOS Safari /
-        // Android WebView, including the document scrolling element. Returned in
-        // closest-first order.
-        const result = [];
-        let el = seed?.parentElement || null;
+    _adviceDebugLog(label, payload) {
+        if (!this._debugToolsEnabled) return;
+        try {
+            const entry = { t: Date.now(), label, ...payload };
+            const key = 'adviceScrollDebug';
+            const list = JSON.parse(sessionStorage.getItem(key) || '[]');
+            list.push(entry);
+            while (list.length > 30) list.shift();
+            sessionStorage.setItem(key, JSON.stringify(list));
+            const summary = `${label} | sc=${payload.scrollerTag} cy=${payload.currentY} wy=${payload.windowScrollY} st=${payload.scrollerScrollTop} t=${payload.targetOffset}`;
+            document.title = summary.slice(0, 80);
+            console.log('[adviceScroll]', entry);
+        } catch (e) {
+            console.warn('[adviceScroll] log failed', e);
+        }
+    },
+
+    showAdviceDebugOverlay() {
+        try {
+            const existing = document.getElementById('adviceDebugOverlay');
+            if (existing) { existing.remove(); return; }
+            const raw = sessionStorage.getItem('adviceScrollDebug') || '[]';
+            let parsed;
+            try { parsed = JSON.parse(raw); } catch { parsed = raw; }
+            const formatted = Array.isArray(parsed)
+                ? parsed.map((e, i) => '#' + i + ' ' + JSON.stringify(e)).join('\n\n')
+                : String(parsed);
+            const wrap = document.createElement('div');
+            wrap.id = 'adviceDebugOverlay';
+            wrap.style.cssText = 'position:fixed;left:0;right:0;bottom:0;top:30%;background:#000;color:#0f0;font:11px/1.4 ui-monospace,monospace;padding:10px;z-index:9999;overflow:auto;white-space:pre-wrap;word-break:break-all;';
+            const close = document.createElement('button');
+            close.textContent = '关闭';
+            close.style.cssText = 'position:sticky;top:0;float:right;background:#fff;color:#000;border:0;padding:4px 10px;border-radius:4px;font-size:12px;';
+            close.onclick = () => wrap.remove();
+            const clear = document.createElement('button');
+            clear.textContent = '清空';
+            clear.style.cssText = 'position:sticky;top:0;float:right;margin-right:6px;background:#f80;color:#fff;border:0;padding:4px 10px;border-radius:4px;font-size:12px;';
+            clear.onclick = () => { sessionStorage.removeItem('adviceScrollDebug'); wrap.remove(); };
+            const copy = document.createElement('button');
+            copy.textContent = '复制';
+            copy.style.cssText = 'position:sticky;top:0;float:right;margin-right:6px;background:#08f;color:#fff;border:0;padding:4px 10px;border-radius:4px;font-size:12px;';
+            copy.onclick = () => {
+                const ta = document.createElement('textarea');
+                ta.value = formatted;
+                document.body.appendChild(ta);
+                ta.select();
+                try { document.execCommand('copy'); } catch {}
+                ta.remove();
+                copy.textContent = '已复制';
+            };
+            wrap.appendChild(close);
+            wrap.appendChild(clear);
+            wrap.appendChild(copy);
+            const pre = document.createElement('div');
+            pre.textContent = formatted || '(empty)';
+            wrap.appendChild(pre);
+            document.body.appendChild(wrap);
+        } catch (e) {
+            alert('debug overlay failed: ' + e.message);
+        }
+    },
+
+    toggleDebugTools() {
+        try {
+            this._debugToolsEnabled = !this._debugToolsEnabled;
+            if (this._debugToolsEnabled) {
+                localStorage.setItem('rehab_debug_tools', '1');
+                this._mountDebugFab?.();
+            } else {
+                localStorage.removeItem('rehab_debug_tools');
+                sessionStorage.removeItem('adviceScrollDebug');
+                document.getElementById('adviceDebugOverlay')?.remove();
+                document.getElementById('adviceDebugFab')?.remove();
+            }
+            if (typeof toast?.show === 'function') {
+                toast.show('调试工具' + (this._debugToolsEnabled ? '已启用' : '已关闭'));
+            }
+            this.rerenderAdvicePanel?.();
+            this.renderProfilePage?.();
+        } catch (e) {
+            console.warn('toggleDebugTools failed', e);
+        }
+    },
+
+    initDebugTools() {
+        try {
+            this._debugToolsEnabled = localStorage.getItem('rehab_debug_tools') === '1';
+        } catch {
+            this._debugToolsEnabled = false;
+        }
+        if (this._debugToolsEnabled) this._mountDebugFab?.();
+    },
+
+    _mountDebugFab() {
+        if (document.getElementById('adviceDebugFab')) return;
+        const fab = document.createElement('button');
+        fab.id = 'adviceDebugFab';
+        fab.type = 'button';
+        fab.textContent = 'LOG';
+        fab.style.cssText = 'position:fixed;right:6px;bottom:120px;width:42px;height:42px;border-radius:50%;border:0;background:#000;color:#0f0;font:700 11px/1 ui-monospace,monospace;letter-spacing:0.5px;box-shadow:0 4px 14px rgba(0,0,0,0.35);z-index:9998;cursor:pointer;';
+        fab.onclick = () => this.showAdviceDebugOverlay?.();
+        document.body.appendChild(fab);
+    },
+
+    _adviceScrollContainer() {
+        const seed = document.querySelector('#ai-coach .ai-msg-list')
+            || document.querySelector('.advice-chat-list')
+            || document.querySelector('#ai-coach .advice-bubble');
+        let el = seed;
         while (el && el !== document.body) {
             const cs = getComputedStyle(el);
             const oy = cs.overflowY;
-            if (oy === 'auto' || oy === 'scroll') result.push(el);
+            if ((oy === 'auto' || oy === 'scroll') && el.scrollHeight > el.clientHeight + 4) {
+                return el;
+            }
             el = el.parentElement;
         }
-        const docEl = document.scrollingElement || document.documentElement;
-        if (docEl && !result.includes(docEl)) result.push(docEl);
-        return result;
-    },
-
-    _adviceScrollHost() {
-        const seed = document.querySelector('#ai-coach .ai-msg-list')
-            || document.querySelector('.advice-chat-list')
-            || document.querySelector('#ai-coach .advice-bubble');
-        if (seed) {
-            for (const el of this._adviceScrollableAncestors(seed)) {
-                if (el.scrollHeight > el.clientHeight + 4) return el;
-            }
-        }
-        const page = document.getElementById('ai-coach');
-        if (page) return page;
         return document.scrollingElement || document.documentElement;
     },
 
-    _adviceHostScrollTop(host) {
-        if (!host) return 0;
-        if (host === document.scrollingElement || host === document.documentElement || host === document.body) {
+    _adviceCurrentScrollY(scroller) {
+        if (!scroller) return 0;
+        if (scroller === document.scrollingElement || scroller === document.documentElement || scroller === document.body) {
             return window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0;
         }
-        return host.scrollTop || 0;
+        return scroller.scrollTop || 0;
     },
 
-    _adviceHostViewportTop(host) {
-        if (!host || host === document.scrollingElement || host === document.documentElement || host === document.body) return 0;
-        return host.getBoundingClientRect().top;
-    },
-
-    _adviceScrollHostTo(host, top, behavior = 'smooth') {
-        if (!host) return;
-        const targetTop = Math.max(0, Math.round(top));
-        const isDoc = host === document.scrollingElement || host === document.documentElement || host === document.body;
-        if (isDoc) {
-            window.scrollTo({ top: targetTop, behavior });
-        } else if (typeof host.scrollTo === 'function') {
-            host.scrollTo({ top: targetTop, behavior });
-        } else {
-            host.scrollTop = targetTop;
+    _adviceMaxScrollY(scroller) {
+        if (!scroller) return 0;
+        if (scroller === document.scrollingElement || scroller === document.documentElement || scroller === document.body) {
+            return Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
         }
-        // Some iOS Safari WebView builds quietly ignore smooth-scrolling on a
-        // nested overflow ancestor. Verify the position changed; if not, fall
-        // back to a hard scrollTop assignment which always works.
+        return Math.max(0, scroller.scrollHeight - scroller.clientHeight);
+    },
+
+    _adviceSetScrollY(scroller, y, smooth = true) {
+        if (!scroller) return;
+        const target = Math.max(0, Math.min(this._adviceMaxScrollY(scroller), Math.round(y)));
+        const isDoc = scroller === document.scrollingElement || scroller === document.documentElement || scroller === document.body;
+        const behavior = smooth ? 'smooth' : 'auto';
+        if (isDoc) {
+            try { window.scrollTo({ top: target, behavior }); } catch { window.scrollTo(0, target); }
+        } else if (typeof scroller.scrollTo === 'function') {
+            try { scroller.scrollTo({ top: target, behavior }); } catch { scroller.scrollTop = target; }
+        } else {
+            scroller.scrollTop = target;
+        }
+        // Some iOS Safari WebViews silently ignore smooth scrolling on a nested
+        // overflow ancestor. Verify after a frame and force the position if
+        // nothing actually moved.
         requestAnimationFrame(() => {
-            const current = isDoc
+            const now = isDoc
                 ? (window.scrollY || document.documentElement.scrollTop || 0)
-                : host.scrollTop;
-            if (Math.abs(current - targetTop) > 2 && Math.abs(current - this._adviceLastScrollTop) < 2) {
+                : (scroller.scrollTop || 0);
+            if (Math.abs(now - target) > 2) {
                 if (isDoc) {
-                    document.documentElement.scrollTop = targetTop;
-                    document.body.scrollTop = targetTop;
-                    window.scrollTo(0, targetTop);
+                    window.scrollTo(0, target);
+                    document.documentElement.scrollTop = target;
+                    document.body.scrollTop = target;
                 } else {
-                    host.scrollTop = targetTop;
+                    scroller.scrollTop = target;
                 }
             }
-            this._adviceLastScrollTop = current;
         });
     },
 
-    scrollAdviceToTop() {
-        // Try every scrollable ancestor, not just the "preferred" one.
-        // On mobile the page-level scroller can change between #ai-coach and the document.
-        const seed = document.querySelector('#ai-coach .ai-msg-list')
-            || document.querySelector('.advice-chat-list')
-            || document.querySelector('#ai-coach .advice-bubble');
-        const hosts = seed ? this._adviceScrollableAncestors(seed) : [this._adviceScrollHost()];
-        const page = document.getElementById('ai-coach');
-        if (page && !hosts.includes(page)) hosts.unshift(page);
-        for (const host of hosts) this._adviceScrollHostTo(host, 0);
-    },
-
-    scrollAdviceToBottom() {
-        const seed = document.querySelector('#ai-coach .ai-msg-list')
-            || document.querySelector('.advice-chat-list')
-            || document.querySelector('#ai-coach .advice-bubble');
-        const hosts = seed ? this._adviceScrollableAncestors(seed) : [this._adviceScrollHost()];
-        const page = document.getElementById('ai-coach');
-        if (page && !hosts.includes(page)) hosts.unshift(page);
-        for (const host of hosts) this._adviceScrollHostTo(host, host.scrollHeight);
+    _adviceAnchorOffsetIn(scroller, anchor) {
+        if (!scroller || !anchor) return 0;
+        if (scroller === document.scrollingElement || scroller === document.documentElement || scroller === document.body) {
+            return anchor.getBoundingClientRect().top + (window.scrollY || 0);
+        }
+        const scrollerRect = scroller.getBoundingClientRect();
+        return anchor.getBoundingClientRect().top - scrollerRect.top + (scroller.scrollTop || 0);
     },
 
     _adviceBubbleAnchors() {
-        const userBubbles = Array.from(document.querySelectorAll('#ai-coach .advice-bubble.user'));
+        // Skip anchors that are inside collapsed date groups or hidden
+        // (display:none -> rect 全 0). They polluted the offsets array and
+        // caused the prev/next loop to break on a phantom 0 before reaching
+        // the real visible bubbles.
+        const isVisible = (el) => {
+            if (el.closest && el.closest('.advice-date-group.collapsed')) return false;
+            const r = el.getBoundingClientRect();
+            return !!(r.width || r.height);
+        };
+        const userBubbles = Array.from(document.querySelectorAll('#ai-coach .advice-bubble.user')).filter(isVisible);
         if (userBubbles.length) return userBubbles;
-        return Array.from(document.querySelectorAll('#ai-coach .advice-bubble'));
+        return Array.from(document.querySelectorAll('#ai-coach .advice-bubble')).filter(isVisible);
     },
 
-    _adviceJumpToAnchor(anchor) {
-        if (!anchor) return;
-        // Use scrollIntoView first — the browser figures out which scroller owns the element,
-        // which is more reliable than guessing on mobile.
-        try {
-            anchor.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        } catch (e) {
-            anchor.scrollIntoView();
-        }
-        // Some iOS WebViews silently ignore smooth scroll on nested overflow containers.
-        // After a frame, if the anchor is still well outside the viewport, fall back to
-        // a manual scrollTop assignment on the actual scrolling host.
-        requestAnimationFrame(() => {
-            const rect = anchor.getBoundingClientRect();
-            if (rect.top >= 0 && rect.top < window.innerHeight - 60) return; // already on screen near top
-            const host = this._adviceScrollHost();
-            if (!host) return;
-            const hostTopY = this._adviceHostViewportTop(host);
-            const hostScrollTop = this._adviceHostScrollTop(host);
-            const newTop = hostScrollTop + (rect.top - hostTopY);
-            this._adviceScrollHostTo(host, newTop, 'auto');
-        });
+    scrollAdviceToTop() {
+        const scroller = this._adviceScrollContainer();
+        const before = this._adviceCurrentScrollY(scroller);
+        this._adviceSetScrollY(scroller, 0, true);
+        setTimeout(() => {
+            this._adviceDebugLog('top', {
+                scrollerTag: scroller?.id || scroller?.tagName,
+                scrollerScrollTop: scroller?.scrollTop,
+                windowScrollY: window.scrollY,
+                documentScrollTop: document.documentElement.scrollTop,
+                currentY: before,
+                targetOffset: 0,
+                afterScrollerScrollTop: scroller?.scrollTop,
+                afterWindowScrollY: window.scrollY,
+            });
+        }, 200);
+    },
+
+    scrollAdviceToBottom() {
+        const scroller = this._adviceScrollContainer();
+        const max = this._adviceMaxScrollY(scroller);
+        this._adviceSetScrollY(scroller, max, true);
+        setTimeout(() => {
+            this._adviceDebugLog('bottom', {
+                scrollerTag: scroller?.id || scroller?.tagName,
+                scrollerScrollTop: scroller?.scrollTop,
+                windowScrollY: window.scrollY,
+                currentY: this._adviceCurrentScrollY(scroller),
+                targetOffset: max,
+                afterScrollerScrollTop: scroller?.scrollTop,
+                afterWindowScrollY: window.scrollY,
+            });
+        }, 200);
     },
 
     scrollAdviceToPrevBubble() {
         const anchors = this._adviceBubbleAnchors();
-        if (!anchors.length) return this.scrollAdviceToTop();
-        // Pick the latest anchor whose top is at least 8px ABOVE the viewport top.
-        // That guarantees we move at least one full round up on every press.
-        let target = null;
-        for (const el of anchors) {
-            const top = el.getBoundingClientRect().top;
-            if (top < -8) target = el;
-            else break;
+        const scroller = this._adviceScrollContainer();
+        const currentY = this._adviceCurrentScrollY(scroller);
+        const offsets = anchors.map(el => Math.round(this._adviceAnchorOffsetIn(scroller, el)));
+        const rectTops = anchors.map(el => Math.round(el.getBoundingClientRect().top));
+        if (!anchors.length) {
+            this._adviceDebugLog('prev:no-anchors', {
+                scrollerTag: scroller?.id || scroller?.tagName,
+                scrollerScrollTop: scroller?.scrollTop,
+                windowScrollY: window.scrollY,
+                currentY, offsets, rectTops, targetOffset: null,
+            });
+            return this.scrollAdviceToTop();
         }
-        if (!target) {
-            this.scrollAdviceToTop();
+        let targetOffset = null;
+        for (const offset of offsets) {
+            if (offset < currentY - 24 && (targetOffset == null || offset > targetOffset)) {
+                targetOffset = offset;
+            }
+        }
+        this._adviceDebugLog('prev', {
+            scrollerTag: scroller?.id || scroller?.tagName,
+            scrollerScrollTop: scroller?.scrollTop,
+            windowScrollY: window.scrollY,
+            documentScrollTop: document.documentElement.scrollTop,
+            bodyScrollTop: document.body.scrollTop,
+            innerHeight: window.innerHeight,
+            currentY, offsets, rectTops, targetOffset,
+        });
+        if (targetOffset == null) {
+            this._adviceSetScrollY(scroller, 0, true);
             return;
         }
-        this._adviceJumpToAnchor(target);
+        this._adviceSetScrollY(scroller, targetOffset, true);
+        // Verify after settle
+        setTimeout(() => {
+            this._adviceDebugLog('prev:after', {
+                scrollerTag: scroller?.id || scroller?.tagName,
+                scrollerScrollTop: scroller?.scrollTop,
+                windowScrollY: window.scrollY,
+                currentY: this._adviceCurrentScrollY(scroller),
+                targetOffset,
+            });
+        }, 500);
     },
 
     scrollAdviceToNextBubble() {
         const anchors = this._adviceBubbleAnchors();
-        if (!anchors.length) return this.scrollAdviceToBottom();
-        // Find the first anchor whose top is at least 8px BELOW the viewport top.
-        for (const el of anchors) {
-            const top = el.getBoundingClientRect().top;
-            if (top > 8) {
-                this._adviceJumpToAnchor(el);
-                return;
+        const scroller = this._adviceScrollContainer();
+        const currentY = this._adviceCurrentScrollY(scroller);
+        const offsets = anchors.map(el => Math.round(this._adviceAnchorOffsetIn(scroller, el)));
+        const rectTops = anchors.map(el => Math.round(el.getBoundingClientRect().top));
+        if (!anchors.length) {
+            this._adviceDebugLog('next:no-anchors', {
+                scrollerTag: scroller?.id || scroller?.tagName,
+                scrollerScrollTop: scroller?.scrollTop,
+                windowScrollY: window.scrollY,
+                currentY, offsets, rectTops, targetOffset: null,
+            });
+            return this.scrollAdviceToBottom();
+        }
+        let targetOffset = null;
+        for (const offset of offsets) {
+            if (offset > currentY + 24 && (targetOffset == null || offset < targetOffset)) {
+                targetOffset = offset;
             }
         }
-        this.scrollAdviceToBottom();
+        this._adviceDebugLog('next', {
+            scrollerTag: scroller?.id || scroller?.tagName,
+            scrollerScrollTop: scroller?.scrollTop,
+            windowScrollY: window.scrollY,
+            documentScrollTop: document.documentElement.scrollTop,
+            bodyScrollTop: document.body.scrollTop,
+            innerHeight: window.innerHeight,
+            currentY, offsets, rectTops, targetOffset,
+        });
+        if (targetOffset == null) {
+            this._adviceSetScrollY(scroller, this._adviceMaxScrollY(scroller), true);
+            return;
+        }
+        this._adviceSetScrollY(scroller, targetOffset, true);
+        setTimeout(() => {
+            this._adviceDebugLog('next:after', {
+                scrollerTag: scroller?.id || scroller?.tagName,
+                scrollerScrollTop: scroller?.scrollTop,
+                windowScrollY: window.scrollY,
+                currentY: this._adviceCurrentScrollY(scroller),
+                targetOffset,
+            });
+        }, 500);
     },
 
     captureAdviceDraft() {
@@ -1802,5 +1966,8 @@ const advicePanel = {
 
 if (typeof window !== 'undefined') {
     window.advicePanel = advicePanel;
-    if (window.data) advicePanel.attach(window.data);
+    if (window.data) {
+        advicePanel.attach(window.data);
+        advicePanel.initDebugTools.call(window.data);
+    }
 }

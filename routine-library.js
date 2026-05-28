@@ -608,6 +608,11 @@
                     <div class="copy"><strong>方案 / 动作库</strong><small>自定义动作与计划</small></div>
                     <span class="material-symbols-rounded arrow">chevron_right</span>
                 </div>
+                <div class="setting-row" onclick="data.toggleDebugTools?.()" role="button" tabindex="0">
+                    <span class="material-symbols-rounded ico">bug_report</span>
+                    <div class="copy"><strong>调试工具</strong><small>${this._debugToolsEnabled ? '已启用 · 点击关闭' : '点击启用'}</small></div>
+                    <span class="material-symbols-rounded arrow">chevron_right</span>
+                </div>
             </div>`;
         },
 
