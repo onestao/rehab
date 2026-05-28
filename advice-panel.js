@@ -363,17 +363,11 @@ const advicePanel = {
     _adviceDebugLog(label, payload) {
         if (!this._debugToolsEnabled) return;
         try {
-            const entry = { t: Date.now(), label, ...payload };
-            const key = 'adviceScrollDebug';
-            const list = JSON.parse(sessionStorage.getItem(key) || '[]');
-            list.push(entry);
-            while (list.length > 30) list.shift();
-            sessionStorage.setItem(key, JSON.stringify(list));
             const summary = `${label} | sc=${payload.scrollerTag} cy=${payload.currentY} wy=${payload.windowScrollY} st=${payload.scrollerScrollTop} t=${payload.targetOffset}`;
             document.title = summary.slice(0, 80);
-            console.log('[adviceScroll]', entry);
+            window.errorBus?.log?.('advice:scroll', summary, { ...payload, label });
         } catch (e) {
-            console.warn('[adviceScroll] log failed', e);
+            // ignore — debug helper must never break the app
         }
     },
 
@@ -381,40 +375,66 @@ const advicePanel = {
         try {
             const existing = document.getElementById('adviceDebugOverlay');
             if (existing) { existing.remove(); return; }
-            const raw = sessionStorage.getItem('adviceScrollDebug') || '[]';
-            let parsed;
-            try { parsed = JSON.parse(raw); } catch { parsed = raw; }
-            const formatted = Array.isArray(parsed)
-                ? parsed.map((e, i) => '#' + i + ' ' + JSON.stringify(e)).join('\n\n')
-                : String(parsed);
+            const errors = window.errorBus?.list?.() || [];
+            const debugEntries = window.errorBus?.listDebug?.() || [];
+            const merged = [
+                ...errors.map(e => ({
+                    t: Date.parse(e.at) || 0,
+                    level: 'error',
+                    scope: e.scope,
+                    line: `[${e.scope}] ${e.message}` + (e.meta ? ' meta=' + JSON.stringify(e.meta) : ''),
+                    stack: e.stack
+                })),
+                ...debugEntries.map(d => ({
+                    t: d.t,
+                    level: d.level,
+                    scope: d.scope,
+                    line: `[${d.scope}] ${(d.args || []).join(' ')}` + (d.extra ? ' meta=' + (typeof d.extra === 'string' ? d.extra : JSON.stringify(d.extra)) : '')
+                }))
+            ].sort((a, b) => a.t - b.t);
+
             const wrap = document.createElement('div');
             wrap.id = 'adviceDebugOverlay';
-            wrap.style.cssText = 'position:fixed;left:0;right:0;bottom:0;top:30%;background:#000;color:#0f0;font:11px/1.4 ui-monospace,monospace;padding:10px;z-index:9999;overflow:auto;white-space:pre-wrap;word-break:break-all;';
-            const close = document.createElement('button');
-            close.textContent = '关闭';
-            close.style.cssText = 'position:sticky;top:0;float:right;background:#fff;color:#000;border:0;padding:4px 10px;border-radius:4px;font-size:12px;';
-            close.onclick = () => wrap.remove();
-            const clear = document.createElement('button');
-            clear.textContent = '清空';
-            clear.style.cssText = 'position:sticky;top:0;float:right;margin-right:6px;background:#f80;color:#fff;border:0;padding:4px 10px;border-radius:4px;font-size:12px;';
-            clear.onclick = () => { sessionStorage.removeItem('adviceScrollDebug'); wrap.remove(); };
-            const copy = document.createElement('button');
-            copy.textContent = '复制';
-            copy.style.cssText = 'position:sticky;top:0;float:right;margin-right:6px;background:#08f;color:#fff;border:0;padding:4px 10px;border-radius:4px;font-size:12px;';
-            copy.onclick = () => {
+            wrap.style.cssText = 'position:fixed;left:0;right:0;bottom:0;top:25%;background:#000;color:#0f0;font:11px/1.4 ui-monospace,monospace;padding:10px;z-index:9999;overflow:auto;white-space:pre-wrap;word-break:break-all;';
+
+            const toolbar = document.createElement('div');
+            toolbar.style.cssText = 'position:sticky;top:-10px;margin:-10px -10px 8px;padding:8px 10px;background:#111;border-bottom:1px solid #333;display:flex;flex-wrap:wrap;gap:6px;align-items:center;';
+
+            const mkBtn = (label, color, fn) => {
+                const b = document.createElement('button');
+                b.textContent = label;
+                b.style.cssText = `background:${color};color:${color === '#fff' ? '#000' : '#fff'};border:0;padding:4px 10px;border-radius:4px;font-size:12px;cursor:pointer;`;
+                b.onclick = fn;
+                return b;
+            };
+
+            const status = document.createElement('span');
+            status.style.cssText = 'flex:1;color:#0f0;font-size:11px;';
+            status.textContent = `共 ${merged.length} 条`;
+
+            const formatted = merged.length
+                ? merged.map((e, i) => '#' + i + ' ' + new Date(e.t).toLocaleTimeString() + ' [' + e.level + '] ' + e.line + (e.stack ? '\n  ' + e.stack.split('\n').slice(0, 3).join('\n  ') : '')).join('\n\n')
+                : '(empty)';
+
+            toolbar.appendChild(status);
+            toolbar.appendChild(mkBtn('复制', '#08f', () => {
                 const ta = document.createElement('textarea');
                 ta.value = formatted;
                 document.body.appendChild(ta);
                 ta.select();
                 try { document.execCommand('copy'); } catch {}
                 ta.remove();
-                copy.textContent = '已复制';
-            };
-            wrap.appendChild(close);
-            wrap.appendChild(clear);
-            wrap.appendChild(copy);
+                status.textContent = '已复制 (' + merged.length + ' 条)';
+            }));
+            toolbar.appendChild(mkBtn('清空', '#f80', () => {
+                window.errorBus?.clear?.();
+                wrap.remove();
+            }));
+            toolbar.appendChild(mkBtn('关闭', '#fff', () => wrap.remove()));
+
+            wrap.appendChild(toolbar);
             const pre = document.createElement('div');
-            pre.textContent = formatted || '(empty)';
+            pre.textContent = formatted;
             wrap.appendChild(pre);
             document.body.appendChild(wrap);
         } catch (e) {
@@ -427,15 +447,16 @@ const advicePanel = {
             this._debugToolsEnabled = !this._debugToolsEnabled;
             if (this._debugToolsEnabled) {
                 localStorage.setItem('rehab_debug_tools', '1');
+                window.errorBus?.enableDebug?.();
                 this._mountDebugFab?.();
             } else {
                 localStorage.removeItem('rehab_debug_tools');
-                sessionStorage.removeItem('adviceScrollDebug');
+                window.errorBus?.disableDebug?.();
                 document.getElementById('adviceDebugOverlay')?.remove();
                 document.getElementById('adviceDebugFab')?.remove();
             }
             if (typeof toast?.show === 'function') {
-                toast.show('调试工具' + (this._debugToolsEnabled ? '已启用' : '已关闭'));
+                toast.show('调试工具' + (this._debugToolsEnabled ? '已启用，将记录全局错误、控制台、网络与导航事件' : '已关闭'));
             }
             this.rerenderAdvicePanel?.();
             this.renderProfilePage?.();
@@ -450,7 +471,10 @@ const advicePanel = {
         } catch {
             this._debugToolsEnabled = false;
         }
-        if (this._debugToolsEnabled) this._mountDebugFab?.();
+        if (this._debugToolsEnabled) {
+            window.errorBus?.enableDebug?.();
+            this._mountDebugFab?.();
+        }
     },
 
     _mountDebugFab() {
@@ -459,6 +483,7 @@ const advicePanel = {
         fab.id = 'adviceDebugFab';
         fab.type = 'button';
         fab.textContent = 'LOG';
+        fab.title = '查看调试日志（点击查看 / 长按拖动）';
         fab.style.cssText = 'position:fixed;right:6px;bottom:120px;width:42px;height:42px;border-radius:50%;border:0;background:#000;color:#0f0;font:700 11px/1 ui-monospace,monospace;letter-spacing:0.5px;box-shadow:0 4px 14px rgba(0,0,0,0.35);z-index:9998;cursor:pointer;';
         fab.onclick = () => this.showAdviceDebugOverlay?.();
         document.body.appendChild(fab);

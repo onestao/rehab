@@ -610,7 +610,7 @@
                 </div>
                 <div class="setting-row" onclick="data.toggleDebugTools?.()" role="button" tabindex="0">
                     <span class="material-symbols-rounded ico">bug_report</span>
-                    <div class="copy"><strong>调试工具</strong><small>${this._debugToolsEnabled ? '已启用 · 点击关闭' : '点击启用'}</small></div>
+                    <div class="copy"><strong>调试工具</strong><small>${this._debugToolsEnabled ? '已启用 · 全局错误 / console / 网络 / 导航' : '点击启用全局诊断'}</small></div>
                     <span class="material-symbols-rounded arrow">chevron_right</span>
                 </div>
             </div>`;
