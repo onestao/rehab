@@ -1,0 +1,308 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>AI 表格渲染 — 真实案例对比</title>
+<style>
+  :root {
+    --md-sys-primary: #0061a4;
+    --md-sys-on-primary: #ffffff;
+    --md-sys-primary-container: #d1e4ff;
+    --md-sys-on-primary-container: #001d36;
+    --md-sys-secondary: #535f70;
+    --md-sys-secondary-container: #d7e3f8;
+    --md-sys-on-secondary-container: #101c2b;
+    --md-sys-tertiary: #6b5778;
+    --md-sys-tertiary-container: #f2daff;
+    --md-sys-on-tertiary-container: #251431;
+    --md-sys-amber: #f59e0b;
+    --md-sys-amber-container: #fef3c7;
+    --md-sys-on-amber-container: #4b2e02;
+    --md-sys-surface-container-lowest: #ffffff;
+    --md-sys-surface-container-low: #f4f3fa;
+    --md-sys-surface-container: #eeedf4;
+    --md-sys-surface-container-high: #e8e7ef;
+    --md-sys-on-surface: #1a1c1e;
+    --md-sys-on-surface-variant: #43474e;
+    --md-sys-outline: #73777f;
+    --md-sys-outline-variant: #c3c7cf;
+    --md-sys-success: #1f6f43;
+    --md-sys-error: #ba1a1a;
+    --glass-bg: color-mix(in srgb, var(--md-sys-surface-container-lowest) 58%, transparent);
+    --glass-bg-strong: color-mix(in srgb, var(--md-sys-surface-container-lowest) 72%, transparent);
+    --glass-border: color-mix(in srgb, var(--md-sys-surface-container-lowest) 64%, transparent);
+    --glass-shadow-out: 0 2px 10px color-mix(in srgb, var(--md-sys-on-surface) 6%, transparent);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--md-sys-surface-container-low); color: var(--md-sys-on-surface);
+    font: 13px/1.5 -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; padding: 24px;
+  }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  .sub { color: var(--md-sys-on-surface-variant); margin-bottom: 24px; font-size: 12px; }
+  .stage { display: flex; gap: 20px; flex-wrap: wrap; justify-content: start; }
+  .col { flex: 0 0 auto; }
+  .col h2 { font-size: 13px; font-weight: 600; margin: 0 0 8px; color: var(--md-sys-on-surface-variant); letter-spacing: .5px; }
+  .col h2 .tag { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 10px; margin-left: 6px; vertical-align: middle; }
+  .tag.bad { background: #fde7e7; color: #b91c1c; }
+  .tag.ok { background: #dff5e7; color: #0a7d50; }
+  .phone {
+    width: 340px; background: var(--md-sys-surface-container-low); border-radius: 24px;
+    box-shadow: var(--glass-shadow-out); border: 1px solid var(--md-sys-outline-variant);
+    overflow: hidden;
+  }
+  .phone-header {
+    padding: 10px 14px 6px; background: var(--md-sys-surface-container-lowest);
+    border-bottom: 1px solid var(--md-sys-outline-variant); display: flex; align-items: center; gap: 8px;
+  }
+  .phone-header .ic { width: 26px; height: 26px; border-radius: 7px; background: var(--md-sys-primary-container); color: var(--md-sys-on-primary-container); display: grid; place-items: center; font-size: 14px; }
+  .phone-header .t { font-weight: 600; font-size: 13px; flex: 1; }
+  .phone-body { padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+
+  .bubble {
+    background: var(--glass-bg-strong); border: 1px solid var(--glass-border);
+    border-radius: 16px; padding: 12px 14px; font-size: 12px; line-height: 1.6; color: var(--md-sys-on-surface);
+  }
+  .bubble p { margin: 0 0 8px; }
+  .bubble p:last-child { margin: 0; }
+  .bubble strong { font-weight: 600; }
+  .bubble h3 { font-size: 14px; font-weight: 600; margin: 0 0 8px; color: var(--md-sys-on-surface); }
+
+  /* A: horizontal scroll */
+  .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 8px 0; border-radius: 10px; border: 1px solid var(--md-sys-outline-variant); }
+  .advice-table { width: 100%; border-collapse: collapse; font-size: 11px; min-width: 480px; }
+  .advice-table th { background: var(--md-sys-surface-container); color: var(--md-sys-on-surface-variant); font-weight: 600; text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--md-sys-outline-variant); white-space: nowrap; }
+  .advice-table td { padding: 5px 8px; border-bottom: 1px solid color-mix(in srgb, var(--md-sys-outline-variant) 50%, transparent); color: var(--md-sys-on-surface); vertical-align: top; }
+  .advice-table tr:last-child td { border-bottom: none; }
+  .table-hint { font-size: 10px; color: var(--md-sys-on-surface-variant); text-align: center; padding: 3px 0; }
+
+  /* B: winner comparison cards */
+  .cmp-cards { display: flex; flex-direction: column; gap: 8px; margin: 8px 0; }
+  .cmp-card {
+    background: var(--md-sys-surface-container-lowest); border: 1px solid var(--md-sys-outline-variant);
+    border-radius: 14px; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px;
+  }
+  .cmp-header { display: flex; align-items: center; gap: 8px; }
+  .cmp-vs { font-size: 12.5px; font-weight: 600; color: var(--md-sys-on-surface); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cmp-verdict {
+    font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 999px; flex-shrink: 0;
+    background: var(--md-sys-primary-container); color: var(--md-sys-on-primary-container);
+  }
+  .cmp-verdict.win { background: color-mix(in srgb, var(--md-sys-success) 15%, transparent); color: var(--md-sys-success); }
+  .cmp-verdict.lose { background: color-mix(in srgb, var(--md-sys-error) 12%, transparent); color: var(--md-sys-error); }
+  .cmp-body { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 10px; }
+  .cmp-cell { padding: 2px 0; }
+  .cmp-cell .cmp-label { font-size: 10px; color: var(--md-sys-on-surface-variant); }
+  .cmp-cell .cmp-val { font-size: 11.5px; font-weight: 500; color: var(--md-sys-on-surface); display: flex; align-items: center; gap: 4px; }
+  .cmp-cell .cmp-val .win-icon { color: var(--md-sys-success); font-size: 12px; }
+  .cmp-cell .cmp-val .lose-icon { color: var(--md-sys-error); font-size: 12px; }
+  .cmp-score { display: flex; gap: 4px; margin-top: 2px; }
+  .cmp-score .bar { flex: 1; height: 4px; border-radius: 999px; background: var(--md-sys-surface-container-high); overflow: hidden; }
+  .cmp-score .bar .fill { height: 100%; border-radius: 999px; }
+  .cmp-score .bar .fill.w { background: var(--md-sys-success); }
+  .cmp-score .bar .fill.l { background: color-mix(in srgb, var(--md-sys-error) 40%, transparent); }
+
+  /* C: winner summary card */
+  .summary-card {
+    background: linear-gradient(135deg, color-mix(in srgb, var(--md-sys-success) 8%, transparent), var(--md-sys-surface-container-lowest));
+    border: 1px solid color-mix(in srgb, var(--md-sys-success) 25%, transparent);
+    border-radius: 14px; padding: 10px 12px; margin: 8px 0;
+  }
+  .summary-card .sc-title { font-size: 12.5px; font-weight: 600; color: var(--md-sys-on-surface); margin-bottom: 6px; display: flex; align-items: center; gap: 6px; }
+  .summary-card .sc-badge { font-size: 10px; padding: 2px 7px; border-radius: 999px; background: color-mix(in srgb, var(--md-sys-success) 15%, transparent); color: var(--md-sys-success); font-weight: 600; }
+  .summary-card .sc-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 6px; }
+  .summary-card .sc-m { text-align: center; background: var(--glass-bg-strong); border: 1px solid var(--glass-border); border-radius: 10px; padding: 4px 6px; }
+  .summary-card .sc-m .sc-ml { font-size: 9.5px; color: var(--md-sys-on-surface-variant); }
+  .summary-card .sc-m .sc-mv { font-size: 12px; font-weight: 600; color: var(--md-sys-on-surface); }
+  .summary-card .sc-note { font-size: 11px; color: var(--md-sys-on-surface-variant); line-height: 1.5; }
+
+  .arrow { font-size: 18px; color: var(--md-sys-on-surface-variant); display: grid; place-items: center; align-self: center; }
+
+  .notes { max-width: 380px; margin-top: 10px; background: var(--md-sys-surface-container-lowest); border: 1px solid var(--md-sys-outline-variant); border-radius: 12px; padding: 10px 12px; font-size: 11.5px; color: var(--md-sys-on-surface-variant); }
+  .notes b { color: var(--md-sys-on-surface); }
+  .notes ul { margin: 4px 0 0; padding-left: 16px; }
+  .notes li { margin: 2px 0; }
+</style>
+</head>
+<body>
+
+<h1>AI 表格渲染 — 真实案例:汉堡对比</h1>
+<div class="sub">AI 输出 4 列 × 5 行对比表格 · 三种窄屏渲染方案</div>
+
+<div class="stage">
+
+  <!-- =================== A: Horizontal scroll =================== -->
+  <div class="col">
+    <h2>A · 横向滚动 <span class="tag bad">当前</span></h2>
+    <div class="phone">
+      <div class="phone-header"><div class="ic">🧠</div><div class="t">AI 教练</div></div>
+      <div class="phone-body">
+        <div class="bubble">
+          <h3>2. 深度对比分析</h3>
+          <div class="table-wrap">
+            <table class="advice-table">
+              <thead>
+                <tr><th>维度</th><th>板烧鸡腿堡</th><th>双层鳕鱼堡</th><th>优劣判断</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>烹饪方式</td><td>煎/烤（非油炸）</td><td>油炸（挂粉吸油）</td><td>板烧胜</td></tr>
+                <tr><td>预估热量</td><td>约 400 kcal</td><td>约 480-500 kcal</td><td>板烧胜</td></tr>
+                <tr><td>蛋白质</td><td>约 23-25g</td><td>约 20-22g</td><td>板烧胜</td></tr>
+                <tr><td>脂肪含量</td><td>约 15-18g</td><td>约 25-28g</td><td>板烧胜</td></tr>
+                <tr><td>饱腹感</td><td>较强（肉质扎实）</td><td>一般（面粉感较重）</td><td>板烧胜</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="table-hint">← 左右滑动查看更多 →</div>
+        </div>
+      </div>
+    </div>
+    <div class="notes">
+      <b>问题</b>
+      <ul>
+        <li>手机上只能看到 2 列，优劣判断被截断</li>
+        <li>用户需要反复横滑才能读完一行</li>
+        <li>对比结论被隐藏，丧失了表格的核心价值</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="arrow">→</div>
+
+  <!-- =================== B: Dimension cards =================== -->
+  <div class="col">
+    <h2>B · 维度卡片 <span class="tag ok">方案一</span></h2>
+    <div class="phone">
+      <div class="phone-header"><div class="ic">🧠</div><div class="t">AI 教练</div></div>
+      <div class="phone-body">
+        <div class="bubble">
+          <h3>2. 深度对比分析</h3>
+          <div class="cmp-cards">
+            <div class="cmp-card">
+              <div class="cmp-header">
+                <span class="cmp-vs">烹饪方式</span>
+                <span class="cmp-verdict win">板烧胜</span>
+              </div>
+              <div class="cmp-body">
+                <div class="cmp-cell"><div class="cmp-label">板烧鸡腿堡</div><div class="cmp-val"><span class="win-icon">✓</span> 煎/烤（非油炸）</div></div>
+                <div class="cmp-cell"><div class="cmp-label">双层鳕鱼堡</div><div class="cmp-val"><span class="lose-icon">✗</span> 油炸（挂粉吸油）</div></div>
+              </div>
+            </div>
+            <div class="cmp-card">
+              <div class="cmp-header">
+                <span class="cmp-vs">预估热量</span>
+                <span class="cmp-verdict win">板烧胜</span>
+              </div>
+              <div class="cmp-body">
+                <div class="cmp-cell"><div class="cmp-label">板烧鸡腿堡</div><div class="cmp-val"><span class="win-icon">✓</span> 约 400 kcal</div></div>
+                <div class="cmp-cell"><div class="cmp-label">双层鳕鱼堡</div><div class="cmp-val"><span class="lose-icon">✗</span> 约 480-500 kcal</div></div>
+              </div>
+            </div>
+            <div class="cmp-card">
+              <div class="cmp-header">
+                <span class="cmp-vs">蛋白质</span>
+                <span class="cmp-verdict win">板烧胜</span>
+              </div>
+              <div class="cmp-body">
+                <div class="cmp-cell"><div class="cmp-label">板烧鸡腿堡</div><div class="cmp-val"><span class="win-icon">✓</span> 约 23-25g</div></div>
+                <div class="cmp-cell"><div class="cmp-label">双层鳕鱼堡</div><div class="cmp-val"><span class="lose-icon">✗</span> 约 20-22g</div></div>
+              </div>
+            </div>
+            <div class="cmp-card">
+              <div class="cmp-header">
+                <span class="cmp-vs">脂肪含量</span>
+                <span class="cmp-verdict win">板烧胜</span>
+              </div>
+              <div class="cmp-body">
+                <div class="cmp-cell"><div class="cmp-label">板烧鸡腿堡</div><div class="cmp-val"><span class="win-icon">✓</span> 约 15-18g</div></div>
+                <div class="cmp-cell"><div class="cmp-label">双层鳕鱼堡</div><div class="cmp-val"><span class="lose-icon">✗</span> 约 25-28g</div></div>
+              </div>
+            </div>
+            <div class="cmp-card">
+              <div class="cmp-header">
+                <span class="cmp-vs">饱腹感</span>
+                <span class="cmp-verdict win">板烧胜</span>
+              </div>
+              <div class="cmp-body">
+                <div class="cmp-cell"><div class="cmp-label">板烧鸡腿堡</div><div class="cmp-val"><span class="win-icon">✓</span> 较强（肉质扎实）</div></div>
+                <div class="cmp-cell"><div class="cmp-label">双层鳕鱼堡</div><div class="cmp-val"><span class="lose-icon">✗</span> 一般（面粉感较重）</div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="notes">
+      <b>优点</b>:无需横滑;结论前置;每行自包含。
+      <b>问题</b>:5 张卡片太长，核心结论被稀释。
+    </div>
+  </div>
+
+  <div class="arrow">→</div>
+
+  <!-- =================== C: Winner summary =================== -->
+  <div class="col">
+    <h2>C · 结论卡片 + 摘要 <span class="tag ok">推荐</span></h2>
+    <div class="phone">
+      <div class="phone-header"><div class="ic">🧠</div><div class="t">AI 教练</div></div>
+      <div class="phone-body">
+        <div class="bubble">
+          <h3>2. 深度对比分析</h3>
+          <div class="summary-card">
+            <div class="sc-title">🍗 板烧鸡腿堡 更优 <span class="sc-badge">5 : 0 完胜</span></div>
+            <div class="sc-grid">
+              <div class="sc-m"><div class="sc-ml">热量</div><div class="sc-mv">400 kcal</div></div>
+              <div class="sc-m"><div class="sc-ml">蛋白</div><div class="sc-mv">23-25g</div></div>
+              <div class="sc-m"><div class="sc-ml">脂肪</div><div class="sc-mv">15-18g</div></div>
+            </div>
+            <div class="sc-note">煎烤工艺，非油炸；蛋白更高，脂肪更低；饱腹感更强。</div>
+          </div>
+          <div class="cmp-cards" style="margin-top:8px">
+            <div class="cmp-card">
+              <div class="cmp-header">
+                <span class="cmp-vs">双层鳕鱼堡 对比</span>
+                <span class="cmp-verdict lose">0 : 5 劣</span>
+              </div>
+              <div class="cmp-body">
+                <div class="cmp-cell"><div class="cmp-label">热量</div><div class="cmp-val">480-500 kcal</div></div>
+                <div class="cmp-cell"><div class="cmp-label">蛋白</div><div class="cmp-val">20-22g</div></div>
+                <div class="cmp-cell"><div class="cmp-label">脂肪</div><div class="cmp-val">25-28g</div></div>
+                <div class="cmp-cell"><div class="cmp-label">烹饪</div><div class="cmp-val">油炸</div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="notes">
+      <b>优点</b>
+      <ul>
+        <li>结论前置:赢家卡片 + 核心指标一眼可见</li>
+        <li>败方只用一张卡片收尾，不重复铺开</li>
+        <li>「5:0 完胜」badge 量化结论</li>
+        <li>比方案 B 短近一半</li>
+      </ul>
+    </div>
+  </div>
+
+</div>
+
+<div class="notes" style="max-width:1100px;margin-top:24px;">
+  <b>推荐 C 方案的理由</b>
+  <ul>
+    <li><b>结论先行</b>:手机用户首先看到「板烧鸡腿堡更优 + 核心三指标」，不需要滑到表格底部才能知道答案。</li>
+    <li><b>量化胜负</b>:「5:0 完胜」badge 比逐行「板烧胜」更直观。</li>
+    <li><b>败方折叠</b>:只有 1 张败方卡片，不重复 5 行结构。</li>
+    <li><b>和 insight card 一致</b>:summary-card 的视觉语言与 AI 教练的 insight 卡片同源（badge + 指标条 + 说明文字）。</li>
+  </ul>
+  <b>自动判断规则（补充）</b>
+  <ul>
+    <li>如果表格最后一列全是「X胜/胜/优/推荐」等胜负判断词 → 按「对比表格」处理，走 C 方案。</li>
+    <li>如果表格没有胜负列 → 按普通数据表格，走 B 方案（维度卡片）。</li>
+    <li>如果只有 2 列 → 走描述列表。</li>
+  </ul>
+</div>
+
+</body>
+</html>

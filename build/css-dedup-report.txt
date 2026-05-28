@@ -50,10 +50,7 @@
   37-dark-mode.css, 46-advice-ai.css
 
 .ai-hero
-  50-v6-ui.css, 54-v6-ai.css, 41-m3e-effects.css
-
-.ai-hero p
-  50-v6-ui.css, 54-v6-ai.css
+  50-v6-ui.css, 41-m3e-effects.css
 
 .ai-input
   50-v6-ui.css, 54-v6-ai.css
@@ -557,13 +554,13 @@
   09-workout-timer.css, 37-dark-mode.css
 
 0%
-  16-history-hero-calendar.css, 50-v6-ui.css, 58-skeleton.css, 41-m3e-effects.css
+  16-history-hero-calendar.css, 50-v6-ui.css, 54-v6-ai.css, 58-skeleton.css, 41-m3e-effects.css
 
 100%
-  16-history-hero-calendar.css, 50-v6-ui.css, 58-skeleton.css, 41-m3e-effects.css
+  16-history-hero-calendar.css, 50-v6-ui.css, 54-v6-ai.css, 58-skeleton.css, 41-m3e-effects.css
 
 50%
-  16-history-hero-calendar.css, 50-v6-ui.css
+  16-history-hero-calendar.css, 50-v6-ui.css, 54-v6-ai.css
 
 body
   02-base.css, 06-layout-page.css, 37-dark-mode.css

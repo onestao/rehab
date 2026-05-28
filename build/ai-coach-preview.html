@@ -1,0 +1,675 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>AI 教练优化预览 v6</title>
+<style>
+  :root {
+    --md-sys-primary: #0061a4;
+    --md-sys-on-primary: #ffffff;
+    --md-sys-primary-container: #d1e4ff;
+    --md-sys-on-primary-container: #001d36;
+    --md-sys-secondary: #535f70;
+    --md-sys-secondary-container: #d7e3f8;
+    --md-sys-on-secondary-container: #101c2b;
+    --md-sys-tertiary: #6b5778;
+    --md-sys-tertiary-container: #f2daff;
+    --md-sys-on-tertiary-container: #251431;
+    --md-sys-amber: #f59e0b;
+    --md-sys-amber-container: #fef3c7;
+    --md-sys-on-amber-container: #4b2e02;
+    --md-sys-surface: #fdfcff;
+    --md-sys-surface-container-lowest: #ffffff;
+    --md-sys-surface-container-low: #f4f3fa;
+    --md-sys-surface-container: #eeedf4;
+    --md-sys-surface-container-high: #e8e7ef;
+    --md-sys-surface-container-highest: #e2e2e9;
+    --md-sys-on-surface: #1a1c1e;
+    --md-sys-on-surface-variant: #43474e;
+    --md-sys-outline: #73777f;
+    --md-sys-outline-variant: #c3c7cf;
+    --md-sys-error: #ba1a1a;
+    --md-sys-success: #1f6f43;
+    --glass-bg: color-mix(in srgb, var(--md-sys-surface-container-lowest) 58%, transparent);
+    --glass-bg-strong: color-mix(in srgb, var(--md-sys-surface-container-lowest) 72%, transparent);
+    --glass-border: color-mix(in srgb, var(--md-sys-surface-container-lowest) 64%, transparent);
+    --glass-shadow-out: 0 2px 10px color-mix(in srgb, var(--md-sys-on-surface) 6%, transparent);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--md-sys-surface-container-low);
+    color: var(--md-sys-on-surface);
+    font: 14px/1.5 -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+    padding: 24px;
+  }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .sub { color: var(--md-sys-on-surface-variant); margin-bottom: 24px; font-size: 13px; }
+  .stage { display: grid; grid-template-columns: repeat(3, 360px); gap: 24px; justify-content: start; }
+  .col h2 { font-size: 14px; font-weight: 600; margin: 0 0 8px; color: var(--md-sys-on-surface-variant); letter-spacing: .5px; }
+  .col h2 .tag { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; margin-left: 6px; vertical-align: middle; background: var(--md-sys-primary-container); color: var(--md-sys-on-primary-container); }
+  .tag.ok { background: var(--md-sys-secondary-container); color: var(--md-sys-on-secondary-container); }
+  .tag.warn { background: var(--md-sys-amber-container); color: var(--md-sys-on-amber-container); }
+  .tag.interactive { background: var(--md-sys-tertiary-container); color: var(--md-sys-on-tertiary-container); }
+
+  .phone {
+    width: 360px; height: 760px;
+    background: var(--md-sys-surface-container-low);
+    border-radius: 28px;
+    box-shadow: var(--glass-shadow-out);
+    overflow: hidden;
+    border: 1px solid var(--md-sys-outline-variant);
+    display: flex; flex-direction: column;
+  }
+  .topbar {
+    padding: 14px 16px 8px;
+    background: var(--md-sys-surface-container-lowest);
+    border-bottom: 1px solid var(--md-sys-outline-variant);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .topbar .icon { width: 28px; height: 28px; border-radius: 8px; background: var(--md-sys-primary-container); color: var(--md-sys-on-primary-container); display: grid; place-items: center; font-size: 16px; }
+  .topbar .title { font-weight: 600; font-size: 15px; flex: 1; }
+  .chip { font-size: 11px; padding: 4px 10px; border-radius: 999px; background: var(--md-sys-surface-container); border: 1px solid var(--md-sys-outline-variant); color: var(--md-sys-on-surface-variant); }
+  .body { flex: 1; overflow: hidden; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+  .filterbar { display: flex; gap: 6px; overflow-x: auto; padding: 4px 0; }
+  .pill { font-size: 11px; padding: 5px 11px; border-radius: 999px; background: var(--md-sys-surface-container-lowest); border: 1px solid var(--md-sys-outline-variant); color: var(--md-sys-on-surface-variant); white-space: nowrap; }
+  .pill.active { background: var(--md-sys-primary); color: var(--md-sys-on-primary); border-color: var(--md-sys-primary); }
+  .quick { background: var(--md-sys-surface-container-lowest); border: 1px solid var(--md-sys-outline-variant); border-radius: 18px; padding: 10px; }
+  .quick .qhead { font-size: 12px; color: var(--md-sys-on-surface-variant); margin-bottom: 6px; }
+  .quick-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .quick-grid button { font-size: 11.5px; padding: 8px 10px; border-radius: 12px; border: 1px solid var(--md-sys-outline-variant); background: var(--glass-bg); color: var(--md-sys-on-surface); text-align: left; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .composer { margin-top: auto; background: var(--md-sys-surface-container); border: 1px solid var(--md-sys-outline-variant); border-radius: 999px; padding: 6px 6px 6px 14px; display: flex; align-items: center; gap: 8px; }
+  .composer input { flex: 1; border: 0; outline: 0; font-size: 13px; background: transparent; color: var(--md-sys-on-surface); }
+  .composer .send { width: 32px; height: 32px; border-radius: 50%; background: var(--md-sys-primary); color: var(--md-sys-on-primary); border: 0; display: grid; place-items: center; font-size: 14px; }
+
+  /* ==========================
+     Insight Card — Collapsible
+     ========================== */
+  .insight {
+    background: linear-gradient(135deg,
+      var(--md-sys-amber-container),
+      color-mix(in srgb, var(--md-sys-primary-container) 60%, #fff));
+    border-radius: 24px;
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--glass-shadow-out);
+    overflow: hidden;
+  }
+
+  /* — Header (always visible, clickable area) — */
+  .insight-header {
+    display: flex; align-items: center; gap: 10px;
+    padding: 12px 14px;
+    cursor: pointer;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  .insight-header:active { opacity: .85; }
+  .ai-avatar {
+    width: 38px; height: 38px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--md-sys-primary), var(--md-sys-tertiary));
+    color: var(--md-sys-on-primary);
+    display: grid; place-items: center;
+    font-size: 17px;
+    flex-shrink: 0;
+    box-shadow: 0 4px 12px color-mix(in srgb, var(--md-sys-primary) 30%, transparent);
+  }
+  .ih-text { flex: 1; min-width: 0; }
+  .ih-kicker {
+    font-size: 10px;
+    color: var(--md-sys-on-surface-variant);
+    font-weight: 600;
+    letter-spacing: .5px;
+    text-transform: uppercase;
+    margin-bottom: 2px;
+    display: flex; align-items: center; gap: 5px;
+  }
+  .ih-kicker .st {
+    font-size: 9.5px; padding: 1px 6px; border-radius: 999px;
+    background: var(--md-sys-secondary-container);
+    color: var(--md-sys-on-secondary-container);
+    font-weight: 600; letter-spacing: 0; text-transform: none;
+  }
+  .ih-kicker .st.offline { background: var(--md-sys-surface-container-high); color: var(--md-sys-on-surface-variant); }
+  .ih-title {
+    font-size: 13.5px; font-weight: 600;
+    color: var(--md-sys-on-surface);
+    margin: 0; line-height: 1.3;
+  }
+  .ih-sub {
+    font-size: 11px;
+    color: var(--md-sys-on-surface-variant);
+    margin: 1px 0 0; line-height: 1.35;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .ih-badges { display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
+  .ih-badge {
+    font-size: 10px; font-weight: 600;
+    padding: 2px 7px; border-radius: 999px;
+    font-variant-numeric: tabular-nums;
+  }
+  .ih-badge.train { background: var(--md-sys-tertiary-container); color: var(--md-sys-on-tertiary-container); }
+  .ih-badge.alert { background: var(--md-sys-amber-container); color: var(--md-sys-on-amber-container); }
+  .ih-chevron {
+    width: 26px; height: 26px;
+    border-radius: 50%;
+    background: var(--glass-bg-strong);
+    border: 1px solid var(--glass-border);
+    display: grid; place-items: center;
+    flex-shrink: 0;
+    transition: transform 0.3s ease;
+    color: var(--md-sys-on-surface-variant);
+    font-size: 12px;
+    pointer-events: none; /* click is on .insight-header */
+  }
+  .insight.expanded .ih-chevron { transform: rotate(180deg); }
+
+  /* — Baseline (always visible: metric strip + compact progress) — */
+  .insight-baseline {
+    padding: 0 14px 12px;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+
+  /* metric strip */
+  .metric-strip { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; }
+  .metric-strip .m {
+    background: var(--glass-bg-strong);
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    padding: 5px 6px; text-align: center;
+  }
+  .metric-strip .m .lbl { font-size: 9.5px; color: var(--md-sys-on-surface-variant); margin-bottom: 1px; }
+  .metric-strip .m .val { font-size: 12.5px; font-weight: 600; color: var(--md-sys-on-surface); font-variant-numeric: tabular-nums; }
+  .metric-strip .m .val.up { color: var(--md-sys-success); }
+  .metric-strip .m .val.warn { color: var(--md-sys-amber); }
+  .metric-strip .m .val .unit { font-size: 10px; font-weight: 500; color: var(--md-sys-on-surface-variant); margin-left: 1px; }
+
+  /* shared plan progress compact */
+  .plan-progress-shared {
+    background: var(--glass-bg-strong);
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    padding: 6px 10px;
+  }
+  .pps-row { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--md-sys-on-surface-variant); }
+  .pps-row .pps-name { color: var(--md-sys-on-surface); font-weight: 600; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pps-row .pps-meta { font-variant-numeric: tabular-nums; flex-shrink: 0; }
+  .pps-mode { font-size: 8.5px; padding: 1px 5px; border-radius: 5px; background: var(--md-sys-surface-container-high); color: var(--md-sys-on-surface-variant); font-weight: 600; text-transform: uppercase; }
+  .pps-bar { margin-top: 4px; height: 3px; border-radius: 999px; background: var(--md-sys-surface-container-high); overflow: hidden; display: flex; }
+  .pps-bar .seg { flex: 1; margin-right: 2px; background: var(--md-sys-outline-variant); border-radius: 999px; }
+  .pps-bar .seg:last-child { margin-right: 0; }
+  .pps-bar .seg.done { background: var(--md-sys-primary); }
+  .pps-bar .seg.active { background: linear-gradient(90deg, var(--md-sys-primary), var(--md-sys-tertiary)); }
+
+  /* — Expandable body — */
+  .insight-body {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.4s ease, opacity 0.25s ease;
+    opacity: 0;
+  }
+  .insight.expanded .insight-body {
+    max-height: 500px;
+    opacity: 1;
+  }
+  .insight-body-inner {
+    padding: 0 14px 14px;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+
+  .divider { height: 1px; background: color-mix(in srgb, var(--md-sys-outline) 18%, transparent); }
+
+  /* training analysis */
+  .analysis-block { background: var(--glass-bg-strong); border: 1px solid var(--glass-border); border-radius: 14px; padding: 8px 10px; }
+  .analysis-block .ph { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+  .analysis-block .ph .pl { font-size: 10px; color: var(--md-sys-tertiary); font-weight: 700; letter-spacing: .5px; text-transform: uppercase; }
+  .analysis-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .ana-cell { display: flex; flex-direction: column; gap: 1px; }
+  .ana-lbl { font-size: 9.5px; color: var(--md-sys-on-surface-variant); }
+  .ana-val { font-size: 12.5px; font-weight: 600; color: var(--md-sys-on-surface); font-variant-numeric: tabular-nums; display: flex; align-items: center; gap: 3px; }
+  .ana-val .delta { font-size: 9.5px; font-weight: 600; padding: 1px 4px; border-radius: 3px; }
+  .ana-val .delta.up { background: color-mix(in srgb, var(--md-sys-success) 18%, transparent); color: var(--md-sys-success); }
+  .ana-val .delta.flat { background: var(--md-sys-surface-container-high); color: var(--md-sys-on-surface-variant); }
+  .ana-hint { font-size: 9.5px; color: var(--md-sys-on-surface-variant); }
+  .recovery-row { display: flex; align-items: center; gap: 8px; margin-top: 6px; padding-top: 6px; border-top: 1px dashed color-mix(in srgb, var(--md-sys-outline) 20%, transparent); }
+  .recovery-row .rl { font-size: 9.5px; color: var(--md-sys-on-surface-variant); flex-shrink: 0; }
+  .recovery-bar { flex: 1; height: 5px; border-radius: 999px; background: var(--md-sys-surface-container-high); overflow: hidden; position: relative; }
+  .recovery-bar .rb { position: absolute; inset: 0; width: 72%; background: linear-gradient(90deg, var(--md-sys-amber), var(--md-sys-primary)); border-radius: 999px; }
+  .recovery-row .rv { font-size: 10.5px; font-weight: 600; color: var(--md-sys-on-surface); font-variant-numeric: tabular-nums; flex-shrink: 0; }
+
+  /* LLM block */
+  .llm-block { font-size: 12px; color: var(--md-sys-on-surface); line-height: 1.55; background: var(--glass-bg-strong); border: 1px solid var(--glass-border); border-radius: 14px; padding: 8px 10px; }
+  .llm-block .llm-label { font-size: 10px; color: var(--md-sys-primary); font-weight: 700; letter-spacing: .5px; margin-bottom: 3px; display: flex; align-items: center; gap: 4px; text-transform: uppercase; }
+  .llm-block .dot { width: 5px; height: 5px; border-radius: 50%; background: var(--md-sys-primary); animation: pulse 1.4s infinite; }
+  @keyframes pulse { 0%,100% { opacity: .35; } 50% { opacity: 1; } }
+  .llm-block ul { margin: 3px 0 0; padding-left: 16px; }
+  .llm-block li { margin: 1px 0; }
+  .llm-block.skeleton .line { height: 8px; border-radius: 4px; background: linear-gradient(90deg, var(--md-sys-surface-container), var(--md-sys-surface-container-low), var(--md-sys-surface-container)); background-size: 200% 100%; animation: shimmer 1.4s linear infinite; margin: 4px 0; }
+  .llm-block.skeleton .line.short { width: 55%; }
+  @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+  .insight-actions { display: flex; gap: 5px; flex-wrap: wrap; }
+  .insight-actions .a { font-size: 10.5px; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--md-sys-outline-variant); background: var(--md-sys-surface-container-lowest); color: var(--md-sys-on-surface); cursor: pointer; }
+  .insight-actions .a.primary { background: var(--md-sys-primary); color: var(--md-sys-on-primary); border-color: var(--md-sys-primary); }
+  .insight-actions .a.tertiary { background: var(--md-sys-tertiary-container); color: var(--md-sys-on-tertiary-container); border-color: transparent; }
+
+  .offline-note { font-size: 10.5px; color: var(--md-sys-on-amber-container); background: var(--md-sys-amber-container); border-radius: 10px; padding: 5px 8px; display: flex; align-items: center; gap: 5px; }
+
+  .anno { margin-top: 10px; font-size: 12px; color: var(--md-sys-on-surface-variant); background: var(--md-sys-surface-container-lowest); border: 1px solid var(--md-sys-outline-variant); border-radius: 12px; padding: 10px 12px; }
+  .anno b { color: var(--md-sys-on-surface); }
+  .anno .row { display: flex; justify-content: space-between; padding: 2px 0; }
+
+  .click-hint { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 8px; font-size: 12px; color: var(--md-sys-tertiary); font-weight: 600; }
+  .click-hint .chev { display: inline-block; font-size: 14px; }
+
+  .compare { max-width: 1144px; margin-top: 24px; background: var(--md-sys-surface-container-lowest); border: 1px solid var(--md-sys-outline-variant); border-radius: 14px; padding: 16px 18px; }
+  .compare h3 { margin: 0 0 8px; font-size: 14px; }
+  .compare table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  .compare th, .compare td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--md-sys-outline-variant); }
+  .compare th { color: var(--md-sys-on-surface-variant); font-weight: 600; background: var(--md-sys-surface-container-low); }
+  .compare td .y { color: var(--md-sys-success); font-weight: 600; }
+  .compare td .n { color: var(--md-sys-on-surface-variant); }
+  .compare td .star { color: var(--md-sys-tertiary); font-weight: 600; }
+
+  .flow { max-width: 1144px; margin-top: 16px; background: var(--md-sys-surface-container-lowest); border: 1px solid var(--md-sys-outline-variant); border-radius: 14px; padding: 16px 18px; }
+  .flow h3 { margin: 0 0 8px; font-size: 14px; }
+  .flow pre { background: #0f172a; color: #e2e8f0; padding: 12px 14px; border-radius: 10px; font-size: 12px; line-height: 1.6; overflow-x: auto; margin: 8px 0 0; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+</style>
+</head>
+<body>
+
+<h1>AI 教练 — Hybrid Insight v6 · 折叠可收起</h1>
+<div class="sub">折叠态保留指标条 + 进度行 · 点击展开分析/LLM · 点击 header 收回 · 按钮不触发折叠</div>
+
+<div class="click-hint">
+  <span class="chev">▼</span>
+  <span id="demoLabel">点击 insight 卡片头部展开 / 收起</span>
+</div>
+
+<div class="stage">
+
+  <!-- =================== STATE 1: LLM streaming =================== -->
+  <div class="col">
+    <h2>状态 1 · LLM 流式中 <span class="tag interactive">可交互</span></h2>
+    <div class="phone">
+      <div class="topbar">
+        <div class="icon">🧠</div>
+        <div class="title">AI 教练</div>
+        <div class="chip">用量</div>
+        <div class="chip">↻</div>
+      </div>
+      <div class="body">
+
+        <div class="insight" id="s1">
+          <!-- Header: always visible, click toggles -->
+          <div class="insight-header" onclick="toggleInsight(this)">
+            <div class="ai-avatar">🤖</div>
+            <div class="ih-text">
+              <div class="ih-kicker">今日洞察 <span class="st">规则 · 已命中</span></div>
+              <div class="ih-title">蛋白缺口 + 推举接近 PR</div>
+              <div class="ih-sub">蛋白 0.9 g/kg(目标 1.6) · 卧推距 PR 2.5kg</div>
+            </div>
+            <div class="ih-badges">
+              <span class="ih-badge train">2/5</span>
+              <span class="ih-badge alert">↓38g</span>
+            </div>
+            <div class="ih-chevron">▼</div>
+          </div>
+
+          <!-- Baseline: always visible (compact) -->
+          <div class="insight-baseline">
+            <div class="metric-strip">
+              <div class="m"><div class="lbl">本周训练量</div><div class="val up">+12%</div></div>
+              <div class="m"><div class="lbl">背肌间隔</div><div class="val">4<span class="unit">天</span></div></div>
+              <div class="m"><div class="lbl">7天热量</div><div class="val warn">−820</div></div>
+            </div>
+            <div class="plan-progress-shared">
+              <div class="pps-row">
+                <span class="pps-mode">紧凑</span>
+                <span class="pps-name">推背日 · 坐姿划船 4×10 →</span>
+                <span class="pps-meta">2 / 5</span>
+              </div>
+              <div class="pps-bar">
+                <div class="seg done"></div>
+                <div class="seg done"></div>
+                <div class="seg active"></div>
+                <div class="seg"></div>
+                <div class="seg"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Expandable: analysis + LLM + actions -->
+          <div class="insight-body">
+            <div class="insight-body-inner">
+              <div class="divider"></div>
+
+              <div class="analysis-block">
+                <div class="ph"><div class="pl">📊 训练分析</div></div>
+                <div class="analysis-grid">
+                  <div class="ana-cell"><div class="ana-lbl">本周推举负荷</div><div class="ana-val">12,840 <span class="delta up">↑12%</span></div><div class="ana-hint">vs 上周 11,460 kg·rep</div></div>
+                  <div class="ana-cell"><div class="ana-lbl">距 PR 距离</div><div class="ana-val">2.5 <span class="delta up">本月新近</span></div><div class="ana-hint">卧推 PR 62.5kg</div></div>
+                  <div class="ana-cell"><div class="ana-lbl">连续训练</div><div class="ana-val">3 <span class="delta flat">天</span></div><div class="ana-hint">建议明日轻量</div></div>
+                  <div class="ana-cell"><div class="ana-lbl">部位均衡</div><div class="ana-val">推:拉</div><div class="ana-hint">1.4:1 (略偏推)</div></div>
+                </div>
+                <div class="recovery-row">
+                  <span class="rl">恢复指数</span>
+                  <div class="recovery-bar"><div class="rb"></div></div>
+                  <span class="rv">72%</span>
+                </div>
+              </div>
+
+              <div class="llm-block skeleton">
+                <div class="llm-label"><span class="dot"></span> AI 正在生成具体建议…</div>
+                <div class="line"></div>
+                <div class="line"></div>
+                <div class="line short"></div>
+              </div>
+
+              <div class="insight-actions">
+                <button class="a tertiary">继续训练</button>
+                <button class="a primary">让 AI 排晚餐</button>
+                <button class="a">查看趋势</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="filterbar">
+          <span class="pill active">今日</span><span class="pill">7天</span><span class="pill">30天</span>
+        </div>
+        <div class="quick">
+          <div class="qhead">快速建议</div>
+          <div class="quick-grid">
+            <button>分析减重停滞原因</button><button>晚餐建议</button>
+            <button>本周训练负荷</button><button>蛋白质够不够？</button>
+          </div>
+        </div>
+        <div class="composer">
+          <input placeholder="问 AI 关于训练 / 饮食..." /><button class="send">↑</button>
+        </div>
+      </div>
+    </div>
+    <div class="anno">
+      <div class="row"><span>折叠态高度</span><span>≈ 160px (header + 指标 + 进度)</span></div>
+      <div class="row"><span>展开后高度</span><span>≈ 440px (+分析 + LLM + 按钮)</span></div>
+      <div class="row"><span>展开/收起</span><span>点击 header 切换</span></div>
+    </div>
+  </div>
+
+  <!-- =================== STATE 2: LLM complete =================== -->
+  <div class="col">
+    <h2>状态 2 · LLM 完成 <span class="tag ok">完整</span></h2>
+    <div class="phone">
+      <div class="topbar">
+        <div class="icon">🧠</div>
+        <div class="title">AI 教练</div>
+        <div class="chip">用量</div><div class="chip">↻</div>
+      </div>
+      <div class="body">
+
+        <div class="insight" id="s2">
+          <div class="insight-header" onclick="toggleInsight(this.parentElement)">
+            <div class="ai-avatar">🤖</div>
+            <div class="ih-text">
+              <div class="ih-kicker">今日洞察 <span class="st">规则 + AI</span></div>
+              <div class="ih-title">本周冲 PR 窗口期</div>
+              <div class="ih-sub">负荷 ↑12% · 距 PR 2.5kg · 蛋白略缺</div>
+            </div>
+            <div class="ih-badges">
+              <span class="ih-badge train">2/5</span>
+              <span class="ih-badge alert">PR✓</span>
+            </div>
+            <div class="ih-chevron">▼</div>
+          </div>
+
+          <div class="insight-baseline">
+            <div class="metric-strip">
+              <div class="m"><div class="lbl">本周训练量</div><div class="val up">+12%</div></div>
+              <div class="m"><div class="lbl">背肌间隔</div><div class="val">4<span class="unit">天</span></div></div>
+              <div class="m"><div class="lbl">7天热量</div><div class="val warn">−820</div></div>
+            </div>
+            <div class="plan-progress-shared">
+              <div class="pps-row">
+                <span class="pps-mode">紧凑</span>
+                <span class="pps-name">推背日 · 坐姿划船 4×10 →</span>
+                <span class="pps-meta">2 / 5</span>
+              </div>
+              <div class="pps-bar">
+                <div class="seg done"></div><div class="seg done"></div>
+                <div class="seg active"></div><div class="seg"></div><div class="seg"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="insight-body">
+            <div class="insight-body-inner">
+              <div class="divider"></div>
+              <div class="analysis-block">
+                <div class="ph"><div class="pl">📊 训练分析</div></div>
+                <div class="analysis-grid">
+                  <div class="ana-cell"><div class="ana-lbl">本周推举负荷</div><div class="ana-val">12,840 <span class="delta up">↑12%</span></div><div class="ana-hint">vs 上周 11,460 kg·rep</div></div>
+                  <div class="ana-cell"><div class="ana-lbl">距 PR 距离</div><div class="ana-val">2.5 <span class="delta up">★窗口</span></div><div class="ana-hint">卧推 PR 62.5kg</div></div>
+                  <div class="ana-cell"><div class="ana-lbl">连续训练</div><div class="ana-val">3 <span class="delta flat">天</span></div><div class="ana-hint">建议明日轻量</div></div>
+                  <div class="ana-cell"><div class="ana-lbl">部位均衡</div><div class="ana-val">推:拉</div><div class="ana-hint">1.4:1 略偏推</div></div>
+                </div>
+                <div class="recovery-row">
+                  <span class="rl">恢复指数</span>
+                  <div class="recovery-bar"><div class="rb"></div></div>
+                  <span class="rv">72%</span>
+                </div>
+              </div>
+
+              <div class="llm-block">
+                <div class="llm-label">✦ AI 跨域建议</div>
+                综合「冲 PR 窗口 + 蛋白缺口 + 恢复 72%」:
+                <ul>
+                  <li><b>下周一</b>:卧推 +2.5kg 试 PR</li>
+                  <li><b>今晚</b>:鸡胸 150g + 酸奶,补 ≈40g 蛋白</li>
+                  <li><b>明日</b>:改腿+核心,推举给 48h 恢复</li>
+                </ul>
+              </div>
+
+              <div class="insight-actions">
+                <button class="a tertiary">继续训练</button>
+                <button class="a primary">应用进阶 +2.5kg</button>
+                <button class="a">加入晚餐</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="filterbar">
+          <span class="pill active">今日</span><span class="pill">7天</span><span class="pill">30天</span>
+        </div>
+        <div class="quick">
+          <div class="qhead">快速建议</div>
+          <div class="quick-grid">
+            <button>分析减重停滞原因</button><button>晚餐建议</button>
+            <button>本周训练负荷</button><button>蛋白质够不够？</button>
+          </div>
+        </div>
+        <div class="composer">
+          <input placeholder="问 AI 关于训练 / 饮食..." /><button class="send">↑</button>
+        </div>
+      </div>
+    </div>
+    <div class="anno">
+      <div class="row"><span>折叠 badge</span><span>PR✓ 动态变化</span></div>
+      <div class="row"><span>展开后</span><span>LLM 跨域建议已就绪</span></div>
+      <div class="row"><span>收起</span><span>再次点击 header</span></div>
+    </div>
+  </div>
+
+  <!-- =================== STATE 3: offline =================== -->
+  <div class="col">
+    <h2>状态 3 · LLM 不可用 <span class="tag warn">降级</span></h2>
+    <div class="phone">
+      <div class="topbar">
+        <div class="icon">🧠</div>
+        <div class="title">AI 教练</div>
+        <div class="chip">⚠ 离线</div><div class="chip">↻</div>
+      </div>
+      <div class="body">
+
+        <div class="insight" id="s3">
+          <div class="insight-header" onclick="toggleInsight(this.parentElement)">
+            <div class="ai-avatar">🤖</div>
+            <div class="ih-text">
+              <div class="ih-kicker">今日洞察 <span class="st offline">规则 · 离线</span></div>
+              <div class="ih-title">蛋白缺口 + 接近 PR</div>
+              <div class="ih-sub">蛋白 0.9 g/kg · 卧推距 PR 2.5kg</div>
+            </div>
+            <div class="ih-badges">
+              <span class="ih-badge train">2/5</span>
+              <span class="ih-badge alert">↓38g</span>
+            </div>
+            <div class="ih-chevron">▼</div>
+          </div>
+
+          <div class="insight-baseline">
+            <div class="metric-strip">
+              <div class="m"><div class="lbl">本周训练量</div><div class="val up">+12%</div></div>
+              <div class="m"><div class="lbl">背肌间隔</div><div class="val">4<span class="unit">天</span></div></div>
+              <div class="m"><div class="lbl">7天热量</div><div class="val warn">−820</div></div>
+            </div>
+            <div class="plan-progress-shared">
+              <div class="pps-row">
+                <span class="pps-mode">紧凑</span>
+                <span class="pps-name">推背日 · 坐姿划船 4×10 →</span>
+                <span class="pps-meta">2 / 5</span>
+              </div>
+              <div class="pps-bar">
+                <div class="seg done"></div><div class="seg done"></div>
+                <div class="seg active"></div><div class="seg"></div><div class="seg"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="insight-body">
+            <div class="insight-body-inner">
+              <div class="divider"></div>
+              <div class="analysis-block">
+                <div class="ph"><div class="pl">📊 训练分析</div></div>
+                <div class="analysis-grid">
+                  <div class="ana-cell"><div class="ana-lbl">本周推举负荷</div><div class="ana-val">12,840 <span class="delta up">↑12%</span></div><div class="ana-hint">vs 上周</div></div>
+                  <div class="ana-cell"><div class="ana-lbl">距 PR 距离</div><div class="ana-val">2.5 <span class="delta up">★</span></div><div class="ana-hint">卧推</div></div>
+                  <div class="ana-cell"><div class="ana-lbl">连续训练</div><div class="ana-val">3 <span class="delta flat">天</span></div><div class="ana-hint">注意疲劳</div></div>
+                  <div class="ana-cell"><div class="ana-lbl">部位均衡</div><div class="ana-val">推:拉</div><div class="ana-hint">1.4:1</div></div>
+                </div>
+                <div class="recovery-row">
+                  <span class="rl">恢复指数</span>
+                  <div class="recovery-bar"><div class="rb"></div></div>
+                  <span class="rv">72%</span>
+                </div>
+              </div>
+
+              <div class="offline-note">⚠ 暂时无法连接 AI 服务,已切换到本地建议库。</div>
+
+              <div class="llm-block">
+                <div class="llm-label" style="color: var(--md-sys-secondary);">📋 本地建议</div>
+                <ul>
+                  <li>蛋白:今日还需 ≈40g(鸡胸 150g 或蛋白粉 1 勺)</li>
+                  <li>训练:连续 3 天,建议明日轻量</li>
+                  <li>PR:连续 2 周达标可试 +2.5kg</li>
+                </ul>
+              </div>
+
+              <div class="insight-actions">
+                <button class="a tertiary">继续训练</button>
+                <button class="a primary">加入晚餐</button>
+                <button class="a">重试 AI</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="filterbar">
+          <span class="pill active">今日</span><span class="pill">7天</span><span class="pill">30天</span>
+        </div>
+        <div class="quick">
+          <div class="qhead">快速建议(离线)</div>
+          <div class="quick-grid">
+            <button>分析减重停滞原因</button><button>晚餐建议</button>
+            <button>本周训练负荷</button><button>蛋白质够不够？</button>
+          </div>
+        </div>
+        <div class="composer">
+          <input placeholder="（离线模式）" /><button class="send" style="background:var(--md-sys-outline-variant)">↑</button>
+        </div>
+      </div>
+    </div>
+    <div class="anno">
+      <div class="row"><span>折叠 badge</span><span>训练 2/5 + ↓38g</span></div>
+      <div class="row"><span>展开后</span><span>analysis + 本地模板</span></div>
+      <div class="row"><span>收起</span><span>点击 header</span></div>
+    </div>
+  </div>
+
+</div>
+
+<div class="compare">
+  <h3>两层可见性 — 对比</h3>
+  <table>
+    <thead>
+      <tr><th>元素</th><th>折叠 (默认)</th><th>展开 (点击)</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>标题 + 副标题 + source-tag</td><td><span class="y">✓</span></td><td><span class="y">✓</span></td></tr>
+      <tr><td>compact badges (进度/缺口)</td><td><span class="y">✓</span></td><td><span class="y">✓</span></td></tr>
+      <tr><td>三联指标条</td><td><span class="y">✓ 始终可见</span></td><td><span class="y">✓</span></td></tr>
+      <tr><td>共享进度组件 (compact)</td><td><span class="y">✓ 始终可见</span></td><td><span class="y">✓</span></td></tr>
+      <tr><td>训练分析块 (4 维 + 恢复)</td><td><span class="n">隐藏</span></td><td><span class="star">✓ 展开区</span></td></tr>
+      <tr><td>LLM / 本地建议</td><td><span class="n">隐藏</span></td><td><span class="star">✓ 展开区</span></td></tr>
+      <tr><td>CTA 按钮</td><td><span class="n">隐藏</span></td><td><span class="star">✓ 展开区</span></td></tr>
+      <tr><td>卡片高度</td><td><span class="star">≈ 160px</span></td><td><span class="star">≈ 440px</span></td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="flow">
+  <h3>折叠交互 — 实现伪代码</h3>
+  <pre>renderHeroInsight(ctx) {
+  // 始终渲染
+  renderHeader(ctx);         // 标题 + badge + chevron
+  renderBaseline(ctx);       // 指标条 + 共享进度组件 compact
+
+  // 点击 header 切换展开/收起
+  header.onclick = () => {
+    if (expanded) {
+      collapse();            // max-height → 0, opacity → 0
+    } else {
+      expand();
+      if (!bodyRendered) {   // 首次展开时才渲染
+        renderAnalysis(ctx);
+        renderLLMSkeleton();
+        streamAdvice(ctx).then(swap).catch(fallback);
+        bodyRendered = true;
+      }
+    }
+  };
+  // CTA 按钮阻止冒泡,不触发折叠
+  actions.onclick = (e) => e.stopPropagation();
+}
+
+// baseline 不依赖 LLM,立刻可见
+renderBaseline({ plan, metrics }) {
+  renderMetricStrip(metrics);            // 3 个 glass tile
+  renderSharedPlanProgress(plan,'compact'); // 1 行 + 微进度条
+}</pre>
+</div>
+
+</body>
+</html>
+<script>
+function toggleInsight(el) {
+  el.classList.toggle('expanded');
+  var label = document.getElementById('demoLabel');
+  if (el.classList.contains('expanded')) {
+    label.textContent = '已展开 — 点击 header 收起';
+  } else {
+    label.textContent = '已收起 — 点击 header 展开';
+  }
+}
+</script>

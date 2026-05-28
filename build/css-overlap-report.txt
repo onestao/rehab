@@ -1,7 +1,7 @@
 # css overlap report
 # real-conflict threshold: 220
 
-## REAL CONFLICTS (same selector + same property, different value): 213
+## REAL CONFLICTS (same selector + same property, different value): 212
 :root
   files: 01-vars.css, 37-dark-mode.css, 49-plan.css, 41-m3e-effects.css
     --md-sys-primary: #0061a4 | #a0cafd (01-vars.css / 37-dark-mode.css)
@@ -268,22 +268,23 @@ mark.ai-hit
     margin-top: 12px | 8px (16-history-hero-calendar.css / 36-responsive.css)
 
 0%
-  files: 16-history-hero-calendar.css, 50-v6-ui.css, 58-skeleton.css, 41-m3e-effects.css
+  files: 16-history-hero-calendar.css, 50-v6-ui.css, 54-v6-ai.css, 58-skeleton.css, 41-m3e-effects.css
     transform: scale(1) | translate(0, 0) scale(1) | scale(1) rotate(-3deg) | scaleX(0.35) (16-history-hero-calendar.css / 50-v6-ui.css / 50-v6-ui.css / 50-v6-ui.css / 50-v6-ui.css / 41-m3e-effects.css)
     box-shadow: inset 0 1px 0 rgba(255,255,255,0.72), inset 0 -1px 2px rgba(0,29,54,0.06), 0 10px 28px color-mix(in srgb, var(--md-sys-primary) 16%, transparent) | 0 6px 18px color-mix(in srgb, var(--md-sys-primary) 35%, transparent) | 0 0 0 4px color-mix(in srgb, var(--md-sys-primary) 18%, transparent) (50-v6-ui.css / 50-v6-ui.css / 50-v6-ui.css / 50-v6-ui.css)
-    opacity: 0.55 | 0.3 (50-v6-ui.css / 50-v6-ui.css)
+    opacity: 0.55 | 0.3 | .35 (50-v6-ui.css / 50-v6-ui.css / 54-v6-ai.css)
 
 100%
-  files: 16-history-hero-calendar.css, 50-v6-ui.css, 58-skeleton.css, 41-m3e-effects.css
+  files: 16-history-hero-calendar.css, 50-v6-ui.css, 54-v6-ai.css, 58-skeleton.css, 41-m3e-effects.css
     transform: scale(1) | translate(0, 0) scale(1) | scale(1) rotate(-3deg) | scaleX(0.35) (16-history-hero-calendar.css / 50-v6-ui.css / 50-v6-ui.css / 50-v6-ui.css / 50-v6-ui.css / 41-m3e-effects.css)
     box-shadow: inset 0 1px 0 rgba(255,255,255,0.72), inset 0 -1px 2px rgba(0,29,54,0.06), 0 10px 28px color-mix(in srgb, var(--md-sys-primary) 16%, transparent) | 0 6px 18px color-mix(in srgb, var(--md-sys-primary) 35%, transparent) | 0 0 0 4px color-mix(in srgb, var(--md-sys-primary) 18%, transparent) (50-v6-ui.css / 50-v6-ui.css / 50-v6-ui.css / 50-v6-ui.css)
-    opacity: 0.55 | 0.3 (50-v6-ui.css / 50-v6-ui.css)
+    opacity: 0.55 | 0.3 | .35 (50-v6-ui.css / 50-v6-ui.css / 54-v6-ai.css)
 
 50%
-  files: 16-history-hero-calendar.css, 50-v6-ui.css
+  files: 16-history-hero-calendar.css, 50-v6-ui.css, 54-v6-ai.css
     transform: scale(1.03) | translate(8px, -12px) scale(1.08) | scale(1.15) rotate(3deg) | scaleX(0.85) | scale(1.05) (16-history-hero-calendar.css / 50-v6-ui.css / 50-v6-ui.css / 50-v6-ui.css / 50-v6-ui.css)
     filter: saturate(1.15) drop-shadow(0 6px 18px var(--md-sys-primary-container)) | saturate(1.12) drop-shadow(0 6px 16px color-mix(in srgb, var(--md-sys-primary) 18%, transparent)) (16-history-hero-calendar.css / 50-v6-ui.css)
     box-shadow: inset 0 1px 0 rgba(255,255,255,0.86), inset 0 -1px 2px rgba(0,29,54,0.05), 0 14px 34px color-mix(in srgb, var(--md-sys-primary) 24%, transparent) | 0 8px 28px color-mix(in srgb, var(--md-sys-primary) 55%, transparent) | 0 0 0 9px color-mix(in srgb, var(--md-sys-primary) 6%, transparent) | 0 8px 24px color-mix(in srgb, var(--md-sys-primary) 55%, transparent) (50-v6-ui.css / 50-v6-ui.css / 50-v6-ui.css / 50-v6-ui.css)
+    opacity: 0.95 | 1 (50-v6-ui.css / 54-v6-ai.css)
 
 .record-tabs
   files: 17-record-tabs-health.css, 53-v6-records.css, 41-m3e-effects.css
@@ -1056,13 +1057,6 @@ mark.ai-hit
         border-color .35s ease,
         box-shadow .6s var(--md-sys-motion-emphasized) (51-v6-today.css / 41-m3e-effects.css)
 
-.ai-hero
-  files: 50-v6-ui.css, 54-v6-ai.css, 41-m3e-effects.css
-    transition: background 0.6s var(--md-sys-motion-emphasized) | background .6s var(--md-sys-motion-emphasized),
-        color .35s ease,
-        border-color .35s ease,
-        box-shadow .6s var(--md-sys-motion-emphasized) (54-v6-ai.css / 41-m3e-effects.css)
-
 .profile-hero
   files: 50-v6-ui.css, 55-v6-profile.css, 41-m3e-effects.css
     padding: 18px | 16px 12px (55-v6-profile.css / 55-v6-profile.css)
@@ -1450,6 +1444,9 @@ body.is-paused .fab-play
 .glass-card
   files: 50-v6-ui.css, 41-m3e-effects.css
 
+.ai-hero
+  files: 50-v6-ui.css, 41-m3e-effects.css
+
 .stat-tile
   files: 50-v6-ui.css, 53-v6-records.css, 41-m3e-effects.css
 
@@ -1481,9 +1478,6 @@ body.is-paused .fab-play
   files: 50-v6-ui.css, 54-v6-ai.css
 
 .ai-msg
-  files: 50-v6-ui.css, 54-v6-ai.css
-
-.ai-hero p
   files: 50-v6-ui.css, 54-v6-ai.css
 
 .setting-row .copy strong

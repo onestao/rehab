@@ -109,6 +109,7 @@ const advicePanel = {
             openAdviceRoutineSave: this.openAdviceRoutineSave,
             saveAdviceRoutine: this.saveAdviceRoutine,
             renderAdvicePanel: this.renderAdvicePanel,
+            toggleAiInsight: this.toggleAiInsight,
             setAdviceStreamUiState: this.setAdviceStreamUiState,
             toggleAdviceStreamRender: this.toggleAdviceStreamRender,
             flushAdviceStreamRender: this.flushAdviceStreamRender,
@@ -1545,23 +1546,34 @@ const advicePanel = {
             : ['分析我最近减重停滞的原因', '根据今天饮食给我晚餐建议', '帮我调整本周训练强度', '我今天蛋白质够不够？'];
         const quicks = [...(this.planAiQuickPrompts?.() || []), ...baseQuicks].slice(0, 4);
 
-        const aiIntake = this.todayCalories?.() || 0;
-        const aiGoal = this.db.health?.dietGoal?.dailyCal || 0;
-        const plans = this.getTodayDailyPlans?.() || [];
-        const agg = this.aggregateCompletionRate?.(plans) || { done: 0, total: 0 };
+        const macros = this.todayMacros?.() || { pro: 0, carb: 0, fat: 0 };
         const sorted = this.sortedWeights?.() || [];
         const latest = sorted.length ? sorted[sorted.length - 1] : null;
-        const latestWeight = latest ? Number(latest.weight).toFixed(1) : '--';
-        const remaining = aiGoal ? aiGoal - aiIntake : 0;
-        const heroText = aiGoal
-            ? `你今天已完成 ${agg.done}/${agg.total} 训练 · ${aiIntake}/${aiGoal} kcal 饮食，剩余 ${remaining} kcal。${latestWeight !== '--' ? '当前体重 ' + latestWeight + ' kg。' : ''}`
-            : '设置饮食目标后可获得更精准建议。';
+        const bodyWeight = latest ? Number(latest.weight) : 0;
+        const dailyPlans = this.db?.dailyPlans || [];
+        const today = new Date().toISOString().slice(0, 10);
+        const weekDeficit = this.buildPlanAnalytics?.().metrics?.weekDeficit;
+
+        const diagCtx = {
+            macros, bodyWeight, goalType,
+            dailyPlans, today, weekDeficit,
+            weights: sorted,
+        };
+        const diag = this.diagnoseInsight?.(diagCtx) || null;
+        const analytics = this.buildPlanAnalytics?.() || {};
+        const insightCtx = { ...analytics, diag, expanded: !!this._aiInsightExpanded };
+        diagCtx.diag = diag;
+        this._lastInsightCtx = { ...insightCtx };
+
+        const insightHeader = this.renderInsightHeader?.(insightCtx) || '';
+        const insightBaseline = this.renderInsightBaseline?.(insightCtx) || '';
+        const expandedClass = this._aiInsightExpanded ? ' expanded' : '';
 
         return `<div class="advice-v6-page ${this._adviceSuppressCardAnimation ? 'advice-no-enter' : ''}">
-            <div class="ai-hero">
-                <div class="ai-avatar"><span class="material-symbols-rounded">psychology</span></div>
-                <h2>今日建议</h2>
-                <p>${this.escapeHtml(heroText)}</p>
+            <div class="ai-insight${expandedClass}">
+                ${insightHeader}
+                ${insightBaseline}
+                <div class="ai-insight-body" id="aiInsightBody"${this._aiInsightExpanded ? '' : ' style="max-height:0;opacity:0;overflow:hidden"'}></div>
             </div>
             <div class="advice-v6-filter-bar">${this.renderAdviceFilterControls()}</div>
             <div class="sect-head"><span class="t">对话</span><button class="a" onclick="data.clearAdviceChat?.()" type="button">清空</button></div>
@@ -1577,7 +1589,34 @@ const advicePanel = {
                 <button id="adviceSendBtn" class="ai-send" onclick="data.sendAiAdvice()" type="button" ${String(rawDraft || '').trim() ? '' : 'disabled'} aria-label="发送问题"><span class="material-symbols-rounded">send</span></button>
             </div>
         </div>`;
-    }
+    },
+
+    toggleAiInsight() {
+        this._aiInsightExpanded = !this._aiInsightExpanded;
+        const card = document.querySelector('.ai-insight');
+        const body = document.getElementById('aiInsightBody');
+        if (!card || !body) return;
+        if (this._aiInsightExpanded) {
+            card.classList.add('expanded');
+            body.style.maxHeight = body.scrollHeight + 'px';
+            body.style.opacity = '1';
+            body.style.overflow = 'visible';
+            if (!this._insightBodyRendered) {
+                const diagCtx = this._lastInsightCtx || {};
+                const diag = diagCtx.diag || null;
+                const llmHtml = this.renderLocalAdvice?.(diag) || '';
+                const expandableHtml = this.renderInsightExpandable?.({ ...diagCtx, llmHtml }) || '';
+                body.innerHTML = expandableHtml;
+                this._insightBodyRendered = true;
+                requestAnimationFrame(() => { body.style.maxHeight = body.scrollHeight + 40 + 'px'; });
+            }
+        } else {
+            card.classList.remove('expanded');
+            body.style.maxHeight = '0';
+            body.style.opacity = '0';
+            body.style.overflow = 'hidden';
+        }
+    },
 };
 
 if (typeof window !== 'undefined') {

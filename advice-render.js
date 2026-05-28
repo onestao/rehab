@@ -182,6 +182,122 @@ Object.assign(advicePanel, {
         if (style) picker.setAttribute('style', style);
         mark.innerHTML = this.adviceModelIconHtml(visual);
     },
+    _parseMarkdownTable(lines, startIdx) {
+        const rows = [];
+        let i = startIdx;
+        for (; i < lines.length; i++) {
+            const t = lines[i].trim();
+            if (!t.startsWith('|') || !t.endsWith('|')) break;
+            const cells = t.slice(1, -1).split('|').map(c => c.trim());
+            rows.push(cells);
+        }
+        if (rows.length < 3) return null;
+        const sepRow = rows[1];
+        if (!sepRow.every(c => /^[:\-]+$/.test(c))) return null;
+        const header = rows[0];
+        const dataRows = rows.slice(2);
+        return { header, dataRows, endIdx: i, colCount: header.length, rowCount: dataRows.length };
+    },
+
+    _isComparisonTable(table) {
+        if (!table || table.colCount < 3) return false;
+        const lastCol = table.header.length - 1;
+        const verdictPattern = /胜|负|优|劣|推荐|赢|更好|更佳|最佳|最差|首选|避免|✓|✗|好|差/;
+        let matchCount = 0;
+        for (const row of table.dataRows) {
+            if (verdictPattern.test(row[lastCol] || '')) matchCount++;
+        }
+        return matchCount >= Math.ceil(table.dataRows.length * 0.6);
+    },
+
+    _renderComparisonCards(table, renderInline) {
+        const headers = table.header;
+        const lastCol = headers.length - 1;
+        const itemA = headers[1] || '';
+        const itemB = headers[2] || '';
+        const dimensionLabel = headers[0] || '维度';
+
+        let winsA = 0;
+        let winsB = 0;
+        for (const row of table.dataRows) {
+            const verdict = row[lastCol] || '';
+            if (new RegExp(escapeRegExp(itemA.split('(')[0].split('（')[0].trim().slice(0, 2)), 'i').test(verdict)) winsA++;
+            else if (new RegExp(escapeRegExp(itemB.split('(')[0].split('（')[0].trim().slice(0, 2)), 'i').test(verdict)) winsB++;
+            else { winsA++; }
+        }
+        const total = table.dataRows.length;
+        const winnerIdx = winsA >= winsB ? 1 : 2;
+        const winnerName = headers[winnerIdx] || '';
+        const winnerShort = winnerName.split('(')[0].split('（')[0].trim();
+        const loserIdx = winnerIdx === 1 ? 2 : 1;
+        const loserName = headers[loserIdx] || '';
+        const loserShort = loserName.split('(')[0].split('（')[0].trim();
+        const score = winnerIdx === 1 ? `${winsA} : ${winsB}` : `${winsB} : ${winsA}`;
+        const verdictClass = 'win';
+
+        const getWinnerMetrics = () => {
+            const metrics = [];
+            for (const row of table.dataRows) {
+                const dim = row[0] || '';
+                const val = row[winnerIdx] || '';
+                if (/热量|kcal|蛋白|脂肪|碳水|糖/i.test(dim)) {
+                    metrics.push({ label: dim.replace(/\s*含量$/, ''), value: val });
+                }
+            }
+            return metrics.slice(0, 3);
+        };
+        const winnerMetrics = getWinnerMetrics();
+        const summaryParts = [];
+        for (const row of table.dataRows) {
+            const dim = row[0] || '';
+            const val = row[winnerIdx] || '';
+            if (summaryParts.length < 2 && !/热量|kcal|蛋白|脂肪|碳水|糖/i.test(dim)) {
+                summaryParts.push(renderInline(dim) + '更优');
+            }
+        }
+
+        const esc = escapeHtml;
+        const summaryMetricsHtml = winnerMetrics.map(m =>
+            `<div class="ai-sc-m"><div class="ai-sc-ml">${esc(m.label)}</div><div class="ai-sc-mv">${renderInline(m.value)}</div></div>`
+        ).join('');
+
+        const loserCells = [];
+        for (const row of table.dataRows) {
+            const dim = row[0] || '';
+            const val = row[loserIdx] || '';
+            if (/热量|kcal|蛋白|脂肪|碳水|糖|烹饪|方式/i.test(dim)) {
+                loserCells.push(`<div class="ai-cc"><div class="ai-cl">${esc(dim)}</div><div class="ai-cv">${renderInline(val)}</div></div>`);
+            }
+        }
+
+        return `<div class="ai-cmp-winner"><div class="ai-sc-title">${esc(winnerShort)} 更优 <span class="ai-sc-badge">${score} 完胜</span></div>${summaryMetricsHtml ? `<div class="ai-sc-grid">${summaryMetricsHtml}</div>` : ''}<div class="ai-sc-note">${summaryParts.length ? summaryParts.join('；') + '。' : ''}</div></div><div class="ai-cmp-cards"><div class="ai-cmp-card"><div class="ai-cmp-header"><span class="ai-cmp-vs">${esc(loserShort)} 对比</span><span class="ai-cmp-verdict lose">劣势</span></div><div class="ai-cmp-body">${loserCells.join('')}</div></div></div>`;
+    },
+
+    _renderDimensionCards(table, renderInline) {
+        const headers = table.header;
+        const esc = escapeHtml;
+        return table.dataRows.map(row => {
+            const title = row[0] || '';
+            const cells = [];
+            for (let c = 1; c < headers.length; c++) {
+                const label = headers[c] || '';
+                const value = row[c] || '';
+                cells.push(`<div class="ai-cc"><div class="ai-cl">${esc(label)}</div><div class="ai-cv">${renderInline(value)}</div></div>`);
+            }
+            return `<div class="ai-cmp-card"><div class="ai-cmp-header"><span class="ai-cmp-vs">${renderInline(title)}</span></div><div class="ai-cmp-body">${cells.join('')}</div></div>`;
+        }).join('');
+    },
+
+    _renderScrollTable(table, renderInline) {
+        const esc = escapeHtml;
+        const thead = table.header.map(h => `<th>${renderInline(h)}</th>`).join('');
+        const tbody = table.dataRows.map(row => {
+            const tds = row.map((cell, ci) => `<td${ci > 0 && /^[\d.]+%?$/.test(cell.trim()) ? ' class="num"' : ''}>${renderInline(cell)}</td>`).join('');
+            return `<tr>${tds}</tr>`;
+        }).join('');
+        return `<div class="ai-table-wrap"><table class="ai-table"><thead><tr>${thead}</tr></thead><tbody>${tbody}</tbody></table></div><div class="ai-table-hint">← 左右滑动查看更多 →</div>`;
+    },
+
     renderAdviceMarkdown(text = '') {
         const escaped = this.escapeHtml(String(text || ''));
         const normalized = escaped.replace(/\r\n?/g, '\n');
@@ -196,8 +312,8 @@ Object.assign(advicePanel, {
         let inList = false;
         let inCode = false;
 
-        for (const raw of lines) {
-            const line = raw.trimEnd();
+        for (let li = 0; li < lines.length; li++) {
+            const line = lines[li].trimEnd();
             if (line.startsWith('```')) {
                 if (inList) { out.push('</ul>'); inList = false; }
                 out.push(inCode ? '</code></pre>' : '<pre><code>');
@@ -225,6 +341,24 @@ Object.assign(advicePanel, {
                 out.push(`<li>${renderInline(bullet[1])}</li>`);
                 continue;
             }
+
+            const isTableLine = line.trim().startsWith('|') && line.trim().endsWith('|');
+            if (isTableLine) {
+                const table = this._parseMarkdownTable(lines, li);
+                if (table) {
+                    if (inList) { out.push('</ul>'); inList = false; }
+                    if (this._isComparisonTable(table)) {
+                        out.push(this._renderComparisonCards(table, renderInline));
+                    } else if (table.colCount <= 4 && table.rowCount <= 6) {
+                        out.push(`<div class="ai-cmp-cards">${this._renderDimensionCards(table, renderInline)}</div>`);
+                    } else {
+                        out.push(this._renderScrollTable(table, renderInline));
+                    }
+                    li = table.endIdx - 1;
+                    continue;
+                }
+            }
+
             if (inList) { out.push('</ul>'); inList = false; }
             out.push(`<p>${renderInline(line)}</p>`);
         }

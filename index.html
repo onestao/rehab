@@ -729,7 +729,7 @@
     <script>
         const PAGE_DEPS = {
             workout: ['voice-engine','voice-cache','voice-webspeech-adapter','voice-legado-adapter','workout-voice','strength-form','weekly-plan','action-history','plan-chains','plan-progression','plan-store','plan-feedback','plan-cooldown','plan-weekly','plan-equipment','plan-ai','plan-ui','workout-system','workout-pip','workout-core','workout-cardio-pure','workout-cardio','workout-engine','workout-state','swipe-actions','routine-plan','routine-library','workout-wakelock','workout-media-session','ai-store','ai-profile','ai-api'],
-            'ai-coach': ['ai-store','ai-profile','ai-models','ai-api','ai-pricing','ai-templates','advice-template-manager','advice-panel','advice-render','advice-prompt','advice-stream-renderer','routine-library','plan-chains','plan-progression','plan-store','plan-ai'],
+            'ai-coach': ['ai-store','ai-profile','ai-models','ai-api','ai-pricing','ai-templates','advice-template-manager','advice-rules','plan-analytics','advice-panel','advice-render','advice-prompt','advice-stream-renderer','routine-library','plan-chains','plan-progression','plan-store','plan-ai'],
             profile: ['voice-engine','voice-cache','voice-webspeech-adapter','voice-legado-adapter','workout-voice','credential-fields','weekly-plan','backup','sync-ui','sync-adapters','sync','routine-library','goal-plan','weekly-summary','plan-chains','plan-progression','plan-store','plan-equipment','plan-ui','ai-store','ai-profile','ai-models'],
             records: ['history-view','weekly-summary','health-diet','health-weight','health-profile','health-exercise','goal-plan','routine-library','food-log','pr-tracker','volume-heatmap','action-history','report-metrics-pure','report-panel','plan-chains','plan-progression','plan-store','plan-weekly','plan-ui','ai-store','ai-profile','ai-models','ai-api'],
             today: ['health-diet','health-weight','health-exercise','food-log','history-view','report-metrics-pure','report-panel','routine-library','plan-chains','plan-progression','plan-store','plan-feedback','plan-cooldown','plan-weekly','plan-equipment','plan-ai','plan-ui','ai-store','ai-profile','ai-models','ai-api']
@@ -745,7 +745,7 @@
             'data-schema': ['data-records'],
             'data-store': ['data-records','data-schema'],
             'advice-template-manager': ['ai-templates'],
-            'advice-panel': ['advice-template-manager'],
+            'advice-panel': ['advice-template-manager','advice-rules','plan-analytics'],
             'advice-render': ['advice-panel'],
             'advice-prompt': ['advice-panel'],
             'advice-stream-renderer': ['advice-panel'],
