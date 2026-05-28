@@ -185,12 +185,21 @@ Object.assign(advicePanel, {
     _parseMarkdownTable(lines, startIdx) {
         const rows = [];
         let i = startIdx;
+        let sawTableAfterBlank = false;
         for (; i < lines.length; i++) {
             const t = lines[i].trim();
+            if (!t) {
+                if (!rows.length) break;
+                sawTableAfterBlank = true;
+                continue;
+            }
             if (!t.startsWith('|') || !t.endsWith('|')) break;
             const cells = t.slice(1, -1).split('|').map(c => c.trim());
+            if (rows.length && cells.length !== rows[0].length) break;
+            sawTableAfterBlank = false;
             rows.push(cells);
         }
+        while (sawTableAfterBlank && i > startIdx && !lines[i - 1].trim()) i--;
         if (rows.length < 3) return null;
         const sepRow = rows[1];
         if (!sepRow.every(c => /^[:\-]+$/.test(c))) return null;
@@ -256,9 +265,8 @@ Object.assign(advicePanel, {
             }
         }
 
-        const esc = escapeHtml;
         const summaryMetricsHtml = winnerMetrics.map(m =>
-            `<div class="ai-sc-m"><div class="ai-sc-ml">${esc(m.label)}</div><div class="ai-sc-mv">${renderInline(m.value)}</div></div>`
+            `<div class="ai-sc-m"><div class="ai-sc-ml">${renderInline(m.label)}</div><div class="ai-sc-mv">${renderInline(m.value)}</div></div>`
         ).join('');
 
         const loserCells = [];
@@ -266,23 +274,22 @@ Object.assign(advicePanel, {
             const dim = row[0] || '';
             const val = row[loserIdx] || '';
             if (/热量|kcal|蛋白|脂肪|碳水|糖|烹饪|方式/i.test(dim)) {
-                loserCells.push(`<div class="ai-cc"><div class="ai-cl">${esc(dim)}</div><div class="ai-cv">${renderInline(val)}</div></div>`);
+                loserCells.push(`<div class="ai-cc"><div class="ai-cl">${renderInline(dim)}</div><div class="ai-cv">${renderInline(val)}</div></div>`);
             }
         }
 
-        return `<div class="ai-cmp-winner"><div class="ai-sc-title">${esc(winnerShort)} 更优 <span class="ai-sc-badge">${score} 完胜</span></div>${summaryMetricsHtml ? `<div class="ai-sc-grid">${summaryMetricsHtml}</div>` : ''}<div class="ai-sc-note">${summaryParts.length ? summaryParts.join('；') + '。' : ''}</div></div><div class="ai-cmp-cards"><div class="ai-cmp-card"><div class="ai-cmp-header"><span class="ai-cmp-vs">${esc(loserShort)} 对比</span><span class="ai-cmp-verdict lose">劣势</span></div><div class="ai-cmp-body">${loserCells.join('')}</div></div></div>`;
+        return `<div class="ai-cmp-winner"><div class="ai-sc-title">${renderInline(winnerShort)} 更优 <span class="ai-sc-badge">${score} 完胜</span></div>${summaryMetricsHtml ? `<div class="ai-sc-grid">${summaryMetricsHtml}</div>` : ''}<div class="ai-sc-note">${summaryParts.length ? summaryParts.join('；') + '。' : ''}</div></div><div class="ai-cmp-cards"><div class="ai-cmp-card"><div class="ai-cmp-header"><span class="ai-cmp-vs">${renderInline(loserShort)} 对比</span><span class="ai-cmp-verdict lose">劣势</span></div><div class="ai-cmp-body">${loserCells.join('')}</div></div></div>`;
     },
 
     _renderDimensionCards(table, renderInline) {
         const headers = table.header;
-        const esc = escapeHtml;
         return table.dataRows.map(row => {
             const title = row[0] || '';
             const cells = [];
             for (let c = 1; c < headers.length; c++) {
                 const label = headers[c] || '';
                 const value = row[c] || '';
-                cells.push(`<div class="ai-cc"><div class="ai-cl">${esc(label)}</div><div class="ai-cv">${renderInline(value)}</div></div>`);
+                cells.push(`<div class="ai-cc"><div class="ai-cl">${renderInline(label)}</div><div class="ai-cv">${renderInline(value)}</div></div>`);
             }
             return `<div class="ai-cmp-card"><div class="ai-cmp-header"><span class="ai-cmp-vs">${renderInline(title)}</span></div><div class="ai-cmp-body">${cells.join('')}</div></div>`;
         }).join('');
