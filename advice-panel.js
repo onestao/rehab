@@ -401,35 +401,37 @@ const advicePanel = {
     },
 
     _adviceBubbleAnchors() {
+        // Use user bubbles as round anchors so prev/next button jumps a whole round.
+        // Fall back to all bubbles when there are no user bubbles (e.g. system-only state).
+        const userBubbles = Array.from(document.querySelectorAll('#ai-coach .advice-bubble.user'));
+        if (userBubbles.length) return userBubbles;
         return Array.from(document.querySelectorAll('#ai-coach .advice-bubble'));
     },
 
     scrollAdviceToPrevBubble() {
-        const bubbles = this._adviceBubbleAnchors();
-        if (!bubbles.length) return this.scrollAdviceToTop();
-        // Use viewport-relative coords: works whether the page scroller is
-        // #ai-coach itself, .advice-chat-list, or document.scrollingElement.
+        const anchors = this._adviceBubbleAnchors();
+        if (!anchors.length) return this.scrollAdviceToTop();
+        // Pick the latest anchor whose top is at least 48px above the viewport edge.
+        // 48px tolerance lets us skip the anchor that's pinned to viewport top after a previous press.
         let target = null;
-        for (const el of bubbles) {
+        for (const el of anchors) {
             const top = el.getBoundingClientRect().top;
-            if (top < -8) target = el;
+            if (top < -48) target = el;
             else break;
         }
         if (!target) {
-            // No bubble is above the viewport top -> already at first bubble.
-            // Scroll the first bubble into view rather than jumping to page top.
-            bubbles[0].scrollIntoView({ behavior: 'smooth', block: 'start' });
+            anchors[0].scrollIntoView({ behavior: 'smooth', block: 'start' });
             return;
         }
         target.scrollIntoView({ behavior: 'smooth', block: 'start' });
     },
 
     scrollAdviceToNextBubble() {
-        const bubbles = this._adviceBubbleAnchors();
-        if (!bubbles.length) return this.scrollAdviceToBottom();
-        for (const el of bubbles) {
+        const anchors = this._adviceBubbleAnchors();
+        if (!anchors.length) return this.scrollAdviceToBottom();
+        for (const el of anchors) {
             const top = el.getBoundingClientRect().top;
-            if (top > 8) {
+            if (top > 48) {
                 el.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 return;
             }
