@@ -126,6 +126,8 @@ const advicePanel = {
             _adviceBubbleAnchors: this._adviceBubbleAnchors,
             _adviceHostScrollTop: this._adviceHostScrollTop,
             _adviceHostViewportTop: this._adviceHostViewportTop,
+            _adviceAnchorOffsetInHost: this._adviceAnchorOffsetInHost,
+            _adviceScrollHostTo: this._adviceScrollHostTo,
             _handleAdviceStreamScroll: this._handleAdviceStreamScroll,
             getAdviceVersionGroup: this.getAdviceVersionGroup,
             setActiveAdviceVersion: this.setActiveAdviceVersion,
@@ -376,63 +378,73 @@ const advicePanel = {
     },
 
     scrollAdviceToTop() {
-        const host = this._adviceScrollHost();
-        if (!host) return;
-        if (host === document.scrollingElement || host === document.documentElement) {
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-        } else if (typeof host.scrollTo === 'function') {
-            host.scrollTo({ top: 0, behavior: 'smooth' });
-        } else {
-            host.scrollTop = 0;
-        }
+        this._adviceScrollHostTo(this._adviceScrollHost(), 0);
     },
 
     scrollAdviceToBottom() {
         const host = this._adviceScrollHost();
         if (!host) return;
-        const target = host.scrollHeight;
-        if (host === document.scrollingElement || host === document.documentElement) {
-            window.scrollTo({ top: target, behavior: 'smooth' });
-        } else if (typeof host.scrollTo === 'function') {
-            host.scrollTo({ top: target, behavior: 'smooth' });
-        } else {
-            host.scrollTop = target;
-        }
+        this._adviceScrollHostTo(host, host.scrollHeight);
     },
 
     _adviceBubbleAnchors() {
-        // Use user bubbles as round anchors so prev/next button jumps a whole round.
-        // Fall back to all bubbles when there are no user bubbles (e.g. system-only state).
         const userBubbles = Array.from(document.querySelectorAll('#ai-coach .advice-bubble.user'));
         if (userBubbles.length) return userBubbles;
         return Array.from(document.querySelectorAll('#ai-coach .advice-bubble'));
     },
 
+    _adviceAnchorOffsetInHost(anchor, host) {
+        const anchorTop = anchor.getBoundingClientRect().top;
+        const hostTop = this._adviceHostViewportTop(host);
+        const hostScrollTop = this._adviceHostScrollTop(host);
+        return anchorTop - hostTop + hostScrollTop;
+    },
+
+    _adviceScrollHostTo(host, top, behavior = 'smooth') {
+        if (!host) return;
+        const targetTop = Math.max(0, Math.round(top));
+        if (host === document.scrollingElement || host === document.documentElement) {
+            window.scrollTo({ top: targetTop, behavior });
+        } else if (typeof host.scrollTo === 'function') {
+            host.scrollTo({ top: targetTop, behavior });
+        } else {
+            host.scrollTop = targetTop;
+        }
+    },
+
     scrollAdviceToPrevBubble() {
+        const host = this._adviceScrollHost();
+        if (!host) return;
         const anchors = this._adviceBubbleAnchors();
         if (!anchors.length) return this.scrollAdviceToTop();
-        // Pick the latest anchor whose top is at least 48px above the viewport edge.
-        // 48px tolerance lets us skip the anchor that's pinned to viewport top after a previous press.
+        const hostScrollTop = this._adviceHostScrollTop(host);
+        // Treat any anchor whose absolute top in host is at least 24px above
+        // the current scrollTop as a previous-round candidate. The largest
+        // such anchor (closest to current position) is our target.
         let target = null;
         for (const el of anchors) {
-            const top = el.getBoundingClientRect().top;
-            if (top < -48) target = el;
+            const offset = this._adviceAnchorOffsetInHost(el, host);
+            if (offset < hostScrollTop - 24) target = offset;
             else break;
         }
-        if (!target) {
-            anchors[0].scrollIntoView({ behavior: 'smooth', block: 'start' });
+        if (target == null) {
+            // Already at or above the first round - go to the page top.
+            this.scrollAdviceToTop();
             return;
         }
-        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        this._adviceScrollHostTo(host, target);
     },
 
     scrollAdviceToNextBubble() {
+        const host = this._adviceScrollHost();
+        if (!host) return;
         const anchors = this._adviceBubbleAnchors();
         if (!anchors.length) return this.scrollAdviceToBottom();
+        const hostScrollTop = this._adviceHostScrollTop(host);
         for (const el of anchors) {
-            const top = el.getBoundingClientRect().top;
-            if (top > 48) {
-                el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            const offset = this._adviceAnchorOffsetInHost(el, host);
+            if (offset > hostScrollTop + 24) {
+                this._adviceScrollHostTo(host, offset);
                 return;
             }
         }

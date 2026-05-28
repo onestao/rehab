@@ -216,17 +216,18 @@
     display: flex;
     flex-direction: column;
     gap: 6px;
-    z-index: 25;
+    z-index: 40;
     pointer-events: auto;
+    touch-action: manipulation;
 }
 #ai-coach.page:not(.active) .advice-scroll-rail,
 .page:not(.active) .advice-scroll-rail { display: none; }
 .advice-rail-btn {
-    width: 34px;
-    height: 34px;
+    width: 38px;
+    height: 38px;
     border-radius: 50%;
     border: 1px solid var(--glass-border);
-    background: color-mix(in srgb, var(--md-sys-surface-container) 86%, transparent);
+    background: color-mix(in srgb, var(--md-sys-surface-container) 92%, transparent);
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
     color: var(--md-sys-on-surface-variant);
@@ -235,12 +236,15 @@
     cursor: pointer;
     box-shadow: var(--glass-shadow-out);
     transition: transform 0.15s var(--md-sys-motion-spring), background 0.15s ease;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+    pointer-events: auto;
 }
 .advice-rail-btn:hover { background: var(--md-sys-surface-container-high); color: var(--md-sys-on-surface); }
 .advice-rail-btn:active { transform: scale(0.92); }
-.advice-rail-btn .material-symbols-rounded { font-size: 18px; }
+.advice-rail-btn .material-symbols-rounded { font-size: 20px; pointer-events: none; }
 @media (max-width: 380px) {
     .advice-scroll-rail { right: 4px; gap: 4px; }
-    .advice-rail-btn { width: 30px; height: 30px; }
-    .advice-rail-btn .material-symbols-rounded { font-size: 16px; }
+    .advice-rail-btn { width: 34px; height: 34px; }
+    .advice-rail-btn .material-symbols-rounded { font-size: 18px; }
 }

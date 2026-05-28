@@ -1104,12 +1104,12 @@ mark.ai-hit
 
 .advice-rail-btn
   files: 54-v6-ai.css
-    width: 34px | 30px (54-v6-ai.css / 54-v6-ai.css)
-    height: 34px | 30px (54-v6-ai.css / 54-v6-ai.css)
+    width: 38px | 34px (54-v6-ai.css / 54-v6-ai.css)
+    height: 38px | 34px (54-v6-ai.css / 54-v6-ai.css)
 
 .advice-rail-btn .material-symbols-rounded
   files: 54-v6-ai.css
-    font-size: 18px | 16px (54-v6-ai.css / 54-v6-ai.css)
+    font-size: 20px | 18px (54-v6-ai.css / 54-v6-ai.css)
 
 .profile-hero-main
   files: 55-v6-profile.css
