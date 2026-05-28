@@ -405,32 +405,30 @@ const advicePanel = {
     },
 
     scrollAdviceToPrevBubble() {
-        const host = this._adviceScrollHost();
-        if (!host) return;
         const bubbles = this._adviceBubbleAnchors();
         if (!bubbles.length) return this.scrollAdviceToTop();
-        const hostTop = this._adviceHostViewportTop(host);
+        // Use viewport-relative coords: works whether the page scroller is
+        // #ai-coach itself, .advice-chat-list, or document.scrollingElement.
         let target = null;
         for (const el of bubbles) {
-            const top = el.getBoundingClientRect().top - hostTop;
+            const top = el.getBoundingClientRect().top;
             if (top < -8) target = el;
             else break;
         }
         if (!target) {
-            this.scrollAdviceToTop();
+            // No bubble is above the viewport top -> already at first bubble.
+            // Scroll the first bubble into view rather than jumping to page top.
+            bubbles[0].scrollIntoView({ behavior: 'smooth', block: 'start' });
             return;
         }
         target.scrollIntoView({ behavior: 'smooth', block: 'start' });
     },
 
     scrollAdviceToNextBubble() {
-        const host = this._adviceScrollHost();
-        if (!host) return;
         const bubbles = this._adviceBubbleAnchors();
         if (!bubbles.length) return this.scrollAdviceToBottom();
-        const hostTop = this._adviceHostViewportTop(host);
         for (const el of bubbles) {
-            const top = el.getBoundingClientRect().top - hostTop;
+            const top = el.getBoundingClientRect().top;
             if (top > 8) {
                 el.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 return;
