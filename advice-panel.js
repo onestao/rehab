@@ -356,24 +356,37 @@ const advicePanel = {
     },
 
     _adviceScrollHost() {
-        const list = document.querySelector('.advice-chat-list');
-        if (list && list.scrollHeight > list.clientHeight + 4) return list;
+        // Walk up from the chat list to find the first ancestor that actually scrolls.
+        // Different layouts (V6 vs legacy, mobile vs desktop) put the scrollbar on different elements.
+        const seed = document.querySelector('#ai-coach .ai-msg-list')
+            || document.querySelector('.advice-chat-list')
+            || document.querySelector('#ai-coach .advice-bubble');
+        if (seed) {
+            let el = seed.parentElement;
+            while (el && el !== document.body) {
+                const cs = getComputedStyle(el);
+                const oy = cs.overflowY;
+                if ((oy === 'auto' || oy === 'scroll') && el.scrollHeight > el.clientHeight + 4) {
+                    return el;
+                }
+                el = el.parentElement;
+            }
+        }
         const page = document.getElementById('ai-coach');
         if (page && page.scrollHeight > page.clientHeight + 4) return page;
-        if (page) return page;
         return document.scrollingElement || document.documentElement;
     },
 
     _adviceHostScrollTop(host) {
         if (!host) return 0;
-        if (host === document.scrollingElement || host === document.documentElement) {
-            return window.scrollY || document.documentElement.scrollTop || 0;
+        if (host === document.scrollingElement || host === document.documentElement || host === document.body) {
+            return window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0;
         }
         return host.scrollTop || 0;
     },
 
     _adviceHostViewportTop(host) {
-        if (!host || host === document.scrollingElement || host === document.documentElement) return 0;
+        if (!host || host === document.scrollingElement || host === document.documentElement || host === document.body) return 0;
         return host.getBoundingClientRect().top;
     },
 
@@ -417,22 +430,27 @@ const advicePanel = {
         if (!host) return;
         const anchors = this._adviceBubbleAnchors();
         if (!anchors.length) return this.scrollAdviceToTop();
-        const hostScrollTop = this._adviceHostScrollTop(host);
-        // Treat any anchor whose absolute top in host is at least 24px above
-        // the current scrollTop as a previous-round candidate. The largest
-        // such anchor (closest to current position) is our target.
+        // Use viewport-relative coordinates as the truth source.  Whichever element
+        // actually owns the scrollbar, the bubble's bounding-rect top tells us
+        // where it is on screen right now; compute the host scroll target from
+        // the delta between that and where we want it (top of the visible area).
+        const hostTopY = this._adviceHostViewportTop(host);
         let target = null;
         for (const el of anchors) {
-            const offset = this._adviceAnchorOffsetInHost(el, host);
-            if (offset < hostScrollTop - 24) target = offset;
+            const rectTop = el.getBoundingClientRect().top;
+            // Treat anchors whose top is at least 24px above the host's viewport
+            // edge as "above current view"; pick the latest such anchor.
+            if (rectTop < hostTopY - 24) target = el;
             else break;
         }
-        if (target == null) {
-            // Already at or above the first round - go to the page top.
+        if (!target) {
             this.scrollAdviceToTop();
             return;
         }
-        this._adviceScrollHostTo(host, target);
+        const rectTop = target.getBoundingClientRect().top;
+        const hostScrollTop = this._adviceHostScrollTop(host);
+        const newTop = hostScrollTop + (rectTop - hostTopY);
+        this._adviceScrollHostTo(host, newTop);
     },
 
     scrollAdviceToNextBubble() {
@@ -440,11 +458,13 @@ const advicePanel = {
         if (!host) return;
         const anchors = this._adviceBubbleAnchors();
         if (!anchors.length) return this.scrollAdviceToBottom();
-        const hostScrollTop = this._adviceHostScrollTop(host);
+        const hostTopY = this._adviceHostViewportTop(host);
         for (const el of anchors) {
-            const offset = this._adviceAnchorOffsetInHost(el, host);
-            if (offset > hostScrollTop + 24) {
-                this._adviceScrollHostTo(host, offset);
+            const rectTop = el.getBoundingClientRect().top;
+            if (rectTop > hostTopY + 24) {
+                const hostScrollTop = this._adviceHostScrollTop(host);
+                const newTop = hostScrollTop + (rectTop - hostTopY);
+                this._adviceScrollHostTo(host, newTop);
                 return;
             }
         }
