@@ -134,7 +134,6 @@
             if (input && !input.dataset.bound) {
                 input.dataset.bound = 'true';
                 input.addEventListener('change', () => this.handleDietPhoto(input.files && input.files[0]));
-                input.addEventListener('cancel', () => this.setDietPhotoStatus('cancelled', '未选择照片'));
             }
         },
 

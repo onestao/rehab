@@ -29,6 +29,7 @@ test('diet photo file picker is bound with event listeners and fallback statuses
     const healthDiet = await readFile(new URL('../health-diet.js', import.meta.url), 'utf8');
 
     assert.doesNotMatch(healthDiet, /onchange="data\.handleDietPhoto/);
+    assert.doesNotMatch(healthDiet, /addEventListener\('cancel'/);
     assert.match(healthDiet, /bindDietPhotoControls\(\)/);
     assert.match(healthDiet, /addEventListener\('change', \(\) => this\.handleDietPhoto\(input\.files && input\.files\[0\]\)\)/);
     assert.match(healthDiet, /setDietPhotoStatus\('waiting', '请选择或拍摄一张照片'\)/);
