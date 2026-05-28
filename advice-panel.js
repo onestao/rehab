@@ -123,10 +123,11 @@ const advicePanel = {
             scrollAdviceToPrevBubble: this.scrollAdviceToPrevBubble,
             scrollAdviceToNextBubble: this.scrollAdviceToNextBubble,
             _adviceScrollHost: this._adviceScrollHost,
+            _adviceScrollableAncestors: this._adviceScrollableAncestors,
             _adviceBubbleAnchors: this._adviceBubbleAnchors,
             _adviceHostScrollTop: this._adviceHostScrollTop,
             _adviceHostViewportTop: this._adviceHostViewportTop,
-            _adviceAnchorOffsetInHost: this._adviceAnchorOffsetInHost,
+            _adviceJumpToAnchor: this._adviceJumpToAnchor,
             _adviceScrollHostTo: this._adviceScrollHostTo,
             _handleAdviceStreamScroll: this._handleAdviceStreamScroll,
             getAdviceVersionGroup: this.getAdviceVersionGroup,
@@ -355,25 +356,34 @@ const advicePanel = {
         this.scrollAdviceToLatest(true, 'smooth');
     },
 
+    _adviceScrollableAncestors(seed) {
+        // Walk up from `seed` collecting every ancestor that *could* scroll on iOS Safari /
+        // Android WebView, including the document scrolling element. Returned in
+        // closest-first order.
+        const result = [];
+        let el = seed?.parentElement || null;
+        while (el && el !== document.body) {
+            const cs = getComputedStyle(el);
+            const oy = cs.overflowY;
+            if (oy === 'auto' || oy === 'scroll') result.push(el);
+            el = el.parentElement;
+        }
+        const docEl = document.scrollingElement || document.documentElement;
+        if (docEl && !result.includes(docEl)) result.push(docEl);
+        return result;
+    },
+
     _adviceScrollHost() {
-        // Walk up from the chat list to find the first ancestor that actually scrolls.
-        // Different layouts (V6 vs legacy, mobile vs desktop) put the scrollbar on different elements.
         const seed = document.querySelector('#ai-coach .ai-msg-list')
             || document.querySelector('.advice-chat-list')
             || document.querySelector('#ai-coach .advice-bubble');
         if (seed) {
-            let el = seed.parentElement;
-            while (el && el !== document.body) {
-                const cs = getComputedStyle(el);
-                const oy = cs.overflowY;
-                if ((oy === 'auto' || oy === 'scroll') && el.scrollHeight > el.clientHeight + 4) {
-                    return el;
-                }
-                el = el.parentElement;
+            for (const el of this._adviceScrollableAncestors(seed)) {
+                if (el.scrollHeight > el.clientHeight + 4) return el;
             }
         }
         const page = document.getElementById('ai-coach');
-        if (page && page.scrollHeight > page.clientHeight + 4) return page;
+        if (page) return page;
         return document.scrollingElement || document.documentElement;
     },
 
@@ -390,14 +400,57 @@ const advicePanel = {
         return host.getBoundingClientRect().top;
     },
 
+    _adviceScrollHostTo(host, top, behavior = 'smooth') {
+        if (!host) return;
+        const targetTop = Math.max(0, Math.round(top));
+        const isDoc = host === document.scrollingElement || host === document.documentElement || host === document.body;
+        if (isDoc) {
+            window.scrollTo({ top: targetTop, behavior });
+        } else if (typeof host.scrollTo === 'function') {
+            host.scrollTo({ top: targetTop, behavior });
+        } else {
+            host.scrollTop = targetTop;
+        }
+        // Some iOS Safari WebView builds quietly ignore smooth-scrolling on a
+        // nested overflow ancestor. Verify the position changed; if not, fall
+        // back to a hard scrollTop assignment which always works.
+        requestAnimationFrame(() => {
+            const current = isDoc
+                ? (window.scrollY || document.documentElement.scrollTop || 0)
+                : host.scrollTop;
+            if (Math.abs(current - targetTop) > 2 && Math.abs(current - this._adviceLastScrollTop) < 2) {
+                if (isDoc) {
+                    document.documentElement.scrollTop = targetTop;
+                    document.body.scrollTop = targetTop;
+                    window.scrollTo(0, targetTop);
+                } else {
+                    host.scrollTop = targetTop;
+                }
+            }
+            this._adviceLastScrollTop = current;
+        });
+    },
+
     scrollAdviceToTop() {
-        this._adviceScrollHostTo(this._adviceScrollHost(), 0);
+        // Try every scrollable ancestor, not just the "preferred" one.
+        // On mobile the page-level scroller can change between #ai-coach and the document.
+        const seed = document.querySelector('#ai-coach .ai-msg-list')
+            || document.querySelector('.advice-chat-list')
+            || document.querySelector('#ai-coach .advice-bubble');
+        const hosts = seed ? this._adviceScrollableAncestors(seed) : [this._adviceScrollHost()];
+        const page = document.getElementById('ai-coach');
+        if (page && !hosts.includes(page)) hosts.unshift(page);
+        for (const host of hosts) this._adviceScrollHostTo(host, 0);
     },
 
     scrollAdviceToBottom() {
-        const host = this._adviceScrollHost();
-        if (!host) return;
-        this._adviceScrollHostTo(host, host.scrollHeight);
+        const seed = document.querySelector('#ai-coach .ai-msg-list')
+            || document.querySelector('.advice-chat-list')
+            || document.querySelector('#ai-coach .advice-bubble');
+        const hosts = seed ? this._adviceScrollableAncestors(seed) : [this._adviceScrollHost()];
+        const page = document.getElementById('ai-coach');
+        if (page && !hosts.includes(page)) hosts.unshift(page);
+        for (const host of hosts) this._adviceScrollHostTo(host, host.scrollHeight);
     },
 
     _adviceBubbleAnchors() {
@@ -406,65 +459,56 @@ const advicePanel = {
         return Array.from(document.querySelectorAll('#ai-coach .advice-bubble'));
     },
 
-    _adviceAnchorOffsetInHost(anchor, host) {
-        const anchorTop = anchor.getBoundingClientRect().top;
-        const hostTop = this._adviceHostViewportTop(host);
-        const hostScrollTop = this._adviceHostScrollTop(host);
-        return anchorTop - hostTop + hostScrollTop;
-    },
-
-    _adviceScrollHostTo(host, top, behavior = 'smooth') {
-        if (!host) return;
-        const targetTop = Math.max(0, Math.round(top));
-        if (host === document.scrollingElement || host === document.documentElement) {
-            window.scrollTo({ top: targetTop, behavior });
-        } else if (typeof host.scrollTo === 'function') {
-            host.scrollTo({ top: targetTop, behavior });
-        } else {
-            host.scrollTop = targetTop;
+    _adviceJumpToAnchor(anchor) {
+        if (!anchor) return;
+        // Use scrollIntoView first — the browser figures out which scroller owns the element,
+        // which is more reliable than guessing on mobile.
+        try {
+            anchor.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        } catch (e) {
+            anchor.scrollIntoView();
         }
+        // Some iOS WebViews silently ignore smooth scroll on nested overflow containers.
+        // After a frame, if the anchor is still well outside the viewport, fall back to
+        // a manual scrollTop assignment on the actual scrolling host.
+        requestAnimationFrame(() => {
+            const rect = anchor.getBoundingClientRect();
+            if (rect.top >= 0 && rect.top < window.innerHeight - 60) return; // already on screen near top
+            const host = this._adviceScrollHost();
+            if (!host) return;
+            const hostTopY = this._adviceHostViewportTop(host);
+            const hostScrollTop = this._adviceHostScrollTop(host);
+            const newTop = hostScrollTop + (rect.top - hostTopY);
+            this._adviceScrollHostTo(host, newTop, 'auto');
+        });
     },
 
     scrollAdviceToPrevBubble() {
-        const host = this._adviceScrollHost();
-        if (!host) return;
         const anchors = this._adviceBubbleAnchors();
         if (!anchors.length) return this.scrollAdviceToTop();
-        // Use viewport-relative coordinates as the truth source.  Whichever element
-        // actually owns the scrollbar, the bubble's bounding-rect top tells us
-        // where it is on screen right now; compute the host scroll target from
-        // the delta between that and where we want it (top of the visible area).
-        const hostTopY = this._adviceHostViewportTop(host);
+        // Pick the latest anchor whose top is at least 8px ABOVE the viewport top.
+        // That guarantees we move at least one full round up on every press.
         let target = null;
         for (const el of anchors) {
-            const rectTop = el.getBoundingClientRect().top;
-            // Treat anchors whose top is at least 24px above the host's viewport
-            // edge as "above current view"; pick the latest such anchor.
-            if (rectTop < hostTopY - 24) target = el;
+            const top = el.getBoundingClientRect().top;
+            if (top < -8) target = el;
             else break;
         }
         if (!target) {
             this.scrollAdviceToTop();
             return;
         }
-        const rectTop = target.getBoundingClientRect().top;
-        const hostScrollTop = this._adviceHostScrollTop(host);
-        const newTop = hostScrollTop + (rectTop - hostTopY);
-        this._adviceScrollHostTo(host, newTop);
+        this._adviceJumpToAnchor(target);
     },
 
     scrollAdviceToNextBubble() {
-        const host = this._adviceScrollHost();
-        if (!host) return;
         const anchors = this._adviceBubbleAnchors();
         if (!anchors.length) return this.scrollAdviceToBottom();
-        const hostTopY = this._adviceHostViewportTop(host);
+        // Find the first anchor whose top is at least 8px BELOW the viewport top.
         for (const el of anchors) {
-            const rectTop = el.getBoundingClientRect().top;
-            if (rectTop > hostTopY + 24) {
-                const hostScrollTop = this._adviceHostScrollTop(host);
-                const newTop = hostScrollTop + (rectTop - hostTopY);
-                this._adviceScrollHostTo(host, newTop);
+            const top = el.getBoundingClientRect().top;
+            if (top > 8) {
+                this._adviceJumpToAnchor(el);
                 return;
             }
         }
