@@ -63,7 +63,6 @@
             const meal = this._dietMeal || 'lunch';
             const mealBtn = (key, label) => `<button class="diet-meal-pill ${meal === key ? 'active' : ''}" onclick="data.setDietMeal('${key}')" type="button">${this.escapeHtml(label)}</button>`;
             const photoInfo = this.getDietPhotoSupportInfo();
-            const photoSupported = photoInfo.supported;
             const photoTitle = this.escapeHtml(this.dietPhotoTitle());
             return `
                 <div class="diet-mode-tabs" style="margin-bottom:10px">
@@ -77,7 +76,7 @@
                     <textarea id="foodAiText" class="diet-ai-input" placeholder="说说你这顿吃了什么，例如：鸡胸肉饭加一杯豆浆" oninput="data.autoResizeDietInput(this)"></textarea>
                     <div class="diet-ai-actions">
                         <button class="md-btn md-btn-filled" onclick="data.aiParseFood()" type="button"><span class="material-symbols-rounded">auto_awesome</span> 文本识别</button>
-                        <button id="dietPhotoButton" class="md-btn md-btn-tonal" onclick="data.triggerDietPhoto()" type="button" ${photoSupported ? '' : 'disabled'} title="${photoTitle}"><span class="material-symbols-rounded">visibility</span> 拍照识别</button>
+                        <button id="dietPhotoButton" class="md-btn md-btn-tonal" onclick="data.triggerDietPhoto()" type="button" title="${photoTitle}"><span class="material-symbols-rounded">visibility</span> 拍照识别</button>
                         <input id="dietPhotoInput" class="hidden" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" capture="environment" onchange="data.handleDietPhoto(this.files?.[0])">
                     </div>
                     <small id="foodAiStatus" class="food-ai-status"></small>
@@ -108,7 +107,6 @@
             const modal = document.getElementById('dietModal');
             const content = document.getElementById('dietModalContent');
             if (!modal || !content) return;
-            await window.ai?.loadVisionWhitelist?.();
             content.innerHTML = this.renderDietModalContent();
             this.syncFoodCalLabel?.();
             this.setDietInputMode(this._dietInputMode || this.db.health.dietInputMode || 'ai');
@@ -119,6 +117,10 @@
                 id: 'dietModal',
                 close: () => this.closeDietModalInternal()
             });
+            window.ai?.loadVisionWhitelist?.().then(() => {
+                const button = document.getElementById('dietPhotoButton');
+                if (button) button.title = this.dietPhotoTitle();
+            }).catch(() => {});
         },
 
         closeDietModal() {
@@ -140,6 +142,7 @@
             if (_aiPhotoBusy) return;
             const info = this.getDietPhotoSupportInfo();
             if (!info.supported) {
+                this.setDietPhotoStatus('blocked', info.reason || '当前 AI 配置不可用');
                 window.toast?.show?.(info.reason || '当前 AI 配置不可用', 'info');
                 return;
             }

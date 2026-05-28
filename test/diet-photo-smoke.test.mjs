@@ -17,3 +17,10 @@ test('diet photo browser assets are wired for offline use', async () => {
     assert.match(healthDiet, /image\/jpeg,image\/png,image\/webp,image\/heic,image\/heif/);
     assert.match(heicBundle, /heic2any/);
 });
+
+test('diet photo button remains clickable when support checks fail', async () => {
+    const healthDiet = await readFile(new URL('../health-diet.js', import.meta.url), 'utf8');
+
+    assert.doesNotMatch(healthDiet, /id="dietPhotoButton"[^>]*disabled/);
+    assert.match(healthDiet, /setDietPhotoStatus\('blocked', info\.reason \|\| '当前 AI 配置不可用'\)/);
+});
