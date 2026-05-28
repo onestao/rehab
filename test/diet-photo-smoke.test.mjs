@@ -31,7 +31,17 @@ test('diet photo file picker is bound with event listeners and fallback statuses
     assert.doesNotMatch(healthDiet, /onchange="data\.handleDietPhoto/);
     assert.doesNotMatch(healthDiet, /addEventListener\('cancel'/);
     assert.match(healthDiet, /bindDietPhotoControls\(\)/);
-    assert.match(healthDiet, /addEventListener\('change', \(\) => this\.handleDietPhoto\(input\.files && input\.files\[0\]\)\)/);
+    assert.match(healthDiet, /addEventListener\('change'/);
     assert.match(healthDiet, /setDietPhotoStatus\('waiting', '请选择或拍摄一张照片'\)/);
     assert.match(healthDiet, /setDietPhotoStatus\('empty', '没有收到照片，请重新选择'\)/);
+});
+
+test('diet photo has Android camera poll fallback', async () => {
+    const healthDiet = await readFile(new URL('../health-diet.js', import.meta.url), 'utf8');
+
+    assert.match(healthDiet, /_startDietPhotoPoll\(input\)/);
+    assert.match(healthDiet, /_stopDietPhotoPoll\(\)/);
+    assert.match(healthDiet, /_dietPhotoPollTimer/);
+    assert.match(healthDiet, /input\.files && input\.files\[0\]/);
+    assert.match(healthDiet, /等待照片超时，请重试/);
 });

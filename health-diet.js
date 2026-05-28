@@ -133,8 +133,35 @@
             }
             if (input && !input.dataset.bound) {
                 input.dataset.bound = 'true';
-                input.addEventListener('change', () => this.handleDietPhoto(input.files && input.files[0]));
+                input.addEventListener('change', () => {
+                    this._stopDietPhotoPoll();
+                    this.handleDietPhoto(input.files && input.files[0]);
+                });
             }
+        },
+
+        _stopDietPhotoPoll() {
+            if (this._dietPhotoPollTimer) {
+                clearInterval(this._dietPhotoPollTimer);
+                this._dietPhotoPollTimer = null;
+            }
+        },
+
+        _startDietPhotoPoll(input) {
+            this._stopDietPhotoPoll();
+            let elapsed = 0;
+            this._dietPhotoPollTimer = setInterval(() => {
+                elapsed += 500;
+                if (elapsed >= 40000) {
+                    this._stopDietPhotoPoll();
+                    this.setDietPhotoStatus('timeout', '等待照片超时，请重试');
+                    return;
+                }
+                if (input.files && input.files[0]) {
+                    this._stopDietPhotoPoll();
+                    this.handleDietPhoto(input.files[0]);
+                }
+            }, 500);
         },
 
         closeDietModal() {
@@ -170,6 +197,7 @@
             }
             this.setDietPhotoStatus('waiting', '请选择或拍摄一张照片');
             input.click?.();
+            this._startDietPhotoPoll(input);
         },
 
         setDietPhotoStatus(stage, text, onCancel = null) {
