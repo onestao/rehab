@@ -749,10 +749,6 @@
                 return;
             }
             const hasAutoFilled = plans.some((plan) => plan.items.some((item) => item.autoFilled?.length));
-            if (hasAutoFilled) {
-                window.toast?.show?.('有字段由默认值补全（红色边框），请检查后再次确认', 'info', 4000);
-                return;
-            }
             plans.forEach((plan) => {
                 const sameDay = this.activeRecords(this.db.dailyPlans || []).filter((p) => p.date === plan.date && !p.deleted);
                 sameDay.forEach((old) => {
@@ -789,7 +785,11 @@
             this.closePlanAiSheet();
             this._closeActiveModal?.();
             this.render?.();
-            window.toast?.show?.('训练计划已生成', 'success');
+            if (hasAutoFilled) {
+                window.toast?.show?.('训练计划已落库（部分字段由默认值补全，可进入「调整任务参数」修正）', 'info', 5000);
+            } else {
+                window.toast?.show?.('训练计划已生成', 'success');
+            }
         }
     };
 })();
