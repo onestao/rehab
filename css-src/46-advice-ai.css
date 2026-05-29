@@ -106,6 +106,7 @@
     background: color-mix(in srgb, var(--md-sys-surface-container-highest) 70%, transparent);
     color: var(--md-sys-on-surface-variant);
     margin-left: 4px;
+    flex-shrink: 0;
 }
 .advice-version-switcher .advice-version-btn {
     width: 22px;
@@ -460,9 +461,9 @@
 }
 .advice-bubble.pending { opacity: 0.86; }
 .advice-bubble.error { background: var(--md-sys-error-container); color: var(--md-sys-on-error-container); }
-.advice-bubble-head { display: flex; align-items: center; gap: 8px; }
-.advice-bubble b { flex: 1; font-size: 11px; color: var(--md-sys-on-surface-variant); display: flex; align-items: center; gap: 6px; }
-.advice-bubble b small { font-size: 10px; font-weight: 600; color: var(--md-sys-on-surface-variant); opacity: 0.8; }
+.advice-bubble-head { display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; min-width: 0; }
+.advice-bubble b { flex: 1 1 0; min-width: 0; overflow: hidden; font-size: 11px; color: var(--md-sys-on-surface-variant); display: flex; align-items: center; gap: 6px; }
+.advice-bubble b small { font-size: 10px; font-weight: 600; color: var(--md-sys-on-surface-variant); opacity: 0.8; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .advice-bubble.user b,
 .advice-bubble.user b small,
 .advice-bubble.user .advice-bubble-content,
