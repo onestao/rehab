@@ -82,12 +82,12 @@ body
 from
   files: 06-layout-page.css, 38-record-page.css, 43-identity-card.css, 46-advice-ai.css, 47-view-transitions.css, 50-v6-ui.css, 57-weight-report.css, 41-m3e-effects.css
     opacity: 0 | 0.5 | 0.72 | 0.35 | 1 (06-layout-page.css / 38-record-page.css / 43-identity-card.css / 43-identity-card.css / 46-advice-ai.css / 46-advice-ai.css / 47-view-transitions.css / 47-view-transitions.css / 50-v6-ui.css / 57-weight-report.css / 41-m3e-effects.css / 41-m3e-effects.css)
-    transform: translateY(8px) | translateY(100%) | translateX(18px) scale(0.985) | translateX(-18px) scale(0.985) | translateY(-4px) | scale(0.8) | translateX(10px) scale(.99) | translate3d(0,0,0) scale(var(--weight-chart-range-start-scale, 1)) | translateY(8px) scale(.985) | translateY(4px) (06-layout-page.css / 38-record-page.css / 43-identity-card.css / 43-identity-card.css / 46-advice-ai.css / 46-advice-ai.css / 57-weight-report.css / 57-weight-report.css / 41-m3e-effects.css / 41-m3e-effects.css)
+    transform: translateY(100%) | translateX(18px) scale(0.985) | translateX(-18px) scale(0.985) | translateY(-4px) | scale(0.8) | translateX(10px) scale(.99) | translate3d(0,0,0) scale(var(--weight-chart-range-start-scale, 1)) | translateY(8px) scale(.985) | translateY(4px) (38-record-page.css / 43-identity-card.css / 43-identity-card.css / 46-advice-ai.css / 46-advice-ai.css / 57-weight-report.css / 57-weight-report.css / 41-m3e-effects.css / 41-m3e-effects.css)
 
 to
   files: 06-layout-page.css, 18-health-diet.css, 38-record-page.css, 43-identity-card.css, 46-advice-ai.css, 47-view-transitions.css, 50-v6-ui.css, 57-weight-report.css, 41-m3e-effects.css
     opacity: 1 | 0 (06-layout-page.css / 38-record-page.css / 43-identity-card.css / 43-identity-card.css / 46-advice-ai.css / 46-advice-ai.css / 47-view-transitions.css / 47-view-transitions.css / 50-v6-ui.css / 57-weight-report.css / 41-m3e-effects.css / 41-m3e-effects.css / 41-m3e-effects.css)
-    transform: translateY(0) | rotate(360deg) | translateX(0) scale(1) | none | scale(1.2) | translate3d(0,0,0) scale(1) | translateY(0) scale(1) | translate(-50%, -50%) scale(20) (06-layout-page.css / 18-health-diet.css / 38-record-page.css / 43-identity-card.css / 43-identity-card.css / 46-advice-ai.css / 46-advice-ai.css / 57-weight-report.css / 57-weight-report.css / 41-m3e-effects.css / 41-m3e-effects.css / 41-m3e-effects.css)
+    transform: rotate(360deg) | translateY(0) | translateX(0) scale(1) | none | scale(1.2) | translate3d(0,0,0) scale(1) | translateY(0) scale(1) | translate(-50%, -50%) scale(20) (18-health-diet.css / 38-record-page.css / 43-identity-card.css / 43-identity-card.css / 46-advice-ai.css / 46-advice-ai.css / 57-weight-report.css / 57-weight-report.css / 41-m3e-effects.css / 41-m3e-effects.css / 41-m3e-effects.css)
 
 .md-card
   files: 08-components-cards.css, 36-responsive.css, 37-dark-mode.css, 50-v6-ui.css, 41-m3e-effects.css
