@@ -377,65 +377,105 @@ const advicePanel = {
             if (existing) { existing.remove(); return; }
             const errors = window.errorBus?.list?.() || [];
             const debugEntries = window.errorBus?.listDebug?.() || [];
-            const merged = [
+            const records = [
                 ...errors.map(e => ({
                     t: Date.parse(e.at) || 0,
+                    iso: e.at || new Date().toISOString(),
                     level: 'error',
-                    scope: e.scope,
-                    line: `[${e.scope}] ${e.message}` + (e.meta ? ' meta=' + JSON.stringify(e.meta) : ''),
-                    stack: e.stack
+                    scope: e.scope || 'unknown',
+                    message: e.message || '',
+                    meta: e.meta || null,
+                    stack: e.stack || null
                 })),
                 ...debugEntries.map(d => ({
-                    t: d.t,
-                    level: d.level,
-                    scope: d.scope,
-                    line: `[${d.scope}] ${(d.args || []).join(' ')}` + (d.extra ? ' meta=' + (typeof d.extra === 'string' ? d.extra : JSON.stringify(d.extra)) : '')
+                    t: d.t || 0,
+                    iso: new Date(d.t || Date.now()).toISOString(),
+                    level: d.level || 'log',
+                    scope: d.scope || 'global',
+                    message: Array.isArray(d.args) ? d.args.join(' ') : String(d.args || ''),
+                    meta: d.extra || null,
+                    stack: null
                 }))
             ].sort((a, b) => a.t - b.t);
+            const ndjson = records.map(r => JSON.stringify(r)).join('\n');
 
             const wrap = document.createElement('div');
             wrap.id = 'adviceDebugOverlay';
-            wrap.style.cssText = 'position:fixed;left:0;right:0;bottom:0;top:25%;background:#000;color:#0f0;font:11px/1.4 ui-monospace,monospace;padding:10px;z-index:9999;overflow:auto;white-space:pre-wrap;word-break:break-all;';
+            wrap.style.cssText = 'position:fixed;left:0;right:0;bottom:0;top:25%;background:#000;color:#0f0;font:11px/1.4 ui-monospace,monospace;padding:10px;z-index:9999;overflow:auto';
 
-            const toolbar = document.createElement('div');
-            toolbar.style.cssText = 'position:sticky;top:-10px;margin:-10px -10px 8px;padding:8px 10px;background:#111;border-bottom:1px solid #333;display:flex;flex-wrap:wrap;gap:6px;align-items:center;';
-
-            const mkBtn = (label, color, fn) => {
+            const bar = document.createElement('div');
+            bar.style.cssText = 'position:sticky;top:-10px;margin:-10px -10px 8px;padding:8px;background:#111;border-bottom:1px solid #333;display:flex;flex-wrap:wrap;gap:6px;align-items:center';
+            const status = document.createElement('span');
+            status.style.cssText = 'flex:1;min-width:120px;color:#0f0';
+            status.textContent = '共 ' + records.length + ' 条';
+            const mkBtn = (label, bg, fn) => {
                 const b = document.createElement('button');
                 b.textContent = label;
-                b.style.cssText = `background:${color};color:${color === '#fff' ? '#000' : '#fff'};border:0;padding:4px 10px;border-radius:4px;font-size:12px;cursor:pointer;`;
+                b.style.cssText = 'background:' + bg + ';color:' + (bg === '#fff' ? '#000' : '#fff') + ';border:0;padding:4px 10px;border-radius:4px;font-size:12px';
                 b.onclick = fn;
                 return b;
             };
-
-            const status = document.createElement('span');
-            status.style.cssText = 'flex:1;color:#0f0;font-size:11px;';
-            status.textContent = `共 ${merged.length} 条`;
-
-            const formatted = merged.length
-                ? merged.map((e, i) => '#' + i + ' ' + new Date(e.t).toLocaleTimeString() + ' [' + e.level + '] ' + e.line + (e.stack ? '\n  ' + e.stack.split('\n').slice(0, 3).join('\n  ') : '')).join('\n\n')
-                : '(empty)';
-
-            toolbar.appendChild(status);
-            toolbar.appendChild(mkBtn('复制', '#08f', () => {
-                const ta = document.createElement('textarea');
-                ta.value = formatted;
-                document.body.appendChild(ta);
-                ta.select();
-                try { document.execCommand('copy'); } catch {}
-                ta.remove();
-                status.textContent = '已复制 (' + merged.length + ' 条)';
+            const copy = (text, ok) => {
+                const done = () => { status.textContent = ok; };
+                try {
+                    if (navigator.clipboard?.writeText) return navigator.clipboard.writeText(text).then(done).catch(fb);
+                } catch {}
+                fb();
+                function fb() {
+                    const ta = document.createElement('textarea');
+                    ta.value = text;
+                    ta.style.cssText = 'position:fixed;left:-9999px';
+                    document.body.appendChild(ta);
+                    ta.select();
+                    try { document.execCommand('copy'); } catch {}
+                    ta.remove();
+                    done();
+                }
+            };
+            bar.appendChild(status);
+            bar.appendChild(mkBtn('文本', '#08f', () => {
+                copy(records.map((r, i) => '#' + i + ' ' + new Date(r.t).toLocaleTimeString() + ' [' + r.level + '] ' + r.scope + '\nmsg: ' + r.message + (r.meta ? '\nmeta: ' + (typeof r.meta === 'string' ? r.meta : JSON.stringify(r.meta)) : '')).join('\n\n'), '已复制 (' + records.length + ')');
             }));
-            toolbar.appendChild(mkBtn('清空', '#f80', () => {
-                window.errorBus?.clear?.();
-                wrap.remove();
+            bar.appendChild(mkBtn('NDJSON', '#0a8', () => copy(ndjson, '已复制 NDJSON (' + records.length + ')')));
+            bar.appendChild(mkBtn('下载', '#a08', () => {
+                try {
+                    const url = URL.createObjectURL(new Blob([ndjson], { type: 'application/x-ndjson;charset=utf-8' }));
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'rehab-debug-' + new Date().toISOString().replace(/[:.]/g, '-') + '.ndjson';
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+                    setTimeout(() => URL.revokeObjectURL(url), 4000);
+                    status.textContent = '已下载 (' + records.length + ')';
+                } catch (e) { status.textContent = '下载失败:' + e.message; }
             }));
-            toolbar.appendChild(mkBtn('关闭', '#fff', () => wrap.remove()));
+            bar.appendChild(mkBtn('清空', '#f80', () => { window.errorBus?.clear?.(); wrap.remove(); }));
+            bar.appendChild(mkBtn('关闭', '#fff', () => wrap.remove()));
+            wrap.appendChild(bar);
 
-            wrap.appendChild(toolbar);
-            const pre = document.createElement('div');
-            pre.textContent = formatted;
-            wrap.appendChild(pre);
+            const list = document.createElement('div');
+            list.style.cssText = 'display:flex;flex-direction:column;gap:6px';
+            if (!records.length) {
+                const empty = document.createElement('div');
+                empty.textContent = '(empty)';
+                empty.style.opacity = '0.6';
+                list.appendChild(empty);
+            } else {
+                records.forEach((r, i) => {
+                    const card = document.createElement('div');
+                    card.style.cssText = 'border:1px solid #1a3;border-radius:6px;padding:6px 8px;background:#020;white-space:pre-wrap;word-break:break-all';
+                    let body = '#' + i + ' ' + new Date(r.t).toLocaleTimeString() + ' [' + r.level + '] ' + r.scope + '\nmsg: ' + r.message;
+                    if (r.meta) {
+                        if (Array.isArray(r.meta?.diffs)) body += '\ndiffs (' + r.meta.diffs.length + '):\n  ' + r.meta.diffs.map(d => '- ' + d).join('\n  ');
+                        else body += '\nmeta: ' + (typeof r.meta === 'string' ? r.meta : JSON.stringify(r.meta));
+                    }
+                    if (r.stack) body += '\nstack: ' + r.stack.split('\n').slice(0, 3).join(' | ');
+                    card.textContent = body;
+                    list.appendChild(card);
+                });
+            }
+            wrap.appendChild(list);
             document.body.appendChild(wrap);
         } catch (e) {
             alert('debug overlay failed: ' + e.message);
