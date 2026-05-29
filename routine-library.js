@@ -538,6 +538,9 @@
             if (overview) {
                 overview.innerHTML = view === 'home' ? this.renderProfileIdentityCard() + this.renderProfileV6Cards() : '';
                 overview.classList.toggle('hidden', view !== 'home');
+                if (view === 'home') {
+                    Promise.resolve().then(() => this.refreshSwCacheName?.());
+                }
             }
 
             if (!content) return;
@@ -610,10 +613,68 @@
                 </div>
                 <div class="setting-row" onclick="data.toggleDebugTools?.()" role="button" tabindex="0">
                     <span class="material-symbols-rounded ico">bug_report</span>
-                    <div class="copy"><strong>调试工具</strong><small>${this._debugToolsEnabled ? '已启用 · 全局错误 / console / 网络 / 导航' : '点击启用全局诊断'}</small></div>
+                    <div class="copy"><strong>调试工具</strong><small>${this._debugToolsEnabled ? '已启用 · 全局错误 / console / 网络 / 导航 / 布局变化' : '点击启用全局诊断'}</small></div>
                     <span class="material-symbols-rounded arrow">chevron_right</span>
                 </div>
+            </div>
+            ${this.renderProfileVersionFooter ? this.renderProfileVersionFooter() : ''}`;
+        },
+
+        renderProfileVersionFooter() {
+            const version = this.detectAppVersion?.() || '';
+            const cache = (typeof caches !== 'undefined' && this._cachedSwName) ? this._cachedSwName : '';
+            const sub = cache ? `Service Worker · ${this.escapeHtml(cache)}` : 'Service Worker · (未注册)';
+            return `<div class="profile-version-footer" id="profileVersionFooter">
+                <div class="pvf-title">版本 ${this.escapeHtml(version || '--')}</div>
+                <div class="pvf-sub">${sub}</div>
+                <button type="button" class="pvf-copy" onclick="data.copyAppVersionInfo?.()">复制版本信息</button>
             </div>`;
+        },
+
+        detectAppVersion() {
+            // Read the ?v=N param from any of the cache-busted asset tags Kilo emits in index.html.
+            try {
+                const node = document.querySelector('script[src*="?v="], link[href*="?v="]');
+                const src = node?.getAttribute('src') || node?.getAttribute('href') || '';
+                const m = src.match(/[?&]v=([^&"'\s]+)/);
+                if (m) return 'v' + m[1];
+            } catch {}
+            return '';
+        },
+
+        async refreshSwCacheName() {
+            if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return;
+            try {
+                const reg = await navigator.serviceWorker.getRegistration();
+                if (!reg) return;
+                if (typeof caches !== 'undefined') {
+                    const names = await caches.keys();
+                    const main = names.find(n => /training-assistant-/.test(n)) || names[0] || '';
+                    if (main && main !== this._cachedSwName) {
+                        this._cachedSwName = main;
+                        const footer = document.getElementById('profileVersionFooter');
+                        if (footer) footer.outerHTML = this.renderProfileVersionFooter();
+                    }
+                }
+            } catch {}
+        },
+
+        copyAppVersionInfo() {
+            const version = this.detectAppVersion?.() || '--';
+            const cache = this._cachedSwName || '(unknown)';
+            const ua = navigator.userAgent || '';
+            const text = `app=${version}\nsw-cache=${cache}\nua=${ua}\ntime=${new Date().toISOString()}`;
+            try {
+                const ta = document.createElement('textarea');
+                ta.value = text;
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                ta.remove();
+                if (typeof toast?.show === 'function') toast.show('已复制版本信息');
+            } catch (e) {
+                if (typeof toast?.show === 'function') toast.show('复制失败：' + e.message, 'error');
+            }
         },
 
         renderRoutines() {

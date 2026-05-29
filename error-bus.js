@@ -119,6 +119,112 @@
         originalFetch = null;
     }
 
+    let layoutWatcherStop = null;
+
+    function startLayoutWatcher() {
+        if (layoutWatcherStop) return;
+        if (typeof document === 'undefined' || typeof MutationObserver !== 'function') return;
+
+        const sample = (page, label) => {
+            if (!page) return;
+            const id = page.id || '?';
+            const samples = {};
+            const targets = page.querySelectorAll('.workout-actions, .quick-dock, .global-training-bar, .ai-input, .composer, .advice-scroll-rail, [class*="sticky"], [class*="fixed"], button[onclick*="startWorkout"], button[onclick*="resumeWorkout"]');
+            targets.forEach((el, i) => {
+                if (i > 12) return;
+                const r = el.getBoundingClientRect();
+                if (!r.width && !r.height) return;
+                const key = (el.className || el.tagName || '').toString().slice(0, 40) + '#' + i;
+                samples[key] = `${Math.round(r.left)},${Math.round(r.top)} ${Math.round(r.width)}×${Math.round(r.height)}`;
+            });
+            const pageRect = page.getBoundingClientRect();
+            pushDebug('info', 'layout', [`${label} page=${id}`], {
+                pageRect: `${Math.round(pageRect.left)},${Math.round(pageRect.top)} ${Math.round(pageRect.width)}×${Math.round(pageRect.height)}`,
+                pageScrollTop: page.scrollTop || 0,
+                windowScrollY: window.scrollY || 0,
+                viewport: `${window.innerWidth}×${window.innerHeight}`,
+                samples
+            });
+        };
+
+        const compareSamples = (before, after) => {
+            const diffs = [];
+            const beforeMap = new Map(Object.entries(before.samples || {}));
+            for (const [key, val] of Object.entries(after.samples || {})) {
+                const prev = beforeMap.get(key);
+                if (prev && prev !== val) diffs.push(`${key}: ${prev} → ${val}`);
+                else if (!prev) diffs.push(`${key}: + ${val}`);
+            }
+            return diffs;
+        };
+
+        const onPageChange = (newPage) => {
+            const id = newPage?.id || '?';
+            const t0 = window.performance?.now?.() || Date.now();
+            const before = {
+                pageRect: newPage?.getBoundingClientRect?.(),
+                samples: (() => {
+                    const out = {};
+                    newPage?.querySelectorAll('.workout-actions, .quick-dock, .global-training-bar, .ai-input, .composer, .advice-scroll-rail, [class*="sticky"], [class*="fixed"], button[onclick*="startWorkout"], button[onclick*="resumeWorkout"]')?.forEach((el, i) => {
+                        if (i > 12) return;
+                        const r = el.getBoundingClientRect();
+                        if (!r.width && !r.height) return;
+                        const key = (el.className || el.tagName || '').toString().slice(0, 40) + '#' + i;
+                        out[key] = `${Math.round(r.left)},${Math.round(r.top)} ${Math.round(r.width)}×${Math.round(r.height)}`;
+                    });
+                    return out;
+                })()
+            };
+
+            sample(newPage, `activate frame=0`);
+            requestAnimationFrame(() => {
+                sample(newPage, `activate frame=1`);
+                requestAnimationFrame(() => {
+                    sample(newPage, `activate frame=2`);
+                    setTimeout(() => {
+                        sample(newPage, `activate frame=settled`);
+                        const afterSamples = {};
+                        newPage?.querySelectorAll('.workout-actions, .quick-dock, .global-training-bar, .ai-input, .composer, .advice-scroll-rail, [class*="sticky"], [class*="fixed"], button[onclick*="startWorkout"], button[onclick*="resumeWorkout"]')?.forEach((el, i) => {
+                            if (i > 12) return;
+                            const r = el.getBoundingClientRect();
+                            if (!r.width && !r.height) return;
+                            const key = (el.className || el.tagName || '').toString().slice(0, 40) + '#' + i;
+                            afterSamples[key] = `${Math.round(r.left)},${Math.round(r.top)} ${Math.round(r.width)}×${Math.round(r.height)}`;
+                        });
+                        const diffs = compareSamples(before, { samples: afterSamples });
+                        if (diffs.length) {
+                            pushDebug('warn', 'layout-shift', [`page=${id} 切换后位置变化 ${diffs.length} 处 (耗时 ${Math.round((window.performance?.now?.() || Date.now()) - t0)}ms)`], { diffs });
+                        }
+                    }, 350);
+                });
+            });
+        };
+
+        const pageObservers = [];
+        document.querySelectorAll('.page').forEach(page => {
+            const observer = new MutationObserver(records => {
+                for (const r of records) {
+                    if (r.type === 'attributes' && r.attributeName === 'class') {
+                        if (page.classList.contains('active')) onPageChange(page);
+                    }
+                }
+            });
+            observer.observe(page, { attributes: true, attributeFilter: ['class'] });
+            pageObservers.push(observer);
+        });
+
+        layoutWatcherStop = () => {
+            pageObservers.forEach(o => o.disconnect());
+        };
+    }
+
+    function stopLayoutWatcher() {
+        if (layoutWatcherStop) {
+            try { layoutWatcherStop(); } catch {}
+            layoutWatcherStop = null;
+        }
+    }
+
     const errorBus = {
         report(scope, err, meta) {
             try {
@@ -173,6 +279,7 @@
             debugMode = true;
             patchConsole();
             patchFetch();
+            startLayoutWatcher();
             pushDebug('info', 'debug', ['debug bus enabled']);
         },
         disableDebug() {
@@ -180,6 +287,7 @@
             debugMode = false;
             unpatchConsole();
             unpatchFetch();
+            stopLayoutWatcher();
             debugQueue.length = 0;
             try { sessionStorage.removeItem('rehabDebugBus'); } catch {}
         }

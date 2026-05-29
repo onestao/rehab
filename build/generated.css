@@ -9203,6 +9203,45 @@ body.is-training .fab-pip.active {
     .profile-stats { padding-left: 8px; }
 }
 
+/* --- Version footer (visible at the bottom of the profile page) --- */
+.profile-version-footer {
+    margin-top: 14px;
+    padding: 12px 14px;
+    border-radius: 16px;
+    background: var(--md-sys-surface-container-lowest);
+    border: 1px solid var(--md-sys-outline-variant);
+    text-align: center;
+    color: var(--md-sys-on-surface-variant);
+    font-size: 12px;
+    line-height: 1.5;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+}
+.profile-version-footer .pvf-title {
+    font-weight: 600;
+    color: var(--md-sys-on-surface);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.3px;
+}
+.profile-version-footer .pvf-sub {
+    font-size: 11px;
+    color: var(--md-sys-on-surface-variant);
+    word-break: break-all;
+}
+.profile-version-footer .pvf-copy {
+    margin-top: 4px;
+    font-size: 11px;
+    padding: 4px 12px;
+    border-radius: 999px;
+    border: 1px solid var(--md-sys-outline-variant);
+    background: var(--md-sys-surface-container);
+    color: var(--md-sys-on-surface);
+    cursor: pointer;
+}
+.profile-version-footer .pvf-copy:active { transform: scale(0.96); }
+
 }
 @layer components {
 /* --- V6 Bottom Navigation Rail --- */
