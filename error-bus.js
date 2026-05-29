@@ -121,39 +121,76 @@
 
     let layoutWatcherStop = null;
 
+    function collectLayoutSamples(page) {
+        const samples = {};
+        if (!page) return samples;
+        const seen = new Set();
+        const push = (el, prefix) => {
+            if (!el || seen.has(el)) return;
+            seen.add(el);
+            const r = el.getBoundingClientRect();
+            if (!r.width && !r.height) return;
+            const cls = (el.className || '').toString().slice(0, 50).replace(/\s+/g, '.');
+            const id = el.id ? '#' + el.id : '';
+            const tag = el.tagName ? el.tagName.toLowerCase() : '';
+            const name = `${prefix}:${tag}${id}.${cls}`.slice(0, 90);
+            if (samples[name]) return;
+            samples[name] = `${Math.round(r.left)},${Math.round(r.top)} ${Math.round(r.width)}×${Math.round(r.height)}`;
+            if (Object.keys(samples).length >= 25) throw new Error('__SAMPLES_FULL__');
+        };
+        try {
+            // 1) Direct children of the page (top-level layout slots).
+            Array.from(page.children).forEach((c, i) => push(c, `child${i}`));
+
+            // 2) Every sticky / fixed positioned descendant.
+            page.querySelectorAll('*').forEach(el => {
+                if (Object.keys(samples).length >= 25) throw new Error('__SAMPLES_FULL__');
+                try {
+                    const cs = getComputedStyle(el);
+                    if (cs.position === 'sticky' || cs.position === 'fixed') push(el, 'pos');
+                } catch {}
+            });
+
+            // 3) Frequently-shifted UI: docks, bars, fabs, action rows, big buttons that act as primary CTA.
+            page.querySelectorAll('.dock, [class*="dock"], [class*="-bar"], [class*="-actions"], [class*="-fab"], .fab, .quick-dock, .ai-input, .composer, .advice-scroll-rail, .global-training-bar, .workout-fab, .start-btn, .primary-action, button.primary')
+                .forEach(el => push(el, 'tag'));
+        } catch (e) {
+            if (e?.message !== '__SAMPLES_FULL__') {
+                pushDebug('warn', 'layout-collect', [String(e?.message || e)]);
+            }
+        }
+        return samples;
+    }
+
     function startLayoutWatcher() {
         if (layoutWatcherStop) return;
         if (typeof document === 'undefined' || typeof MutationObserver !== 'function') return;
 
         const sample = (page, label) => {
-            if (!page) return;
+            if (!page) return null;
             const id = page.id || '?';
-            const samples = {};
-            const targets = page.querySelectorAll('.workout-actions, .quick-dock, .global-training-bar, .ai-input, .composer, .advice-scroll-rail, [class*="sticky"], [class*="fixed"], button[onclick*="startWorkout"], button[onclick*="resumeWorkout"]');
-            targets.forEach((el, i) => {
-                if (i > 12) return;
-                const r = el.getBoundingClientRect();
-                if (!r.width && !r.height) return;
-                const key = (el.className || el.tagName || '').toString().slice(0, 40) + '#' + i;
-                samples[key] = `${Math.round(r.left)},${Math.round(r.top)} ${Math.round(r.width)}×${Math.round(r.height)}`;
-            });
+            const samples = collectLayoutSamples(page);
             const pageRect = page.getBoundingClientRect();
-            pushDebug('info', 'layout', [`${label} page=${id}`], {
+            pushDebug('info', 'layout', [`${label} page=${id} samples=${Object.keys(samples).length}`], {
                 pageRect: `${Math.round(pageRect.left)},${Math.round(pageRect.top)} ${Math.round(pageRect.width)}×${Math.round(pageRect.height)}`,
                 pageScrollTop: page.scrollTop || 0,
                 windowScrollY: window.scrollY || 0,
                 viewport: `${window.innerWidth}×${window.innerHeight}`,
                 samples
             });
+            return samples;
         };
 
         const compareSamples = (before, after) => {
             const diffs = [];
-            const beforeMap = new Map(Object.entries(before.samples || {}));
-            for (const [key, val] of Object.entries(after.samples || {})) {
+            const beforeMap = new Map(Object.entries(before || {}));
+            for (const [key, val] of Object.entries(after || {})) {
                 const prev = beforeMap.get(key);
-                if (prev && prev !== val) diffs.push(`${key}: ${prev} → ${val}`);
-                else if (!prev) diffs.push(`${key}: + ${val}`);
+                if (prev && prev !== val) diffs.push(`${key} : ${prev} → ${val}`);
+                else if (!prev) diffs.push(`${key} : (新增) ${val}`);
+            }
+            for (const [key, val] of beforeMap) {
+                if (!(key in (after || {}))) diffs.push(`${key} : ${val} → (消失)`);
             }
             return diffs;
         };
@@ -161,39 +198,16 @@
         const onPageChange = (newPage) => {
             const id = newPage?.id || '?';
             const t0 = window.performance?.now?.() || Date.now();
-            const before = {
-                pageRect: newPage?.getBoundingClientRect?.(),
-                samples: (() => {
-                    const out = {};
-                    newPage?.querySelectorAll('.workout-actions, .quick-dock, .global-training-bar, .ai-input, .composer, .advice-scroll-rail, [class*="sticky"], [class*="fixed"], button[onclick*="startWorkout"], button[onclick*="resumeWorkout"]')?.forEach((el, i) => {
-                        if (i > 12) return;
-                        const r = el.getBoundingClientRect();
-                        if (!r.width && !r.height) return;
-                        const key = (el.className || el.tagName || '').toString().slice(0, 40) + '#' + i;
-                        out[key] = `${Math.round(r.left)},${Math.round(r.top)} ${Math.round(r.width)}×${Math.round(r.height)}`;
-                    });
-                    return out;
-                })()
-            };
-
-            sample(newPage, `activate frame=0`);
+            const initialSamples = sample(newPage, 'activate frame=0');
             requestAnimationFrame(() => {
-                sample(newPage, `activate frame=1`);
+                sample(newPage, 'activate frame=1');
                 requestAnimationFrame(() => {
-                    sample(newPage, `activate frame=2`);
+                    sample(newPage, 'activate frame=2');
                     setTimeout(() => {
-                        sample(newPage, `activate frame=settled`);
-                        const afterSamples = {};
-                        newPage?.querySelectorAll('.workout-actions, .quick-dock, .global-training-bar, .ai-input, .composer, .advice-scroll-rail, [class*="sticky"], [class*="fixed"], button[onclick*="startWorkout"], button[onclick*="resumeWorkout"]')?.forEach((el, i) => {
-                            if (i > 12) return;
-                            const r = el.getBoundingClientRect();
-                            if (!r.width && !r.height) return;
-                            const key = (el.className || el.tagName || '').toString().slice(0, 40) + '#' + i;
-                            afterSamples[key] = `${Math.round(r.left)},${Math.round(r.top)} ${Math.round(r.width)}×${Math.round(r.height)}`;
-                        });
-                        const diffs = compareSamples(before, { samples: afterSamples });
+                        const settled = sample(newPage, 'activate frame=settled');
+                        const diffs = compareSamples(initialSamples, settled);
                         if (diffs.length) {
-                            pushDebug('warn', 'layout-shift', [`page=${id} 切换后位置变化 ${diffs.length} 处 (耗时 ${Math.round((window.performance?.now?.() || Date.now()) - t0)}ms)`], { diffs });
+                            pushDebug('warn', 'layout-shift', [`page=${id} 切换后 ${diffs.length} 处位置变化 (耗时 ${Math.round((window.performance?.now?.() || Date.now()) - t0)}ms)`], { diffs });
                         }
                     }, 350);
                 });
