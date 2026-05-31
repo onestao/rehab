@@ -38,7 +38,28 @@
                 ? (nextIndex > previousIndex ? 'next' : 'prev')
                 : '';
             this.routineView = next;
+            this.syncRoutineSubpageNav?.(next);
             this.renderRoutines();
+        },
+
+        syncRoutineSubpageNav(view) {
+            if (this._closingRoutineSubpage) return;
+            const next = this.normalizeRoutineView(view);
+            if (next === 'home') {
+                window.navStack?.popType?.('subtab');
+                return;
+            }
+            window.navStack?.replaceOrPush?.({
+                type: 'subtab',
+                id: 'routine',
+                close: () => {
+                    this._closingRoutineSubpage = true;
+                    this.routineView = 'home';
+                    this.renderRoutines?.();
+                    this._closingRoutineSubpage = false;
+                    return true;
+                }
+            });
         },
 
         routineViewOrder() {
