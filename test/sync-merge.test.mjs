@@ -123,6 +123,7 @@ test('backupCounts summarizes core restore preview entities', () => {
         exercise: 1,
         weight: 1,
         rehabWeekly: 1,
-        advice: 1
+        advice: 1,
+        aiInsightCache: 0
     });
 });

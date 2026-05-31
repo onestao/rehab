@@ -41,7 +41,6 @@
 /* ── Shared plan progress (compact) ── */
 .ai-plan-shared { background: var(--glass-bg-strong); border: 1px solid var(--glass-border); border-radius: 12px; padding: 6px 10px; }
 .ai-plan-row { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--md-sys-on-surface-variant); }
-.ai-plan-row .ai-plan-tag { font-size: 8.5px; padding: 1px 5px; border-radius: 5px; background: var(--md-sys-surface-container-high); color: var(--md-sys-on-surface-variant); font-weight: 600; text-transform: uppercase; }
 .ai-plan-row .ai-plan-name { color: var(--md-sys-on-surface); font-weight: 600; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ai-plan-row .ai-plan-meta { font-variant-numeric: tabular-nums; flex-shrink: 0; }
 .ai-plan-bar { margin-top: 4px; height: 3px; border-radius: 999px; background: var(--md-sys-surface-container-high); overflow: hidden; display: flex; }
@@ -83,6 +82,12 @@
 .ai-llm-skeleton .ai-llm-short { width: 55%; }
 @keyframes ai-shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
 .ai-offline-note { font-size: 10.5px; color: var(--md-sys-on-amber-container); background: var(--md-sys-amber-container); border-radius: 10px; padding: 5px 8px; display: flex; align-items: center; gap: 5px; }
+.ai-insight-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.ai-insight-action { display: inline-flex; align-items: center; gap: 4px; min-height: 30px; padding: 5px 10px; border-radius: 999px; border: 1px solid var(--md-sys-outline-variant); background: var(--md-sys-surface-container-lowest); color: var(--md-sys-on-surface); font-size: 10.5px; font-weight: 600; cursor: pointer; }
+.ai-insight-action .material-symbols-rounded { font-size: 15px; }
+.ai-insight-action.primary { border-color: transparent; background: var(--md-sys-primary); color: var(--md-sys-on-primary); }
+.ai-insight-action.tertiary { border-color: transparent; background: var(--md-sys-tertiary-container); color: var(--md-sys-on-tertiary-container); }
+.ai-insight-action:active { transform: scale(.96); }
 
 .ai-msg-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
 .ai-msg { max-width: 88%; padding: 10px 14px; border-radius: 18px; font-size: 12px; line-height: 1.5; }

@@ -191,7 +191,8 @@ function compareCounts(remoteCounts, localDb, dropRatio = 0.5) {
         food:     () => localDb?.health?.foodLogs?.length || 0,
         exercise: () => localDb?.health?.exerciseLogs?.length || 0,
         weight:   () => localDb?.health?.weights?.length || 0,
-        rehabWeekly: () => localDb?.health?.rehabWeekly?.length || 0
+        rehabWeekly: () => localDb?.health?.rehabWeekly?.length || 0,
+        aiInsightCache: () => localDb?.health?.aiInsightCache ? 1 : 0
     };
     for (const k of Object.keys(remoteCounts)) {
         const r = Number(remoteCounts[k] || 0);
@@ -220,7 +221,8 @@ function backupCounts(dbObj = {}) {
         exercise: health.exerciseLogs?.length || 0,
         weight: health.weights?.length || 0,
         rehabWeekly: health.rehabWeekly?.length || 0,
-        advice: health.aiAdviceChat?.length || 0
+        advice: health.aiAdviceChat?.length || 0,
+        aiInsightCache: health.aiInsightCache ? 1 : 0
     };
 }
 

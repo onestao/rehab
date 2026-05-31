@@ -26,6 +26,7 @@ cloud_alert
 cloud_done
 cloud_off
 cloud_sync
+compare_arrows
 content_copy
 dark_mode
 delete
@@ -94,6 +95,7 @@ replay
 restart_alt
 restaurant
 rowing
+rule
 save
 schedule
 search

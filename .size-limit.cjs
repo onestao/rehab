@@ -20,5 +20,5 @@ module.exports = [
   },
   { name: 'generated-css', path: 'build/generated.css', limit: '80 KB' },
   { name: 'workout-bundle', path: 'workout-*.js', limit: '50 KB' },
-  { name: 'ai-bundle', path: ['ai-*.js', 'advice-*.js'], limit: '52 KB' }
+  { name: 'ai-bundle', path: ['ai-*.js', 'advice-*.js'], limit: '55 KB' }
 ];

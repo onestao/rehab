@@ -113,6 +113,15 @@ const advicePanel = {
             saveAdviceRoutine: this.saveAdviceRoutine,
             renderAdvicePanel: this.renderAdvicePanel,
             toggleAiInsight: this.toggleAiInsight,
+            requestInsightAiAdvice: this.requestInsightAiAdvice,
+            insightCacheKey: this.insightCacheKey,
+            getInsightCache: this.getInsightCache,
+            setInsightCache: this.setInsightCache,
+            parseTrainingClassificationResponse: this.parseTrainingClassificationResponse,
+            cacheTrainingClassifications: this.cacheTrainingClassifications,
+            updateInsightAiBlock: this.updateInsightAiBlock,
+            resizeInsightBody: this.resizeInsightBody,
+            runInsightAction: this.runInsightAction,
             setAdviceStreamUiState: this.setAdviceStreamUiState,
             toggleAdviceStreamRender: this.toggleAdviceStreamRender,
             flushAdviceStreamRender: this.flushAdviceStreamRender,
@@ -2117,6 +2126,163 @@ const advicePanel = {
         </div>`;
     },
 
+    async requestInsightAiAdvice(options = {}) {
+        const ctx = this._lastInsightCtx || {};
+        const a = ctx.analysis || {};
+        const m = ctx.metrics || {};
+        const block = document.getElementById('aiInsightLlmBlock');
+        if (!block) return;
+        const today = this.logicalDateKey?.() || new Date().toISOString().slice(0, 10);
+        const cacheKey = this.insightCacheKey?.(ctx, today) || today;
+        const cached = !options.force ? this.getInsightCache?.(cacheKey, today) : null;
+        if (cached?.html) {
+            this.updateInsightAiBlock(cached.html);
+            return;
+        }
+        const effective = ai.getEffectiveConfig?.() || ai.cfg || {};
+        if (!effective.enabled) {
+            const local = ctx.diag ? (this.renderLocalAdvice?.(ctx.diag) || '') : '';
+            this.updateInsightAiBlock(local || '<div class="ai-llm-label">本地建议</div><div>AI 未配置，已保留本地分析。</div>');
+            return;
+        }
+        if (this._insightAiStreaming && !options.force) return;
+        this._insightAiStreaming = true;
+        block.className = 'ai-llm-block ai-llm-skeleton';
+        block.innerHTML = '<div class="ai-llm-label"><span class="ai-llm-dot"></span> AI 正在生成具体建议…</div><div class="ai-llm-line"></div><div class="ai-llm-line"></div><div class="ai-llm-line ai-llm-short"></div>';
+        try {
+            const messages = [
+                { role: 'system', content: '你是训练与营养健康顾问。只基于数据，用3条以内短建议，必须可执行。若存在待判训练标签，先判断它们属于 push、pull、lower、core、cardio、rehab 之一，并在最后用 JSON 单独输出：{"classifications":[{"label":"原标签","bucket":"lower"}],"advice":"建议正文"}。bucket 只能用这六个英文值。' },
+                { role: 'user', content: `计划:${ctx.planTitle || '无'} ${ctx.planProgress || '--'} 下一项:${ctx.nextItemName || '无'}
+饮食:蛋白${Math.round(m.proIntake || 0)}${m.proGoal ? '/' + Math.round(m.proGoal) + 'g' : 'g'} 热量${Math.round(m.calIntake || 0)}${m.calGoal ? '/' + Math.round(m.calGoal) + 'kcal' : 'kcal'}
+训练:负荷${a.weeklyVolumeLoad ?? '--'}kg·rep 变化${a.volumeDelta ?? '--'}% 连续${a.streakDays ?? '--'}天 恢复${a.recoveryIndex ?? '--'}% 分布${a.pushPullRatio || '--'} 待判:${(a.unknownTrainingLabels || []).join('、') || '无'}
+PR:${a.prLift || '无'} 1RM${a.prDistance || '--'} ${a.prWeight || '--'}kg${a.prReps ? 'x' + a.prReps : ''} 进阶:${ctx.progression?.suggestion || 'maintain'} ${ctx.progression?.reason || ''}
+规则:${ctx.diag ? `${ctx.diag.title || ''} ${ctx.diag.subtitle || ''}` : '无告警'}` }
+            ];
+            const text = await ai.call(messages, 700);
+            const parsed = this.parseTrainingClassificationResponse?.(text) || { advice: text, classifications: [] };
+            this.cacheTrainingClassifications?.(parsed.classifications);
+            const updatedCtx = parsed.classifications?.length && this.buildPlanAnalytics ? { ...ctx, ...this.buildPlanAnalytics() } : ctx;
+            this._lastInsightCtx = { ...updatedCtx };
+            const html = `<div class="ai-llm-label">AI 跨域建议</div>${this.renderAdviceMarkdown(parsed.advice || text)}`;
+            this.setInsightCache?.(cacheKey, today, html, { text: parsed.advice || text, classifications: parsed.classifications || [], analysis: updatedCtx.analysis || {} });
+            this.updateInsightAiBlock(html);
+            if (parsed.classifications?.length && this._aiInsightExpanded) {
+                this._cachedInsightHtml = html;
+                this._insightBodyRendered = false;
+                this.rerenderAdvicePanel?.({ refreshMessages: false });
+            }
+        } catch (error) {
+            const local = ctx.diag ? (this.renderLocalAdvice?.(ctx.diag) || '') : '';
+            const msg = window.toast?.sanitize ? toast.sanitize(error) : (error?.message || 'AI 建议生成失败');
+            this.updateInsightAiBlock(local || `<div class="ai-llm-label">本地建议</div><div>AI 暂不可用：${this.escapeHtml(msg)}。</div>`);
+        } finally {
+            this._insightAiStreaming = false;
+            this.resizeInsightBody?.();
+        }
+    },
+
+    updateInsightAiBlock(html = '') {
+        const block = document.getElementById('aiInsightLlmBlock');
+        if (!block) return;
+        block.className = 'ai-llm-block';
+        block.innerHTML = html;
+        this.resizeInsightBody?.();
+    },
+
+    insightCacheKey(ctx = {}, today = '') {
+        const a = ctx.analysis || {};
+        return [
+            today,
+            ctx.planProgress || '',
+            ctx.planTitle || '',
+            ctx.nextItemName || '',
+            a.pushPullRatio || '',
+            (a.unknownTrainingLabels || []).join('|'),
+            a.weeklyVolumeLoad ?? '',
+            a.recoveryIndex ?? '',
+            ctx.diag?.id || ctx.diag?.title || ''
+        ].join('::').slice(0, 500);
+    },
+
+    getInsightCache(key = '', today = '') {
+        const cache = this.db.health?.aiInsightCache;
+        if (!cache || cache.date !== today || cache.key !== key || !cache.html) return null;
+        return cache;
+    },
+
+    setInsightCache(key = '', today = '', html = '', payload = {}) {
+        this.db.health = this.db.health || {};
+        this.db.health.aiInsightCache = {
+            id: 'ai-insight-cache',
+            date: today,
+            key,
+            html,
+            payload,
+            updatedAt: Date.now(),
+            deleted: false
+        };
+        this.save?.({ render: false });
+    },
+
+    parseTrainingClassificationResponse(raw = '') {
+        const text = String(raw || '').trim();
+        const parseJson = (value) => { try { return JSON.parse(value); } catch { return null; } };
+        const json = parseJson(text)
+            || parseJson((text.match(/```(?:json)?\s*([\s\S]*?)```/i) || [])[1] || '')
+            || parseJson((text.match(/\{[\s\S]*\}/) || [])[0] || '');
+        if (!json || typeof json !== 'object') return { advice: text, classifications: [] };
+        const allowed = new Set(['push', 'pull', 'lower', 'core', 'cardio', 'rehab']);
+        const classifications = (Array.isArray(json.classifications) ? json.classifications : [])
+            .map(item => ({ label: String(item?.label || item?.name || '').trim(), bucket: String(item?.bucket || item?.category || '').trim().toLowerCase() }))
+            .filter(item => item.label && allowed.has(item.bucket))
+            .slice(0, 24);
+        return { advice: String(json.advice || json.suggestion || json.text || text).trim(), classifications };
+    },
+
+    cacheTrainingClassifications(classifications = []) {
+        const normalizer = window.planAnalytics;
+        const keyFor = (value) => normalizer?._trainingLabelKey ? normalizer._trainingLabelKey(value) : String(value || '').trim().toLowerCase().replace(/\s+/g, ' ').slice(0, 80);
+        const bucketFor = (value) => normalizer?._normalizeTrainingBucket ? normalizer._normalizeTrainingBucket(value) : value;
+        const valid = (classifications || [])
+            .map(item => ({ label: String(item?.label || '').trim(), bucket: bucketFor(item?.bucket) }))
+            .filter(item => item.label && item.bucket);
+        if (!valid.length) return false;
+        this.db.health = this.db.health || {};
+        const cache = this.db.health.trainingLabelClassifications && typeof this.db.health.trainingLabelClassifications === 'object'
+            ? this.db.health.trainingLabelClassifications
+            : {};
+        const now = Date.now();
+        valid.forEach((item) => {
+            cache[keyFor(item.label)] = { label: item.label, bucket: item.bucket, source: 'ai-insight', updatedAt: now, deleted: false };
+        });
+        this.db.health.trainingLabelClassifications = cache;
+        this.save?.({ render: false });
+        return true;
+    },
+
+    resizeInsightBody() {
+        const body = document.getElementById('aiInsightBody');
+        if (body && this._aiInsightExpanded) body.style.maxHeight = body.scrollHeight + 40 + 'px';
+    },
+
+    runInsightAction(action = '') {
+        const ctx = this._lastInsightCtx || {};
+        if (action === 'continue') {
+            if (ctx.planId && ctx.nextItemId) this.handlePlanTaskTap?.(ctx.planId, ctx.nextItemId);
+            return;
+        }
+        if (action === 'progression') {
+            if (ctx.planId && ctx.nextItemId) this.maybeApplyProgression?.(ctx.planId, ctx.nextItemId);
+            return;
+        }
+        if (action === 'ai') {
+            const today = this.logicalDateKey?.() || new Date().toISOString().slice(0, 10);
+            const key = this.insightCacheKey?.(ctx, today) || today;
+            if (this.db.health?.aiInsightCache?.key === key) this.db.health.aiInsightCache.deleted = true;
+            this.requestInsightAiAdvice?.({ force: true });
+        }
+    },
+
     toggleAiInsight() {
         this._aiInsightExpanded = !this._aiInsightExpanded;
         const card = document.querySelector('.ai-insight');
@@ -2130,11 +2296,14 @@ const advicePanel = {
             if (!this._insightBodyRendered) {
                 const diagCtx = this._lastInsightCtx || {};
                 const diag = diagCtx.diag || null;
-                const llmHtml = diag ? (this.renderLocalAdvice?.(diag) || '') : '';
+                const localHtml = diag ? (this.renderLocalAdvice?.(diag) || '') : '';
+                const llmHtml = `<div id="aiInsightLlmBlock" class="ai-llm-block">${this._cachedInsightHtml || localHtml || '<div class="ai-llm-label"><span class="material-symbols-rounded" style="font-size:14px">tips_and_updates</span> AI 建议</div><div>展开后将基于今日训练、饮食和恢复数据生成建议。</div>'}</div>`;
                 const expandableHtml = this.renderInsightExpandable?.({ ...diagCtx, llmHtml, llmStreaming: false }) || '';
                 body.innerHTML = expandableHtml;
                 this._insightBodyRendered = true;
                 requestAnimationFrame(() => { body.style.maxHeight = body.scrollHeight + 40 + 'px'; });
+                if (!this._cachedInsightHtml) this.requestInsightAiAdvice?.();
+                this._cachedInsightHtml = '';
             }
         } else {
             card.classList.remove('expanded');

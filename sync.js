@@ -184,6 +184,7 @@ const sync = {
             rehabWeekly: health.rehabWeekly || [],
             healthProfile: health.profile && typeof health.profile === 'object' ? [health.profile] : [],
             aiAdviceChat: health.aiAdviceChat || [],
+            aiInsightCache: health.aiInsightCache ? [health.aiInsightCache] : [],
             aiCipher: db.aiCipher ? [db.aiCipher] : []
         };
     },
@@ -370,6 +371,14 @@ const sync = {
                         db.health.aiAdviceChat = value;
                     }
                 };
+            case 'aiInsightCache':
+                return {
+                    get: () => (db.health || {}).aiInsightCache ? [db.health.aiInsightCache] : [],
+                    set: (value) => {
+                        db.health = db.health || {};
+                        db.health.aiInsightCache = (value || [])[0] || null;
+                    }
+                };
             case 'aiCipher':
                 return {
                     get: () => db.aiCipher ? [db.aiCipher] : [],
@@ -452,7 +461,8 @@ const sync = {
                         food:     () => localDb?.health?.foodLogs?.length || 0,
                         exercise: () => localDb?.health?.exerciseLogs?.length || 0,
                         weight:   () => localDb?.health?.weights?.length || 0,
-                        rehabWeekly: () => localDb?.health?.rehabWeekly?.length || 0
+                        rehabWeekly: () => localDb?.health?.rehabWeekly?.length || 0,
+                        aiInsightCache: () => localDb?.health?.aiInsightCache ? 1 : 0
                     };
                     for (const k of Object.keys(remoteCounts)) {
                         const r = Number(remoteCounts[k] || 0);

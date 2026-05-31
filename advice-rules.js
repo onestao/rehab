@@ -86,7 +86,7 @@ const adviceRules = {
             cells.push(`<div class="ai-ana-cell"><div class="ai-ana-l">本周训练负荷</div><div class="ai-ana-v">${esc(String(a.weeklyVolumeLoad))} ${delta(a.volumeDelta)}</div><div class="ai-ana-h">vs 上周 ${esc(String(a.lastWeekVolumeLoad || '--'))} kg·rep</div></div>`);
         }
         if (a.prDistance != null) {
-            cells.push(`<div class="ai-ana-cell"><div class="ai-ana-l">距 PR 距离</div><div class="ai-ana-v">${esc(String(a.prDistance))}<span class="ai-ana-delta up">本月新近</span></div><div class="ai-ana-h">${esc(a.prLift || '最近动作')} PR ${esc(String(a.prWeight || '--'))}</div></div>`);
+            cells.push(`<div class="ai-ana-cell"><div class="ai-ana-l">估算 PR</div><div class="ai-ana-v">${esc(String(a.prDistance))}<span class="ai-ana-delta up">1RM</span></div><div class="ai-ana-h">${esc(a.prLift || '最近动作')} · ${esc(String(a.prWeight || '--'))}kg${a.prReps ? ' × ' + esc(String(a.prReps)) : ''}</div></div>`);
         }
         if (a.streakDays != null) {
             const streakTag = a.streakDays >= 3
@@ -95,7 +95,7 @@ const adviceRules = {
             cells.push(`<div class="ai-ana-cell"><div class="ai-ana-l">连续训练</div><div class="ai-ana-v">${esc(String(a.streakDays))} ${streakTag}</div><div class="ai-ana-h">${a.streakDays >= 3 ? '建议轻量或休息' : '状态良好'}</div></div>`);
         }
         if (a.pushPullRatio) {
-            cells.push(`<div class="ai-ana-cell"><div class="ai-ana-l">部位均衡</div><div class="ai-ana-v">推:拉</div><div class="ai-ana-h">${esc(a.pushPullRatio)}</div></div>`);
+            cells.push(`<div class="ai-ana-cell"><div class="ai-ana-l">部位均衡</div><div class="ai-ana-v">分布</div><div class="ai-ana-h">${esc(a.pushPullRatio)}</div></div>`);
         }
 
         const recoveryBar = a.recoveryIndex != null
@@ -114,6 +114,7 @@ const adviceRules = {
         const offlineNote = ctx.offline
             ? '<div class="ai-offline-note"><span class="material-symbols-rounded" style="font-size:16px">cloud_off</span>暂时无法连接 AI 服务，已切换到本地建议库。</div>'
             : '';
+        const actions = this.renderInsightActions?.(ctx) || '';
 
         return `
             <div class="ai-insight-body">
@@ -122,8 +123,29 @@ const adviceRules = {
                     ${cells.length ? `<div class="ai-analysis-block"><div class="ai-analysis-head"><span>📊 训练分析</span></div><div class="ai-analysis-grid">${cells.join('')}</div>${recoveryBar}</div>` : ''}
                     ${offlineNote}
                     ${llmBlock}
+                    ${actions}
                 </div>
             </div>`;
+    },
+
+    renderInsightActions(ctx = {}) {
+        const esc = window.renderSafe?.escapeHtml || window.data?.escapeHtml || (s => s);
+        const planId = esc(ctx.planId || '');
+        const taskId = esc(ctx.nextItemId || '');
+        const actions = [];
+        if (ctx.planId && ctx.nextItemId) {
+            actions.push(`<button class="ai-insight-action tertiary" type="button" onclick="event.stopPropagation();data.runInsightAction('continue')"><span class="material-symbols-rounded">play_arrow</span>继续训练</button>`);
+        }
+        if (ctx.progression?.canApply && ctx.planId && ctx.nextItemId) {
+            const label = ctx.progression.suggestion === 'upgrade' ? '应用进阶' : '应用降阶';
+            actions.push(`<button class="ai-insight-action primary" type="button" onclick="event.stopPropagation();data.runInsightAction('progression')"><span class="material-symbols-rounded">trending_up</span>${esc(label)}</button>`);
+        }
+        if (ctx.planId) {
+            actions.push(`<button class="ai-insight-action" type="button" onclick="event.stopPropagation();data.openPlanTaskDrawer('${planId}')"><span class="material-symbols-rounded">checklist</span>查看计划</button>`);
+        }
+        actions.push(`<button class="ai-insight-action" type="button" onclick="event.stopPropagation();data.runInsightAction('ai')"><span class="material-symbols-rounded">auto_awesome</span>刷新 AI 建议</button>`);
+        if (!actions.length) return '';
+        return `<div class="ai-insight-actions" data-plan-id="${planId}" data-task-id="${taskId}">${actions.join('')}</div>`;
     },
 
     _renderFallbackHeader(ctx) {
@@ -261,6 +283,7 @@ const adviceRules = {
             renderInsightHeader: this.renderInsightHeader.bind(this),
             renderInsightBaseline: this.renderInsightBaseline.bind(this),
             renderInsightExpandable: this.renderInsightExpandable.bind(this),
+            renderInsightActions: this.renderInsightActions.bind(this),
             renderLocalAdvice: this.renderLocalAdvice.bind(this),
         });
     },
