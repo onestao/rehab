@@ -2,7 +2,7 @@
 (function () {
     const errorBus = window.errorBus;
     const ARTWORK = [
-        { src: 'https://cdn-icons-png.flaticon.com/512/2964/2964514.png', sizes: '512x512', type: 'image/png' }
+        { src: 'assets/app-icon.svg', sizes: '512x512', type: 'image/svg+xml' }
     ];
 
     let warned = false;

@@ -190,7 +190,8 @@ function compareCounts(remoteCounts, localDb, dropRatio = 0.5) {
         progressionChains: () => localDb?.progressionChains?.length || 0,
         food:     () => localDb?.health?.foodLogs?.length || 0,
         exercise: () => localDb?.health?.exerciseLogs?.length || 0,
-        weight:   () => localDb?.health?.weights?.length || 0
+        weight:   () => localDb?.health?.weights?.length || 0,
+        rehabWeekly: () => localDb?.health?.rehabWeekly?.length || 0
     };
     for (const k of Object.keys(remoteCounts)) {
         const r = Number(remoteCounts[k] || 0);
@@ -207,6 +208,22 @@ function prepareRemoteSnapshotDb(dbObj) {
     return JSON.parse(JSON.stringify(dbObj || {}));
 }
 
+/** @param {any} dbObj */
+function backupCounts(dbObj = {}) {
+    const health = dbObj.health || {};
+    return {
+        actions: dbObj.actions?.length || 0,
+        routines: dbObj.routines?.length || 0,
+        history: dbObj.history?.length || 0,
+        dailyPlans: dbObj.dailyPlans?.length || 0,
+        food: health.foodLogs?.length || 0,
+        exercise: health.exerciseLogs?.length || 0,
+        weight: health.weights?.length || 0,
+        rehabWeekly: health.rehabWeekly?.length || 0,
+        advice: health.aiAdviceChat?.length || 0
+    };
+}
+
 export {
     mergeIncremental,
     computeRetryDelay,
@@ -220,7 +237,8 @@ export {
     mergeAdviceRecord,
     validatePayload,
     compareCounts,
-    prepareRemoteSnapshotDb
+    prepareRemoteSnapshotDb,
+    backupCounts
 };
 
 if (typeof window !== 'undefined') {
@@ -231,6 +249,6 @@ if (typeof window !== 'undefined') {
         buildS3ObjectKey, hasMeaningfulHealthProfile, mergeHealthProfileRecord,
         mergeRecordsFieldwise, takeQueueBatch,
         mergeAdviceVersions, mergeAdviceRecord,
-        validatePayload, compareCounts, prepareRemoteSnapshotDb
+        validatePayload, compareCounts, prepareRemoteSnapshotDb, backupCounts
     });
 }

@@ -7,7 +7,8 @@ import {
     buildS3ObjectKey,
     hasMeaningfulHealthProfile,
     mergeHealthProfileRecord,
-    prepareRemoteSnapshotDb
+    prepareRemoteSnapshotDb,
+    backupCounts
 } from '../sync-pure.js';
 
 test('mergeIncremental applies LWW by updatedAt', () => {
@@ -97,4 +98,31 @@ test('prepareRemoteSnapshotDb preserves voice engine configuration', () => {
     assert.equal(snapshot.voice.engines[0].header.Authorization, 'Bearer token');
     snapshot.voice.engines[0].header.Authorization = 'changed';
     assert.equal(db.voice.engines[0].header.Authorization, 'Bearer token');
+});
+
+test('backupCounts summarizes core restore preview entities', () => {
+    const counts = backupCounts({
+        actions: [{ id: 'a' }],
+        routines: [{ id: 'r' }],
+        history: [{ id: 'h' }, { id: 'h2' }],
+        dailyPlans: [{ id: 'p' }],
+        health: {
+            foodLogs: [{ id: 'f' }],
+            exerciseLogs: [{ id: 'e' }],
+            weights: [{ id: 'w' }],
+            rehabWeekly: [{ id: 'rw' }],
+            aiAdviceChat: [{ id: 'm' }]
+        }
+    });
+    assert.deepEqual(counts, {
+        actions: 1,
+        routines: 1,
+        history: 2,
+        dailyPlans: 1,
+        food: 1,
+        exercise: 1,
+        weight: 1,
+        rehabWeekly: 1,
+        advice: 1
+    });
 });

@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 390 844" role="img" aria-label="训练助手训练页截图占位">
+  <rect width="390" height="844" rx="38" fill="#f8fafd"/>
+  <rect x="18" y="76" width="354" height="254" rx="30" fill="#111827"/>
+  <text x="195" y="132" text-anchor="middle" font-family="Arial,sans-serif" font-size="14" font-weight="700" fill="#d1e4ff">HOLD</text>
+  <text x="195" y="236" text-anchor="middle" font-family="Arial,sans-serif" font-size="104" font-weight="900" fill="#ffffff">32</text>
+  <text x="195" y="284" text-anchor="middle" font-family="Arial,sans-serif" font-size="18" fill="#ffffff" opacity="0.72">深蹲</text>
+  <rect x="18" y="358" width="354" height="82" rx="26" fill="#ffffff"/>
+  <rect x="42" y="386" width="78" height="28" rx="14" fill="#eaddff"/>
+  <rect x="136" y="386" width="78" height="28" rx="14" fill="#eaddff"/>
+  <rect x="230" y="386" width="78" height="28" rx="14" fill="#eaddff"/>
+  <rect x="18" y="468" width="354" height="156" rx="28" fill="#ffffff"/>
+  <rect x="42" y="500" width="210" height="18" rx="9" fill="#1f1f1f" opacity="0.72"/>
+  <rect x="42" y="536" width="292" height="12" rx="6" fill="#79747e" opacity="0.5"/>
+  <rect x="42" y="568" width="250" height="12" rx="6" fill="#79747e" opacity="0.38"/>
+  <circle cx="195" cy="704" r="44" fill="#0061a4"/>
+  <polygon points="182,682 182,726 222,704" fill="#fff"/>
+  <rect x="18" y="766" width="354" height="54" rx="27" fill="#ffffff"/>
+</svg>

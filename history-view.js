@@ -581,6 +581,7 @@
                     : [{ label: '分析今天', prompt: '请分析我今天的饮食、训练和体重记录，并给出今晚或明天的调整建议' }, { label: '晚餐建议', prompt: '根据今天已经摄入的饮食和目标，给我晚餐建议' }, { label: '明日调整', prompt: '根据今天记录，帮我安排明天的饮食和训练重点' }],
                 diet: [{ label: '饮食分析', prompt: '请分析我今天和最近的饮食结构，重点看热量和蛋白质是否达标' }, { label: '补蛋白建议', prompt: '我今天蛋白质够不够？如果不够，建议怎么补' }, { label: '热量控制', prompt: '请根据我的饮食记录判断热量控制是否合理' }],
                 exercise: [{ label: '训练强度', prompt: '请分析我最近训练频率和强度是否合理' }, { label: '恢复建议', prompt: '根据最近训练记录，帮我安排一次恢复训练' }, { label: '训练调整', prompt: '我应该增加还是减少训练量？请结合记录判断' }],
+                weekly_review: [{ label: '生成周总结', prompt: this.weeklyAiPrompt?.() || '请基于我最近 7 天记录生成训练、饮食、体重周总结，并给出下周建议' }, { label: '判断是否降载', prompt: (this.weeklyAiPrompt?.() || '') + '\n请特别判断我下周是否需要 deload，并给出具体降载比例、保留动作和恢复安排。' }],
                 weight: isGain
                     ? [{ label: '增肌趋势', prompt: '请分析我最近体重趋势，判断增肌进展是否正常' }, { label: '停滞原因', prompt: '如果我最近增肌停滞，请结合饮食和训练记录分析原因' }, { label: '目标调整', prompt: '请根据我的体重趋势调整增肌热量和训练建议' }]
                     : [{ label: '趋势分析', prompt: '请分析我最近体重趋势，并判断减重是否正常' }, { label: '停滞原因', prompt: '如果我最近减重停滞，请结合饮食和训练记录分析原因' }, { label: '目标调整', prompt: '请根据我的体重趋势调整热量和运动建议' }],
@@ -592,6 +593,7 @@
             const hasStoredAi = !!(this.db?.aiProfiles?.length && (this.db.aiActiveId || this.db.aiProfiles[0]?.id));
             if (!hasStoredAi && !(window.ai && ai.cfg?.enabled)) return alert('请先在设置中配置 AI');
             if (context === 'weight') this.adviceRange = 'month';
+            if (context === 'weekly_review') this.adviceRange = 'week';
             this.routineView = 'advice';
             const nav = document.querySelectorAll('.nav-item')[3];
             await ui.tab('ai-coach', nav);

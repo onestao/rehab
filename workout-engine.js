@@ -346,6 +346,7 @@ const workoutEngine = {
         workout._phaseLeft = remaining;
         workout._phaseSub = sub;
         workout._phaseStatus = status;
+        workout._phaseLastTick = Date.now();
         await workout.count(remaining, sub, status);
         if (this.applySkipOverride()) return;
         if (workout.isPlaying) this.transition(nextPhase, { phaseLeft: null, phaseSub: '', phaseStatus: '' });

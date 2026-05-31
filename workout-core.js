@@ -150,6 +150,7 @@ Object.assign(workout, {
         if (this.mode === 'cardio') return cardio.toggle();
         if (!this.isPlaying) {
             if ((data._planActions ? data._planActions() : data.activeRecords(data.db.actions || []).filter(a => !a.libOnly)).length === 0) return;
+            window.workoutReadiness?.notifyBeforeStart?.();
             window.workoutVoice?.unlockAudio?.();
             this.isPlaying = true; this.isPaused = false; this.totalSec = 0;
             if (window.workoutEngine) workoutEngine.state = workoutEngine.createInitialState();
@@ -167,7 +168,19 @@ Object.assign(workout, {
             this.keepAudioAlive();
             this.initBackGuard();
             
-            this.sessionInt = setInterval(() => { if(!this.isPaused) { this.totalSec++; this.updateUI(); }}, 1000);
+            this._sessionLastTick = Date.now();
+            this.sessionInt = setInterval(() => {
+                if (this.isPaused) {
+                    this._sessionLastTick = Date.now();
+                    return;
+                }
+                const now = Date.now();
+                const delta = Math.max(0, Math.floor((now - Number(this._sessionLastTick || now)) / 1000));
+                if (delta <= 0) return;
+                this._sessionLastTick = Number(this._sessionLastTick || now) + delta * 1000;
+                this.totalSec += delta;
+                this.updateUI();
+            }, 1000);
             if (window.workoutState) workoutState.markActive();
             
             await this.speak("训练开始");
@@ -186,6 +199,7 @@ Object.assign(workout, {
             this._phaseLeft = sec;
             this._phaseSub = sub;
             this._phaseStatus = status;
+            this._phaseLastTick = Date.now();
             this._countResolve = resolve;
             document.getElementById('subText').innerText = sub;
             document.getElementById('statusText').innerText = status;
@@ -198,8 +212,15 @@ Object.assign(workout, {
                     this._phaseLeft = null;
                     this._countResolve = null; resolve(); return;
                 }
-                if (this.isPaused) return;
-                this._phaseLeft = Math.max(0, Number(this._phaseLeft || 0) - 1);
+                if (this.isPaused) {
+                    this._phaseLastTick = Date.now();
+                    return;
+                }
+                const now = Date.now();
+                const delta = Math.max(0, Math.floor((now - Number(this._phaseLastTick || now)) / 1000));
+                if (delta <= 0) return;
+                this._phaseLastTick = Number(this._phaseLastTick || now) + delta * 1000;
+                this._phaseLeft = Math.max(0, Number(this._phaseLeft || 0) - delta);
                 if (window.workoutEngine?.state) workoutEngine.state.phaseLeft = this._phaseLeft;
                 document.getElementById('mainTime').innerText = this._phaseLeft;
                 this.renderPip();

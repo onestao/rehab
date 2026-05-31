@@ -79,6 +79,16 @@ const syncStatus = {
         }
     },
 
+    conflictCount() {
+        return Number(data?.db?.syncMeta?.conflictLog?.length || 0);
+    },
+
+    latestQueueReason() {
+        const queue = data?.db?.syncMeta?.pendingQueue || [];
+        const last = queue[queue.length - 1];
+        return last?.reason || last?.error || '';
+    },
+
     persist() {
         try { localStorage.setItem(this.META_KEY, JSON.stringify(this.meta)); } catch {}
     },
@@ -93,13 +103,25 @@ const syncStatus = {
         this.refreshFromDbSyncMeta();
         const el = document.getElementById('syncDetailStatus');
         if (!el) return;
+        const meta = data?.db?.syncMeta || {};
+        const lastArchive = meta.lastArchiveDate || '暂无';
+        const conflictCount = this.conflictCount();
+        const queueReason = this.latestQueueReason();
         el.innerHTML = `
             <div class="sync-meta-item"><strong>同步方式</strong><span>${this.meta.mode === 'none' ? '仅本地' : this.meta.mode === 's3' ? 'S3' : 'WebDAV'}</span></div>
             <div class="sync-meta-item"><strong>最近同步</strong><span>${this.formatTime(this.lastSyncAt)}</span></div>
             <div class="sync-meta-item"><strong>待重试</strong><span>${this.pendingCount}</span></div>
             <div class="sync-meta-item"><strong>最近错误</strong><span>${this.lastError ? this.lastError : '暂无'}</span></div>
+            <div class="sync-meta-item"><strong>最近归档</strong><span>${lastArchive}</span></div>
+            <div class="sync-meta-item"><strong>冲突记录</strong><span>${conflictCount}</span></div>
+            <div class="sync-meta-item sync-meta-wide"><strong>队列原因</strong><span>${queueReason || '暂无'}</span></div>
             <div class="sync-meta-item sync-meta-wide"><strong>状态</strong><span>${this.meta.detail || (this.meta.state === 'cloud' ? '云端同步正常' : this.meta.state === 'error' ? '同步失败' : '本地模式')}</span></div>
             <div class="sync-meta-item sync-meta-wide"><button class="md-btn md-btn-tonal" id="syncFlushBtn" ${this.pendingCount > 0 ? '' : 'disabled'} onclick="sync.flushQueue?.()">立即重试队列</button></div>`;
+    },
+
+    async renderHealth() {
+        this.render();
+        await window.pwaSupport?.renderHealth?.('syncPwaHealth');
     }
 };
 

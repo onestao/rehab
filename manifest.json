@@ -1,16 +1,69 @@
 {
   "name": "训练助手",
   "short_name": "训练助手",
-  "start_url": "index.html",
+  "description": "Android-first 本地优先训练、饮食、体重和 AI 教练 PWA。",
+  "id": "/index.html",
+  "start_url": "index.html?source=pwa",
+  "scope": "./",
   "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
   "background_color": "#fdfcff",
   "theme_color": "#0061a4",
+  "orientation": "portrait-primary",
+  "categories": ["health", "fitness", "productivity"],
+  "lang": "zh-CN",
   "icons": [
     {
-      "src": "https://cdn-icons-png.flaticon.com/512/2964/2964514.png",
-      "sizes": "512x512",
-      "type": "image/png",
+      "src": "assets/app-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
       "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "开始训练",
+      "short_name": "训练",
+      "description": "打开训练计时页",
+      "url": "index.html?shortcut=workout",
+      "icons": [{ "src": "assets/app-icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+    },
+    {
+      "name": "今日记录",
+      "short_name": "今日",
+      "description": "查看今日计划、饮食和训练记录",
+      "url": "index.html?shortcut=today",
+      "icons": [{ "src": "assets/app-icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+    },
+    {
+      "name": "AI 教练",
+      "short_name": "AI",
+      "description": "打开 AI 训练与饮食分析",
+      "url": "index.html?shortcut=ai-coach",
+      "icons": [{ "src": "assets/app-icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+    },
+    {
+      "name": "云端同步",
+      "short_name": "同步",
+      "description": "打开备份与同步设置",
+      "url": "index.html?shortcut=sync",
+      "icons": [{ "src": "assets/app-icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "assets/screenshots/android-today.svg",
+      "sizes": "390x844",
+      "type": "image/svg+xml",
+      "form_factor": "narrow",
+      "label": "今日计划、饮食和训练概览"
+    },
+    {
+      "src": "assets/screenshots/android-workout.svg",
+      "sizes": "390x844",
+      "type": "image/svg+xml",
+      "form_factor": "narrow",
+      "label": "训练计时与后台保持提示"
     }
   ]
 }

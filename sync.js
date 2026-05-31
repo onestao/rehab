@@ -124,17 +124,33 @@ const sync = {
         setTimeout(() => URL.revokeObjectURL(url), 1000);
     },
 
+    async resolveConflictChoice(kind, localValue, remoteValue, summary = '') {
+        const localTs = Number(localValue?.updatedAt || 0);
+        const remoteTs = Number(remoteValue?.updatedAt || 0);
+        const lines = [
+            `检测到 ${kind} 双端冲突。`,
+            summary,
+            `本地时间: ${localTs ? new Date(localTs).toLocaleString() : '未知'}`,
+            `远端时间: ${remoteTs ? new Date(remoteTs).toLocaleString() : '未知'}`,
+            '',
+            '确定：保留本地',
+            '取消：使用远端'
+        ].filter(Boolean);
+        const useLocal = confirm(lines.join('\n'));
+        if (useLocal) return { choice: 'local', value: localValue };
+        const exportBackup = confirm('是否先导出本地冲突备份 JSON？');
+        if (exportBackup) await this.exportAiCipherBackup({ kind, localValue, remoteValue, exportedAt: new Date().toISOString() });
+        return { choice: 'remote', value: remoteValue };
+    },
+
     async resolveAiCipherConflict(localCipher, remoteCipher) {
         const localTs = Number(localCipher?.updatedAt || 0);
         const remoteTs = Number(remoteCipher?.updatedAt || 0);
         if (!localCipher) return remoteCipher;
         if (!remoteCipher) return localCipher;
         if (localTs === remoteTs) return remoteCipher;
-        const useLocal = confirm(`检测到 AI 加密配置双端冲突。\n\n本地时间: ${new Date(localTs).toLocaleString()}\n远端时间: ${new Date(remoteTs).toLocaleString()}\n\n点击“确定”保留本地，点击“取消”保留远端。`);
-        if (useLocal) return localCipher;
-        const exportBackup = confirm('是否先导出本地 AI 加密配置 JSON 备份？');
-        if (exportBackup) await this.exportAiCipherBackup(localCipher);
-        return remoteCipher;
+        const result = await this.resolveConflictChoice('AI 加密配置', localCipher, remoteCipher);
+        return result.value;
     },
 
     saveSyncMeta() {
@@ -165,6 +181,7 @@ const sync = {
             foodLogs: health.foodLogs || [],
             exerciseLogs: health.exerciseLogs || [],
             reports: health.reports || [],
+            rehabWeekly: health.rehabWeekly || [],
             healthProfile: health.profile && typeof health.profile === 'object' ? [health.profile] : [],
             aiAdviceChat: health.aiAdviceChat || [],
             aiCipher: db.aiCipher ? [db.aiCipher] : []
@@ -234,7 +251,22 @@ const sync = {
                 } catch {}
                 return;
             }
-            if (remoteTs > localTs) merged.set(item.id, item);
+            if (remoteTs > localTs) {
+                try {
+                    const meta = this.getSyncMeta();
+                    meta.conflictLog = Array.isArray(meta.conflictLog) ? meta.conflictLog : [];
+                    meta.conflictLog.push({
+                        id: item.id,
+                        entity: item.__entity || '',
+                        mergedAt: Date.now(),
+                        localUpdatedAt: localTs,
+                        remoteUpdatedAt: remoteTs,
+                        strategy: 'remote-lww'
+                    });
+                    if (meta.conflictLog.length > 50) meta.conflictLog = meta.conflictLog.slice(-50);
+                } catch {}
+                merged.set(item.id, item);
+            }
         });
         return Array.from(merged.values());
     },
@@ -308,6 +340,14 @@ const sync = {
                     set: (value) => {
                         db.health = db.health || {};
                         db.health.reports = value;
+                    }
+                };
+            case 'rehabWeekly':
+                return {
+                    get: () => (db.health || {}).rehabWeekly || [],
+                    set: (value) => {
+                        db.health = db.health || {};
+                        db.health.rehabWeekly = value;
                     }
                 };
             case 'healthProfile':
@@ -411,7 +451,8 @@ const sync = {
                         history:  () => localDb?.history?.length || 0,
                         food:     () => localDb?.health?.foodLogs?.length || 0,
                         exercise: () => localDb?.health?.exerciseLogs?.length || 0,
-                        weight:   () => localDb?.health?.weights?.length || 0
+                        weight:   () => localDb?.health?.weights?.length || 0,
+                        rehabWeekly: () => localDb?.health?.rehabWeekly?.length || 0
                     };
                     for (const k of Object.keys(remoteCounts)) {
                         const r = Number(remoteCounts[k] || 0);

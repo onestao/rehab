@@ -10,6 +10,8 @@ declare const workoutState: any;
 declare const advicePanel: any;
 declare const backup: any;
 declare const appUpdate: any;
+declare const pwaSupport: any;
+declare const workoutReadiness: any;
 declare const onboarding: any;
 declare const theme: any;
 declare const fooddb: any;
@@ -31,6 +33,8 @@ interface Window {
   advicePanel: any;
   backup: any;
   appUpdate: any;
+  pwaSupport: any;
+  workoutReadiness: any;
   onboarding: any;
   theme: any;
   fooddb: any;

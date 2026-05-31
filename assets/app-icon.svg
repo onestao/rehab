@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="训练助手">
+  <defs>
+    <linearGradient id="bg" x1="64" y1="32" x2="456" y2="480" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0061a4"/>
+      <stop offset="0.56" stop-color="#6750a4"/>
+      <stop offset="1" stop-color="#2e7d32"/>
+    </linearGradient>
+    <linearGradient id="shine" x1="94" y1="52" x2="390" y2="362" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ffffff" stop-opacity="0.52"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="116" fill="url(#bg)"/>
+  <path d="M82 98c74-54 181-67 277-18 62 32 96 82 113 137V116C472 69 443 40 396 40H116C69 40 40 69 40 116v139c9-61 23-116 42-157Z" fill="url(#shine)"/>
+  <g fill="#fff">
+    <rect x="100" y="232" width="74" height="48" rx="20" opacity="0.94"/>
+    <rect x="338" y="232" width="74" height="48" rx="20" opacity="0.94"/>
+    <rect x="162" y="192" width="48" height="128" rx="22"/>
+    <rect x="302" y="192" width="48" height="128" rx="22"/>
+    <rect x="210" y="240" width="92" height="32" rx="16" opacity="0.9"/>
+  </g>
+  <path d="M168 366c42 26 132 26 176 0" fill="none" stroke="#d1e4ff" stroke-width="28" stroke-linecap="round" opacity="0.92"/>
+</svg>

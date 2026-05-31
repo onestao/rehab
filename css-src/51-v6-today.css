@@ -171,6 +171,13 @@
 
 .today-ai-reminder { background: linear-gradient(135deg, var(--md-sys-amber-container, #fff3e0), var(--md-sys-surface-container-lowest)); transition: background 0.6s var(--md-sys-motion-emphasized); border-radius: 28px; }
 .today-ai-reminder .cardio-kicker { background: var(--glass-bg); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border: 1px solid var(--glass-border); border-radius: 999px; box-shadow: var(--glass-shadow-inset); }
+.weekly-ai-insight-card {
+    background: linear-gradient(135deg, color-mix(in srgb, var(--md-sys-primary-container) 72%, var(--md-sys-surface-container-lowest)), var(--md-sys-surface-container-lowest));
+    border-radius: 28px;
+}
+.weekly-ai-insight-card .context-ai-actions {
+    margin-top: 12px;
+}
 
 @media (max-width: 380px) {
     .ring { width: 96px; height: 96px; }

@@ -77,6 +77,10 @@ Object.assign(advicePanel, {
             return `- ${e.date}｜${label}｜${e.minutes}分钟｜${e.calories || 0} kcal${e.distance ? `｜${e.distance}km` : ''}`;
         }).join('\n');
         const formatWeights = (list) => list.map(w => `- ${w.date}｜${w.weight.toFixed(1)} kg`).join('\n');
+        const formatRehabWeekly = (list) => list.map(week => {
+            const actions = (week.actions || []).map(a => `${a.name || '未命名'}（${a.status || 'continued'}${a.painLevel ? `，疼痛${a.painLevel}/10` : ''}${a.needsReview ? '，需确认' : ''}${a.coachNote ? '，' + a.coachNote : ''}）`).join('；');
+            return `- ${week.weekStart || week.visitDate || ''}｜${actions || '无动作明细'}${week.therapistAssessment ? '｜评估：' + week.therapistAssessment : ''}`;
+        }).join('\n');
 
         const enabledLabels = [
             contexts.diet && '饮食', contexts.training && '训练',
@@ -133,6 +137,11 @@ Object.assign(advicePanel, {
         if (contexts.training) {
             blocks.push(`【${rangeLabel}训练记录】\n${formatTraining(rangeHistory) || `${rangeLabel}暂无训练记录`}`);
             blocks.push(`【${rangeLabel}手动运动】\n${formatExerciseLogs(rangeExerciseLogs) || `${rangeLabel}暂无手动运动记录`}`);
+            const rehabWeeks = this.activeRecords(this.db.health?.rehabWeekly || [])
+                .slice()
+                .sort((a, b) => String(b.weekStart || '').localeCompare(String(a.weekStart || '')) || Number(b.updatedAt || 0) - Number(a.updatedAt || 0))
+                .slice(0, 3);
+            blocks.push(`【近3周康复中心处方】\n${formatRehabWeekly(rehabWeeks) || '暂无康复中心处方'}`);
         }
         if (contexts.weight) {
             blocks.push(`【${rangeLabel}体重记录】\n${formatWeights(rangeWeights) || `${rangeLabel}暂无体重记录`}`);

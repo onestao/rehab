@@ -11,7 +11,7 @@
             // health.reports item shape:
             // { id, kind:'weekly'|'monthly', periodStart, periodEnd, generatedAt, updatedAt, deleted,
             //   metrics:{ weight, training, diet, cardio }, ai:{ summary, highlights, suggestions, model, prompt_id } }
-            this.db.health = { weights: [], foodLogs: [], exerciseLogs: [], reports: [], goalType: 'loss', bodyPlan: null, weightPlan: null, dietGoal: null, aiAdviceChat: [], weeklyGoalSessions: 5, ...(this.db.health || {}) };
+            this.db.health = { weights: [], foodLogs: [], exerciseLogs: [], reports: [], rehabWeekly: [], goalType: 'loss', bodyPlan: null, weightPlan: null, dietGoal: null, aiAdviceChat: [], weeklyGoalSessions: 5, ...(this.db.health || {}) };
             this.db.actions = (this.db.actions || []).map(a => this.ensureRecordMeta(a, 'action', nowTs));
             this.db.routines = (this.db.routines || []).map(r => {
                 this.ensureRecordMeta(r, 'routine', nowTs);
@@ -31,6 +31,7 @@
             this.db.health.foodLogs = (this.db.health.foodLogs || []).map(item => this.ensureRecordMeta(item, 'food', nowTs));
             this.db.health.exerciseLogs = (this.db.health.exerciseLogs || []).map(item => this.ensureRecordMeta(item, 'exercise', nowTs));
             this.db.health.reports = (this.db.health.reports || []).map(item => this.ensureRecordMeta(item, 'health-report', nowTs));
+            this.db.health.rehabWeekly = (this.db.health.rehabWeekly || []).map(item => this.ensureRecordMeta(item, 'rehab-week', nowTs));
             this.db.health.aiAdviceChat = (this.db.health.aiAdviceChat || []).map(item => this.ensureRecordMeta(item, 'advice', nowTs));
             this.db.actions = this.db.actions.map(a => {
                 a.tags = Array.isArray(a.tags) ? a.tags.filter(Boolean) : [];

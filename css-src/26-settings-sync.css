@@ -28,6 +28,13 @@
 .sync-meta-item strong { font-size: 11px; color: var(--md-sys-on-surface-variant); }
 .sync-meta-item span { font-size: 12px; color: var(--md-sys-on-surface); }
 .sync-meta-wide { grid-column: 1 / -1; }
+.sync-pwa-health:empty { display: none; }
+.sync-pwa-health {
+    margin-top: 8px;
+}
+.sync-meta-item span {
+    overflow-wrap: anywhere;
+}
 
 .voice-sheet-card {
     width: min(94vw, 560px);

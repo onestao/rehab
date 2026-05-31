@@ -38,6 +38,7 @@
             if (dietStatus) dietStatus.innerHTML = ctx.renderTodayV6DietCard?.() || '';
             if (timeline) timeline.innerHTML = ctx.renderTodayTimeline?.() || '';
             if (aiCard) aiCard.innerHTML = ctx.renderTodayAiReminder?.() || ctx.renderContextAiCard?.('today') || '';
+            if (aiCard && ctx.renderWeeklyAiInsightCard) aiCard.innerHTML += ctx.renderWeeklyAiInsightCard();
             ctx.bindPlanQuickRepeat?.();
             ctx.updateTodayV6Greet?.();
         },
@@ -72,6 +73,7 @@
                     return this.renderWeightPanel() + (this.renderContextAiCard?.('weight') || '');
                 case 'training':
                     return this.renderHealthProfileCard() +
+                        (this.renderRehabWeeklyCard?.() || '') +
                         this.renderManualExercisePanel() +
                         '<div class="record-section-title">最近训练记录</div>' +
                         this.renderRecentHistoryList(5) +

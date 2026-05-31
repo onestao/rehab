@@ -1298,7 +1298,7 @@ mark.ai-hit
   files: 49-plan.css, 49-plan-ai.css
     color: var(--md-sys-on-surface-variant) (49-plan.css / 49-plan-ai.css)
 
-## COMPLEMENTS (same selector, disjoint properties): 91
+## COMPLEMENTS (same selector, disjoint properties): 92
 .bar-leading
   files: 04-layout-appbar.css, 50-v6-ui.css
 
@@ -1346,6 +1346,9 @@ mark.ai-hit
 
 .library-card-actions .md-btn span:last-child
   files: 24-routines-cards.css, 45-library-segment.css
+
+.sync-meta-item span
+  files: 26-settings-sync.css
 
 .voice-priority-option
   files: 26-settings-sync.css

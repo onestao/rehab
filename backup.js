@@ -93,6 +93,39 @@ async function readBackupFileText(file) {
     return new TextDecoder().decode(buf);
 }
 
+function backupCounts(dbObj = {}) {
+    const health = dbObj.health || {};
+    return {
+        actions: dbObj.actions?.length || 0,
+        routines: dbObj.routines?.length || 0,
+        history: dbObj.history?.length || 0,
+        dailyPlans: dbObj.dailyPlans?.length || 0,
+        food: health.foodLogs?.length || 0,
+        exercise: health.exerciseLogs?.length || 0,
+        weight: health.weights?.length || 0,
+        rehabWeekly: health.rehabWeekly?.length || 0,
+        advice: health.aiAdviceChat?.length || 0
+    };
+}
+
+function backupPreviewText(label, dbObj, meta = {}) {
+    const counts = backupCounts(dbObj);
+    return `${label}\n\n` + [
+        `导出时间：${meta.exportedAt ? new Date(meta.exportedAt).toLocaleString() : '未知'}`,
+        `schemaVersion：${meta.schemaVersion || dbObj?.schemaVersion || '未知'}`,
+        `动作：${counts.actions}`,
+        `方案：${counts.routines}`,
+        `训练记录：${counts.history}`,
+        `每日计划：${counts.dailyPlans}`,
+        `饮食：${counts.food}`,
+        `手动运动：${counts.exercise}`,
+        `体重：${counts.weight}`,
+        `康复周处方：${counts.rehabWeekly}`,
+        `AI 对话：${counts.advice}`,
+        meta.checksum ? `checksum：${String(meta.checksum).slice(0, 16)}...` : ''
+    ].filter(Boolean).join('\n');
+}
+
 const backup = {
     async buildArchive() {
         if (typeof data.flush === 'function') await data.flush();
@@ -115,9 +148,11 @@ const backup = {
                 actions: data.db.actions?.length || 0,
                 routines: data.db.routines?.length || 0,
                 history: data.db.history?.length || 0,
+                dailyPlans: data.db.dailyPlans?.length || 0,
                 food: data.db.health?.foodLogs?.length || 0,
                 exercise: data.db.health?.exerciseLogs?.length || 0,
-                weight: data.db.health?.weights?.length || 0
+                weight: data.db.health?.weights?.length || 0,
+                advice: data.db.health?.aiAdviceChat?.length || 0
             },
             checksum,
             db: data.db
@@ -331,6 +366,18 @@ const backup = {
         }
     },
 
+    async previewCurrentData() {
+        try {
+            if (typeof data.flush === 'function') await data.flush();
+            alert(backupPreviewText('当前本地数据预览', data.db, {
+                exportedAt: new Date().toISOString(),
+                schemaVersion: data.db.schemaVersion || data.SCHEMA_VERSION || 1
+            }));
+        } catch (e) {
+            alert('预览失败: ' + e.message);
+        }
+    },
+
     async exportCSV(kind) {
         if (typeof data.flush === 'function') await data.flush();
         let rows = [];
@@ -374,6 +421,9 @@ const backup = {
             const nextDb = json?.db && typeof json.db === 'object' ? json.db : json;
             if (!nextDb || typeof nextDb !== 'object') throw new Error('文件格式不正确');
 
+            const preview = backupPreviewText(`即将导入：${file.name || '备份文件'}`, nextDb, json || {});
+            if (!confirm(`${preview}\n\n导入前已自动创建本地回滚快照。是否继续？`)) return;
+
             if (json.checksum && typeof json.checksum === 'string') {
                 const nextDbStr = JSON.stringify(nextDb);
                 const recomputed = await sha256Hex(nextDbStr);
@@ -407,7 +457,7 @@ const backup = {
                 }
             }
 
-            if (!confirm('导入后会覆盖当前本地数据，是否继续？')) return;
+            if (!confirm('最后确认：导入后会覆盖当前本地数据，是否继续？')) return;
 
             data.db = nextDb;
             if (window.storageMigrate?.migrateAdviceToVersioned) {
@@ -429,6 +479,8 @@ const backup = {
 
     isGzipBackupFile,
     readBackupFileText,
+    backupCounts,
+    backupPreviewText,
     sha256Hex
 };
 

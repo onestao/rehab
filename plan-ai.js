@@ -233,6 +233,29 @@
             }));
     }
 
+    function summarizeRehabWeekly(ctx, limit = 3) {
+        const weeks = ctx.activeRecords?.(ctx.db?.health?.rehabWeekly || []) || [];
+        return weeks.slice()
+            .sort((a, b) => String(b.weekStart || '').localeCompare(String(a.weekStart || '')) || Number(b.updatedAt || 0) - Number(a.updatedAt || 0))
+            .slice(0, limit)
+            .map((week) => ({
+                weekStart: week.weekStart || '',
+                visitDate: week.visitDate || '',
+                therapistAssessment: week.therapistAssessment || '',
+                homework: week.homework || '',
+                actions: (week.actions || []).map((action) => ({
+                    name: action.name || '',
+                    status: action.status || 'continued',
+                    rawDescription: action.rawDescription || '',
+                    spec: action.spec || null,
+                    painLevel: Number(action.painLevel || 0),
+                    confidence: Number(action.confidence || 0),
+                    needsReview: !!action.needsReview,
+                    coachNote: action.coachNote || ''
+                }))
+            }));
+    }
+
     window.dataPlanAi = {
         planAiQuickPrompts() {
             return [
@@ -269,6 +292,7 @@
                 workouts: summarizeTodayHistory(this, today),
                 manualExercises: summarizeManualExercises(this, today)
             };
+            const rehabWeekly = summarizeRehabWeekly(this, 3);
             const recentPlans = this.activeRecords(this.db.dailyPlans || [])
                 .filter((plan) => types.includes(plan.type || 'rehab'))
                 .slice(0, 14)
@@ -321,6 +345,8 @@
                 `健康档案装备偏好: ${profileEquipment.join(', ') || '无'}`,
                 `最终可用装备池: ${allEquipment.join(', ') || '无'}`,
                 `今日已完成运动摘要: ${JSON.stringify(todayCompleted)}`,
+                `近3周康复中心处方: ${JSON.stringify(rehabWeekly)}`,
+                rehabWeekly.length ? '康复处方规则: 必须优先遵守最近康复中心处方；continued/progressed 动作应保留或参考；dropped 动作不能出现在计划中；new/watch/needsReview 动作不得自动加量，疼痛>=4/10 只能降级或替换。' : '',
                 `最近 7 天对应类型计划摘要: ${JSON.stringify(recentPlans)}`,
                 `健康档案: ${JSON.stringify(profile)}`,
                 `目标类型: ${String(this.db.health?.dietGoal?.goalType || this.db.health?.goalType || '')}`,

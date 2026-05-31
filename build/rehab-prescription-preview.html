@@ -1,0 +1,1046 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PROTOTYPE - 康复周处方 AI 录入预览</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700;800&family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,500,0,0" rel="stylesheet">
+  <style>
+    /* PROTOTYPE: three V6-style variants of natural-language rehab prescription import, switchable via ?variant=A|B|C. */
+    :root {
+      color-scheme: light;
+      --md-sys-primary: #0061a4;
+      --md-sys-on-primary: #ffffff;
+      --md-sys-primary-container: #d1e4ff;
+      --md-sys-on-primary-container: #001d36;
+      --md-sys-secondary: #535f70;
+      --md-sys-secondary-container: #d7e3f8;
+      --md-sys-tertiary: #6b5778;
+      --md-sys-tertiary-container: #f2daff;
+      --md-sys-amber: #f59e0b;
+      --md-sys-amber-container: #fef3c7;
+      --md-sys-on-amber-container: #78350f;
+      --md-sys-error: #ba1a1a;
+      --md-sys-error-container: #ffdad6;
+      --md-sys-surface: #fdfcff;
+      --md-sys-surface-container-lowest: #ffffff;
+      --md-sys-surface-container-low: #f4f3fa;
+      --md-sys-surface-container: #eeedf4;
+      --md-sys-surface-container-high: #e8e7ef;
+      --md-sys-surface-container-highest: #e2e2e9;
+      --md-sys-on-surface: #1a1c1e;
+      --md-sys-on-surface-variant: #43474e;
+      --md-sys-outline: #73777f;
+      --md-sys-outline-variant: #c3c7cf;
+      --md-sys-shape-md: 12px;
+      --md-sys-shape-lg: 16px;
+      --md-sys-shape-xl: 28px;
+      --md-sys-shape-full: 9999px;
+      --md-sys-elevation-1: 0 1px 2px rgba(0,0,0,.1), 0 1px 3px 1px rgba(0,0,0,.06);
+      --md-sys-elevation-2: 0 1px 2px rgba(0,0,0,.1), 0 2px 6px 2px rgba(0,0,0,.08);
+      --glass-bg: color-mix(in srgb, var(--md-sys-surface-container-lowest) 58%, transparent);
+      --glass-bg-strong: color-mix(in srgb, var(--md-sys-surface-container-lowest) 72%, transparent);
+      --glass-border: color-mix(in srgb, var(--md-sys-surface-container-lowest) 64%, transparent);
+      --glass-blur: blur(20px) saturate(160%);
+      --glass-shadow-inset: inset 0 1px 0 color-mix(in srgb, var(--md-sys-surface-container-lowest) 70%, transparent);
+      --glass-shadow-out: 0 2px 10px color-mix(in srgb, var(--md-sys-on-surface) 6%, transparent);
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+      font-family: "Noto Sans SC", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--md-sys-on-surface);
+      background:
+        radial-gradient(circle at 0% 0%, color-mix(in srgb, var(--md-sys-primary-container) 80%, transparent) 0, transparent 30rem),
+        radial-gradient(circle at 85% 12%, color-mix(in srgb, var(--md-sys-tertiary-container) 70%, transparent) 0, transparent 26rem),
+        linear-gradient(180deg, var(--md-sys-surface) 0%, var(--md-sys-surface-container-low) 100%);
+      padding-bottom: calc(92px + var(--safe-bottom));
+    }
+
+    button, textarea, input, select { font: inherit; }
+    button { cursor: pointer; }
+
+    .material-symbols-rounded {
+      font-family: "Material Symbols Rounded";
+      font-weight: normal;
+      font-style: normal;
+      font-size: 22px;
+      line-height: 1;
+      letter-spacing: normal;
+      text-transform: none;
+      display: inline-block;
+      white-space: nowrap;
+      word-wrap: normal;
+      direction: ltr;
+      -webkit-font-feature-settings: "liga";
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .app-shell {
+      width: min(1180px, 100%);
+      margin: 0 auto;
+      padding: 18px 14px 0;
+    }
+
+    .top-app-bar {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 4px 16px;
+      backdrop-filter: var(--glass-blur);
+      -webkit-backdrop-filter: var(--glass-blur);
+    }
+
+    .bar-leading { display: flex; align-items: center; gap: 12px; min-width: 0; }
+    .brand-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 16px;
+      border: 1px solid color-mix(in srgb, var(--md-sys-primary) 24%, transparent);
+      color: var(--md-sys-on-primary-container);
+      background: linear-gradient(135deg, var(--md-sys-primary-container), color-mix(in srgb, var(--md-sys-primary-container) 42%, white));
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: var(--md-sys-elevation-1);
+    }
+    .app-title { display: flex; flex-direction: column; min-width: 0; }
+    .app-title strong { font-size: 18px; line-height: 24px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .app-title small { color: var(--md-sys-on-surface-variant); font-size: 12px; line-height: 18px; overflow-wrap: anywhere; }
+
+    .md-btn, .md-chip, .md-icon-btn {
+      border: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      min-width: 0;
+      -webkit-tap-highlight-color: transparent;
+      transition: transform .18s cubic-bezier(.2,0,0,1), background .18s, box-shadow .18s;
+    }
+    .md-btn:active, .md-chip:active, .md-icon-btn:active { transform: scale(.98); }
+    .md-btn {
+      min-height: 44px;
+      padding: 0 18px;
+      border-radius: var(--md-sys-shape-full);
+      background: var(--md-sys-surface-container-highest);
+      color: var(--md-sys-on-surface);
+      font-size: 14px;
+      font-weight: 700;
+    }
+    .md-btn-filled { background: var(--md-sys-primary); color: var(--md-sys-on-primary); box-shadow: var(--md-sys-elevation-1); }
+    .md-btn-tonal { background: var(--md-sys-secondary-container); color: var(--md-sys-on-primary-container); }
+    .md-btn-danger { background: var(--md-sys-error-container); color: var(--md-sys-error); }
+    .md-icon-btn {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: var(--glass-bg-strong);
+      color: var(--md-sys-on-surface-variant);
+      border: 1px solid var(--glass-border);
+    }
+    .md-chip {
+      min-height: 34px;
+      padding: 0 12px;
+      border-radius: var(--md-sys-shape-full);
+      background: var(--md-sys-surface-container-high);
+      color: var(--md-sys-on-surface-variant);
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .md-chip.active { background: var(--md-sys-primary-container); color: var(--md-sys-on-primary-container); }
+
+    .glass-card, .md-card {
+      background: var(--glass-bg-strong);
+      backdrop-filter: var(--glass-blur);
+      -webkit-backdrop-filter: var(--glass-blur);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--md-sys-shape-xl);
+      box-shadow: var(--glass-shadow-inset), var(--glass-shadow-out);
+    }
+    .md-card { padding: 18px; }
+
+    .hero {
+      position: relative;
+      overflow: hidden;
+      padding: 12px 14px;
+      border-radius: 22px;
+      background:
+        radial-gradient(circle at 16% 12%, rgba(255,255,255,.9), transparent 20rem),
+        linear-gradient(135deg, color-mix(in srgb, var(--md-sys-primary-container) 78%, white), color-mix(in srgb, var(--md-sys-tertiary-container) 66%, white));
+      border: 1px solid color-mix(in srgb, white 70%, transparent);
+      box-shadow: var(--md-sys-elevation-2);
+    }
+    .hero::after { content: none; }
+    .hero-grid {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 10px;
+      align-items: center;
+    }
+    .kicker {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      font-weight: 800;
+      color: var(--md-sys-primary);
+      text-transform: uppercase;
+      letter-spacing: .08em;
+    }
+    h1, h2, h3, p { margin: 0; }
+    h1 { margin-top: 2px; font-size: 18px; line-height: 1.25; letter-spacing: -.025em; }
+    .hero p { display: none; }
+
+    .hero-stats {
+      display: grid;
+      grid-template-columns: repeat(3, 72px);
+      gap: 6px;
+    }
+    .stat-tile {
+      min-height: 62px;
+      padding: 8px;
+      border-radius: 16px;
+      background: color-mix(in srgb, white 58%, transparent);
+      border: 1px solid color-mix(in srgb, white 70%, transparent);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    .stat-tile .num { font-size: 16px; font-weight: 800; color: var(--md-sys-on-primary-container); }
+    .stat-tile small { color: var(--md-sys-on-surface-variant); font-weight: 700; font-size: 10px; line-height: 13px; }
+
+    .variant-page { display: none; margin-top: 14px; }
+    .variant-page.active { display: block; }
+    .layout-two { display: grid; grid-template-columns: minmax(0, .92fr) minmax(320px, 1.08fr); gap: 14px; align-items: start; margin-top: 14px; }
+    .layout-three { display: grid; grid-template-columns: minmax(0, .88fr) minmax(300px, .72fr) minmax(340px, 1fr); gap: 14px; align-items: start; margin-top: 14px; }
+
+    .card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 14px; }
+    .card-title { display: flex; align-items: flex-start; gap: 10px; min-width: 0; }
+    .card-title .icon {
+      width: 42px;
+      height: 42px;
+      border-radius: 16px;
+      background: var(--md-sys-primary-container);
+      color: var(--md-sys-on-primary-container);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex: 0 0 auto;
+    }
+    .card-title h2 { font-size: 18px; line-height: 24px; }
+    .card-title small { display: block; color: var(--md-sys-on-surface-variant); line-height: 18px; margin-top: 2px; }
+
+    .md-field { position: relative; }
+    .md-field textarea, .md-field input, .md-field select {
+      width: 100%;
+      border: 1px solid var(--md-sys-outline-variant);
+      border-radius: 22px;
+      background: color-mix(in srgb, var(--md-sys-surface-container-lowest) 72%, transparent);
+      color: var(--md-sys-on-surface);
+      outline: none;
+      padding: 20px 16px 12px;
+      min-height: 56px;
+      resize: vertical;
+    }
+    .md-field textarea:focus, .md-field input:focus, .md-field select:focus { border-color: var(--md-sys-primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--md-sys-primary) 14%, transparent); }
+    .md-field label {
+      position: absolute;
+      top: 7px;
+      left: 16px;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--md-sys-primary);
+      pointer-events: none;
+    }
+    .prompt-area textarea { min-height: 178px; line-height: 1.7; }
+    .field-help { margin: 8px 3px 0; color: var(--md-sys-on-surface-variant); font-size: 12px; line-height: 1.55; }
+    .action-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 14px; }
+
+    .example-chip-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 0; }
+    .pipeline { display: grid; gap: 10px; }
+    .pipe-step {
+      display: grid;
+      grid-template-columns: 42px minmax(0, 1fr) auto;
+      gap: 10px;
+      align-items: center;
+      padding: 12px;
+      border-radius: 22px;
+      background: var(--md-sys-surface-container-low);
+    }
+    .pipe-step .step-icon {
+      width: 42px;
+      height: 42px;
+      border-radius: 16px;
+      background: var(--md-sys-surface-container-highest);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--md-sys-primary);
+    }
+    .pipe-step.done .step-icon { background: var(--md-sys-primary-container); color: var(--md-sys-on-primary-container); }
+    .pipe-step.running .step-icon { background: var(--md-sys-amber-container); color: var(--md-sys-on-amber-container); }
+    .pipe-step strong { display: block; font-size: 14px; }
+    .pipe-step small { color: var(--md-sys-on-surface-variant); }
+
+    .status-badge, .confidence-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      min-height: 26px;
+      padding: 0 9px;
+      border-radius: var(--md-sys-shape-full);
+      font-size: 11px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+    .status-new { background: var(--md-sys-primary-container); color: var(--md-sys-on-primary-container); }
+    .status-continued { background: var(--md-sys-secondary-container); color: #101c2b; }
+    .status-progressed { background: var(--md-sys-amber-container); color: var(--md-sys-on-amber-container); }
+    .status-watch { background: var(--md-sys-error-container); color: var(--md-sys-error); }
+    .confidence-badge { background: color-mix(in srgb, #e8f5e9 82%, white); color: #1b5e20; }
+    .confidence-low { background: var(--md-sys-error-container); color: var(--md-sys-error); }
+
+    .parsed-list { display: grid; gap: 10px; }
+    .parsed-card {
+      padding: 14px;
+      border-radius: 24px;
+      background: color-mix(in srgb, var(--md-sys-surface-container-lowest) 72%, transparent);
+      border: 1px solid var(--md-sys-outline-variant);
+    }
+    .parsed-card.needs-review { border-color: color-mix(in srgb, var(--md-sys-error) 42%, var(--md-sys-outline-variant)); }
+    .parsed-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+    .parsed-name { display: flex; gap: 9px; align-items: flex-start; min-width: 0; }
+    .parsed-name .drag-dot { width: 10px; height: 42px; border-radius: 999px; background: var(--md-sys-primary-container); flex: 0 0 auto; }
+    .parsed-name h3 { font-size: 16px; line-height: 22px; overflow-wrap: anywhere; }
+    .parsed-name small { color: var(--md-sys-on-surface-variant); line-height: 18px; display: block; margin-top: 2px; }
+    .parsed-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+    .spec-pill {
+      min-height: 30px;
+      padding: 0 10px;
+      border-radius: var(--md-sys-shape-full);
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      background: var(--md-sys-surface-container);
+      color: var(--md-sys-on-surface-variant);
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .source-quote { margin-top: 12px; padding: 10px 12px; border-radius: 18px; background: var(--md-sys-surface-container-low); color: var(--md-sys-on-surface-variant); font-size: 12px; line-height: 1.6; }
+    .comparison-grid { display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); gap: 14px; margin-top: 14px; align-items: stretch; }
+    .baseline-list { display: grid; gap: 8px; }
+    .baseline-item { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px; border-radius: 18px; background: var(--md-sys-surface-container-low); }
+    .baseline-item strong { display: block; font-size: 14px; }
+    .baseline-item small { display: block; color: var(--md-sys-on-surface-variant); line-height: 18px; margin-top: 2px; }
+    .diff-summary-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+    .diff-summary-card { min-height: 92px; padding: 12px; border-radius: 20px; background: var(--md-sys-surface-container-low); display: flex; flex-direction: column; justify-content: space-between; }
+    .diff-summary-card strong { font-size: 24px; line-height: 1; }
+    .diff-summary-card small { color: var(--md-sys-on-surface-variant); font-weight: 700; }
+    .diff-detail-list { display: grid; gap: 8px; margin-top: 12px; }
+    .step-stack { display: grid; gap: 10px; margin-top: 14px; }
+    .step-card { overflow: hidden; }
+    .step-card summary {
+      list-style: none;
+      cursor: pointer;
+      display: grid;
+      grid-template-columns: 42px minmax(0, 1fr) auto;
+      gap: 10px;
+      align-items: center;
+      padding: 14px;
+      min-height: 72px;
+    }
+    .step-card summary::-webkit-details-marker { display: none; }
+    .step-card .step-index {
+      width: 42px;
+      height: 42px;
+      border-radius: 16px;
+      background: var(--md-sys-primary-container);
+      color: var(--md-sys-on-primary-container);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+    }
+    .step-card .step-copy { min-width: 0; }
+    .step-card .step-copy strong { display: block; font-size: 15px; line-height: 20px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .step-card .step-copy small { display: block; color: var(--md-sys-on-surface-variant); line-height: 18px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .step-card .step-trailing { display: flex; align-items: center; gap: 6px; min-width: 0; }
+    .step-card .step-chevron { color: var(--md-sys-on-surface-variant); transition: transform .18s cubic-bezier(.2,0,0,1); }
+    .step-card[open] .step-chevron { transform: rotate(180deg); }
+    .step-body { padding: 0 14px 14px; }
+    .step-body-grid { display: grid; grid-template-columns: minmax(0, .92fr) minmax(0, 1.08fr); gap: 12px; align-items: start; }
+    .compact-note { margin: 0 0 12px; color: var(--md-sys-on-surface-variant); font-size: 12px; line-height: 1.55; }
+    .mobile-quick-summary {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin: 6px 0 10px;
+      padding: 8px;
+      border-radius: 24px;
+      background:
+        linear-gradient(135deg,
+          color-mix(in srgb, var(--md-sys-surface-container-lowest) 78%, transparent),
+          color-mix(in srgb, var(--md-sys-primary-container) 28%, transparent)),
+        var(--glass-bg-strong);
+      border: 1px solid color-mix(in srgb, var(--glass-border) 72%, white);
+      box-shadow: var(--glass-shadow-inset), 0 10px 26px color-mix(in srgb, var(--md-sys-primary) 10%, transparent);
+      backdrop-filter: var(--glass-blur);
+      -webkit-backdrop-filter: var(--glass-blur);
+      position: relative;
+      overflow: hidden;
+    }
+    .mobile-quick-summary::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background:
+        radial-gradient(circle at 12% 0%, color-mix(in srgb, white 72%, transparent) 0, transparent 34%),
+        radial-gradient(circle at 92% 16%, color-mix(in srgb, var(--md-sys-tertiary-container) 36%, transparent) 0, transparent 42%);
+      opacity: .86;
+    }
+    .mobile-quick-summary .state-pill {
+      position: relative;
+      z-index: 1;
+      padding: 10px;
+      border-radius: 18px;
+      background: color-mix(in srgb, var(--md-sys-surface-container-lowest) 58%, transparent);
+      border: 1px solid color-mix(in srgb, white 68%, transparent);
+      box-shadow: inset 0 1px 0 color-mix(in srgb, white 76%, transparent);
+    }
+    .mobile-quick-summary .state-pill strong { display: block; font-size: 18px; line-height: 1; color: var(--md-sys-on-primary-container); }
+    .mobile-quick-summary .state-pill small { display: block; margin-top: 5px; font-size: 11px; font-weight: 800; color: var(--md-sys-on-surface-variant); }
+    .review-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 12px; }
+    .mini-field { display: grid; gap: 5px; }
+    .mini-field span { font-size: 11px; font-weight: 800; color: var(--md-sys-primary); }
+    .mini-field input, .mini-field select { height: 38px; border: 1px solid var(--md-sys-outline-variant); border-radius: 14px; background: white; padding: 0 10px; min-width: 0; }
+
+    .ai-json {
+      margin: 0;
+      max-height: 330px;
+      overflow: auto;
+      padding: 14px;
+      border-radius: 20px;
+      background: #101820;
+      color: #d9f8ff;
+      font-size: 12px;
+      line-height: 1.55;
+      white-space: pre-wrap;
+    }
+    details.context-preview { margin-top: 12px; }
+    details.context-preview summary { cursor: pointer; color: var(--md-sys-primary); font-weight: 800; font-size: 13px; }
+
+    .chat-shell { display: grid; grid-template-columns: minmax(0, .86fr) minmax(330px, 1.14fr); gap: 14px; margin-top: 14px; align-items: stretch; }
+    .chat-window { display: flex; flex-direction: column; gap: 12px; min-height: 620px; }
+    .bubble {
+      max-width: 92%;
+      padding: 13px 15px;
+      border-radius: 24px;
+      line-height: 1.7;
+      font-size: 14px;
+      background: var(--md-sys-surface-container-low);
+    }
+    .bubble.user { align-self: flex-end; background: var(--md-sys-primary); color: var(--md-sys-on-primary); border-bottom-right-radius: 8px; }
+    .bubble.ai { align-self: flex-start; border-bottom-left-radius: 8px; }
+    .composer { margin-top: auto; display: grid; gap: 10px; }
+    .composer textarea { min-height: 116px; }
+    .assistant-panel { display: grid; gap: 12px; }
+    .risk-note {
+      display: flex;
+      gap: 10px;
+      padding: 12px;
+      border-radius: 22px;
+      background: color-mix(in srgb, var(--md-sys-amber-container) 70%, white);
+      color: var(--md-sys-on-amber-container);
+      line-height: 1.55;
+      font-size: 13px;
+    }
+
+    .week-board { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; margin-top: 14px; align-items: start; }
+    .week-lane { display: grid; gap: 10px; }
+    .week-lane-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+    .week-lane-head h2 { font-size: 18px; }
+    .week-card { padding: 14px; border-radius: 24px; background: var(--md-sys-surface-container-lowest); border: 1px solid var(--md-sys-outline-variant); }
+    .week-card.dim { opacity: .72; }
+    .diff-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 0; border-top: 1px solid var(--md-sys-outline-variant); }
+    .diff-row:first-of-type { border-top: 0; }
+    .diff-main strong { display: block; font-size: 14px; }
+    .diff-main small { display: block; color: var(--md-sys-on-surface-variant); line-height: 18px; margin-top: 2px; }
+
+    .empty-state {
+      min-height: 180px;
+      border: 1px dashed var(--md-sys-outline-variant);
+      border-radius: 24px;
+      display: grid;
+      place-items: center;
+      text-align: center;
+      color: var(--md-sys-on-surface-variant);
+      padding: 18px;
+      background: color-mix(in srgb, var(--md-sys-surface-container-lowest) 45%, transparent);
+    }
+    .empty-state .material-symbols-rounded { font-size: 42px; margin-bottom: 8px; color: var(--md-sys-primary); }
+
+    .preview-state {
+      margin-top: 14px;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+    }
+    .state-pill { padding: 12px; border-radius: 20px; background: var(--md-sys-surface-container-low); }
+    .state-pill strong { display: block; font-size: 18px; }
+    .state-pill small { color: var(--md-sys-on-surface-variant); font-size: 12px; }
+
+    .switcher {
+      position: fixed;
+      left: 50%;
+      bottom: calc(16px + var(--safe-bottom));
+      transform: translateX(-50%);
+      z-index: 60;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px;
+      border-radius: 999px;
+      background: color-mix(in srgb, #101820 86%, transparent);
+      color: white;
+      box-shadow: 0 18px 50px rgba(0,0,0,.28);
+      backdrop-filter: blur(20px) saturate(160%);
+      -webkit-backdrop-filter: blur(20px) saturate(160%);
+    }
+    .switcher button { width: 42px; height: 42px; border: 0; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: white; background: rgba(255,255,255,.12); }
+    .switcher .label { min-width: 230px; text-align: center; font-size: 13px; font-weight: 800; }
+
+    @media (max-width: 920px) {
+      .hero-grid, .layout-two, .layout-three, .chat-shell, .week-board, .comparison-grid { grid-template-columns: 1fr; }
+      .chat-window { min-height: 0; }
+      .preview-state { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 560px) {
+      body { padding-bottom: calc(76px + var(--safe-bottom)); }
+      .app-shell { padding: 8px 8px 0; }
+      .top-app-bar { position: static; padding: 4px 0 8px; }
+      .brand-icon { width: 36px; height: 36px; border-radius: 14px; }
+      .app-title strong { font-size: 15px; line-height: 20px; }
+      .app-title small { font-size: 11px; line-height: 15px; }
+      .hero { padding: 12px; border-radius: 22px; margin-bottom: 8px; }
+      .hero-grid { gap: 10px; }
+      .hero .kicker { font-size: 10px; }
+      .hero h1 { margin-top: 4px; font-size: 21px; line-height: 1.12; letter-spacing: -.035em; }
+      .hero p { display: none; }
+      .hero-stats { display: none; }
+      .mobile-quick-summary { gap: 6px; margin: 4px 0 8px; padding: 6px; border-radius: 22px; }
+      .mobile-quick-summary .state-pill { padding: 8px; border-radius: 16px; }
+      .mobile-quick-summary .state-pill strong { font-size: 15px; }
+      .mobile-quick-summary .state-pill small { font-size: 10px; }
+      .step-stack { gap: 8px; margin-top: 8px; }
+      .md-card, .glass-card { border-radius: 20px; }
+      .step-card summary { grid-template-columns: 32px minmax(0, 1fr) auto; min-height: 58px; padding: 10px; gap: 8px; }
+      .step-card .step-index { width: 32px; height: 32px; border-radius: 12px; font-size: 13px; }
+      .step-card .step-copy strong { font-size: 14px; line-height: 18px; }
+      .step-card .step-copy small { font-size: 11px; line-height: 15px; }
+      .step-card .step-trailing { grid-column: auto; justify-content: flex-end; }
+      .step-card .step-trailing .status-badge { max-width: 86px; overflow: hidden; text-overflow: ellipsis; }
+      .step-chevron { display: none !important; }
+      .step-body { padding: 0 10px 10px; }
+      .step-body-grid { display: block; }
+      .compact-note { display: none; }
+      .baseline-list { gap: 6px; }
+      .baseline-item { padding: 8px 9px; border-radius: 14px; }
+      .baseline-item:nth-child(n+3) { display: none; }
+      .baseline-item strong { font-size: 13px; }
+      .baseline-item small { font-size: 11px; line-height: 15px; }
+      .diff-summary-grid { grid-template-columns: repeat(4, 1fr); gap: 5px; }
+      .diff-summary-card { min-height: 58px; padding: 8px; border-radius: 14px; }
+      .diff-summary-card strong { font-size: 18px; }
+      .diff-summary-card small { font-size: 10px; }
+      .diff-summary-card .status-badge { display: none; }
+      .diff-detail-list { gap: 0; margin-top: 8px; }
+      .diff-row { align-items: flex-start; padding: 8px 0; }
+      .diff-main strong { font-size: 13px; line-height: 17px; }
+      .diff-main small { display: none; }
+      .prompt-area textarea { min-height: 118px; border-radius: 18px; padding: 18px 12px 10px; }
+      .field-help { display: none; }
+      .example-chip-row { margin-top: 8px; gap: 6px; overflow-x: auto; flex-wrap: nowrap; padding-bottom: 2px; }
+      .example-chip-row .md-chip { flex: 0 0 auto; }
+      .action-row { margin-top: 10px; gap: 6px; }
+      .md-btn { min-height: 40px; padding: 0 13px; font-size: 13px; }
+      .pipeline { display: none; }
+      .review-row { grid-template-columns: 1fr; gap: 6px; }
+      .parsed-list { gap: 8px; }
+      .parsed-card { padding: 10px; border-radius: 16px; }
+      .parsed-top { align-items: flex-start; }
+      .parsed-name { gap: 7px; }
+      .parsed-name .drag-dot { width: 7px; height: 34px; }
+      .parsed-name h3 { font-size: 14px; line-height: 19px; }
+      .parsed-name small { display: none; }
+      .confidence-badge { min-height: 22px; padding: 0 7px; font-size: 10px; }
+      .parsed-meta { margin-top: 8px; gap: 5px; }
+      .status-badge, .spec-pill { min-height: 24px; padding: 0 8px; font-size: 10px; }
+      .source-quote { display: none; }
+      .mini-field span { font-size: 10px; }
+      .mini-field input, .mini-field select { height: 34px; border-radius: 12px; font-size: 12px; }
+      .ai-json { max-height: 170px; font-size: 10px; border-radius: 14px; padding: 10px; }
+      details.context-preview summary { font-size: 12px; }
+      .empty-state { min-height: 92px !important; padding: 10px; border-radius: 16px; }
+      .empty-state .material-symbols-rounded { font-size: 28px; margin-bottom: 4px; }
+      .empty-state p { font-size: 12px; line-height: 18px; }
+      .preview-state { display: none; }
+      .top-app-bar { align-items: flex-start; }
+      .bar-actions { display: none; }
+      .switcher { width: calc(100% - 16px); bottom: calc(8px + var(--safe-bottom)); padding: 6px; }
+      .switcher button { width: 36px; height: 36px; }
+      .switcher .label { min-width: 0; flex: 1; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app-shell">
+    <header class="top-app-bar">
+      <div class="bar-leading">
+        <div class="brand-icon"><span class="material-symbols-rounded">clinical_notes</span></div>
+        <div class="app-title">
+          <strong>康复周处方 AI 录入</strong>
+          <small>PROTOTYPE - 只验证 UI 和流程，不写入真实数据</small>
+        </div>
+      </div>
+      <div class="bar-actions action-row" style="margin-top:0">
+        <button class="md-btn md-btn-tonal" type="button" onclick="loadExample()"><span class="material-symbols-rounded">auto_fix_high</span>填入示例</button>
+        <button class="md-icon-btn" type="button" onclick="resetDemo()" aria-label="重置"><span class="material-symbols-rounded">restart_alt</span></button>
+      </div>
+    </header>
+
+    <section class="mobile-quick-summary" aria-label="移动端摘要">
+      <div class="state-pill"><strong id="mobileStateActions">0</strong><small>动作</small></div>
+      <div class="state-pill"><strong id="mobileStateNew">0</strong><small>新增</small></div>
+      <div class="state-pill"><strong id="mobileStateReview">0</strong><small>确认</small></div>
+    </section>
+
+    <section id="variantA" class="variant-page" data-label="A - 引导式三步录入">
+      <div class="step-stack">
+        <details class="md-card step-card" id="stepA0">
+          <summary><span class="step-index">0</span><span class="step-copy"><strong>上周基线</strong><small>AI 用它判断哪些是老动作</small></span><span class="step-trailing"><span id="stepA0Badge" class="status-badge status-continued">4 老动作</span><span class="step-chevron material-symbols-rounded">expand_more</span></span></summary>
+          <div class="step-body">
+            <p class="compact-note">上周处方作为 AI 的对比基线。默认折叠，只在需要核对老动作时展开。</p>
+            <div class="baseline-list">
+              <div class="baseline-item"><div><strong>靠墙静蹲</strong><small>3 组 × 35 秒 · 已连续 4 周</small></div><span class="status-badge status-continued">老动作</span></div>
+              <div class="baseline-item"><div><strong>蚌式开合</strong><small>每侧 12 次 × 2 组 · 已连续 2 周</small></div><span class="status-badge status-continued">老动作</span></div>
+              <div class="baseline-item"><div><strong>跪姿后踢腿</strong><small>每侧 12 次 × 2 组 · 上周有腰代偿备注</small></div><span class="status-badge status-progressed">需观察</span></div>
+              <div class="baseline-item"><div><strong>股四头肌等长收缩</strong><small>夹毛巾保持 10 秒 · 热身/恢复</small></div><span class="status-badge status-continued">老动作</span></div>
+            </div>
+          </div>
+        </details>
+
+        <details class="md-card step-card" id="stepA1" open>
+          <summary><span class="step-index">1</span><span class="step-copy"><strong>粘贴或口述本周处方</strong><small>自然语言即可，AI 会自动做差分</small></span><span class="step-trailing"><span id="stepA1Badge" class="status-badge status-progressed">当前</span><span class="step-chevron material-symbols-rounded">expand_more</span></span></summary>
+          <div class="step-body">
+            <div class="step-body-grid">
+              <section>
+                <div class="md-field prompt-area">
+                  <textarea id="inputA" placeholder=" "></textarea>
+                  <label>本周康复中心给你的运动描述</label>
+                </div>
+                <p class="field-help">示例：今天老师说继续靠墙蹲，但别太低；新增一个用弹力带把膝盖往外打开的动作；上周那个跪姿后踢腿先停掉，因为腰有点代偿。</p>
+                <div class="example-chip-row">
+                  <button class="md-chip active" type="button" onclick="loadExample('short')">半结构化示例</button>
+                  <button class="md-chip" type="button" onclick="loadExample('messy')">口语化示例</button>
+                  <button class="md-chip" type="button" onclick="loadExample('pain')">带疼痛反馈</button>
+                </div>
+                <div class="action-row">
+                  <button class="md-btn md-btn-filled" type="button" onclick="mockParse('A')"><span class="material-symbols-rounded">auto_awesome</span>让 AI 解析</button>
+                  <button class="md-btn" type="button" onclick="copyToAllInputs()"><span class="material-symbols-rounded">content_copy</span>同步到其他版本</button>
+                </div>
+              </section>
+              <aside class="pipeline" id="pipelineA">
+                <div class="pipe-step"><span class="step-icon material-symbols-rounded">description</span><div><strong>提取处方原句</strong><small>保留康复师原始描述和上下文</small></div><span class="status-badge status-continued">等待</span></div>
+                <div class="pipe-step"><span class="step-icon material-symbols-rounded">compare_arrows</span><div><strong>匹配已有动作库</strong><small>识别“靠墙蹲”≈“靠墙静蹲”</small></div><span class="status-badge status-continued">等待</span></div>
+                <div class="pipe-step"><span class="step-icon material-symbols-rounded">rule</span><div><strong>标记状态</strong><small>new / continued / progressed / dropped</small></div><span class="status-badge status-continued">等待</span></div>
+                <div class="pipe-step"><span class="step-icon material-symbols-rounded">health_and_safety</span><div><strong>风险检查</strong><small>低置信或疼痛项要求你确认</small></div><span class="status-badge status-continued">等待</span></div>
+              </aside>
+            </div>
+          </div>
+        </details>
+
+        <details class="md-card step-card" id="stepA2">
+          <summary><span class="step-index">2</span><span class="step-copy"><strong>查看本周差分</strong><small>解析后才会出现继续、新增、暂停</small></span><span class="step-trailing"><span id="stepA2Badge" class="status-badge status-continued">等待解析</span><span class="step-chevron material-symbols-rounded">expand_more</span></span></summary>
+          <div class="step-body"><div id="diffSummaryA"><div class="empty-state" style="min-height:120px"><div><span class="material-symbols-rounded">compare_arrows</span><p>先录入本周描述，AI 才能和上周基线做差分。</p></div></div></div></div>
+        </details>
+
+        <details class="md-card step-card" id="stepA3">
+          <summary><span class="step-index">3</span><span class="step-copy"><strong>确认 AI 解析结果</strong><small>只改错别字、组数或状态</small></span><span class="step-trailing"><span id="stepA3Badge" class="status-badge status-continued">等待确认</span><span class="step-chevron material-symbols-rounded">expand_more</span></span></summary>
+          <div class="step-body"><div id="parsedA" class="parsed-list"><div class="empty-state"><div><span class="material-symbols-rounded">auto_fix_normal</span><p>点击“让 AI 解析”后，这里会出现可确认的动作卡片。</p></div></div></div></div>
+        </details>
+
+        <details class="md-card step-card" id="stepA4">
+          <summary><span class="step-index">4</span><span class="step-copy"><strong>确认录入与 AI 上下文</strong><small>写入 rehabWeekly，供计划 AI 使用</small></span><span class="step-trailing"><span id="stepA4Badge" class="status-badge status-continued">未就绪</span><span class="step-chevron material-symbols-rounded">expand_more</span></span></summary>
+          <div class="step-body">
+            <pre id="jsonA" class="ai-json">暂无数据</pre>
+            <details class="context-preview"><summary>查看会注入给 AI 的上下文摘要</summary><pre id="contextA" class="ai-json" style="margin-top:10px">暂无上下文</pre></details>
+            <div class="action-row"><button class="md-btn md-btn-filled" type="button"><span class="material-symbols-rounded">done_all</span>确认录入本周处方</button><button class="md-btn" type="button">保存草稿</button></div>
+          </div>
+        </details>
+      </div>
+    </section>
+
+    <section id="variantB" class="variant-page" data-label="B - 对话式 AI 导入">
+      <div class="chat-shell">
+        <article class="md-card chat-window">
+          <div class="card-head"><div class="card-title"><span class="icon material-symbols-rounded">forum</span><div><h2>像聊天一样补充处方</h2><small>适合你从康复中心出来后边回忆边录入。</small></div></div></div>
+          <div class="bubble ai">把康复师今天说的动作尽量按原话写下来。我会先提取动作，再问你不确定的地方。</div>
+          <div class="bubble user">继续那个靠墙蹲，老师说别蹲太低。新增弹力带膝盖往外打开，每边 15 次。跪姿后踢腿先停。</div>
+          <div class="bubble ai">我理解到 3 个动作变化：1 个继续、1 个新增、1 个暂停。其中“弹力带膝盖往外打开”可能是髋外展/蚌式，需要你确认。</div>
+          <div class="composer">
+            <div class="md-field"><textarea id="inputB" placeholder=" "></textarea><label>继续补充或粘贴本周处方</label></div>
+            <div class="action-row"><button class="md-btn md-btn-filled" onclick="mockParse('B')" type="button"><span class="material-symbols-rounded">send</span>发送给 AI 解析</button><button class="md-btn" onclick="loadExample('messy')" type="button">填入口语示例</button></div>
+          </div>
+        </article>
+        <aside class="assistant-panel">
+          <div class="md-card">
+            <div class="card-head"><div class="card-title"><span class="icon material-symbols-rounded">manage_search</span><div><h2>AI 提取面板</h2><small>低置信项在这里集中处理。</small></div></div></div>
+            <div class="risk-note"><span class="material-symbols-rounded">priority_high</span><span>不要让 AI 静默创建动作。凡是匹配置信度低于 80% 的动作，必须让你选“匹配已有 / 新建动作 / 只作为备注”。</span></div>
+          </div>
+          <div class="md-card"><div id="parsedB" class="parsed-list"><div class="empty-state"><div><span class="material-symbols-rounded">psychology</span><p>发送描述后会出现动作匹配建议。</p></div></div></div></div>
+          <div class="md-card"><pre id="jsonB" class="ai-json">暂无数据</pre></div>
+        </aside>
+      </div>
+    </section>
+
+    <section id="variantC" class="variant-page" data-label="C - 周看板差分录入">
+      <div class="week-board">
+        <article class="md-card week-lane">
+          <div class="week-lane-head"><h2>上周康复处方</h2><span class="md-chip">2026-05-18</span></div>
+          <div class="week-card dim"><div class="diff-row"><div class="diff-main"><strong>靠墙静蹲</strong><small>continued · 3 组 × 35 秒</small></div><span class="status-badge status-continued">继续</span></div><div class="diff-row"><div class="diff-main"><strong>蚌式开合</strong><small>continued · 每侧 12 次</small></div><span class="status-badge status-continued">继续</span></div><div class="diff-row"><div class="diff-main"><strong>跪姿后踢腿</strong><small>continued · 每侧 12 次</small></div><span class="status-badge status-continued">继续</span></div></div>
+          <div class="md-field"><textarea id="inputC" placeholder=" "></textarea><label>本周康复师原话</label></div>
+          <div class="action-row"><button class="md-btn md-btn-filled" onclick="mockParse('C')" type="button"><span class="material-symbols-rounded">difference</span>生成本周差分</button><button class="md-btn" onclick="loadExample('pain')" type="button">填入疼痛示例</button></div>
+        </article>
+        <article class="md-card week-lane">
+          <div class="week-lane-head"><h2>本周待确认</h2><span class="md-chip active">2026-05-25</span></div>
+          <div id="parsedC" class="parsed-list"><div class="empty-state"><div><span class="material-symbols-rounded">calendar_month</span><p>AI 会把本周原话和上周处方做对比，突出新增、进阶和暂停。</p></div></div></div>
+        </article>
+      </div>
+      <div class="layout-two">
+        <article class="md-card"><div class="card-head"><div class="card-title"><span class="icon material-symbols-rounded">insights</span><div><h2>给训练计划 AI 的约束</h2><small>后续生成每日计划必须先遵守这些规则。</small></div></div></div><pre id="contextC" class="ai-json">暂无上下文</pre></article>
+        <article class="md-card"><div class="card-head"><div class="card-title"><span class="icon material-symbols-rounded">database</span><div><h2>结构化记录</h2><small>这是最终写入 `rehabWeekly` 的形状。</small></div></div></div><pre id="jsonC" class="ai-json">暂无数据</pre></article>
+      </div>
+    </section>
+
+    <section class="preview-state">
+      <div class="state-pill"><strong id="stateActions">0</strong><small>解析动作</small></div>
+      <div class="state-pill"><strong id="stateNew">0</strong><small>本周新增</small></div>
+      <div class="state-pill"><strong id="stateReview">0</strong><small>需人工确认</small></div>
+      <div class="state-pill"><strong id="stateReady">否</strong><small>可录入</small></div>
+    </section>
+  </main>
+
+  <nav class="switcher" aria-label="Prototype variant switcher">
+    <button type="button" onclick="cycleVariant(-1)" aria-label="上一版"><span class="material-symbols-rounded">chevron_left</span></button>
+    <div class="label" id="switcherLabel">A - 引导式三步录入</div>
+    <button type="button" onclick="cycleVariant(1)" aria-label="下一版"><span class="material-symbols-rounded">chevron_right</span></button>
+  </nav>
+
+  <script>
+    const variants = ['A', 'B', 'C'];
+    const examples = {
+      short: '这周继续靠墙静蹲，3组，每组40秒，蹲到膝盖不痛的位置。新增弹力带膝外推，每侧15次做2组。上周跪姿后踢腿先停掉，老师说我腰有代偿。最后继续股四头肌等长收缩，每次夹毛巾保持10秒。',
+      messy: '今天康复老师说：那个靠墙慢慢蹲的还要做，但是不要蹲太低；又加了一个坐着还是躺着用弹力带把膝盖往外打开的动作，左右都做，大概15下；之前趴着/跪着腿往后抬那个先不做，说我的腰容易抢力。还有一个脚踩台阶慢慢下来的动作，让我扶着做。',
+      pain: '本周反馈：靠墙蹲做到40秒膝盖大概2分疼，可以继续。弹力带开合做完髋外侧酸，膝盖不疼，老师说是新动作。台阶下放右腿支撑时膝前方有4分疼，老师说先降低台阶高度。跪姿后踢腿暂停。'
+    };
+
+    let parsedState = [];
+
+    function currentVariant() {
+      const fromUrl = new URLSearchParams(location.search).get('variant');
+      return variants.includes(fromUrl) ? fromUrl : 'A';
+    }
+
+    function showVariant(next) {
+      document.querySelectorAll('.variant-page').forEach(el => el.classList.toggle('active', el.id === `variant${next}`));
+      const label = document.querySelector(`#variant${next}`)?.dataset.label || `Variant ${next}`;
+      document.getElementById('switcherLabel').textContent = label;
+      const url = new URL(location.href);
+      url.searchParams.set('variant', next);
+      history.replaceState(null, '', url);
+    }
+
+    function cycleVariant(delta) {
+      const index = variants.indexOf(currentVariant());
+      const next = variants[(index + delta + variants.length) % variants.length];
+      showVariant(next);
+    }
+
+    function focusedInTextInput() {
+      const el = document.activeElement;
+      return el && (el.matches('input, textarea, select') || el.isContentEditable);
+    }
+
+    function loadExample(type = 'short') {
+      const text = examples[type] || examples.short;
+      ['inputA', 'inputB', 'inputC'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = text;
+      });
+    }
+
+    function copyToAllInputs() {
+      const text = document.getElementById('inputA')?.value || document.getElementById('inputB')?.value || document.getElementById('inputC')?.value || '';
+      ['inputA', 'inputB', 'inputC'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = text;
+      });
+    }
+
+    function resetDemo() {
+      parsedState = [];
+      ['inputA', 'inputB', 'inputC'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+      ['parsedA', 'parsedB', 'parsedC'].forEach(id => document.getElementById(id).innerHTML = '<div class="empty-state"><div><span class="material-symbols-rounded">auto_fix_normal</span><p>等待 AI 解析康复师原话。</p></div></div>');
+      const diffSummary = document.getElementById('diffSummaryA');
+      if (diffSummary) diffSummary.innerHTML = '<div class="empty-state" style="min-height:120px"><div><span class="material-symbols-rounded">compare_arrows</span><p>先录入本周描述，AI 才能和上周基线做差分。</p></div></div>';
+      ['jsonA', 'jsonB', 'jsonC', 'contextA', 'contextC'].forEach(id => { const el = document.getElementById(id); if (el) el.textContent = '暂无数据'; });
+      resetPipeline();
+      updateState();
+      openStepA('stepA1');
+    }
+
+    function resetPipeline() {
+      const pipe = document.getElementById('pipelineA');
+      if (!pipe) return;
+      pipe.querySelectorAll('.pipe-step').forEach(step => {
+        step.classList.remove('done', 'running');
+        step.querySelector('.status-badge').className = 'status-badge status-continued';
+        step.querySelector('.status-badge').textContent = '等待';
+      });
+    }
+
+    function mockParse(source) {
+      copyToAllInputs();
+      const text = document.getElementById(`input${source}`)?.value.trim() || examples.short;
+      if (!document.getElementById(`input${source}`)?.value) loadExample('short');
+      parsedState = buildMockParse(text);
+      animatePipeline();
+      renderAll();
+      openStepA('stepA2');
+    }
+
+    function openStepA(id) {
+      ['stepA0', 'stepA1', 'stepA2', 'stepA3', 'stepA4'].forEach(stepId => {
+        const step = document.getElementById(stepId);
+        if (step) step.open = stepId === id;
+      });
+    }
+
+    function buildMockParse(text) {
+      const hasPain = /疼|痛|膝前|4分/.test(text);
+      const hasStep = /台阶|下放|踩/.test(text);
+      const messy = /那个|大概|还是|趴着/.test(text);
+      return [
+        {
+          name: '靠墙静蹲', raw: '那个靠墙慢慢蹲的 / 继续靠墙静蹲', status: hasPain ? 'progressed' : 'continued', confidence: 96,
+          match: '已匹配动作库：靠墙静蹲', spec: { sets: 3, reps: 0, work: hasPain ? 40 : 40, mode: 'hold', actionRest: 30 }, painLevel: hasPain ? 2 : 0,
+          coachNote: '不要蹲太低，以膝盖不痛位置为准。'
+        },
+        {
+          name: '弹力带髋外展 / 蚌式开合', raw: '用弹力带把膝盖往外打开', status: 'new', confidence: messy ? 72 : 84,
+          match: messy ? '低置信：可能是坐姿髋外展或蚌式开合' : '建议新建或匹配：蚌式开合', spec: { sets: 2, reps: 15, work: 2, mode: 'alt-reps', actionRest: 25 }, painLevel: 0,
+          coachNote: '髋外侧酸正常；若膝痛则减小弹力带阻力。', needsReview: messy
+        },
+        {
+          name: '跪姿后踢腿', raw: '之前腿往后抬那个先不做 / 跪姿后踢腿暂停', status: 'dropped', confidence: 91,
+          match: '已匹配动作库：跪姿后踢腿', spec: null, painLevel: 0,
+          coachNote: '因腰部代偿，本周不进入训练计划。'
+        },
+        ...(hasStep ? [{
+          name: '台阶下放', raw: '脚踩台阶慢慢下来的动作 / 台阶下放', status: hasPain ? 'watch' : 'new', confidence: 81,
+          match: '建议匹配：台阶下放', spec: { sets: 2, reps: 8, work: 4, mode: 'alt-reps', actionRest: 45 }, painLevel: hasPain ? 4 : 1,
+          coachNote: hasPain ? '膝前疼 4/10，先降低台阶高度，计划 AI 不应加量。' : '扶支撑物，慢速离心。', needsReview: hasPain
+        }] : []),
+        {
+          name: '股四头肌等长收缩', raw: '夹毛巾保持10秒 / 股四头肌等长', status: 'continued', confidence: 88,
+          match: '已匹配动作库：股四头肌等长收缩', spec: { sets: 3, reps: 10, work: 10, mode: 'reps', actionRest: 20 }, painLevel: 0,
+          coachNote: '作为热身或恢复动作保留。'
+        }
+      ];
+    }
+
+    function animatePipeline() {
+      const steps = [...document.querySelectorAll('#pipelineA .pipe-step')];
+      steps.forEach((step, index) => {
+        setTimeout(() => {
+          step.classList.add(index === steps.length - 1 ? 'running' : 'done');
+          const badge = step.querySelector('.status-badge');
+          badge.className = `status-badge ${index === steps.length - 1 ? 'status-progressed' : 'status-new'}`;
+          badge.textContent = index === steps.length - 1 ? '需确认' : '完成';
+        }, 120 * index);
+      });
+    }
+
+    function statusLabel(status) {
+      return { new: '本周新增', continued: '继续执行', progressed: '进阶/调整', dropped: '暂停/淘汰', watch: '疼痛观察' }[status] || status;
+    }
+
+    function statusClass(status) {
+      return status === 'new' ? 'status-new' : status === 'progressed' ? 'status-progressed' : status === 'watch' || status === 'dropped' ? 'status-watch' : 'status-continued';
+    }
+
+    function renderParsedCards() {
+      if (!parsedState.length) return '<div class="empty-state"><div><span class="material-symbols-rounded">auto_fix_normal</span><p>等待 AI 解析康复师原话。</p></div></div>';
+      return parsedState.map((item, index) => `
+        <div class="parsed-card ${item.needsReview ? 'needs-review' : ''}">
+          <div class="parsed-top">
+            <div class="parsed-name"><span class="drag-dot"></span><div><h3>${escapeHtml(item.name)}</h3><small>${escapeHtml(item.match)}</small></div></div>
+            <span class="confidence-badge ${item.confidence < 80 ? 'confidence-low' : ''}">${item.confidence}%</span>
+          </div>
+          <div class="parsed-meta">
+            <span class="status-badge ${statusClass(item.status)}">${statusLabel(item.status)}</span>
+            ${item.spec ? `<span class="spec-pill"><span class="material-symbols-rounded">repeat</span>${item.spec.sets}组</span><span class="spec-pill">${item.spec.mode.includes('hold') ? item.spec.work + '秒' : item.spec.reps + '次/侧'}</span>` : '<span class="spec-pill">不进入本周训练</span>'}
+            <span class="spec-pill"><span class="material-symbols-rounded">monitor_heart</span>疼痛 ${item.painLevel}/10</span>
+          </div>
+          <div class="source-quote">原话：${escapeHtml(item.raw)}<br>AI 备注：${escapeHtml(item.coachNote)}</div>
+          <div class="review-row">
+            <label class="mini-field"><span>状态</span><select><option selected>${statusLabel(item.status)}</option><option>本周新增</option><option>继续执行</option><option>暂停/淘汰</option></select></label>
+            <label class="mini-field"><span>动作名</span><input value="${escapeHtml(item.name)}"></label>
+            <label class="mini-field"><span>疼痛</span><input type="number" min="0" max="10" value="${item.painLevel}"></label>
+          </div>
+        </div>`).join('');
+    }
+
+    function renderDiffSummary() {
+      const target = document.getElementById('diffSummaryA');
+      if (!target) return;
+      if (!parsedState.length) {
+        target.innerHTML = '<div class="empty-state" style="min-height:226px"><div><span class="material-symbols-rounded">compare_arrows</span><p>AI 会把本周描述与上周基线对比，输出继续、新增、暂停和疼痛观察。</p></div></div>';
+        return;
+      }
+      const groups = {
+        continued: parsedState.filter(item => item.status === 'continued' || item.status === 'progressed'),
+        new: parsedState.filter(item => item.status === 'new'),
+        dropped: parsedState.filter(item => item.status === 'dropped'),
+        watch: parsedState.filter(item => item.status === 'watch' || item.painLevel >= 4 || item.needsReview)
+      };
+      const detailRows = parsedState.map(item => `
+        <div class="diff-row">
+          <div class="diff-main"><strong>${escapeHtml(item.name)}</strong><small>${escapeHtml(item.raw)} · ${escapeHtml(item.coachNote)}</small></div>
+          <span class="status-badge ${statusClass(item.status)}">${statusLabel(item.status)}</span>
+        </div>`).join('');
+      target.innerHTML = `
+        <div class="diff-summary-grid">
+          <div class="diff-summary-card"><small>继续/进阶</small><strong>${groups.continued.length}</strong><span class="status-badge status-continued">保留</span></div>
+          <div class="diff-summary-card"><small>本周新增</small><strong>${groups.new.length}</strong><span class="status-badge status-new">不自动加量</span></div>
+          <div class="diff-summary-card"><small>暂停/淘汰</small><strong>${groups.dropped.length}</strong><span class="status-badge status-watch">禁止生成</span></div>
+          <div class="diff-summary-card"><small>需确认</small><strong>${groups.watch.length}</strong><span class="status-badge status-progressed">人工复核</span></div>
+        </div>
+        <div class="diff-detail-list">${detailRows}</div>`;
+    }
+
+    function buildRecord() {
+      return {
+        id: 'prototype-rehab-week-2026-05-25',
+        weekStart: '2026-05-25',
+        visitDate: '2026-05-27',
+        source: 'ai-parsed-natural-language',
+        therapistAssessment: '本周处方来自自然语言描述，低置信动作需用户确认后录入。',
+        actions: parsedState.map(item => ({
+          name: item.name,
+          rawDescription: item.raw,
+          status: item.status,
+          confidence: item.confidence,
+          spec: item.spec,
+          painLevel: item.painLevel,
+          coachNote: item.coachNote,
+          needsReview: !!item.needsReview
+        }))
+      };
+    }
+
+    function buildContext() {
+      if (!parsedState.length) return '暂无上下文';
+      const mustInclude = parsedState.filter(a => ['continued', 'progressed'].includes(a.status)).map(a => a.name);
+      const mustExclude = parsedState.filter(a => a.status === 'dropped').map(a => a.name);
+      const cautious = parsedState.filter(a => a.status === 'new' || a.status === 'watch' || a.needsReview).map(a => `${a.name}（${statusLabel(a.status)}，疼痛${a.painLevel}/10，置信${a.confidence}%）`);
+      return [
+        '【近3周康复中心处方 - 本周摘要】',
+        `必须保留或参考：${mustInclude.join('、') || '无'}`,
+        `本周禁止出现在计划中：${mustExclude.join('、') || '无'}`,
+        `新增/观察动作不得自动加量：${cautious.join('、') || '无'}`,
+        '规则：低置信动作必须先让用户确认；疼痛 >=4/10 的动作只能降级或替换，不能进阶。'
+      ].join('\n');
+    }
+
+    function renderAll() {
+      const cards = renderParsedCards();
+      ['parsedA', 'parsedB', 'parsedC'].forEach(id => { const el = document.getElementById(id); if (el) el.innerHTML = cards; });
+      renderDiffSummary();
+      const record = JSON.stringify(buildRecord(), null, 2);
+      ['jsonA', 'jsonB', 'jsonC'].forEach(id => { const el = document.getElementById(id); if (el) el.textContent = record; });
+      const context = buildContext();
+      ['contextA', 'contextC'].forEach(id => { const el = document.getElementById(id); if (el) el.textContent = context; });
+      updateState();
+    }
+
+    function updateState() {
+      const review = parsedState.filter(item => item.needsReview || item.confidence < 80 || item.painLevel >= 4).length;
+      const newCount = parsedState.filter(item => item.status === 'new').length;
+      const heroParsedCount = document.getElementById('heroParsedCount');
+      const heroRiskCount = document.getElementById('heroRiskCount');
+      if (heroParsedCount) heroParsedCount.textContent = parsedState.length;
+      if (heroRiskCount) heroRiskCount.textContent = review;
+      document.getElementById('stateActions').textContent = parsedState.length;
+      document.getElementById('stateNew').textContent = newCount;
+      document.getElementById('stateReview').textContent = review;
+      document.getElementById('stateReady').textContent = parsedState.length && !review ? '是' : '需确认';
+      document.getElementById('mobileStateActions').textContent = parsedState.length;
+      document.getElementById('mobileStateNew').textContent = newCount;
+      document.getElementById('mobileStateReview').textContent = review;
+      updateStepBadges(review, newCount);
+    }
+
+    function setBadge(id, text, className = 'status-continued') {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.className = `status-badge ${className}`;
+      el.textContent = text;
+    }
+
+    function updateStepBadges(review, newCount) {
+      if (!parsedState.length) {
+        setBadge('stepA0Badge', '4 老动作', 'status-continued');
+        setBadge('stepA1Badge', '当前', 'status-progressed');
+        setBadge('stepA2Badge', '等待解析', 'status-continued');
+        setBadge('stepA3Badge', '等待确认', 'status-continued');
+        setBadge('stepA4Badge', '未就绪', 'status-continued');
+        return;
+      }
+      setBadge('stepA0Badge', '已对比', 'status-new');
+      setBadge('stepA1Badge', '已解析', 'status-new');
+      setBadge('stepA2Badge', `${newCount} 新增 · ${review} 确认`, review ? 'status-progressed' : 'status-new');
+      setBadge('stepA3Badge', `${parsedState.length} 动作`, review ? 'status-progressed' : 'status-new');
+      setBadge('stepA4Badge', review ? '需确认' : '可录入', review ? 'status-progressed' : 'status-new');
+    }
+
+    function escapeHtml(value) {
+      return String(value || '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    }
+
+    document.addEventListener('keydown', event => {
+      if (focusedInTextInput()) return;
+      if (event.key === 'ArrowLeft') cycleVariant(-1);
+      if (event.key === 'ArrowRight') cycleVariant(1);
+    });
+
+    showVariant(currentVariant());
+    loadExample('short');
+    updateState();
+  </script>
+</body>
+</html>

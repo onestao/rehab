@@ -204,3 +204,27 @@
     background: rgba(255, 255, 255, 0.26);
 }
 
+.workout-readiness {
+    margin-top: 12px;
+    padding: 8px 10px;
+    border-radius: 16px;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 6px;
+    color: rgba(255,255,255,0.78);
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.14);
+    font-size: 11px;
+    line-height: 1.35;
+    text-align: left;
+}
+.workout-readiness:empty { display: none; }
+.workout-readiness .material-symbols-rounded {
+    font-size: 16px;
+    flex: 0 0 auto;
+}
+.workout-readiness[data-level="ok"] { color: rgba(210,255,214,0.9); }
+.workout-readiness[data-level="warn"] { color: rgba(255,243,196,0.95); }
+.workout-readiness[data-level="bad"] { color: rgba(255,218,214,0.95); }
+
