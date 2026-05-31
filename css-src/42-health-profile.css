@@ -445,7 +445,12 @@
 .rehab-action-review-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
 .rehab-action-review-head strong { display: block; font-size: 14px; line-height: 19px; }
 .rehab-action-review-head small { display: block; color: var(--md-sys-on-surface-variant); font-size: 11px; line-height: 15px; }
-.rehab-review-grid { display: grid; grid-template-columns: 1fr; gap: 6px; margin-top: 8px; }
+.rehab-action-review-head-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.rehab-action-del-btn { width: 32px; height: 32px; border: 0; border-radius: 50%; display: inline-grid; place-items: center; background: transparent; color: var(--md-sys-error); cursor: pointer; transition: background .15s; }
+.rehab-action-del-btn:hover { background: var(--md-sys-error-container); }
+.rehab-action-del-btn .material-symbols-rounded { font-size: 18px; }
+.rehab-review-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 8px; }
+.profile-edit-btn-row { display: flex; gap: 6px; flex-wrap: wrap; }
 .mini-field { display: grid; gap: 4px; }
 .mini-field span { color: var(--md-sys-primary); font-size: 10px; font-weight: 800; }
 .mini-field input,
@@ -453,7 +458,7 @@
 .rehab-json { max-height: 170px; overflow: auto; margin: 0; padding: 10px; border-radius: 14px; background: #101820; color: #d9f8ff; font-size: 10px; line-height: 1.55; white-space: pre-wrap; }
 
 @media (min-width: 640px) {
-    .rehab-review-grid { grid-template-columns: 160px minmax(0, 1fr) 120px; }
+    .rehab-review-grid { grid-template-columns: 140px minmax(0, 1fr) 100px 140px; }
     .rehab-step-body { padding: 0 14px 14px; }
 }
 

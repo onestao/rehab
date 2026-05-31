@@ -111,7 +111,10 @@
                             <small>${latest ? '训练计划 AI 会自动参考最近 3 周处方' : '输入康复师原话，AI 解析后再确认录入'}</small>
                         </div>
                     </div>
-                    <button class="md-btn md-btn-tonal profile-edit-btn" onclick="data.openRehabWeeklySheet()" type="button"><span class="material-symbols-rounded">auto_awesome</span> 录入</button>
+                    <div class="profile-edit-btn-row">
+                        <button class="md-btn md-btn-tonal profile-edit-btn" onclick="data.openRehabWeeklySheet()" type="button"><span class="material-symbols-rounded">auto_awesome</span> 录入</button>
+                        ${latest ? `<button class="md-btn md-btn-tonal profile-edit-btn" onclick="data.openRehabWeeklySheet('${esc(this, latest.weekStart)}')" type="button"><span class="material-symbols-rounded">edit</span> 编辑</button>` : ''}
+                    </div>
                 </div>
                 ${latest ? `<div class="rehab-week-action-list">${actionPreview || '<div class="profile-condition-note">本周处方暂无动作明细</div>'}</div>` : `<div class="profile-condition-note">适合每周从康复中心回来后录入新动作、暂停动作和疼痛反馈。</div>`}
             </div>`;
@@ -309,10 +312,14 @@
             this.renderHistory();
         },
 
-        openRehabWeeklySheet() {
-            const weekStart = this.rehabWeekStart?.() || this.logicalDateKey?.() || this.dateKey(new Date());
+        openRehabWeeklySheet(editWeekStart) {
+            const weekStart = editWeekStart || this.rehabWeekStart?.() || this.logicalDateKey?.() || this.dateKey(new Date());
             const visitDate = this.logicalDateKey?.() || this.dateKey(new Date());
-            this._rehabWeeklyDraft = null;
+            let existingRecord = null;
+            if (editWeekStart) {
+                existingRecord = (this.activeRecords?.(this.db.health?.rehabWeekly || []) || []).find(r => r.weekStart === editWeekStart) || null;
+            }
+            this._rehabWeeklyDraft = existingRecord ? this.normalizeRehabWeeklyPayload(existingRecord, { weekStart: existingRecord.weekStart, visitDate: existingRecord.visitDate, rawText: existingRecord.rawText || '' }) : null;
             document.getElementById('rehabWeeklySheet')?.remove();
             const html = `<div class="md-modal-overlay rehab-week-overlay" id="rehabWeeklySheet" onclick="if(event.target===this)data.closeRehabWeeklySheet()">
                 <div class="md-modal rehab-week-modal">
@@ -335,7 +342,19 @@
                 </div>
             </div>`;
             document.body.insertAdjacentHTML('beforeend', html);
-            this.openRehabWeeklyStep('rehabStepInput');
+            if (existingRecord) {
+                const textarea = document.getElementById('rehabPrescriptionText');
+                if (textarea) textarea.value = existingRecord.rawText || '';
+                const weekInput = document.getElementById('rehabWeekStart');
+                if (weekInput) weekInput.value = existingRecord.weekStart || weekStart;
+                const visitInput = document.getElementById('rehabVisitDate');
+                if (visitInput) visitInput.value = existingRecord.visitDate || visitDate;
+                this.renderRehabWeeklyDraft();
+                this.openRehabWeeklyStep('rehabStepReview');
+                this.setRehabParseStatus('正在编辑已录入处方，修改后重新确认即可。', 'ok');
+            } else {
+                this.openRehabWeeklyStep('rehabStepInput');
+            }
             this.updateRehabWeeklyDraftUi();
         },
 
@@ -449,28 +468,44 @@
                     spec: action.spec || null,
                     painLevel: Number(action.painLevel || 0),
                     coachNote: action.coachNote || '',
-                    confidence: Number(action.confidence || 0)
+                    confidence: Number(action.confidence || 0),
+                    progressesFrom: action.progressesFrom !== undefined ? action.progressesFrom : null
                 }))
             }));
         },
 
         buildRehabWeeklyPrompt(text = '', weekStart = '', visitDate = '') {
             const recent = this.recentRehabWeeklyContext?.(3) || [];
+            const p = this.db?.health?.profile || {};
+            const conds = (p.conditions || []).map(c => {
+                const sev = c.severity ? `（${c.severity === 'severe' ? '严重' : c.severity === 'moderate' ? '中度' : '轻度'}）` : '';
+                const avoid = c.avoid?.length ? `，避免：${c.avoid.join('、')}` : '';
+                return `${c.label}${sev}${avoid}${c.note ? '，备注：' + c.note : ''}`;
+            });
+            const equipment = p.preferences?.equipment || [];
+            const profileBlock = [
+                conds.length ? `健康状况/训练禁忌：${conds.join('；')}` : '',
+                equipment.length ? `可用器材：${equipment.join('、')}` : '',
+                p.age ? `年龄：${p.age}` : ''
+            ].filter(Boolean).join('\n');
             return [
                 '你是康复训练处方结构化助手。用户只能提供康复师的自然语言描述，你需要把它解析为本周康复处方。',
                 '必须只返回严格 JSON，不要 Markdown，不要解释。',
-                'JSON 结构：{"weekStart":"YYYY-MM-DD","visitDate":"YYYY-MM-DD","therapistAssessment":"...","homework":"...","actions":[{"name":"标准化动作名","rawDescription":"用户原话片段","status":"new|continued|progressed|dropped|watch","confidence":0-100,"spec":{"sets":number,"reps":number,"work":number,"mode":"reps|hold|alt-reps|alt-hold","actionRest":number}|null,"painLevel":0-10,"coachNote":"...","needsReview":true|false}]}',
+                'JSON 结构：{"weekStart":"YYYY-MM-DD","visitDate":"YYYY-MM-DD","therapistAssessment":"...","homework":"...","actions":[{"name":"标准化动作名","rawDescription":"用户原话片段","status":"new|continued|progressed|dropped|watch","confidence":0-100,"spec":{"sets":number,"reps":number,"work":number,"mode":"reps|hold|alt-reps|alt-hold","actionRest":number}|null,"painLevel":0-10,"coachNote":"...","needsReview":true|false,"progressesFrom":number|null}]}',
                 '规则：',
-                '- name 要尽量归一化为可执行动作名；如果不确定，在 name 中保留候选，如“弹力带髋外展 / 蚌式开合”。',
+                '- name 要尽量归一化为可执行动作名；如果不确定，在 name 中保留候选，如"弹力带髋外展 / 蚌式开合"。',
                 '- status 必须通过本周描述和最近处方对比判断：首次出现为 new；延续为 continued；加量/改强度为 progressed；明确停做为 dropped；疼痛或需观察为 watch。',
                 '- 低置信动作 confidence < 80 或疼痛 >= 4 必须 needsReview=true。',
                 '- dropped 动作 spec 可以为 null。',
                 '- 不要编造用户没提到的动作。',
+                '- progressesFrom 表示该动作是从哪个动作进阶/变化而来的（填写原始 actions 数组的索引），如果没有则为 null。',
+                '- 如果用户健康档案中有训练禁忌或损伤，coachNote 中必须提醒注意事项；避免推荐会加重伤情的动作。',
+                profileBlock ? `\n【用户健康档案】\n${profileBlock}` : '',
                 `本周开始：${weekStart || '未知'}`,
                 `复诊日期：${visitDate || '未知'}`,
                 `最近3周处方：${JSON.stringify(recent)}`,
                 `用户本周描述：${text}`
-            ].join('\n');
+            ].filter(Boolean).join('\n');
         },
 
         normalizeRehabWeeklyPayload(payload = {}, fallback = {}) {
@@ -488,7 +523,8 @@
                     spec: status === 'dropped' ? null : normalizeRehabSpec(action.spec),
                     painLevel,
                     coachNote: String(action.coachNote || '').slice(0, 240),
-                    needsReview: !!action.needsReview || confidence < 80 || painLevel >= 4
+                    needsReview: !!action.needsReview || confidence < 80 || painLevel >= 4,
+                    progressesFrom: action.progressesFrom !== undefined && action.progressesFrom !== null ? Number(action.progressesFrom) : undefined
                 };
             }).filter(Boolean);
             return {
@@ -556,7 +592,7 @@
                 <div class="rehab-diff-card"><small>需确认</small><strong>${reviewCount}</strong></div>
             </div><div class="rehab-diff-list">${actions.map(a => `<div class="baseline-item"><div><strong>${esc(this, a.name)}</strong><small>${esc(this, a.rawDescription || a.coachNote || '')}</small></div><span class="rehab-status ${this.rehabStatusClass(a.status)}">${this.rehabStatusLabel(a.status)}</span></div>`).join('')}</div>`;
             const review = document.getElementById('rehabReviewBody');
-            if (review) review.innerHTML = actions.map((action, index) => this.renderRehabActionReview(action, index)).join('');
+            if (review) review.innerHTML = actions.map((action, index) => this.renderRehabActionReview(action, index, actions)).join('');
             const record = document.getElementById('rehabRecordJson');
             if (record) record.textContent = JSON.stringify(draft || {}, null, 2);
             const context = document.getElementById('rehabContextPreview');
@@ -565,17 +601,26 @@
             if (save) save.disabled = !actions.length;
         },
 
-        renderRehabActionReview(action, index) {
+        renderRehabActionReview(action, index, allActions) {
             const status = normalizeRehabStatus(action.status);
+            const otherActions = (allActions || []).filter((_, i) => i !== index);
+            const progressesFromOptions = otherActions.map((a, i) => {
+                const origIndex = (allActions || []).indexOf(a);
+                return `<option value="${origIndex}" ${action.progressesFrom === origIndex ? 'selected' : ''}>${esc(this, a.name)}</option>`;
+            }).join('');
             return `<div class="rehab-action-review" data-rehab-action-index="${index}">
                 <div class="rehab-action-review-head">
                     <div><strong>${esc(this, action.name)}</strong><small>${esc(this, action.rawDescription || action.coachNote || '')}</small></div>
-                    <span class="rehab-confidence ${action.confidence < 80 ? 'is-low' : ''}">${Number(action.confidence || 0)}%</span>
+                    <div class="rehab-action-review-head-actions">
+                        <span class="rehab-confidence ${action.confidence < 80 ? 'is-low' : ''}">${Number(action.confidence || 0)}%</span>
+                        <button class="md-icon-btn rehab-action-del-btn" onclick="data.deleteRehabAction(${index})" type="button" title="删除此动作"><span class="material-symbols-rounded">delete</span></button>
+                    </div>
                 </div>
                 <div class="rehab-review-grid">
                     <label class="mini-field"><span>状态</span><select data-field="status"><option value="continued" ${status === 'continued' ? 'selected' : ''}>继续</option><option value="new" ${status === 'new' ? 'selected' : ''}>新增</option><option value="progressed" ${status === 'progressed' ? 'selected' : ''}>进阶</option><option value="dropped" ${status === 'dropped' ? 'selected' : ''}>暂停</option><option value="watch" ${status === 'watch' ? 'selected' : ''}>观察</option></select></label>
                     <label class="mini-field"><span>动作名</span><input data-field="name" value="${esc(this, action.name)}"></label>
                     <label class="mini-field"><span>疼痛</span><input data-field="painLevel" type="number" min="0" max="10" value="${Number(action.painLevel || 0)}"></label>
+                    ${progressesFromOptions ? `<label class="mini-field"><span>进阶自</span><select data-field="progressesFrom"><option value="">无</option>${progressesFromOptions}</select></label>` : ''}
                 </div>
             </div>`;
         },
@@ -597,8 +642,19 @@
                 action.painLevel = Math.max(0, Math.min(10, Math.round(Number(row.querySelector('[data-field="painLevel"]')?.value || 0))));
                 action.needsReview = action.needsReview || action.painLevel >= 4 || Number(action.confidence || 100) < 80;
                 if (action.status === 'dropped') action.spec = null;
+                const pf = row.querySelector('[data-field="progressesFrom"]')?.value;
+                action.progressesFrom = pf !== undefined && pf !== '' ? Number(pf) : undefined;
             });
             return draft;
+        },
+
+        deleteRehabAction(index) {
+            const draft = this._rehabWeeklyDraft;
+            if (!draft || !draft.actions?.[index]) return;
+            const name = draft.actions[index].name || '此动作';
+            draft.actions.splice(index, 1);
+            this.renderRehabWeeklyDraft();
+            window.toast?.show?.(`已删除「${name}」`, 'success');
         },
 
         rehabWeeklyAiContextText(draft = this._rehabWeeklyDraft) {
