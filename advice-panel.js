@@ -20,6 +20,9 @@ const advicePanel = {
             copyAdviceMessage: this.copyAdviceMessage,
             retryAdviceFrom: this.retryAdviceFrom,
             regenerateAdvice: this.regenerateAdvice,
+            openEditAdviceMessage: this.openEditAdviceMessage,
+            regenerateAdviceFromEditedUser: this.regenerateAdviceFromEditedUser,
+            findAssistantReplyForUser: this.findAssistantReplyForUser,
             captureAdviceDraft: this.captureAdviceDraft,
             adviceSavedScrollTop: this.adviceSavedScrollTop,
             adviceSavedPageScrollOffset: this.adviceSavedPageScrollOffset,
@@ -1054,7 +1057,7 @@ const advicePanel = {
         el.style.height = 'auto';
         const nextHeight = Math.max(44, Math.min(el.scrollHeight, 160));
         el.style.height = `${nextHeight}px`;
-        el.classList.toggle('is-scrollable', el.scrollHeight > 160);
+        el.classList.toggle('is-scrollable', el.scrollHeight > nextHeight + 1);
     },
 
     setAdviceModel(model) {
@@ -1355,7 +1358,7 @@ const advicePanel = {
     },
 
     adviceConversationContext(limit = 12) {
-        const messages = this.activeRecords(this.db.health.aiAdviceChat || []);
+        const messages = this.visibleAdviceMessages(this.activeRecords(this.db.health.aiAdviceChat || []));
         const today = this.logicalDateKey();
         const todayMessages = messages.filter(msg => this.logicalDateKey(this.parseHistoryDate(msg.at)) === today);
         const recentMessages = messages.slice(-limit);
@@ -1545,10 +1548,13 @@ const advicePanel = {
         const replyToId = options?.replyToId || '';
         const baseVersionIdx = Number(options?.versionIdx || 0);
         this._adviceSending = true;
+        let userMessageId = '';
         if (!options?.skipUserMessage) {
-            this.db.health.aiAdviceChat.push({ id: this.generateRecordId('advice-user'), role: 'user', content: prompt, at: now, updatedAt: Date.now(), deleted: false });
+            const userMessage = { id: this.generateRecordId('advice-user'), role: 'user', content: prompt, at: now, updatedAt: Date.now(), deleted: false };
+            userMessageId = userMessage.id;
+            this.db.health.aiAdviceChat.push(userMessage);
         }
-        this.db.health.aiAdviceChat.push({
+        const pendingRecord = {
             id: pendingId,
             role: 'assistant',
             content: '',
@@ -1563,7 +1569,11 @@ const advicePanel = {
             versionIdx: baseVersionIdx,
             versionActive: options?.versionActive !== false,
             versionPinned: !!options?.versionPinned
-        });
+        };
+        const insertAfterId = options?.insertAfterId || userMessageId;
+        const insertAfterIdx = insertAfterId ? this.db.health.aiAdviceChat.findIndex(msg => msg?.id === insertAfterId) : -1;
+        if (insertAfterIdx >= 0) this.db.health.aiAdviceChat.splice(insertAfterIdx + 1, 0, pendingRecord);
+        else this.db.health.aiAdviceChat.push(pendingRecord);
         if (input) input.value = '';
         this.clearAdviceDraft();
         this.save();
@@ -1663,7 +1673,7 @@ const advicePanel = {
             });
         } catch (e) {
             const idx = this.db.health.aiAdviceChat.findIndex(msg => msg.id === pendingId);
-            const failed = { id: pendingId, role: 'assistant', content: `分析失败：${window.toast ? toast.sanitize(e) : e.message}`, at: new Date().toISOString(), model, provider, temporaryModel: isOverride, error: true, retryPrompt: prompt, deleted: false, updatedAt: Date.now() };
+            const failed = { id: pendingId, role: 'assistant', content: `分析失败：${window.toast ? toast.sanitize(e) : e.message}`, at: new Date().toISOString(), model, provider, temporaryModel: isOverride, error: true, retryPrompt: prompt, deleted: false, updatedAt: Date.now(), replyToId, versionIdx: baseVersionIdx, versionActive: options?.versionActive !== false, versionPinned: !!options?.versionPinned };
             if (idx >= 0) this.db.health.aiAdviceChat[idx] = failed;
             else this.db.health.aiAdviceChat.push(failed);
             this.save();
@@ -1679,6 +1689,112 @@ const advicePanel = {
             const send = document.getElementById('adviceSendBtn');
             if (send) send.disabled = true;
         }
+    },
+
+    findAssistantReplyForUser(userId = '') {
+        if (!userId) return null;
+        const messages = this.activeRecords(this.db.health?.aiAdviceChat || []);
+        const userIndex = messages.findIndex(msg => msg?.id === userId && msg.role === 'user');
+        if (userIndex < 0) return null;
+        for (let i = userIndex + 1; i < messages.length; i++) {
+            const msg = messages[i];
+            if (!msg || msg.role === 'user') break;
+            if (msg.role === 'assistant') return msg;
+        }
+        return null;
+    },
+
+    openEditAdviceMessage(idx, id = '') {
+        const msg = this.findAdviceMessage(idx, id);
+        if (!msg || msg.role !== 'user') return;
+        if (this._adviceSending) {
+            window.toast?.show?.('AI 正在回复，请稍后再编辑', 'info');
+            return;
+        }
+        const original = String(msg.content || '');
+        const commit = (value) => {
+            const nextPrompt = String(value || '').trim();
+            if (!nextPrompt) {
+                window.toast?.show?.('问题不能为空', 'error');
+                return false;
+            }
+            this.regenerateAdviceFromEditedUser(msg.id, nextPrompt).catch(e => {
+                window.toast?.show?.(`重新提问失败：${window.toast?.sanitize ? toast.sanitize(e) : e?.message || e}`, 'error');
+            });
+            return true;
+        };
+        if (typeof this._openModal !== 'function') {
+            const next = window.prompt?.('编辑问题后重新提问', original);
+            if (next != null) commit(next);
+            return;
+        }
+        this._openModal({
+            title: '编辑并重新提问',
+            icon: 'edit_note',
+            bodyHtml: `
+                <div class="md-field" style="margin:0">
+                    <textarea id="adviceEditPrompt" rows="7" placeholder=" " style="min-height:150px;max-height:50vh;overflow-y:auto;resize:vertical;-webkit-overflow-scrolling:touch;touch-action:pan-y">${this.escapeHtml(original)}</textarea>
+                    <label>问题内容</label>
+                </div>
+                <div style="margin-top:8px;color:var(--md-sys-on-surface-variant);font-size:12px;line-height:1.45">保存后会在原对话位置重新提问，新回答会作为当前激活版本显示。</div>
+            `,
+            actionsHtml: `
+                <button class="md-btn" type="button" data-modal-close>取消</button>
+                <button class="md-btn md-btn-filled" type="button" data-advice-edit-save><span class="material-symbols-rounded">send</span> 重新提问</button>
+            `,
+            onMount: (root, close) => {
+                const input = root.querySelector('#adviceEditPrompt');
+                const save = root.querySelector('[data-advice-edit-save]');
+                input?.focus?.();
+                input?.setSelectionRange?.(input.value.length, input.value.length);
+                const submit = () => {
+                    if (commit(input?.value || '')) close();
+                };
+                save?.addEventListener('click', (e) => { e.preventDefault(); submit(); });
+                input?.addEventListener('keydown', (e) => {
+                    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                        e.preventDefault();
+                        submit();
+                    }
+                });
+            }
+        });
+    },
+
+    async regenerateAdviceFromEditedUser(userId = '', prompt = '') {
+        if (this._adviceSending) return;
+        const messages = this.db.health?.aiAdviceChat || [];
+        const user = messages.find(msg => msg?.id === userId && msg.role === 'user' && !msg.deleted);
+        const nextPrompt = String(prompt || '').trim();
+        if (!user || !nextPrompt) return;
+        const now = Date.now();
+        user.content = nextPrompt;
+        user.editedAt = now;
+        user.updatedAt = now;
+
+        const reply = this.findAssistantReplyForUser(userId);
+        const rootId = reply ? (reply.replyToId || reply.id) : '';
+        const group = rootId ? this.getAdviceVersionGroup(rootId) : [];
+        const nextVersionIdx = group.length
+            ? Math.max(...group.map(item => Number(item.versionIdx || 0))) + 1
+            : 0;
+        group.forEach(item => {
+            item.versionActive = false;
+            item.updatedAt = now;
+        });
+
+        await this.sendAiAdvice(nextPrompt, {
+            skipUserMessage: true,
+            insertAfterId: userId,
+            replyToId: rootId,
+            versionIdx: nextVersionIdx,
+            versionActive: true
+        });
+        if (rootId) {
+            this.pruneAdviceVersionGroup(rootId, 10);
+            this.save({ render: false });
+        }
+        window.haptics?.light?.();
     },
 
     findAdviceMessage(idx, id = '') {

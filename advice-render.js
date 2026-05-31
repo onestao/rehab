@@ -486,7 +486,10 @@ Object.assign(advicePanel, {
                     ? `<button onclick="data.deleteAdviceVersion(this.closest('.advice-bubble')?.querySelector('.advice-version-switcher')?.dataset.adviceVersionRoot || '', this.closest('.advice-bubble')?.dataset.adviceId || '')" type="button">删除版本</button>`
                     : `<button onclick="data.deleteAiAdviceMessage(${msg.idx}, this.closest('.advice-bubble')?.dataset.adviceId || '')" type="button">删除</button>`}
             </div>`
-            : `<div class="advice-bubble-actions"><button onclick="data.deleteAiAdviceMessage(${msg.idx}, this.closest('.advice-bubble')?.dataset.adviceId || '')" type="button">删除</button></div>`;
+            : `<div class="advice-bubble-actions">
+                <button onclick="data.openEditAdviceMessage(${msg.idx}, this.closest('.advice-bubble')?.dataset.adviceId || '')" type="button">编辑重问</button>
+                <button onclick="data.deleteAiAdviceMessage(${msg.idx}, this.closest('.advice-bubble')?.dataset.adviceId || '')" type="button">删除</button>
+            </div>`;
         return `<div class="advice-bubble ${msg.role}${state}" ${safeId ? `data-advice-id="${safeId}"` : ''} ${latest ? 'data-advice-latest="true"' : ''}>
             <div class="advice-bubble-head">
                 <b>${label}<small>${time}${model}${usage}${cost}</small></b>

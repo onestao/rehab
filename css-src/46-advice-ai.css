@@ -726,6 +726,9 @@
     max-height: 160px;
     resize: none;
     overflow-y: hidden;
+    overscroll-behavior: contain;
+    touch-action: pan-y;
+    -webkit-overflow-scrolling: touch;
     border: none;
     outline: none;
     background: transparent;

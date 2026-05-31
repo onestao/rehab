@@ -6294,6 +6294,9 @@ body.is-training .fab-pip.active {
     max-height: 160px;
     resize: none;
     overflow-y: hidden;
+    overscroll-behavior: contain;
+    touch-action: pan-y;
+    -webkit-overflow-scrolling: touch;
     border: none;
     outline: none;
     background: transparent;
@@ -6413,6 +6416,7 @@ body.is-training .fab-pip.active {
                 background .25s ease;
 }
 .advice-quick-prompts > button:active { transform: scale(.92) rotate(-1deg); }
+
 }
 @layer components {
 /* --- View Transitions --- */
@@ -9035,7 +9039,7 @@ body.is-training .fab-pip.active {
 
 .ai-input { display: flex; gap: 6px; align-items: center; background: var(--md-sys-surface-container); padding: 8px 14px max(8px, env(safe-area-inset-bottom)); position: sticky; bottom: 0; z-index: 20; margin: 0 -14px -14px; box-shadow: 0 -10px 24px color-mix(in srgb, var(--md-sys-surface) 84%, transparent); }
 .ai-input .advice-model-chip { flex: none; }
-.ai-input textarea { flex: 1 1 auto; min-width: 0; border: none; background: transparent; font-size: 13px; color: var(--md-sys-on-surface); outline: none; resize: none; min-height: 24px; max-height: 80px; font-family: inherit; overflow-wrap: anywhere; }
+.ai-input textarea { flex: 1 1 auto; min-width: 0; border: none; background: transparent; font-size: 13px; color: var(--md-sys-on-surface); outline: none; resize: none; min-height: 24px; max-height: 160px; font-family: inherit; overflow-wrap: anywhere; overscroll-behavior: contain; touch-action: pan-y; -webkit-overflow-scrolling: touch; }
 .ai-input textarea::placeholder { color: var(--md-sys-on-surface-variant); }
 .ai-send { width: 36px; height: 36px; border-radius: 50%; border: none; background: var(--md-sys-primary); color: var(--md-sys-on-primary); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: var(--md-sys-elevation-1); transition: transform 0.2s var(--md-sys-motion-spring); flex: none; }
 .ai-send:active { transform: scale(0.92); }
