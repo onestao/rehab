@@ -111,6 +111,7 @@ speed
 sports
 sports_gymnastics
 stop
+summarize
 swap_horiz
 sync
 sync_problem

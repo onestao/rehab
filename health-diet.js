@@ -86,6 +86,10 @@
                     <div class="md-grid modal-grid">
                         <div class="md-field span-full"><input id="foodName" type="text" placeholder=" " oninput="data.onFoodSearchInput()" onblur="data.autoFillFoodByName()"><label>食物</label></div>
                         <div id="foodSearchSuggest" class="span-full"></div>
+                        <div class="food-dedupe-row span-full">
+                            <button class="md-btn md-btn-tonal food-dedupe-btn" onclick="data.aiDedupeFoodHistory()" type="button"><span class="material-symbols-rounded">auto_awesome</span> AI 合并历史同类项</button>
+                            <small id="foodDedupeStatus">把“煎鸡胸/鸡胸肉煎”等同类历史名称合并成一个候选</small>
+                        </div>
                         <div class="md-field"><input id="foodGrams" type="number" step="1" placeholder=" " oninput="data.updateFoodComputedPreview()"><label>克数</label></div>
                         <div class="md-field"><select id="foodCalUnit" onchange="data.changeFoodCalUnit(this.value)"><option value="kj">千焦 kJ</option><option value="kcal">千卡 kcal</option></select><label>热量单位</label></div>
                         <div class="md-field"><input id="foodCal" type="number" step="0.1" placeholder=" " oninput="data.updateFoodComputedPreview()"><label id="foodCalLabel">千焦 kJ/100g</label></div>

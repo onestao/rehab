@@ -174,7 +174,11 @@
                             <small>${hasAny ? 'AI 在每次分析时会自动参考此档案' : '点击编辑，让 AI 给你更安全、更贴合的建议'}</small>
                         </div>
                     </div>
-                    <button class="md-btn md-btn-tonal profile-edit-btn" onclick="data.openProfileModal()" type="button"><span class="material-symbols-rounded">edit</span> 编辑</button>
+                    <div class="profile-head-actions">
+                        <button class="md-icon-btn profile-summary-btn" onclick="data.openWeeklySummarySheet()" type="button" aria-label="周总结" title="周总结"><span class="material-symbols-rounded">summarize</span></button>
+                        <button class="md-icon-btn profile-summary-btn" onclick="data.openMonthlySummarySheet()" type="button" aria-label="月总结" title="月总结"><span class="material-symbols-rounded">calendar_month</span></button>
+                        <button class="md-btn md-btn-tonal profile-edit-btn" onclick="data.openProfileModal()" type="button"><span class="material-symbols-rounded">edit</span> 编辑</button>
+                    </div>
                 </div>
                 ${hasAny ? `<details class="profile-details">
                     <summary><span class="material-symbols-rounded">expand_more</span> 查看详细健康档案</summary>

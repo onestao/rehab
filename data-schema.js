@@ -11,7 +11,7 @@
             // health.reports item shape:
             // { id, kind:'weekly'|'monthly', periodStart, periodEnd, generatedAt, updatedAt, deleted,
             //   metrics:{ weight, training, diet, cardio }, ai:{ summary, highlights, suggestions, model, prompt_id } }
-            this.db.health = { weights: [], foodLogs: [], exerciseLogs: [], reports: [], rehabWeekly: [], goalType: 'loss', bodyPlan: null, weightPlan: null, dietGoal: null, aiAdviceChat: [], aiInsightCache: null, trainingLabelClassifications: {}, weeklyGoalSessions: 5, ...(this.db.health || {}) };
+            this.db.health = { weights: [], foodLogs: [], exerciseLogs: [], reports: [], rehabWeekly: [], goalType: 'loss', bodyPlan: null, weightPlan: null, dietGoal: null, aiAdviceChat: [], aiInsightCache: null, trainingLabelClassifications: {}, foodAliasGroups: [], weeklyGoalSessions: 5, ...(this.db.health || {}) };
             this.db.actions = (this.db.actions || []).map(a => this.ensureRecordMeta(a, 'action', nowTs));
             this.db.routines = (this.db.routines || []).map(r => {
                 this.ensureRecordMeta(r, 'routine', nowTs);
@@ -35,6 +35,7 @@
             this.db.health.aiAdviceChat = (this.db.health.aiAdviceChat || []).map(item => this.ensureRecordMeta(item, 'advice', nowTs));
             this.db.health.aiInsightCache = this.db.health.aiInsightCache && typeof this.db.health.aiInsightCache === 'object' ? this.ensureRecordMeta(this.db.health.aiInsightCache, 'ai-insight-cache', nowTs) : null;
             this.db.health.trainingLabelClassifications = this.db.health.trainingLabelClassifications && typeof this.db.health.trainingLabelClassifications === 'object' ? this.db.health.trainingLabelClassifications : {};
+            this.db.health.foodAliasGroups = Array.isArray(this.db.health.foodAliasGroups) ? this.db.health.foodAliasGroups : [];
             this.db.actions = this.db.actions.map(a => {
                 a.tags = Array.isArray(a.tags) ? a.tags.filter(Boolean) : [];
                 if (typeof a.libOnly !== 'boolean') a.libOnly = false;

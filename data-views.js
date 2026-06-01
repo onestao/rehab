@@ -128,6 +128,7 @@
         var ctx = btn.dataset.aiCtx;
         var idx = Number(btn.dataset.aiIdx);
         if (!ctx || isNaN(idx)) return;
+        if (btn.closest('.summary-sheet-overlay')) data.closeSummarySheet?.();
         var list = data.contextAiPrompts?.(ctx);
         if (list && list[idx]) data.askContextAi(ctx, list[idx].prompt);
     }, { passive: true });

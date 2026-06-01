@@ -54,6 +54,17 @@
     border-left: 3px solid var(--md-sys-tertiary);
 }
 .food-history-result small { color: var(--md-sys-on-tertiary-container); }
+.food-dedupe-row {
+    display: grid;
+    gap: 6px;
+    padding: 4px 0 2px;
+}
+.food-dedupe-row small {
+    color: var(--md-sys-on-surface-variant);
+    font-size: 11px;
+    line-height: 1.4;
+}
+.food-dedupe-btn { justify-self: start; margin-top: 0; }
 .food-ai-result { border-left: 3px solid var(--md-sys-tertiary); }
 .food-ai-result-card { display: grid; gap: 6px; }
 .food-add-all {

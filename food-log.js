@@ -13,8 +13,15 @@ const foodLog = {
             todayCalories: this.todayCalories,
             todayMacros: this.todayMacros,
             applyFoodItem: this.applyFoodItem,
+            normalizeFoodAlias: this.normalizeFoodAlias,
+            foodLogNutritionPer100g: this.foodLogNutritionPer100g,
+            buildFoodAliasLookup: this.buildFoodAliasLookup,
+            groupHistoricalFoods: this.groupHistoricalFoods,
+            parseFoodAliasGroups: this.parseFoodAliasGroups,
+            requestFoodAliasGroups: this.requestFoodAliasGroups,
             historicalFoodSuggestions: this.historicalFoodSuggestions,
             applyHistoricalFoodItem: this.applyHistoricalFoodItem,
+            aiDedupeFoodHistory: this.aiDedupeFoodHistory,
             onFoodSearchInput: this.onFoodSearchInput,
             autoFillFoodByName: this.autoFillFoodByName,
             updateFoodComputedPreview: this.updateFoodComputedPreview,
@@ -252,40 +259,139 @@ const foodLog = {
         this.updateFoodComputedPreview();
     },
 
+    normalizeFoodAlias(value) {
+        return String(value || '').trim().toLowerCase().replace(/[\s\u3000·・,，、()（）\[\]【】]/g, '');
+    },
+
+    foodLogNutritionPer100g(log) {
+        const grams = Number(log?.grams || 0);
+        const cal = Number(log?.calPer100g || (grams ? (Number(log.cal || 0) * 100 / grams) : 0));
+        if (!cal) return null;
+        return {
+            cal: Number(cal.toFixed(1)),
+            pro: Number(Number(log.proPer100g ?? (grams ? (Number(log.pro || 0) * 100 / grams) : 0)).toFixed(1)),
+            carb: Number(Number(log.carbPer100g ?? (grams ? (Number(log.carb || 0) * 100 / grams) : 0)).toFixed(1)),
+            fat: Number(Number(log.fatPer100g ?? (grams ? (Number(log.fat || 0) * 100 / grams) : 0)).toFixed(1))
+        };
+    },
+
+    buildFoodAliasLookup() {
+        const lookup = new Map();
+        (this.db.health?.foodAliasGroups || []).forEach(group => {
+            const canonical = String(group?.canonical || '').trim();
+            if (!canonical || !Array.isArray(group.aliases)) return;
+            group.aliases.forEach(alias => {
+                const key = this.normalizeFoodAlias(alias);
+                if (key) lookup.set(key, canonical);
+            });
+            const canonicalKey = this.normalizeFoodAlias(canonical);
+            if (canonicalKey) lookup.set(canonicalKey, canonical);
+        });
+        return lookup;
+    },
+
+    groupHistoricalFoods(logs, keyword) {
+        const kw = this.normalizeFoodAlias(keyword);
+        const aliasLookup = this.buildFoodAliasLookup();
+        const groups = new Map();
+        logs.forEach(log => {
+            const name = String(log?.name || '').trim();
+            const normalizedName = this.normalizeFoodAlias(name);
+            if (!name || (!normalizedName.includes(kw) && !kw.includes(normalizedName))) return;
+            const nutrition = this.foodLogNutritionPer100g(log);
+            if (!nutrition) return;
+            const canonical = aliasLookup.get(normalizedName) || name;
+            const canonicalKey = this.normalizeFoodAlias(canonical);
+            const group = groups.get(canonicalKey) || { canonical, names: new Set(), entries: [] };
+            group.names.add(name);
+            group.entries.push({ log, nutrition });
+            groups.set(canonicalKey, group);
+        });
+        return [...groups.values()].map(group => {
+            const entries = group.entries;
+            const latest = entries[0]?.log || {};
+            const avg = field => Number((entries.reduce((sum, item) => sum + Number(item.nutrition[field] || 0), 0) / entries.length).toFixed(1));
+            return {
+                name: group.canonical,
+                aliases: [...group.names],
+                grams: Number(latest.grams || 0),
+                cal: avg('cal'),
+                pro: avg('pro'),
+                carb: avg('carb'),
+                fat: avg('fat'),
+                date: latest.date || '',
+                meal: latest.meal || '',
+                mergedCount: group.names.size,
+                entryCount: entries.length
+            };
+        });
+    },
+
+    parseFoodAliasGroups(raw, inputNames = []) {
+        const match = String(raw || '').match(/\[[\s\S]*\]/);
+        if (!match) throw new Error('AI 返回格式异常');
+        const parsed = JSON.parse(match[0]);
+        const inputSet = new Set(inputNames);
+        return (Array.isArray(parsed) ? parsed : []).map(group => {
+            const aliases = [...new Set((group?.aliases || []).map(name => String(name || '').trim()).filter(name => inputSet.has(name)))];
+            const canonical = String(group?.canonical || aliases[0] || '').trim();
+            return { canonical, aliases };
+        }).filter(group => group.canonical && group.aliases.length >= 2);
+    },
+
+    async requestFoodAliasGroups(names = []) {
+        const input = [...new Set((names || []).map(name => String(name || '').trim()).filter(Boolean))].slice(0, 120);
+        if (input.length < 2) return [];
+        const prompt = `合并同一种食物的历史名称。只合并确定同食材且营养接近的项；不要合并鸡胸/鸡腿、米饭/蛋炒饭。canonical 用简洁中文名，aliases 只能来自输入。只返回 JSON 数组：[{"canonical":"标准名","aliases":["原名1","原名2"]}]\n输入：${JSON.stringify(input)}`;
+        const raw = await window.ai.call([
+            { role: 'system', content: '只返回纯 JSON 数组，不要 markdown，不要解释。' },
+            { role: 'user', content: prompt }
+        ], 900);
+        return this.parseFoodAliasGroups(raw, input);
+    },
+
     historicalFoodSuggestions(keyword, limit = 8) {
-        const kw = String(keyword || '').trim().toLowerCase();
+        const kw = this.normalizeFoodAlias(keyword);
         if (!kw) return [];
         const seen = new Set();
         const logs = this.activeRecords(this.db.health?.foodLogs || []).slice().reverse();
+        const grouped = this.groupHistoricalFoods(logs, keyword).filter(item => item.mergedCount > 1);
         const suggestions = [];
+        for (const item of grouped) {
+            const key = `group|${this.normalizeFoodAlias(item.name)}`;
+            if (seen.has(key)) continue;
+            seen.add(key);
+            suggestions.push(item);
+            if (suggestions.length >= limit) return suggestions;
+        }
         for (const log of logs) {
             const name = String(log?.name || '').trim();
-            const normalizedName = name.toLowerCase();
+            const normalizedName = this.normalizeFoodAlias(name);
             if (!name || (!normalizedName.includes(kw) && !kw.includes(normalizedName))) continue;
-            const grams = Number(log.grams || 0);
-            const calPer100g = Number(log.calPer100g || (grams ? (Number(log.cal || 0) * 100 / grams) : 0));
-            if (!calPer100g) continue;
-            const proPer100g = Number(log.proPer100g ?? (grams ? (Number(log.pro || 0) * 100 / grams) : 0));
-            const carbPer100g = Number(log.carbPer100g ?? (grams ? (Number(log.carb || 0) * 100 / grams) : 0));
-            const fatPer100g = Number(log.fatPer100g ?? (grams ? (Number(log.fat || 0) * 100 / grams) : 0));
+            if (grouped.some(group => group.aliases.includes(name))) continue;
+            const nutrition = this.foodLogNutritionPer100g(log);
+            if (!nutrition) continue;
             const key = [
                 normalizedName,
-                Math.round(calPer100g),
-                proPer100g.toFixed(1),
-                carbPer100g.toFixed(1),
-                fatPer100g.toFixed(1)
+                Math.round(nutrition.cal),
+                nutrition.pro.toFixed(1),
+                nutrition.carb.toFixed(1),
+                nutrition.fat.toFixed(1)
             ].join('|');
             if (seen.has(key)) continue;
             seen.add(key);
             suggestions.push({
                 name,
-                grams,
-                cal: Number(calPer100g.toFixed(1)),
-                pro: Number(proPer100g.toFixed(1)),
-                carb: Number(carbPer100g.toFixed(1)),
-                fat: Number(fatPer100g.toFixed(1)),
+                aliases: [name],
+                grams: Number(log.grams || 0),
+                cal: nutrition.cal,
+                pro: nutrition.pro,
+                carb: nutrition.carb,
+                fat: nutrition.fat,
                 date: log.date || '',
-                meal: log.meal || ''
+                meal: log.meal || '',
+                mergedCount: 1,
+                entryCount: 1
             });
             if (suggestions.length >= limit) break;
         }
@@ -314,6 +420,48 @@ const foodLog = {
         this.updateFoodComputedPreview();
     },
 
+    async aiDedupeFoodHistory() {
+        const statusEl = document.getElementById('foodDedupeStatus');
+        const setStatus = (text) => { if (statusEl) statusEl.textContent = text; };
+        const logs = this.activeRecords(this.db.health?.foodLogs || []);
+        const names = [...new Set(logs.map(log => String(log?.name || '').trim()).filter(Boolean))];
+        if (names.length < 2) {
+            setStatus('历史食物名称不足，暂不需要合并');
+            return;
+        }
+        if (!window.ai?.cfg?.enabled || typeof window.ai?.call !== 'function') {
+            setStatus('请先在设置中配置 AI 后再合并历史同类项');
+            window.toast?.show?.('请先在设置中配置 AI', 'info');
+            return;
+        }
+        setStatus('AI 正在分析历史食物名称...');
+        try {
+            const groups = await this.requestFoodAliasGroups(names);
+            const existing = Array.isArray(this.db.health.foodAliasGroups) ? this.db.health.foodAliasGroups : [];
+            const byCanonical = new Map(existing.map(group => [this.normalizeFoodAlias(group.canonical), { ...group, aliases: [...(group.aliases || [])] }]));
+            groups.forEach(group => {
+                const aliases = [...new Set((group.aliases || []).map(name => String(name || '').trim()).filter(Boolean))];
+                if (aliases.length < 2) return;
+                const canonical = String(group.canonical || aliases[0]).trim();
+                const key = this.normalizeFoodAlias(canonical);
+                const prev = byCanonical.get(key) || { canonical, aliases: [] };
+                prev.aliases = [...new Set([...(prev.aliases || []), canonical, ...aliases])];
+                prev.canonical = canonical;
+                prev.updatedAt = Date.now();
+                byCanonical.set(key, prev);
+            });
+            this.db.health.foodAliasGroups = [...byCanonical.values()].filter(group => group.aliases?.length >= 2);
+            this.onFoodSearchInput();
+            this.saveAndBackup();
+            setStatus(groups.length ? `已合并 ${groups.length} 组历史同类项` : 'AI 未发现可确定合并的同类项');
+            window.toast?.show?.(groups.length ? `已合并 ${groups.length} 组历史同类项` : '未发现可合并项', groups.length ? 'success' : 'info');
+        } catch (e) {
+            const message = window.toast ? toast.sanitize(e) : String(e?.message || e);
+            setStatus(`AI 合并失败：${message}`);
+            window.toast?.show?.(`AI 合并失败：${message}`, 'error');
+        }
+    },
+
     onFoodSearchInput() {
         const kw = document.getElementById('foodName')?.value?.trim() || '';
         const results = fooddb.searchAll(kw);
@@ -326,7 +474,8 @@ const foodLog = {
         const historyHtml = historyResults.map((item, idx) => {
             const gramsText = item.grams ? ` · 上次 ${Number(item.grams)}g` : '';
             const dateText = item.date ? ` · ${item.date}` : '';
-            return `<button class="food-result-item food-history-result" onclick="data.applyHistoricalFoodItem(${idx})"><span>${esc(item.name)}</span><small>历史${dateText}${gramsText} · ${Number(item.cal || 0)} kcal/100g</small></button>`;
+            const mergeText = item.mergedCount > 1 ? ` · 合并${item.mergedCount}名/${item.entryCount}次` : '';
+            return `<button class="food-result-item food-history-result" onclick="data.applyHistoricalFoodItem(${idx})"><span>${esc(item.name)}</span><small>历史${dateText}${gramsText}${mergeText} · ${Number(item.cal || 0)} kcal/100g</small></button>`;
         }).join('');
         const libraryHtml = results.map(item =>
             `<button class="food-result-item" onclick="data.applyFoodItem('${esc(item.id)}')"><span>${esc(item.name)}</span><small>${Number(item.cal || 0)} kcal/100g</small></button>`
