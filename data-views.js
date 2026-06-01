@@ -105,7 +105,11 @@
                         throw e;
                     }
                 }
-                requestAnimationFrame(() => this.autoResizeAdvicePrompt?.());
+                requestAnimationFrame(() => {
+                    this.autoResizeAdvicePrompt?.();
+                    this.bindAdviceAttachmentControls?.();
+                    this.updateAdviceSendState?.();
+                });
                 requestAnimationFrame(() => {
                     this.bindAdviceScrollListener?.();
                     this.restoreAdviceScroll?.();

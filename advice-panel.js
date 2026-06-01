@@ -155,6 +155,7 @@ const advicePanel = {
             shareAdviceMessage: this.shareAdviceMessage
         });
         Object.assign(target, window.adviceTemplateManager || {});
+        Object.assign(target, window.adviceAttachments || {});
 
         target.loadAdviceSettings?.();
         this.listenThemeChanges();
@@ -974,6 +975,8 @@ const advicePanel = {
         }
         requestAnimationFrame(() => {
             this.autoResizeAdvicePrompt?.();
+            this.bindAdviceAttachmentControls?.();
+            this.updateAdviceSendState?.();
             this.holdAdviceTopChrome?.(list, expandChrome);
             if (focusSearch) document.getElementById('adviceSearchInput')?.focus();
         });
@@ -1040,8 +1043,11 @@ const advicePanel = {
         this._adviceDraft = el.value;
         try { sessionStorage.setItem(this.DRAFT_KEY, el.value); } catch {}
         this.autoResizeAdvicePrompt(el);
-        const send = document.getElementById('adviceSendBtn');
-        if (send) send.disabled = !el.value.trim() || !!this._adviceSending;
+        if (typeof this.updateAdviceSendState === 'function') this.updateAdviceSendState();
+        else {
+            const send = document.getElementById('adviceSendBtn');
+            if (send) send.disabled = !el.value.trim() || !!this._adviceSending;
+        }
     },
 
     onAdvicePromptKeydown(e) {
@@ -1541,12 +1547,29 @@ const advicePanel = {
         if (this._adviceSending) return;
         const input = document.getElementById('advicePrompt');
         const prompt = (promptOverride || input?.value || '').trim();
-        if (!prompt) return;
+        const attachments = (!promptOverride && !options?.skipUserMessage) ? (this._adviceAttachments || []).filter(att => att && att.status !== 'failed').slice() : [];
+        const effectivePrompt = prompt || (attachments.some(att => att.kind === 'image') ? '请结合附件内容进行分析，并给出可执行建议。' : '请分析附件内容，并给出可执行建议。');
+        if (!(this.canSendAdviceWithAttachments?.(prompt, attachments) || prompt)) return;
+        if (attachments.some(att => att.status === 'processing')) {
+            window.toast?.show?.('附件仍在处理中，请稍后发送', 'info');
+            return;
+        }
+        const model = effective.model || ai.cfg.model;
+        const provider = effective.provider || ai.cfg.provider || 'openai';
+        const hasImageAttachment = attachments.some(att => att.kind === 'image');
+        if (hasImageAttachment) {
+            const verdict = window.ai?.analyzeVisionModel?.(model, provider) || { vision: false, isImageGen: false };
+            if (verdict.isImageGen) {
+                window.toast?.show?.('图像生成模型不能用于图片问答，请切换视觉模型', 'info');
+                return;
+            }
+            if (!verdict.vision) {
+                window.toast?.show?.('当前模型未验证支持图片，仍将尝试识别', 'info');
+            }
+        }
         const list = document.querySelector('.advice-chat-list');
         this._adviceFollowStream = !list || (list.scrollHeight - list.clientHeight - list.scrollTop) < 180;
         this._adviceUserScrollPaused = false;
-        const model = effective.model || ai.cfg.model;
-        const provider = effective.provider || ai.cfg.provider || 'openai';
         const isOverride = !!ai.overrideModel && (
             ai.overrideModel.model !== ai.cfg.model ||
             ai.overrideModel.provider !== ai.cfg.provider ||
@@ -1559,7 +1582,7 @@ const advicePanel = {
         this._adviceSending = true;
         let userMessageId = '';
         if (!options?.skipUserMessage) {
-            const userMessage = { id: this.generateRecordId('advice-user'), role: 'user', content: prompt, at: now, updatedAt: Date.now(), deleted: false };
+            const userMessage = { id: this.generateRecordId('advice-user'), role: 'user', content: effectivePrompt, attachments: this.adviceAttachmentMetadata?.(attachments) || [], at: now, updatedAt: Date.now(), deleted: false };
             userMessageId = userMessage.id;
             this.db.health.aiAdviceChat.push(userMessage);
         }
@@ -1585,6 +1608,7 @@ const advicePanel = {
         else this.db.health.aiAdviceChat.push(pendingRecord);
         if (input) input.value = '';
         this.clearAdviceDraft();
+        if (!options?.skipUserMessage) this.clearAdviceAttachments?.();
         this.save();
         requestAnimationFrame(() => {
             if (!this._adviceUserScrollPaused && this._adviceFollowStream) {
@@ -1595,13 +1619,14 @@ const advicePanel = {
         this._streamRenderers = this._streamRenderers || {};
         this.setAdviceStreamUiState('streaming');
         try {
-            const messages = this.buildAdviceMessages(prompt, model);
+            const baseMessages = this.buildAdviceMessages(effectivePrompt, model);
+            const messages = this.applyAdviceAttachmentsToMessages?.(baseMessages, attachments) || baseMessages;
             let full = '';
             let _lastRender = 0;
             let _pendingFrame = 0;
             /** @type {{ in: number, out: number }|null} */
             let lastUsage = null;
-            full = await ai.callStream(messages, 2400, (delta, accumulated, meta) => {
+            const onToken = (delta, accumulated, meta) => {
                     const idx = this.db.health.aiAdviceChat.findIndex(msg => msg.id === pendingId);
                     if (idx < 0) return;
                     this.db.health.aiAdviceChat[idx].content = accumulated;
@@ -1646,7 +1671,28 @@ const advicePanel = {
                     const dots = bubble.querySelector('.advice-typing-dot');
                     if (dots) dots.remove();
                     if (!this._adviceUserScrollPaused) this.scheduleAdviceStreamScroll();
-            });
+            };
+            full = hasImageAttachment
+                ? await ai.callAdviceWithAttachments(messages, attachments, 2400, {
+                    timeoutMs: 45000,
+                    onProgress: ({ stage, message }) => {
+                        const idx = this.db.health.aiAdviceChat.findIndex(msg => msg.id === pendingId);
+                        if (idx < 0) return;
+                        const status = message || (stage === 'resize' ? '正在处理图片…' : stage === 'request' ? '正在请求视觉模型…' : '正在分析附件…');
+                        this.db.health.aiAdviceChat[idx].content = status;
+                        this.db.health.aiAdviceChat[idx].pending = true;
+                        this.rerenderAdvicePanel?.();
+                    }
+                })
+                : await ai.callStream(messages, 2400, onToken);
+            if (hasImageAttachment) {
+                const idx = this.db.health.aiAdviceChat.findIndex(msg => msg.id === pendingId);
+                if (idx >= 0) {
+                    this.db.health.aiAdviceChat[idx].content = full;
+                    this.db.health.aiAdviceChat[idx].pending = false;
+                    this.db.health.aiAdviceChat[idx].updatedAt = Date.now();
+                }
+            }
             const idx = this.db.health.aiAdviceChat.findIndex(msg => msg.id === pendingId);
             if (idx >= 0) this.db.health.aiAdviceChat[idx] = {
                 ...this.db.health.aiAdviceChat[idx],
@@ -2118,10 +2164,15 @@ const advicePanel = {
                 <div class="sect-head" style="padding:0 0 8px;margin:0"><span class="t">快速建议</span></div>
                 <div class="advice-v6-suggestions">${quicks.map(q => `<button onclick="data.useAdvicePrompt('${this.escapeHtml(q)}')" type="button">${this.escapeHtml(q)}</button>`).join('')}</div>
             </div>
-            <div class="ai-input">
-                ${this.renderAdviceModelChip()}
-                <textarea id="advicePrompt" class="advice-composer-input" rows="1" placeholder="问 AI 关于训练 / 饮食..." oninput="data.onAdvicePromptInput(this)" onkeydown="data.onAdvicePromptKeydown(event)">${draft}</textarea>
-                <button id="adviceSendBtn" class="ai-send" onclick="data.sendAiAdvice()" type="button" ${String(rawDraft || '').trim() ? '' : 'disabled'} aria-label="发送问题"><span class="material-symbols-rounded">send</span></button>
+            <div class="advice-composer-stack">
+                ${this.renderAdviceAttachmentChips?.() || ''}
+                <div class="ai-input">
+                    ${this.renderAdviceAttachmentInputs?.() || ''}
+                    ${this.renderAdviceModelChip()}
+                    ${this.renderAdviceAttachmentControls?.() || ''}
+                    <textarea id="advicePrompt" class="advice-composer-input" rows="1" placeholder="问 AI 关于训练 / 饮食..." oninput="data.onAdvicePromptInput(this)" onkeydown="data.onAdvicePromptKeydown(event)">${draft}</textarea>
+                    <button id="adviceSendBtn" class="ai-send" onclick="data.sendAiAdvice()" type="button" ${(String(rawDraft || '').trim() || ((this._adviceAttachments || []).some(att => att && att.status !== 'failed' && (att.kind === 'image' || att.readable)))) ? '' : 'disabled'} aria-label="发送问题"><span class="material-symbols-rounded">send</span></button>
+                </div>
             </div>
         </div>`;
     },

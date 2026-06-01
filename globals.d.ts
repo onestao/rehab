@@ -60,6 +60,7 @@ interface Window {
   dataViews: any;
   dataAiTemplates: any;
   adviceTemplateManager: any;
+  adviceAttachments: any;
   aiPricing: any;
   syncPure: any;
   syncUi: any;

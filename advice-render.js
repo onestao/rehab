@@ -454,6 +454,18 @@ Object.assign(advicePanel, {
         const content = msg.role === 'assistant'
             ? (rawContent ? highlightRenderedHtml(this.renderAdviceMarkdown(rawContent), currentKeyword) : '')
             : `<p>${highlightKeyword(rawContent, currentKeyword).replace(/\n/g, '<br>')}</p>`;
+        const attachments = Array.isArray(msg.attachments) && msg.attachments.length
+            ? `<div class="advice-message-attachments">${msg.attachments.map(att => {
+                const icon = att.kind === 'image' ? 'visibility' : att.kind === 'text' ? 'clinical_notes' : 'upload_file';
+                const bytes = Math.max(0, Number(att.size) || 0);
+                const size = bytes < 1024 ? `${bytes} B` : bytes < 1048576 ? `${(bytes / 1024).toFixed(bytes < 10240 ? 1 : 0)} KB` : `${(bytes / 1048576).toFixed(bytes < 10485760 ? 1 : 0)} MB`;
+                const meta = [att.label || att.kind || '文件', size].filter(Boolean).join(' · ');
+                const preview = att.kind === 'image' && att.thumb
+                    ? `<button class="advice-attachment-thumb" type="button" onclick="data.previewAdviceAttachment('${escapeHtml(att.previewId || att.id || '')}')" aria-label="预览图片"><img src="${escapeHtml(att.thumb)}" alt=""></button>`
+                    : `<span class="material-symbols-rounded">${icon}</span>`;
+                return `<span class="advice-message-attachment ${att.kind === 'image' && att.thumb ? 'has-thumb' : ''}" title="${escapeHtml(att.name || '附件')}">${preview}${highlightKeyword(att.name || '附件', currentKeyword)}<small>${highlightKeyword(meta, currentKeyword)}</small></span>`;
+            }).join('')}</div>`
+            : '';
         const state = msg.pending ? ' pending' : msg.error ? ' error' : '';
         const versionGroup = Array.isArray(msg.versionGroup) ? msg.versionGroup : null;
         let versionSwitcher = '';
@@ -496,6 +508,7 @@ Object.assign(advicePanel, {
                 ${versionSwitcher}
                 ${msg.pending ? '<span class="advice-typing-dot"></span>' : ''}
             </div>
+            ${attachments}
             <div class="advice-bubble-content">${msg.pending ? '<div class="skeleton-line skeleton" style="width:80%"></div><div class="skeleton-line skeleton" style="width:60%"></div><div class="skeleton-line skeleton" style="width:90%"></div>' : content}</div>
             ${routineActions}
             ${actions}

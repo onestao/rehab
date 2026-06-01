@@ -279,6 +279,23 @@ Object.assign(ai, {
         }
     },
 
+    async callAdviceWithAttachments(messages = [], attachments = [], maxTokens = 2400, opts = {}) {
+        const images = (attachments || []).filter(att => att && att.kind === 'image' && att.file);
+        if (!images.length) return this.call(messages, maxTokens);
+        const promptText = (messages || [])
+            .filter(m => m.role !== 'system')
+            .map(m => `${m.role === 'assistant' ? 'AI' : '用户'}：${m.content || ''}`)
+            .join('\n\n');
+        const systemText = (messages || [])
+            .filter(m => m.role === 'system')
+            .map(m => m.content || '')
+            .join('\n\n');
+        if (images.length > 1) {
+            opts.onProgress?.({ stage: 'notice', message: '当前仅发送第一张图片，其余图片以附件说明进入问题上下文' });
+        }
+        return await this.callVisionTextImage(promptText, images[0].file, maxTokens, systemText, opts);
+    },
+
     async callStream(messages, maxTokens = 2000, onToken = () => {}) {
         const effective = this.getEffectiveConfig ? this.getEffectiveConfig() : { ...this.cfg, profileId: this.cfg.activeProfileId, apiKey: this.apiKeyFor(this.cfg.activeProfileId) };
         if (!effective.enabled) throw new Error('请先在设置中配置 AI 接口');
