@@ -575,7 +575,10 @@
 
         contextAiPrompts(context) {
             const isGain = this.isGainMode();
-            return {
+            const tpl = window.dataAiTemplates;
+            const prefs = tpl?.getPromptPrefs('quick_prompts', this.db) || {};
+            const customNote = prefs.customNote ? '\n' + prefs.customNote : '';
+            const prompts = {
                 today: isGain
                     ? [{ label: '分析今天', prompt: '请以增肌目标为前提，分析我今天的饮食、训练和体重记录，并给出今晚或明天的调整建议' }, { label: '晚餐建议', prompt: '根据今天已经摄入的饮食和增肌目标，给我晚餐建议' }, { label: '明日调整', prompt: '根据今天记录，帮我安排明天的饮食和训练重点（增肌方向）' }]
                     : [{ label: '分析今天', prompt: '请分析我今天的饮食、训练和体重记录，并给出今晚或明天的调整建议' }, { label: '晚餐建议', prompt: '根据今天已经摄入的饮食和目标，给我晚餐建议' }, { label: '明日调整', prompt: '根据今天记录，帮我安排明天的饮食和训练重点' }],
@@ -587,6 +590,10 @@
                     : [{ label: '趋势分析', prompt: '请分析我最近体重趋势，并判断减重是否正常' }, { label: '停滞原因', prompt: '如果我最近减重停滞，请结合饮食和训练记录分析原因' }, { label: '目标调整', prompt: '请根据我的体重趋势调整热量和运动建议' }],
                 calendar: [{ label: '分析选中日', prompt: '请分析我选中日期当天的饮食、训练和体重记录' }, { label: '本月总结', prompt: '请总结我这个月的训练、饮食和体重变化' }]
             }[context] || [{ label: '分析今天', prompt: '请分析我今天的记录' }];
+            if (customNote) {
+                prompts.forEach(p => { p.prompt = p.prompt + customNote; });
+            }
+            return prompts;
         },
 
         async askContextAi(context, prompt) {

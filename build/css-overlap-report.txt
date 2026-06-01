@@ -1,7 +1,7 @@
 # css overlap report
 # real-conflict threshold: 220
 
-## REAL CONFLICTS (same selector + same property, different value): 215
+## REAL CONFLICTS (same selector + same property, different value): 219
 :root
   files: 01-vars.css, 37-dark-mode.css, 49-plan.css, 41-m3e-effects.css
     --md-sys-primary: #0061a4 | #a0cafd (01-vars.css / 37-dark-mode.css)
@@ -438,6 +438,24 @@ mark.ai-hit
 .ai-template-actions .material-symbols-rounded
   files: 20-settings-ai.css, 36-responsive.css
     font-size: 18px | 16px (20-settings-ai.css / 36-responsive.css)
+
+.pref-card[open]
+  files: 20-settings-ai.css
+    padding: 14px | 10px (20-settings-ai.css / 20-settings-ai.css)
+
+.pref-card-summary
+  files: 20-settings-ai.css
+    padding: 12px 14px | 10px 12px (20-settings-ai.css / 20-settings-ai.css)
+
+.pref-field-control
+  files: 20-settings-ai.css
+    gap: 4px | 3px (20-settings-ai.css / 20-settings-ai.css)
+
+.pref-chip
+  files: 20-settings-ai.css
+    font-size: 12px | 11px (20-settings-ai.css / 20-settings-ai.css)
+    padding: 0 12px | 0 10px (20-settings-ai.css / 20-settings-ai.css)
+    height: 30px | 28px (20-settings-ai.css / 20-settings-ai.css)
 
 .mode-tabs
   files: 22-workout-mode-tabs.css, 52-v6-workout.css, 41-m3e-effects.css
@@ -1298,7 +1316,7 @@ mark.ai-hit
   files: 49-plan.css, 49-plan-ai.css
     color: var(--md-sys-on-surface-variant) (49-plan.css / 49-plan-ai.css)
 
-## COMPLEMENTS (same selector, disjoint properties): 92
+## COMPLEMENTS (same selector, disjoint properties): 93
 .bar-leading
   files: 04-layout-appbar.css, 50-v6-ui.css
 
@@ -1340,6 +1358,9 @@ mark.ai-hit
 
 .goal-guide-content ul
   files: 19-health-weightloss-ai.css
+
+.pref-panel-actions
+  files: 20-settings-ai.css
 
 .mode-tab:active
   files: 22-workout-mode-tabs.css, 41-m3e-effects.css

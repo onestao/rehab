@@ -79,6 +79,54 @@
     background: var(--md-sys-secondary-container);
     color: var(--md-sys-on-secondary-container);
 }
+.weight-report-period-controls {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 12px;
+}
+.weight-report-period-field {
+    min-height: 44px;
+    border-radius: var(--md-sys-shape-full, 999px);
+    background: var(--glass-bg, var(--md-sys-surface-container-high));
+    border: 1px solid var(--glass-border, var(--md-sys-outline-variant));
+    box-shadow: var(--glass-shadow-inset, none);
+    backdrop-filter: var(--glass-blur-sm, blur(12px));
+    -webkit-backdrop-filter: var(--glass-blur-sm, blur(12px));
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 12px;
+}
+.weight-report-period-field .material-symbols-rounded {
+    flex: 0 0 auto;
+    font-size: 18px;
+    color: var(--md-sys-primary);
+}
+.weight-report-period-field input {
+    min-width: 0;
+    width: 100%;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: var(--md-sys-on-surface);
+    font: inherit;
+    font-size: 14px;
+    font-weight: 700;
+}
+.weight-report-period-apply {
+    min-height: 44px;
+    border: 0;
+    border-radius: var(--md-sys-shape-full, 999px);
+    padding: 0 14px;
+    background: var(--md-sys-secondary-container);
+    color: var(--md-sys-on-secondary-container);
+    font-size: 13px;
+    font-weight: 800;
+    white-space: nowrap;
+    cursor: pointer;
+}
 .weight-report-empty,
 .weight-report-current {
     display: grid;

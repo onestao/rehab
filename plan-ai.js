@@ -280,6 +280,10 @@
 
         buildPlanAiContext(mode = 'today', userText = '', typesInput = 'rehab') {
             const prefs = this.ensurePlanPrefs?.() || {};
+            const tpl = window.dataAiTemplates;
+            const prefResult = tpl?.buildPromptMessages('plan_generate', {}, this.db) || {};
+            const prefSys = prefResult.messages?.find(m => m.role === 'system')?.content || '';
+            const prefTagsStr = prefResult.prefTags || '';
             const today = this.logicalDateKey?.() || this.dateKey(new Date());
             const types = normalizePlanTypes(typesInput);
             const metas = types.map((type) => this.planTypeMeta?.(type) || { label: '训练计划' });
@@ -333,7 +337,7 @@
             ].join('\n');
             const typeInstructions = types.map((type, index) => `${index + 1}. ${type} / ${this.planTypeMeta?.(type)?.label || type}`).join('\n');
             return [
-                '你是训练日程计划助手。只输出严格 JSON 文本，不要 Markdown 代码块、不要解释、不要追加任何说明。',
+                prefSys || '你是训练日程计划助手。只输出严格 JSON 文本，不要 Markdown 代码块、不要解释、不要追加任何说明。',
                 promptMode,
                 specRules,
                 '所有 spec 字段（sets/reps/work/repRest/actionRest/isAlt/mode）都必须由你显式填写，不能依赖客户端推断；如果你拿不准就按规则中的默认值填上，但绝不能省略字段或填 0/空。mode 必须根据动作类型正确选择 reps/hold/alt-reps/alt-hold。',
@@ -350,6 +354,7 @@
                 `最近 7 天对应类型计划摘要: ${JSON.stringify(recentPlans)}`,
                 `健康档案: ${JSON.stringify(profile)}`,
                 `目标类型: ${String(this.db.health?.dietGoal?.goalType || this.db.health?.goalType || '')}`,
+                prefTagsStr ? `偏好参数:\n${prefTagsStr}` : '',
                 `用户补充: ${userText || '无'}`
             ].join('\n');
         },

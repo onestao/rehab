@@ -677,10 +677,13 @@ Object.assign(ai, {
     },
 
     async parseFood(text) {
-        const prompt = `你是营养师助手。用户描述了食物，请严格只返回 JSON 数组，不要其他文字。\n每个元素格式：{"name":"食物名","grams":克数,"cal":热量kcal,"pro":蛋白质g,"carb":碳水g,"fat":脂肪g}\n如果用户没给克数，用常见份量估算。\n用户描述：${text}`;
+        const tpl = window.dataAiTemplates;
+        const prefResult = tpl?.buildPromptMessages('food_parse_text', { text: text }, window.data?.db) || {};
+        const sysMsg = prefResult.messages?.find(m => m.role === 'system')?.content || '你是营养师助手，只返回纯 JSON 数组，不要 markdown，不要解释。';
+        const userMsg = prefResult.messages?.find(m => m.role === 'user')?.content || `用户描述：${text}`;
         const raw = await this.call([
-            { role: 'system', content: '你是营养师助手，只返回纯 JSON 数组，不要 markdown，不要解释。' },
-            { role: 'user', content: prompt }
+            { role: 'system', content: sysMsg },
+            { role: 'user', content: userMsg }
         ]);
         const match = raw.match(/\[[\s\S]*\]/);
         if (!match) throw new Error('AI 返回格式异常');
@@ -731,8 +734,11 @@ Object.assign(ai, {
     },
 
     async parseFoodFromImage(file, opts = {}) {
-        const prompt = `你是营养师助手。用户给出了一张“这顿饭/食物”的照片。请你根据图片内容识别食物，并严格只返回 JSON 数组，不要其他文字。\n每个元素格式：{"name":"食物名","grams":克数,"cal":热量kcal,"pro":蛋白质g,"carb":碳水g,"fat":脂肪g}\n要求：\n- 如果无法判断克数，请用常见份量估算；\n- 如果图片中看不清或不确定，请不要编造，返回空数组 [] 或减少条目；\n- 不要输出 markdown、不要解释。`;
-        const raw = await this.callVisionTextImage(prompt, file, 2000, '你是营养师助手，只返回纯 JSON 数组，不要 markdown，不要解释。', opts);
+        const tpl = window.dataAiTemplates;
+        const prefResult = tpl?.buildPromptMessages('food_parse_image', {}, window.data?.db) || {};
+        const sysMsg = prefResult.messages?.find(m => m.role === 'system')?.content || '你是营养师助手，只返回纯 JSON 数组，不要 markdown，不要解释。';
+        const prompt = prefResult.messages?.find(m => m.role === 'user')?.content || `你是营养师助手。用户给出了一张"这顿饭/食物"的照片。请你根据图片内容识别食物，并严格只返回 JSON 数组，不要其他文字。\n每个元素格式：{"name":"食物名","grams":克数,"cal":热量kcal,"pro":蛋白质g,"carb":碳水g,"fat":脂肪g}\n要求：\n- 如果无法判断克数，请用常见份量估算；\n- 如果图片中看不清或不确定，请不要编造，返回空数组 [] 或减少条目；\n- 不要输出 markdown、不要解释。`;
+        const raw = await this.callVisionTextImage(prompt, file, 2000, sysMsg, opts);
         opts.onProgress?.({ stage: 'parse' });
         const match = String(raw || '').match(/\[[\s\S]*\]/);
         if (!match) {
@@ -772,18 +778,20 @@ Object.assign(ai, {
             intermediate: '中级：规律训练6个月-2年',
             advanced: '高级：规律训练超过2年，有周期化经验'
         };
+        const tpl = window.dataAiTemplates;
+        const taskId = isGain ? 'body_goal_plan' : 'body_goal_plan';
+        const prefResult = tpl?.buildPromptMessages(taskId, {}, window.data?.db) || {};
+        const prefTags = prefResult.prefTags || '';
+        const sysMsg = prefResult.messages?.find(m => m.role === 'system')?.content || '你是运动营养师，只返回纯 JSON，不要 markdown，不要解释。';
         let prompt;
         if (isGain) {
             prompt = `你是运动营养师。请为用户制定增肌计划。\n用户信息：\n- 当前体重：${currentWeight} kg\n- 目标体重：${targetWeight} kg（需增 ${diff.toFixed(1)} kg）\n- 身高：${height || '未知'} cm\n- 日常活动水平：${activityMap[activityLevel] || activityLevel}\n- 每次运动时间：${dailyTrainMin} 分钟\n- 每周运动次数：${weeklyFreq} 次\n- 运动强度：${intensityMap[intensity] || intensity}\n- 主要运动项目：${sportMap[sportType] || sportType}\n- 训练经验：${experienceMap[experience] || experience || '未知'}
-- 用户性别：${gender === 'female' ? '女' : '男'}，年龄：${age} 岁。请使用 Mifflin-St Jeor 公式：
-  - 男：BMR = 10*体重(kg) + 6.25*身高(cm) - 5*年龄 + 5
-  - 女：BMR = 10*体重(kg) + 6.25*身高(cm) - 5*年龄 - 161
-  计算 BMR 后再乘以活动系数得到 TDEE，最终热量基于 TDEE 调整。\n\n请严格只返回如下 JSON，不要其他文字：\n{\n  "conservative": { "days": 天数, "weeklyChange": 每周增重kg, "dailyCal": 建议每日摄入kcal, "calorieDelta": 每日热量盈余kcal, "proteinGoal": 蛋白质目标g, "carbGoal": 碳水目标g, "fatGoal": 脂肪目标g, "desc": "一句话说明" },\n  "moderate": { "days": 天数, "weeklyChange": 每周增重kg, "dailyCal": 建议每日摄入kcal, "calorieDelta": 每日热量盈余kcal, "proteinGoal": 蛋白质目标g, "carbGoal": 碳水目标g, "fatGoal": 脂肪目标g, "desc": "一句话说明" },\n  "aggressive": { "days": 天数, "weeklyChange": 每周增重kg, "dailyCal": 建议每日摄入kcal, "calorieDelta": 每日热量盈余kcal, "proteinGoal": 蛋白质目标g, "carbGoal": 碳水目标g, "fatGoal": 脂肪目标g, "desc": "一句话说明" },\n  "tips": ["建议1", "建议2", "建议3"]\n}`;
+- 用户性别：${gender === 'female' ? '女' : '男'}，年龄：${age} 岁。${tpl?.buildFormulaTag?.(prefResult.prefs?.formulaPreference || 'mifflin_st_jeor') || '请使用 Mifflin-St Jeor 公式计算 BMR 和 TDEE'}\n\n${prefTags ? prefTags + '\n' : ''}请严格只返回如下 JSON，不要其他文字：\n{\n  "conservative": { "days": 天数, "weeklyChange": 每周增重kg, "dailyCal": 建议每日摄入kcal, "calorieDelta": 每日热量盈余kcal, "proteinGoal": 蛋白质目标g, "carbGoal": 碳水目标g, "fatGoal": 脂肪目标g, "desc": "一句话说明" },\n  "moderate": { "days": 天数, "weeklyChange": 每周增重kg, "dailyCal": 建议每日摄入kcal, "calorieDelta": 每日热量盈余kcal, "proteinGoal": 蛋白质目标g, "carbGoal": 碳水目标g, "fatGoal": 脂肪目标g, "desc": "一句话说明" },\n  "aggressive": { "days": 天数, "weeklyChange": 每周增重kg, "dailyCal": 建议每日摄入kcal, "calorieDelta": 每日热量盈余kcal, "proteinGoal": 蛋白质目标g, "carbGoal": 碳水目标g, "fatGoal": 脂肪目标g, "desc": "一句话说明" },\n  "tips": ["建议1", "建议2", "建议3"]\n}`;
         } else {
-            prompt = `你是运动营养师。请为用户制定减重计划。\n用户信息：\n- 当前体重：${currentWeight} kg\n- 目标体重：${targetWeight} kg（需减 ${diff.toFixed(1)} kg）\n- 身高：${height || '未知'} cm\n- 日常活动水平：${activityMap[activityLevel] || activityLevel}\n- 每次运动时间：${dailyTrainMin} 分钟\n- 每周运动次数：${weeklyFreq} 次\n- 运动强度：${intensityMap[intensity] || intensity}\n- 主要运动项目：${sportMap[sportType] || sportType}\n- 用户性别：${gender === 'female' ? '女' : '男'}，年龄：${age} 岁。请使用 Mifflin-St Jeor 公式：\n  - 男：BMR = 10*体重(kg) + 6.25*身高(cm) - 5*年龄 + 5\n  - 女：BMR = 10*体重(kg) + 6.25*身高(cm) - 5*年龄 - 161\n  计算 BMR 后再乘以活动系数得到 TDEE，最终热量基于 TDEE 调整。\n\n请严格只返回如下 JSON，不要其他文字：\n{\n  "fast": { "days": 天数, "weeklyLoss": 每周减重kg, "dailyCal": 建议每日摄入kcal, "deficit": 每日热量缺口kcal, "proteinGoal": 蛋白质目标g, "carbGoal": 碳水目标g, "fatGoal": 脂肪目标g, "desc": "一句话说明" },\n  "moderate": { "days": 天数, "weeklyLoss": 每周减重kg, "dailyCal": 建议每日摄入kcal, "deficit": 每日热量缺口kcal, "proteinGoal": 蛋白质目标g, "carbGoal": 碳水目标g, "fatGoal": 脂肪目标g, "desc": "一句话说明" },\n  "slow": { "days": 天数, "weeklyLoss": 每周减重kg, "dailyCal": 建议每日摄入kcal, "deficit": 每日热量缺口kcal, "proteinGoal": 蛋白质目标g, "carbGoal": 碳水目标g, "fatGoal": 脂肪目标g, "desc": "一句话说明" },\n  "tips": ["建议1", "建议2", "建议3"]\n}`;
+            prompt = `你是运动营养师。请为用户制定减重计划。\n用户信息：\n- 当前体重：${currentWeight} kg\n- 目标体重：${targetWeight} kg（需减 ${diff.toFixed(1)} kg）\n- 身高：${height || '未知'} cm\n- 日常活动水平：${activityMap[activityLevel] || activityLevel}\n- 每次运动时间：${dailyTrainMin} 分钟\n- 每周运动次数：${weeklyFreq} 次\n- 运动强度：${intensityMap[intensity] || intensity}\n- 主要运动项目：${sportMap[sportType] || sportType}\n- 用户性别：${gender === 'female' ? '女' : '男'}，年龄：${age} 岁。${tpl?.buildFormulaTag?.(prefResult.prefs?.formulaPreference || 'mifflin_st_jeor') || '请使用 Mifflin-St Jeor 公式计算 BMR 和 TDEE'}\n\n${prefTags ? prefTags + '\n' : ''}请严格只返回如下 JSON，不要其他文字：\n{\n  "fast": { "days": 天数, "weeklyLoss": 每周减重kg, "dailyCal": 建议每日摄入kcal, "deficit": 每日热量缺口kcal, "proteinGoal": 蛋白质目标g, "carbGoal": 碳水目标g, "fatGoal": 脂肪目标g, "desc": "一句话说明" },\n  "moderate": { "days": 天数, "weeklyLoss": 每周减重kg, "dailyCal": 建议每日摄入kcal, "deficit": 每日热量缺口kcal, "proteinGoal": 蛋白质目标g, "carbGoal": 碳水目标g, "fatGoal": 脂肪目标g, "desc": "一句话说明" },\n  "slow": { "days": 天数, "weeklyLoss": 每周减重kg, "dailyCal": 建议每日摄入kcal, "deficit": 每日热量缺口kcal, "proteinGoal": 蛋白质目标g, "carbGoal": 碳水目标g, "fatGoal": 脂肪目标g, "desc": "一句话说明" },\n  "tips": ["建议1", "建议2", "建议3"]\n}`;
         }
         const raw = await this.call([
-            { role: 'system', content: '你是运动营养师，只返回纯 JSON，不要 markdown，不要解释。' },
+            { role: 'system', content: sysMsg },
             { role: 'user', content: prompt }
         ]);
         const match = raw.match(/\{[\s\S]*"tips"[\s\S]*\}/);

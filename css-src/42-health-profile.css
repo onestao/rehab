@@ -67,30 +67,49 @@
 
 .profile-head-actions {
     display: flex;
+    flex-direction: column;
     align-items: center;
     gap: 4px;
     flex: 0 0 auto;
 }
 
-.profile-summary-btn {
-    width: 36px;
-    height: 36px;
+.profile-summary-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 4px;
+    width: 100%;
+}
+
+.profile-summary-action {
+    min-width: 0;
+    min-height: 32px;
+    padding: 0;
     border: 0;
-    border-radius: 50%;
-    display: inline-grid;
-    place-items: center;
-    background: transparent;
+    border-radius: var(--md-sys-shape-full);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--glass-shadow-inset);
+    backdrop-filter: var(--glass-blur-sm);
+    -webkit-backdrop-filter: var(--glass-blur-sm);
     color: var(--md-sys-on-surface-variant);
-    transition: background var(--md-sys-motion-duration-short) var(--md-sys-motion-emphasized),
+    overflow: hidden;
+    cursor: pointer;
+    transition:
+        background var(--md-sys-motion-duration-short) var(--md-sys-motion-emphasized),
+        transform var(--md-sys-motion-duration-short) var(--md-expressive-spring),
         color var(--md-sys-motion-duration-short) var(--md-sys-motion-emphasized);
 }
-.profile-summary-btn:hover,
-.profile-summary-btn:focus-visible {
+.profile-summary-action:hover,
+.profile-summary-action:focus-visible {
     background: var(--md-sys-secondary-container);
     color: var(--md-sys-on-secondary-container);
+    transform: translateY(-1px);
 }
-.profile-summary-btn .material-symbols-rounded {
-    font-size: 20px;
+.profile-summary-action .material-symbols-rounded {
+    font-size: 18px;
 }
 
 .profile-edit-btn {
@@ -889,6 +908,59 @@
     padding: 4px 20px 24px;
 }
 
+.summary-month-controls {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.summary-month-field {
+    min-height: 44px;
+    border-radius: var(--md-sys-shape-full);
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--glass-shadow-inset);
+    backdrop-filter: var(--glass-blur-sm);
+    -webkit-backdrop-filter: var(--glass-blur-sm);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 12px;
+}
+
+.summary-month-field .material-symbols-rounded {
+    flex: 0 0 auto;
+    font-size: 18px;
+    color: var(--md-sys-primary);
+}
+
+.summary-month-field input {
+    min-width: 0;
+    width: 100%;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: var(--md-sys-on-surface);
+    font: inherit;
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.summary-month-apply {
+    min-height: 44px;
+    padding: 0 14px;
+    border: 0;
+    border-radius: var(--md-sys-shape-full);
+    background: var(--md-sys-secondary-container);
+    color: var(--md-sys-on-secondary-container);
+    font-size: 13px;
+    font-weight: 800;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
 .summary-glass-card {
     padding: 16px;
     border-radius: 24px;
@@ -976,18 +1048,20 @@
     margin-top: 12px;
 }
 .summary-ai-btn {
-    flex: 1;
+    flex: 1 1 0;
+    min-width: 0;
     min-height: 40px;
     border: 0;
     border-radius: var(--md-sys-shape-full);
-    padding: 0 14px;
-    font-size: 13px;
+    padding: 0 10px;
+    font-size: 12px;
     font-weight: 600;
+    white-space: nowrap;
     cursor: pointer;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 6px;
+    gap: 5px;
     background: var(--md-sys-secondary-container);
     color: var(--md-sys-on-secondary-container);
     transition:
@@ -1003,7 +1077,8 @@
     transform: none;
 }
 .summary-ai-btn .material-symbols-rounded {
-    font-size: 18px;
+    font-size: 17px;
+    flex-shrink: 0;
 }
 
 .summary-month-grid {
@@ -1042,6 +1117,11 @@
     .profile-card-icon { width: 42px; height: 42px; border-radius: 16px; font-size: 23px; }
     .profile-head h3 { font-size: 16px; }
     .profile-head { align-items: center; }
+    .profile-head-main { align-items: flex-start; }
+    .profile-head-main > div { min-width: 0; }
+    .profile-head h3,
+    .profile-head small { overflow-wrap: anywhere; }
+    .profile-head-actions { align-self: flex-start; }
     .profile-edit-btn { padding: 5px 10px !important; font-size: 12px !important; gap: 4px; }
     .profile-condition { padding: 8px 10px; }
     .md-modal-overlay#profileModal { padding: 10px; }
@@ -1051,6 +1131,9 @@
     .profile-form-basic .md-grid { grid-template-columns: minmax(54px, 0.65fr) minmax(60px, 0.75fr) minmax(106px, 1.35fr); gap: 6px; }
     .profile-cond-meta-grid { grid-template-columns: minmax(128px, 1fr) minmax(74px, 0.5fr); gap: 6px; }
     .profile-cond-sev-field select { padding-left: 10px; padding-right: 18px; }
+    .summary-sheet-body { padding: 4px 14px 20px; }
+    .summary-ai-btn { padding: 0 8px; font-size: 11px; gap: 4px; }
+    .summary-ai-btn .material-symbols-rounded { font-size: 16px; }
 }
 
 /* ============================================

@@ -175,9 +175,11 @@
                         </div>
                     </div>
                     <div class="profile-head-actions">
-                        <button class="md-icon-btn profile-summary-btn" onclick="data.openWeeklySummarySheet()" type="button" aria-label="周总结" title="周总结"><span class="material-symbols-rounded">summarize</span></button>
-                        <button class="md-icon-btn profile-summary-btn" onclick="data.openMonthlySummarySheet()" type="button" aria-label="月总结" title="月总结"><span class="material-symbols-rounded">calendar_month</span></button>
                         <button class="md-btn md-btn-tonal profile-edit-btn" onclick="data.openProfileModal()" type="button"><span class="material-symbols-rounded">edit</span> 编辑</button>
+                        <div class="profile-summary-actions" aria-label="健康档案总结入口">
+                            <button class="profile-summary-action" onclick="data.openWeeklySummarySheet()" type="button" aria-label="打开周总结"><span class="material-symbols-rounded">summarize</span></button>
+                            <button class="profile-summary-action" onclick="data.openMonthlySummarySheet()" type="button" aria-label="打开月总结"><span class="material-symbols-rounded">calendar_month</span></button>
+                        </div>
                     </div>
                 </div>
                 ${hasAny ? `<details class="profile-details">
@@ -481,6 +483,10 @@
         buildRehabWeeklyPrompt(text = '', weekStart = '', visitDate = '') {
             const recent = this.recentRehabWeeklyContext?.(3) || [];
             const p = this.db?.health?.profile || {};
+            const tpl = window.dataAiTemplates;
+            const prefResult = tpl?.buildPromptMessages('rehab_weekly_parse', {}, this.db) || {};
+            const prefSys = prefResult.messages?.find(m => m.role === 'system')?.content || '';
+            const prefs = prefResult.prefs || {};
             const conds = (p.conditions || []).map(c => {
                 const sev = c.severity ? `（${c.severity === 'severe' ? '严重' : c.severity === 'moderate' ? '中度' : '轻度'}）` : '';
                 const avoid = c.avoid?.length ? `，避免：${c.avoid.join('、')}` : '';
@@ -492,14 +498,15 @@
                 equipment.length ? `可用器材：${equipment.join('、')}` : '',
                 p.age ? `年龄：${p.age}` : ''
             ].filter(Boolean).join('\n');
+            const painThreshold = prefs.painThreshold || 4;
+            const confidenceThreshold = prefs.lowConfidenceThreshold || 80;
             return [
-                '你是康复训练处方结构化助手。用户只能提供康复师的自然语言描述，你需要把它解析为本周康复处方。',
-                '必须只返回严格 JSON，不要 Markdown，不要解释。',
+                prefSys || '你是康复训练处方结构化助手。用户只能提供康复师的自然语言描述，你需要把它解析为本周康复处方。\n必须只返回严格 JSON，不要 Markdown，不要解释。',
                 'JSON 结构：{"weekStart":"YYYY-MM-DD","visitDate":"YYYY-MM-DD","therapistAssessment":"...","homework":"...","actions":[{"name":"标准化动作名","rawDescription":"用户原话片段","status":"new|continued|progressed|dropped|watch","confidence":0-100,"spec":{"sets":number,"reps":number,"work":number,"mode":"reps|hold|alt-reps|alt-hold","actionRest":number}|null,"painLevel":0-10,"coachNote":"...","needsReview":true|false,"progressesFrom":number|null}]}',
                 '规则：',
                 '- name 要尽量归一化为可执行动作名；如果不确定，在 name 中保留候选，如"弹力带髋外展 / 蚌式开合"。',
                 '- status 必须通过本周描述和最近处方对比判断：首次出现为 new；延续为 continued；加量/改强度为 progressed；明确停做为 dropped；疼痛或需观察为 watch。',
-                '- 低置信动作 confidence < 80 或疼痛 >= 4 必须 needsReview=true。',
+                `- 低置信动作 confidence < ${confidenceThreshold} 或疼痛 >= ${painThreshold} 必须 needsReview=true。`,
                 '- dropped 动作 spec 可以为 null。',
                 '- 不要编造用户没提到的动作。',
                 '- progressesFrom 表示该动作是从哪个动作进阶/变化而来的（填写原始 actions 数组的索引），如果没有则为 null。',

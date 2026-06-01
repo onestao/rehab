@@ -342,9 +342,12 @@ const foodLog = {
     async requestFoodAliasGroups(names = []) {
         const input = [...new Set((names || []).map(name => String(name || '').trim()).filter(Boolean))].slice(0, 120);
         if (input.length < 2) return [];
-        const prompt = `合并同一种食物的历史名称。只合并确定同食材且营养接近的项；不要合并鸡胸/鸡腿、米饭/蛋炒饭。canonical 用简洁中文名，aliases 只能来自输入。只返回 JSON 数组：[{"canonical":"标准名","aliases":["原名1","原名2"]}]\n输入：${JSON.stringify(input)}`;
+        const tpl = window.dataAiTemplates;
+        const prefResult = tpl?.buildPromptMessages('food_alias_merge', {}, window.data?.db) || {};
+        const sysMsg = prefResult.messages?.find(m => m.role === 'system')?.content || '只返回纯 JSON 数组，不要 markdown，不要解释。';
+        const prompt = `合并同一种食物的历史名称。canonical 用简洁中文名，aliases 只能来自输入。只返回 JSON 数组：[{"canonical":"标准名","aliases":["原名1","原名2"]}]\n输入：${JSON.stringify(input)}`;
         const raw = await window.ai.call([
-            { role: 'system', content: '只返回纯 JSON 数组，不要 markdown，不要解释。' },
+            { role: 'system', content: sysMsg },
             { role: 'user', content: prompt }
         ], 900);
         return this.parseFoodAliasGroups(raw, input);

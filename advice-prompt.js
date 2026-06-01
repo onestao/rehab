@@ -87,18 +87,8 @@ Object.assign(advicePanel, {
             contexts.weight && '体重', contexts.goal && '目标'
         ].filter(Boolean).join('、') || '无';
 
-        const sys = `你是训练与营养健康顾问。基于用户的实际记录回答问题。
-当前启用的分析维度：${enabledLabels}。未启用的维度不会提供数据，请不要编造，也不要要求用户开启。
-规则：
-0. 用户健康档案为最高优先级：在生成任何训练或饮食建议前必须先核对【健康档案】。如果建议涉及档案中标记的避免项或用户过敏/不耐受的食物，必须替换为安全替代方案，并在回答中显式说明（例如"考虑到你的左膝问题，已用臀桥替代深蹲"）。
-1. 只能引用下方实际提供的记录，不能凭空编造数据
-2. 必须引用至少 2 条具体记录作为证据（如果数据足够）
-3. 引用时写出具体日期和内容，例如"5月6日午餐鸡胸肉饭 520 kcal"
-4. 如果某一类数据为空或未启用，简要说明，不要笼统说全部不足
-5. 优先用短段落和清单表达，不要输出 markdown 表格
-6. 如果用户问题提到了某个具体日期，优先分析该日期的数据
-7. 回答后给出 1-2 条具体可执行的建议
-8. 体重为状态量，进行趋势分析时应综合"近30条体重记录"，不局限于当前分析范围`;
+        const prefResult = window.dataAiTemplates?.buildPromptMessages('advice_general', {}, this.db) || {};
+        const sys = `当前启用的分析维度：${enabledLabels}。未启用的维度不会提供数据，请不要编造，也不要要求用户开启。\n` + (prefResult.messages?.[0]?.content || '');
 
         const blocks = [`分析范围：${rangeLabel}`, `用户提问：${prompt}`];
         const profile = this.db.health?.profile || {};

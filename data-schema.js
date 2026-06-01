@@ -43,6 +43,7 @@
             });
             this.db.aiTemplates = Array.isArray(this.db.aiTemplates) ? this.db.aiTemplates : [];
             this.db.aiTemplateActiveId = this.db.aiTemplateActiveId || '';
+            this.db.aiPromptPrefs = this.db.aiPromptPrefs && typeof this.db.aiPromptPrefs === 'object' ? this.db.aiPromptPrefs : {};
             this.db.aiTrash = Array.isArray(this.db.aiTrash) ? this.db.aiTrash : [];
             const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
             this.db.aiTrash = this.db.aiTrash.filter(item => Number(item?.deletedAt || 0) >= cutoff);

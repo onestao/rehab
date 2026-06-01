@@ -2201,8 +2201,10 @@ const advicePanel = {
         block.className = 'ai-llm-block ai-llm-skeleton';
         block.innerHTML = '<div class="ai-llm-label"><span class="ai-llm-dot"></span> AI 正在生成具体建议…</div><div class="ai-llm-line"></div><div class="ai-llm-line"></div><div class="ai-llm-line ai-llm-short"></div>';
         try {
+            const prefResult = window.dataAiTemplates?.buildPromptMessages('insight_advice', {}, this.db) || {};
+            const insightSys = prefResult.messages?.find(m => m.role === 'system')?.content || '你是训练与营养健康顾问。只基于数据，用3条以内短建议，必须可执行。若存在待判训练标签，先判断它们属于 push、pull、lower、core、cardio、rehab 之一，并在最后用 JSON 单独输出：{"classifications":[{"label":"原标签","bucket":"lower"}],"advice":"建议正文"}。bucket 只能用这六个英文值。';
             const messages = [
-                { role: 'system', content: '你是训练与营养健康顾问。只基于数据，用3条以内短建议，必须可执行。若存在待判训练标签，先判断它们属于 push、pull、lower、core、cardio、rehab 之一，并在最后用 JSON 单独输出：{"classifications":[{"label":"原标签","bucket":"lower"}],"advice":"建议正文"}。bucket 只能用这六个英文值。' },
+                { role: 'system', content: insightSys },
                 { role: 'user', content: `计划:${ctx.planTitle || '无'} ${ctx.planProgress || '--'} 下一项:${ctx.nextItemName || '无'}
 饮食:蛋白${Math.round(m.proIntake || 0)}${m.proGoal ? '/' + Math.round(m.proGoal) + 'g' : 'g'} 热量${Math.round(m.calIntake || 0)}${m.calGoal ? '/' + Math.round(m.calGoal) + 'kcal' : 'kcal'}
 训练:负荷${a.weeklyVolumeLoad ?? '--'}kg·rep 变化${a.volumeDelta ?? '--'}% 连续${a.streakDays ?? '--'}天 恢复${a.recoveryIndex ?? '--'}% 分布${a.pushPullRatio || '--'} 待判:${(a.unknownTrainingLabels || []).join('、') || '无'}
