@@ -111,6 +111,7 @@
 
         exerciseLabel(type = '', entry = null) {
             if (type === 'custom') return entry?.customName || entry?.note || '自定义运动';
+            if (type === 'strength' && entry?.customName) return entry.customName;
             const map = {
                 walk: '步行',
                 run: '跑步',
