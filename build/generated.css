@@ -1846,6 +1846,11 @@ mark.ai-hit {
 }
 .food-result-item:active { background: var(--md-sys-surface-container); }
 .food-result-item small { color: var(--md-sys-on-surface-variant); white-space: nowrap; }
+.food-history-result {
+    background: color-mix(in srgb, var(--md-sys-tertiary-container) 42%, var(--md-sys-surface-container-lowest));
+    border-left: 3px solid var(--md-sys-tertiary);
+}
+.food-history-result small { color: var(--md-sys-on-tertiary-container); }
 .food-ai-result { border-left: 3px solid var(--md-sys-tertiary); }
 .food-ai-result-card { display: grid; gap: 6px; }
 .food-add-all {
@@ -2164,6 +2169,7 @@ mark.ai-hit {
 }
 .exercise-grid { margin: 0; }
 .manual-ex-list { display: grid; gap: 4px; }
+
 }
 @layer components {
 /* --- Weight Loss Plan --- */

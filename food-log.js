@@ -13,6 +13,8 @@ const foodLog = {
             todayCalories: this.todayCalories,
             todayMacros: this.todayMacros,
             applyFoodItem: this.applyFoodItem,
+            historicalFoodSuggestions: this.historicalFoodSuggestions,
+            applyHistoricalFoodItem: this.applyHistoricalFoodItem,
             onFoodSearchInput: this.onFoodSearchInput,
             autoFillFoodByName: this.autoFillFoodByName,
             updateFoodComputedPreview: this.updateFoodComputedPreview,
@@ -250,16 +252,86 @@ const foodLog = {
         this.updateFoodComputedPreview();
     },
 
+    historicalFoodSuggestions(keyword, limit = 8) {
+        const kw = String(keyword || '').trim().toLowerCase();
+        if (!kw) return [];
+        const seen = new Set();
+        const logs = this.activeRecords(this.db.health?.foodLogs || []).slice().reverse();
+        const suggestions = [];
+        for (const log of logs) {
+            const name = String(log?.name || '').trim();
+            const normalizedName = name.toLowerCase();
+            if (!name || (!normalizedName.includes(kw) && !kw.includes(normalizedName))) continue;
+            const grams = Number(log.grams || 0);
+            const calPer100g = Number(log.calPer100g || (grams ? (Number(log.cal || 0) * 100 / grams) : 0));
+            if (!calPer100g) continue;
+            const proPer100g = Number(log.proPer100g ?? (grams ? (Number(log.pro || 0) * 100 / grams) : 0));
+            const carbPer100g = Number(log.carbPer100g ?? (grams ? (Number(log.carb || 0) * 100 / grams) : 0));
+            const fatPer100g = Number(log.fatPer100g ?? (grams ? (Number(log.fat || 0) * 100 / grams) : 0));
+            const key = [
+                normalizedName,
+                Math.round(calPer100g),
+                proPer100g.toFixed(1),
+                carbPer100g.toFixed(1),
+                fatPer100g.toFixed(1)
+            ].join('|');
+            if (seen.has(key)) continue;
+            seen.add(key);
+            suggestions.push({
+                name,
+                grams,
+                cal: Number(calPer100g.toFixed(1)),
+                pro: Number(proPer100g.toFixed(1)),
+                carb: Number(carbPer100g.toFixed(1)),
+                fat: Number(fatPer100g.toFixed(1)),
+                date: log.date || '',
+                meal: log.meal || ''
+            });
+            if (suggestions.length >= limit) break;
+        }
+        return suggestions;
+    },
+
+    applyHistoricalFoodItem(index) {
+        const item = (this._foodHistorySuggestions || [])[Number(index)];
+        if (!item) return;
+        const nameEl = document.getElementById('foodName');
+        const gramsEl = document.getElementById('foodGrams');
+        if (nameEl) nameEl.value = item.name;
+        if (gramsEl && !gramsEl.value && item.grams) gramsEl.value = item.grams;
+        this._foodCalUnit = 'kcal';
+        this.syncFoodCalLabel?.();
+        if (document.getElementById('foodCal')) document.getElementById('foodCal').value = item.cal || '';
+        if (document.getElementById('foodPro')) document.getElementById('foodPro').value = item.pro || 0;
+        if (document.getElementById('foodCarb')) document.getElementById('foodCarb').value = item.carb || 0;
+        if (document.getElementById('foodFat')) document.getElementById('foodFat').value = item.fat || 0;
+        const suggestEl = document.getElementById('foodSearchSuggest');
+        if (suggestEl) suggestEl.innerHTML = '';
+        this._aiFoodResults = [];
+        this._aiFoodDrafts = [];
+        this._aiFoodAdded = null;
+        this.setFoodSource('历史记录');
+        this.updateFoodComputedPreview();
+    },
+
     onFoodSearchInput() {
         const kw = document.getElementById('foodName')?.value?.trim() || '';
         const results = fooddb.searchAll(kw);
+        const historyResults = this.historicalFoodSuggestions(kw);
+        this._foodHistorySuggestions = historyResults;
         const el = document.getElementById('foodSearchSuggest');
         if (!el) return;
-        if (!kw || results.length === 0) { el.innerHTML = ''; return; }
+        if (!kw || (results.length === 0 && historyResults.length === 0)) { el.innerHTML = ''; return; }
         const esc = this.escapeHtml || window.renderSafe?.escapeHtml || (v => String(v ?? ''));
-        el.innerHTML = results.map(item =>
+        const historyHtml = historyResults.map((item, idx) => {
+            const gramsText = item.grams ? ` · 上次 ${Number(item.grams)}g` : '';
+            const dateText = item.date ? ` · ${item.date}` : '';
+            return `<button class="food-result-item food-history-result" onclick="data.applyHistoricalFoodItem(${idx})"><span>${esc(item.name)}</span><small>历史${dateText}${gramsText} · ${Number(item.cal || 0)} kcal/100g</small></button>`;
+        }).join('');
+        const libraryHtml = results.map(item =>
             `<button class="food-result-item" onclick="data.applyFoodItem('${esc(item.id)}')"><span>${esc(item.name)}</span><small>${Number(item.cal || 0)} kcal/100g</small></button>`
         ).join('');
+        el.innerHTML = historyHtml + libraryHtml;
     },
 
     autoFillFoodByName() {
