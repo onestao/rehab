@@ -38,6 +38,24 @@
         return start;
     }
 
+    function parseReportAiText(text, fallback = {}) {
+        const raw = String(text || '').trim();
+        const jsonText = raw.match(/```json\s*([\s\S]*?)```/i)?.[1] || raw.match(/\{[\s\S]*\}/)?.[0] || '';
+        if (jsonText) {
+            try {
+                const parsed = JSON.parse(jsonText);
+                return {
+                    ...fallback,
+                    summary: String(parsed.summary || fallback.summary || '').trim(),
+                    highlights: Array.isArray(parsed.highlights) ? parsed.highlights.map(String).filter(Boolean).slice(0, 3) : fallback.highlights,
+                    suggestions: Array.isArray(parsed.suggestions) ? parsed.suggestions.map(String).filter(Boolean).slice(0, 3) : fallback.suggestions,
+                    raw
+                };
+            } catch {}
+        }
+        return { ...fallback, summary: raw.slice(0, 240) || fallback.summary, raw };
+    }
+
     window.dataReport = {
         openWeightReport(kind = 'weekly') {
             this.db.health.reports = this.db.health.reports || [];
@@ -134,15 +152,21 @@
             let ai = window.reportMetricsPure.summarizeReportPlain(metrics);
             ai.model = 'offline';
             ai.prompt_id = `${kind}_report_offline`;
-            if (useAi && typeof this.askContextAi === 'function') {
+            if (useAi) {
                 try {
-                    const payload = JSON.stringify(metrics.metrics);
-                    const result = await this.askContextAi(kind === 'monthly' ? 'monthly_report' : 'weekly_report', payload);
-                    if (result && typeof result === 'object') ai = { ...ai, ...result };
-                    else if (typeof result === 'string' && result.trim()) ai.summary = result.trim().slice(0, 160);
-                    ai.model = ai.model || this.adviceModel || 'ai';
+                    if (!window.ai?.cfg?.enabled && !this.db?.aiProfiles?.length) throw new Error('请先在设置中配置 AI');
+                    const context = this.buildPeriodReportContext?.(metrics.periodStart, metrics.periodEnd) || '';
+                    const messages = [
+                        { role: 'system', content: '你是严谨的体重、饮食和训练复盘助手。必须只依据用户提供的周期数据。返回严格 JSON：{"summary":"≤100字","highlights":["≤3条"],"suggestions":["≤3条"]}。不要编造不存在的数据。' },
+                        { role: 'user', content: `请生成${kind === 'monthly' ? '月' : '周'}体重复盘。\n\n【聚合指标】\n${JSON.stringify(metrics.metrics, null, 2)}\n\n${context}` }
+                    ];
+                    const result = await ai.call(messages, 1800);
+                    ai = parseReportAiText(result, ai);
+                    ai.model = ai.model || (window.ai?.getEffectiveConfig?.()?.model) || 'ai';
                     ai.prompt_id = kind === 'monthly' ? 'monthly_report' : 'weekly_report';
-                } catch {}
+                } catch (err) {
+                    window.toast?.show?.(String(err?.message || err || 'AI 复盘失败，已保留离线复盘'), 'error');
+                }
             }
             this.db.health.reports = this.db.health.reports || [];
             const now = Date.now();
