@@ -55,9 +55,16 @@
 
 .weight-report-card {
     max-height: min(82vh, 720px);
+    display: flex;
+    flex-direction: column;
+}
+.weight-report-card .md-modal-head {
+    flex: 0 0 auto;
 }
 .weight-report-content {
-    overflow: auto;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
     overscroll-behavior: contain;
     padding: 0 2px 8px;
 }

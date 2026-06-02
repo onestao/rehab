@@ -221,8 +221,82 @@
         askWeeklySummaryAi(weekKey = '', deload = false) {
             const basePrompt = this.weeklyAiPromptForWeek(weekKey);
             const prompt = deload ? `${basePrompt}\n请特别判断下一周是否需要 deload，并给出具体降载比例、保留动作和恢复安排。` : basePrompt;
-            this.closeSummarySheet();
-            this.askContextAi?.('weekly_review', prompt);
+            this._inlineSummaryAi('weekly', weekKey, prompt, deload ? '判断降载' : '周总结');
+        },
+
+        askMonthlySummaryAi(monthKey = '') {
+            const prompt = this.monthlySummaryAiPrompt(monthKey);
+            this._inlineSummaryAi('monthly', monthKey, prompt, '月总结');
+        },
+
+        async _inlineSummaryAi(kind, periodKey, prompt, label) {
+            const hasAi = !!(this.db?.aiProfiles?.length && (this.db.aiActiveId || this.db.aiProfiles[0]?.id)) || !!(window.ai && ai.cfg?.enabled);
+            if (!hasAi) return alert('请先在设置中配置 AI');
+            const body = document.getElementById('summarySheetBody');
+            if (!body) return;
+            const safe = this.escapeHtml ? this.escapeHtml.bind(this) : (v) => String(v ?? '');
+            let responseEl = document.getElementById('summaryAiResponse');
+            if (!responseEl) {
+                responseEl = document.createElement('div');
+                responseEl.id = 'summaryAiResponse';
+                responseEl.className = 'summary-ai-response';
+                body.appendChild(responseEl);
+            }
+            responseEl.innerHTML = `<div class="summary-ai-loading"><span class="material-symbols-rounded progress-icon">progress_activity</span> 正在生成${safe(label)}…</div>`;
+            responseEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            try {
+                const systemMsg = kind === 'monthly'
+                    ? '你是严谨的训练与体重数据复盘助手。禁止编造数据，只能引用输入字段。输出：summary ≤80字，highlights ≤3条，suggestions ≤3条。'
+                    : '你是严谨的训练与体重数据复盘助手。禁止编造数据，只能引用输入字段。输出：summary ≤80字，highlights ≤3条，suggestions ≤3条，deload判断（如适用）。';
+                const messages = [
+                    { role: 'system', content: systemMsg },
+                    { role: 'user', content: prompt }
+                ];
+                const renderMd = this.renderAdviceMarkdown ? (t) => this.renderAdviceMarkdown(t) : (t) => `<p>${safe(t)}</p>`;
+                if (window.ai?.callStream) {
+                    let accumulated = '';
+                    let _lastRender = 0;
+                    const result = await ai.callStream(messages, 1800, (delta, acc) => {
+                        accumulated = acc;
+                        const now = Date.now();
+                        if (now - _lastRender > 60) {
+                            _lastRender = now;
+                            responseEl.innerHTML = `<div class="summary-ai-result">${renderMd(accumulated)}</div>`;
+                        }
+                    });
+                    const finalText = typeof result === 'string' ? result : accumulated;
+                    responseEl.innerHTML = `<div class="summary-ai-result">${renderMd(finalText)}</div>`;
+                    this._saveSummaryReport(kind, periodKey, finalText);
+                } else {
+                    const result = await ai.call(messages, 1800);
+                    const text = typeof result === 'string' ? result : (result?.choices?.[0]?.message?.content || JSON.stringify(result));
+                    responseEl.innerHTML = `<div class="summary-ai-result">${renderMd(text)}</div>`;
+                    this._saveSummaryReport(kind, periodKey, text);
+                }
+            } catch (err) {
+                responseEl.innerHTML = `<div class="summary-ai-error"><span class="material-symbols-rounded">error</span> ${safe(String(err?.message || err || '请求失败'))}</div>`;
+            }
+        },
+
+        _saveSummaryReport(kind, periodKey, content) {
+            try {
+                this.db.health.reports = this.db.health.reports || [];
+                const now = Date.now();
+                const existing = this.activeRecords(this.db.health.reports).find(r => r.kind === `summary_${kind}` && r.periodKey === periodKey);
+                const record = {
+                    id: existing?.id || this.generateRecordId(`summary-${kind}`),
+                    kind: `summary_${kind}`,
+                    periodKey,
+                    generatedAt: existing?.generatedAt || new Date(now).toISOString(),
+                    updatedAt: now,
+                    deleted: false,
+                    content,
+                    ai: { summary: content, model: 'ai', prompt_id: `summary_${kind}` }
+                };
+                if (existing) Object.assign(existing, record);
+                else this.db.health.reports.push(record);
+                this.saveAndBackup?.();
+            } catch {}
         },
 
         openWeeklySummarySheet() {
@@ -327,12 +401,6 @@
             const body = document.getElementById('summarySheetBody');
             if (!body) return;
             body.innerHTML = this.renderMonthlySummarySheetBody(input?.value);
-        },
-
-        askMonthlySummaryAi(monthKey) {
-            const prompt = this.monthlySummaryAiPrompt(monthKey);
-            this.closeSummarySheet();
-            this.askContextAi?.('calendar', prompt);
         },
 
         openMonthlySummarySheet() {
