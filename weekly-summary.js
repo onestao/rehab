@@ -82,6 +82,30 @@
             const historyKey = (h) => this.historyDayKey ? this.historyDayKey(h) : dateKey(this.parseHistoryDate?.(h.date) || new Date(h.date || Date.now()));
             const fmtNum = (n, digits = 0) => Number(n || 0).toFixed(digits);
             const mealLabel = (meal) => ({ breakfast: '早餐', lunch: '午餐', dinner: '晚餐', snack: '加餐' }[meal] || meal || '未分类');
+            const planTypeLabel = (type, title = '') => ({ rehab: '康复训练', cut: '减脂训练', bulk: '增肌/力量增强', maintenance: '维持训练', custom: '自定义训练' }[type] || title || type || '训练计划');
+            const taskCategoryLabel = (category) => ({ warmup: '热身', main: '主训练', cooldown: '拉伸/放松' }[category] || category || '主训练');
+            const taskStatusLabel = (status) => ({ done: '已完成', completed: '已完成', skipped: '已跳过', 'in-progress': '进行中', pending: '待执行' }[status] || status || '待执行');
+            const taskSpec = (task = {}) => {
+                const spec = task.spec || {};
+                const parts = [];
+                if (spec.sets) parts.push(`${spec.sets}组`);
+                if (spec.reps) parts.push(`每组${spec.reps}次`);
+                if (spec.work) parts.push(`每次${spec.work}秒`);
+                if (spec.repRest) parts.push(`次休${spec.repRest}秒`);
+                if (spec.actionRest) parts.push(`组休${spec.actionRest}秒`);
+                if (spec.isAlt) parts.push('双侧交替');
+                if (task.currentLevel) parts.push(`Lv${task.currentLevel}`);
+                return parts.join('，') || '未填写参数';
+            };
+            const profile = this.db.health?.profile || {};
+            const profileLines = [];
+            const conditionType = { injury: '运动损伤', chronic: '慢性病', allergy: '过敏', surgery: '手术史', medication: '用药', other: '其他' };
+            if (profile.gender || profile.age || this.db.health?.height) profileLines.push(`基础：${profile.gender === 'female' ? '女' : '男'} · ${profile.age || '?'}岁${this.db.health?.height ? ' · 身高' + this.db.health.height + 'cm' : ''}`);
+            if (profile.conditions?.length) profile.conditions.forEach(c => profileLines.push(`- [${conditionType[c.type] || c.type || '健康状况'}] ${c.label || '未命名'}${c.severity ? '（' + c.severity + '）' : ''}${c.avoid?.length ? '；避免：' + c.avoid.join('、') : ''}${c.note ? '；备注：' + c.note : ''}`));
+            if (profile.allergies?.length) profileLines.push(`过敏/不耐受：${profile.allergies.join('、')}`);
+            if (profile.preferences?.equipment?.length) profileLines.push(`可用器材：${profile.preferences.equipment.join('、')}`);
+            if (profile.preferences?.sports?.length) profileLines.push(`偏好运动：${profile.preferences.sports.join('、')}`);
+            if (profile.vitals?.restingHR) profileLines.push(`静息心率：${profile.vitals.restingHR} bpm`);
             const weights = active(this.db.health?.weights || []).filter(w => inKeyRange(w.date)).sort((a, b) => String(a.date).localeCompare(String(b.date)));
             const foods = active(this.db.health?.foodLogs || []).filter(f => inKeyRange(f.date)).sort((a, b) => String(a.date).localeCompare(String(b.date)) || String(a.meal || '').localeCompare(String(b.meal || '')));
             const manualExercises = active(this.db.health?.exerciseLogs || []).filter(e => inKeyRange(e.date)).sort((a, b) => String(a.date).localeCompare(String(b.date)));
@@ -94,6 +118,45 @@
                 acc.fat += Number(f.fat || 0);
                 return acc;
             }, { cal: 0, pro: 0, carb: 0, fat: 0 });
+            const foodPer100 = (f, field, totalField) => {
+                const direct = Number(f[field] || 0);
+                if (direct > 0) return direct;
+                const grams = Number(f.grams || 0);
+                const total = Number(f[totalField] || 0);
+                return grams > 0 && total > 0 ? total * 100 / grams : 0;
+            };
+            const foodSource = (f) => [
+                f.sourceLabel,
+                f.source,
+                f.foodSource,
+                f.id && String(f.id).startsWith('ai-food') ? 'AI识别' : '',
+                f.calUnit ? `热量原单位:${f.calUnit}` : '',
+                f.confidence ? `置信度:${f.confidence}` : ''
+            ].filter(Boolean).join('；') || '手动/未标注';
+            const foodExtra = (f) => [
+                f.brand ? `品牌:${f.brand}` : '',
+                f.fiber ? `膳食纤维:${fmtNum(f.fiber, 1)}g` : '',
+                f.sugar ? `糖:${fmtNum(f.sugar, 1)}g` : '',
+                f.sodium ? `钠:${fmtNum(f.sodium, 0)}mg` : '',
+                f.saturatedFat ? `饱和脂肪:${fmtNum(f.saturatedFat, 1)}g` : '',
+                Array.isArray(f.ingredients) && f.ingredients.length ? `主要配料:${f.ingredients.join('、')}` : '',
+                f.cooking ? `烹饪方式:${f.cooking}` : '',
+                f.note ? `备注:${f.note}` : '',
+                f.rawText ? `原始描述:${f.rawText}` : '',
+                f.aiText ? `AI描述:${f.aiText}` : '',
+                Array.isArray(f.tags) && f.tags.length ? `标签:${f.tags.join('、')}` : ''
+            ].filter(Boolean).join('；');
+            const foodDaySummary = Object.entries(foods.reduce((acc, f) => {
+                const key = f.date || '未知日期';
+                acc[key] = acc[key] || { cal: 0, pro: 0, carb: 0, fat: 0, meals: {} };
+                acc[key].cal += Number(f.cal || 0);
+                acc[key].pro += Number(f.pro || 0);
+                acc[key].carb += Number(f.carb || 0);
+                acc[key].fat += Number(f.fat || 0);
+                const meal = mealLabel(f.meal);
+                acc[key].meals[meal] = (acc[key].meals[meal] || 0) + Number(f.cal || 0);
+                return acc;
+            }, {})).map(([day, d]) => `- ${day}｜总热量 ${Math.round(d.cal)} kcal｜P${fmtNum(d.pro, 1)} C${fmtNum(d.carb, 1)} F${fmtNum(d.fat, 1)}｜餐次热量 ${Object.entries(d.meals).map(([meal, cal]) => `${meal}${Math.round(cal)}kcal`).join('、')}`);
             const historyMinutes = histories.reduce((sum, h) => sum + Math.round(Number(h.duration || 0) / 60), 0);
             const manualMinutes = manualExercises.reduce((sum, e) => sum + Number(e.minutes || 0), 0);
             const actionNames = (h) => {
@@ -109,15 +172,20 @@
             };
             const lines = [];
             lines.push(`【周期】${periodStart} 至 ${periodEnd}`);
+            lines.push(`【健康档案（必须遵守）】\n${profileLines.length ? profileLines.join('\n') : '暂无健康档案'}`);
             lines.push(`【周期摘要】训练历史 ${histories.length} 条，手动运动 ${manualExercises.length} 条，训练总时长 ${historyMinutes + manualMinutes} 分钟；饮食 ${foods.length} 条，摄入 ${Math.round(macros.cal)} kcal，蛋白 ${fmtNum(macros.pro, 1)}g，碳水 ${fmtNum(macros.carb, 1)}g，脂肪 ${fmtNum(macros.fat, 1)}g；体重 ${weights.length} 条。`);
             lines.push(`【体重记录】\n${weights.length ? weights.map(w => `- ${w.date}｜${fmtNum(w.weight, 2)} kg${w.note ? '｜' + w.note : ''}`).join('\n') : '该周期无体重记录'}`);
-            lines.push(`【饮食记录】\n${foods.length ? foods.slice(0, 80).map(f => `- ${f.date}｜${mealLabel(f.meal)}｜${f.name || '未命名食物'}${f.grams ? ' ' + f.grams + 'g' : ''}｜${Math.round(Number(f.cal || 0))} kcal｜P${fmtNum(f.pro)} C${fmtNum(f.carb)} F${fmtNum(f.fat)}`).join('\n') : '该周期无饮食记录'}`);
+            lines.push(`【饮食按日/餐汇总】\n${foodDaySummary.length ? foodDaySummary.join('\n') : '该周期无饮食记录'}`);
+            lines.push(`【饮食记录明细（用于判断饮食是否健康）】\n${foods.length ? foods.slice(0, 120).map(f => `- ${f.date}｜${mealLabel(f.meal)}｜${f.name || '未命名食物'}${f.grams ? '｜食用量 ' + f.grams + 'g' : ''}｜总热量 ${Math.round(Number(f.cal || 0))} kcal｜每100g热量 ${fmtNum(foodPer100(f, 'calPer100g', 'cal'), 1)} kcal${f.calInputPer100g ? '｜录入热量 ' + fmtNum(f.calInputPer100g, 1) + (f.calUnit ? f.calUnit + '/100g' : '/100g') : ''}｜总P/C/F ${fmtNum(f.pro, 1)}/${fmtNum(f.carb, 1)}/${fmtNum(f.fat, 1)}g｜每100g P/C/F ${fmtNum(foodPer100(f, 'proPer100g', 'pro'), 1)}/${fmtNum(foodPer100(f, 'carbPer100g', 'carb'), 1)}/${fmtNum(foodPer100(f, 'fatPer100g', 'fat'), 1)}g｜来源 ${foodSource(f)}${foodExtra(f) ? '｜' + foodExtra(f) : ''}`).join('\n') : '该周期无饮食记录'}`);
             lines.push(`【训练历史】\n${histories.length ? histories.slice(0, 50).map(h => `- ${historyKey(h)}｜${actionNames(h)}｜${Math.round(Number(h.duration || 0) / 60)}分钟${h.cardio?.calories ? '｜有氧' + Math.round(h.cardio.calories) + 'kcal' : ''}${setSummary(h)}`).join('\n') : '该周期无训练历史'}`);
             lines.push(`【手动运动】\n${manualExercises.length ? manualExercises.slice(0, 80).map(e => `- ${e.date}｜${this.exerciseLabel ? this.exerciseLabel(e.type, e) : (e.name || e.type || '运动')}｜${Number(e.minutes || 0)}分钟｜${Math.round(Number(e.calories || 0))} kcal${e.distance ? '｜' + e.distance + 'km' : ''}${e.sets ? '｜' + e.sets + '组' : ''}${e.repsPerSet ? '×' + e.repsPerSet + '次' : ''}${e.weightKg ? '｜' + e.weightKg + 'kg' : ''}`).join('\n') : '该周期无手动运动记录'}`);
             lines.push(`【计划完成】\n${plans.length ? plans.slice(0, 30).map(p => {
                 const items = p.items || p.tasks || [];
                 const done = items.filter(item => item.completed || item.status === 'done' || item.status === 'completed').length;
-                return `- ${p.date || p.dayKey}｜${p.planType || p.type || '计划'}｜${done}/${items.length} 完成${p.cancelled || p.deleted ? '｜已取消/删除' : ''}`;
+                const planType = p.type || p.planType || 'rehab';
+                const header = `- ${p.date || p.dayKey}｜${planTypeLabel(planType, p.title)}｜${done}/${items.length} 完成${p.cancelled || p.deleted ? '｜已取消/删除' : ''}`;
+                const taskLines = items.slice(0, 12).map(task => `  · ${task.name || '未命名任务'}｜${taskCategoryLabel(task.category)}｜${taskStatusLabel(task.status)}｜${taskSpec(task)}`);
+                return [header, ...taskLines].join('\n');
             }).join('\n') : '该周期无每日计划记录'}`);
             return lines.join('\n\n');
         },

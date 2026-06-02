@@ -46,7 +46,16 @@ const foodLog = {
             cal: Number(item.cal || 0),
             pro: Number(item.pro || 0),
             carb: Number(item.carb || 0),
-            fat: Number(item.fat || 0)
+            fat: Number(item.fat || 0),
+            fiber: Number(item.fiber || 0),
+            sugar: Number(item.sugar || 0),
+            sodium: Number(item.sodium || 0),
+            saturatedFat: Number(item.saturatedFat || item.satFat || 0),
+            ingredients: Array.isArray(item.ingredients) ? item.ingredients.map(v => String(v || '').trim()).filter(Boolean) : [],
+            cooking: String(item.cooking || item.cookingMethod || '').trim(),
+            source: String(item.source || '').trim(),
+            confidence: item.confidence === undefined ? '' : Number(item.confidence || 0),
+            note: String(item.note || '').trim()
         };
     },
 
@@ -159,6 +168,8 @@ const foodLog = {
             proPer100g: pro,
             carbPer100g: carb,
             fatPer100g: fat,
+            sourceLabel: this._foodSource || '',
+            source: this._foodSource ? 'selected-food-source' : 'manual',
             createdAt: new Date().toISOString(),
             updatedAt: Date.now(),
             deleted: false
@@ -646,6 +657,16 @@ const foodLog = {
             proPer100g: grams ? Number((pro * 100 / grams).toFixed(1)) : 0,
             carbPer100g: grams ? Number((carb * 100 / grams).toFixed(1)) : 0,
             fatPer100g: grams ? Number((fat * 100 / grams).toFixed(1)) : 0,
+            fiber: Number(item.fiber || 0),
+            sugar: Number(item.sugar || 0),
+            sodium: Number(item.sodium || 0),
+            saturatedFat: Number(item.saturatedFat || 0),
+            ingredients: item.ingredients || [],
+            cooking: item.cooking || '',
+            source: item.source || 'ai-food-parse',
+            sourceLabel: 'AI 识别结果',
+            confidence: item.confidence || '',
+            note: item.note || '',
             createdAt: new Date().toISOString(),
             updatedAt: Date.now(),
             deleted: false
