@@ -493,7 +493,7 @@
             const weightArrow = weightDelta === null ? ''
                 : (weightDelta > 0.1 ? '↑' : weightDelta < -0.1 ? '↓' : '→');
             const weightText = weightDelta === null ? '--'
-                : `${weightDelta > 0 ? '+' : ''}${weightDelta.toFixed(1)} kg ${weightArrow}`;
+                : `${weightDelta > 0 ? '+' : ''}${weightDelta.toFixed(2)} kg ${weightArrow}`;
             const goalText = !goal ? '未设目标'
                 : `目标 ${isGain ? '+' : '-'}${Math.abs(target).toFixed(1)}/周`;
 
@@ -517,8 +517,8 @@
                     </div>
                 </div>
                 <div class="profile-stats">
-                    <div class="ps-item"><b>${latestWeight ? Number(latestWeight.weight).toFixed(1) : '--'}</b><small>kg 当前</small></div>
-                    <div class="ps-item"><b>${weightDelta !== null ? (weightDelta > 0 ? '+' : '') + weightDelta.toFixed(1) : '--'}</b><small>kg 7天</small></div>
+                    <div class="ps-item"><b>${latestWeight ? Number(latestWeight.weight).toFixed(2) : '--'}</b><small>kg 当前</small></div>
+                    <div class="ps-item"><b>${weightDelta !== null ? (weightDelta > 0 ? '+' : '') + weightDelta.toFixed(2) : '--'}</b><small>kg 7天</small></div>
                     <div class="ps-item"><b>${weekDone}/${weekGoal}</b><small>次/周</small></div>
                     <div class="ps-item"><b>${totalSessions}</b><small>累计</small></div>
                 </div>

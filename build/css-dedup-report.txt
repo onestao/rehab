@@ -490,6 +490,9 @@
 .weight-card
   17-record-tabs-health.css, 19-health-weightloss-ai.css, 36-responsive.css
 
+.weight-input-row
+  17-record-tabs-health.css, 35-components-modal.css
+
 .weight-range
   17-record-tabs-health.css, 57-weight-report.css
 

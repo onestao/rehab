@@ -232,7 +232,7 @@
             return `<article class="weight-report-current">
                 <div class="weight-report-period"><b>${esc(report.periodStart)} 至 ${esc(report.periodEnd)}</b><small>${esc(report.kind === 'monthly' ? '月报' : '周报')}</small></div>
                 <div class="weight-report-metrics">
-                    <div><b>${w.delta > 0 ? '+' : ''}${Number(w.delta || 0).toFixed(1)}kg</b><small>体重变化</small></div>
+                    <div><b>${w.delta > 0 ? '+' : ''}${Number(w.delta || 0).toFixed(2)}kg</b><small>体重变化</small></div>
                     <div><b>${Math.round(t.totalMinutes || 0)}分</b><small>训练时长</small></div>
                     <div><b>${Math.round(d.avgKcal || 0)}</b><small>日均 kcal</small></div>
                     <div><b>${Math.round(c.totalMinutes || 0)}分</b><small>有氧</small></div>

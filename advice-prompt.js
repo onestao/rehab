@@ -76,7 +76,7 @@ Object.assign(advicePanel, {
             const label = this.exerciseLabel(e.type, e);
             return `- ${e.date}｜${label}｜${e.minutes}分钟｜${e.calories || 0} kcal${e.distance ? `｜${e.distance}km` : ''}`;
         }).join('\n');
-        const formatWeights = (list) => list.map(w => `- ${w.date}｜${w.weight.toFixed(1)} kg`).join('\n');
+        const formatWeights = (list) => list.map(w => `- ${w.date}｜${w.weight.toFixed(2)} kg`).join('\n');
         const formatRehabWeekly = (list) => list.map(week => {
             const actions = (week.actions || []).map(a => `${a.name || '未命名'}（${a.status || 'continued'}${a.painLevel ? `，疼痛${a.painLevel}/10` : ''}${a.needsReview ? '，需确认' : ''}${a.coachNote ? '，' + a.coachNote : ''}）`).join('；');
             return `- ${week.weekStart || week.visitDate || ''}｜${actions || '无动作明细'}${week.therapistAssessment ? '｜评估：' + week.therapistAssessment : ''}`;

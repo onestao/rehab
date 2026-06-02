@@ -1,7 +1,7 @@
 # css overlap report
 # real-conflict threshold: 220
 
-## REAL CONFLICTS (same selector + same property, different value): 219
+## REAL CONFLICTS (same selector + same property, different value): 220
 :root
   files: 01-vars.css, 37-dark-mode.css, 49-plan.css, 41-m3e-effects.css
     --md-sys-primary: #0061a4 | #a0cafd (01-vars.css / 37-dark-mode.css)
@@ -330,6 +330,11 @@ mark.ai-hit
 .weight-card
   files: 17-record-tabs-health.css, 19-health-weightloss-ai.css, 36-responsive.css
     gap: 14px | 10px (17-record-tabs-health.css / 36-responsive.css)
+
+.weight-input-row
+  files: 17-record-tabs-health.css, 35-components-modal.css
+    display: grid | flex (17-record-tabs-health.css / 35-components-modal.css)
+    gap: 8px | 4px (17-record-tabs-health.css / 35-components-modal.css)
 
 .calendar-day.selected
   files: 17-record-tabs-health.css, 37-dark-mode.css

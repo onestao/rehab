@@ -54,7 +54,7 @@
                 <div class="record-overview-date">
                     <span class="hero-kicker">今日总览</span>
                     <h3>${monthNum}月${dayNum}日 ${weekday}</h3>
-                    ${weight ? `<p>体重 ${weight.weight.toFixed(1)} kg</p>` : ''}
+                    ${weight ? `<p>体重 ${weight.weight.toFixed(2)} kg</p>` : ''}
                 </div>
                 ${goalCal ? `<div class="today-focus-ring macro-focus-ring" style="--progress:${progress};--pro-stop:${macroStops.pro}deg;--carb-stop:${macroStops.carb}deg;--fat-stop:${macroStops.fat}deg"><div><b>${progress}%</b><small>摄入</small><em>${remainingText}</em></div></div>` : ''}
             </div>
@@ -73,10 +73,10 @@
             );
             const latest = sorted.length ? sorted[sorted.length - 1] : null;
             const prev = sorted.length >= 2 ? sorted[sorted.length - 2] : null;
-            const weightVal = latest ? Number(latest.weight).toFixed(1) : '--';
+            const weightVal = latest ? Number(latest.weight).toFixed(2) : '--';
             const weightDelta = (latest && prev) ? (latest.weight - prev.weight) : null;
             const weightDeltaText = weightDelta !== null
-                ? `${weightDelta > 0 ? '+' : ''}${weightDelta.toFixed(1)} kg`
+                ? `${weightDelta > 0 ? '+' : ''}${weightDelta.toFixed(2)} kg`
                 : '--';
             const weightDeltaClass = weightDelta !== null
                 ? (weightDelta < -0.05 ? 'is-down' : weightDelta > 0.05 ? 'is-up' : '')
@@ -334,7 +334,7 @@
                     });
                 });
             });
-            if (weight) items.push({ order: 0, sk: '0', icon: 'monitor_weight', label: '体重记录', detail: weight.weight.toFixed(1)+' kg', meta: weight.note || '', type: 'weight' });
+            if (weight) items.push({ order: 0, sk: '0', icon: 'monitor_weight', label: '体重记录', detail: weight.weight.toFixed(2)+' kg', meta: weight.note || '', type: 'weight' });
             if (!items.length) return '<div class="md-card today-timeline-empty"><div class="empty-state" style="padding:24px 16px"><span class="material-symbols-rounded">timeline</span><p>今天还没有记录，使用上方快捷按钮开始记录</p></div></div>';
             items.sort((a, b) => a.order - b.order || String(a.sk).localeCompare(String(b.sk)));
             return '<div class="md-card today-timeline-card"><div class="today-timeline-header"><span class="material-symbols-rounded">timeline</span><strong>今日时间线</strong><small>' + items.length + ' 条</small></div><div class="today-timeline-list">' + items.map(it => '<div class="today-timeline-item today-timeline-' + it.type + '"><span class="today-timeline-icon material-symbols-rounded">' + it.icon + '</span><div class="today-timeline-body"><div class="today-timeline-main"><strong>' + it.label + '</strong><span>' + it.detail + '</span></div>' + (it.meta ? '<small>' + it.meta + '</small>' : '') + (it.sub ? '<span class="today-timeline-sub">' + it.sub + '</span>' : '') + '</div></div>').join('') + '</div></div>';
@@ -513,7 +513,7 @@
                 <span>${totalMin} 分钟训练</span>
                 ${totalCal ? `<span>${totalCal} kcal 运动消耗</span>` : ''}
                 ${foodCal ? `<span>${foodCal} kcal 摄入</span>` : ''}
-                ${weight ? `<span>${weight.weight.toFixed(1)} kg</span>` : ''}
+                ${weight ? `<span>${weight.weight.toFixed(2)} kg</span>` : ''}
             </div>
             ${dailyPlans.length ? `<div class="day-detail-section"><b>日程计划</b>
                 <div class="day-detail-item"><span class="record-icon material-symbols-rounded">event_note</span><span>计划完成率</span><small>${planStats.done}/${planStats.total || 0}</small></div>
@@ -531,7 +531,7 @@
                 return `<div class="day-detail-item"><span class="food-tag">${this.escapeHtml(mealNames[f.meal] || f.meal)}</span><span>${this.escapeHtml(f.name || '')}${f.grams ? ' ' + this.escapeHtml(f.grams) + 'g' : ''}</span><small>${f.cal} kcal · P${Number(f.pro || 0).toFixed(0)} C${Number(f.carb || 0).toFixed(0)} F${Number(f.fat || 0).toFixed(0)}</small></div>`;
             }).join('')}</div>` : ''}
             ${manualExercises.length ? `<div class="day-detail-section"><b>手动运动</b>${manualExercises.map(e => `<div class="day-detail-item"><span class="record-icon material-symbols-rounded">${this.sportIcon(this.exerciseLabel(e.type, e))}</span><span>${this.exerciseLabel(e.type, e)} ${e.minutes} 分钟${e.note ? ' · ' + this.escapeHtml(e.note) : ''}</span><small>${e.calories || 0} kcal</small></div>`).join('')}</div>` : ''}
-            ${weight ? `<div class="day-detail-section"><b>体重</b><div class="day-detail-item"><span class="material-symbols-rounded" style="font-size:18px">monitor_weight</span><span>${weight.weight.toFixed(1)} kg</span>${weight.note ? `<small>${this.escapeHtml(weight.note)}</small>` : ''}</div></div>` : ''}
+            ${weight ? `<div class="day-detail-section"><b>体重</b><div class="day-detail-item"><span class="material-symbols-rounded" style="font-size:18px">monitor_weight</span><span>${weight.weight.toFixed(2)} kg</span>${weight.note ? `<small>${this.escapeHtml(weight.note)}</small>` : ''}</div></div>` : ''}
         </div>`;
         },
 

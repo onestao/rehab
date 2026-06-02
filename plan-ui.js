@@ -72,7 +72,7 @@
             const intake = this.todayCalories?.() || 0;
             const goalCal = this.db.health?.dietGoal?.dailyCal || 0;
             const remaining = goalCal ? goalCal - intake : 0;
-            const heroTitle = goalCal ? `距目标还差 ${remaining} 千卡` : (weight ? `体重 ${Number(weight.weight || 0).toFixed(1)} kg` : '开始今日训练');
+            const heroTitle = goalCal ? `距目标还差 ${remaining} 千卡` : (weight ? `体重 ${Number(weight.weight || 0).toFixed(2)} kg` : '开始今日训练');
             const streakDays = this.computeStreakDays?.() || 0;
             const prefs = this.ensurePlanPrefs?.() || {};
             const weeklySummary = window.planWeekly?.summary?.() || { done: 0, total: 0 };
@@ -752,7 +752,7 @@
             if (!type) return;
             const rows = type === 'weight'
                 ? this.sortedWeights?.().slice(-5).reverse().map((item) => ({
-                    title: `${Number(item.weight || 0).toFixed(1)} kg`,
+                    title: `${Number(item.weight || 0).toFixed(2)} kg`,
                     meta: item.note || item.date,
                     onClick: () => {
                         this.openWeightModal?.();

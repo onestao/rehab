@@ -315,6 +315,11 @@
         openWeightModal() {
             document.getElementById('modalWeightDate').value = this.logicalDateKey();
             document.getElementById('modalHeight').value = this.db.health.height || '';
+            var scanBtn = document.getElementById('miScaleScanBtn');
+            if (scanBtn) {
+                scanBtn.style.display = '';
+                scanBtn.disabled = false;
+            }
             window.navStack?.replaceOrPush?.({
                 type: 'modal',
                 id: 'weightModal',

@@ -3,6 +3,8 @@
     const DAY_MS = 86400000;
 
     window.dataHealthWeight = {
+        _miScaleReading: null,
+
         addWeight() {
             const date = document.getElementById('modalWeightDate').value || this.logicalDateKey();
             const weight = parseFloat(document.getElementById('modalWeightValue').value);
@@ -12,7 +14,8 @@
             this.db.health = this.db.health || { weights: [] };
             this.db.health.weights = this.db.health.weights || [];
             if (height > 0) this.db.health.height = height;
-            this.db.health.weights.push({
+
+            var record = {
                 id: this.generateRecordId('weight'),
                 date,
                 weight,
@@ -20,13 +23,73 @@
                 createdAt: new Date().toISOString(),
                 updatedAt: Date.now(),
                 deleted: false
-            });
+            };
+
+            var reading = this._miScaleReading;
+            if (reading) {
+                record.source = 'mi-scale';
+                if (reading.sourceId) record.sourceId = reading.sourceId;
+                if (reading.measuredAt) record.measuredAt = reading.measuredAt;
+                if (reading.impedance) record.bodyComposition = { impedance: reading.impedance };
+                this._miScaleReading = null;
+            }
+
+            var exists = false;
+            if (record.sourceId) {
+                exists = this.db.health.weights.some(function (w) {
+                    return !w.deleted && w.sourceId === record.sourceId;
+                });
+            }
+            if (exists) {
+                alert('该记录已存在');
+                return;
+            }
+
+            this.db.health.weights.push(record);
             this.db.health.weights.sort((a, b) => this.dateFromKey(b.date) - this.dateFromKey(a.date));
             this.weightRecordAnchorKey = date;
             document.getElementById('modalWeightValue').value = '';
             document.getElementById('modalWeightNote').value = '';
             this.closeWeightModal();
             this.saveAndBackup();
+        },
+
+        scanMiScale() {
+            var self = this;
+            var bt = window.miScaleBluetooth;
+            var support = bt && typeof bt.supportInfo === 'function'
+                ? bt.supportInfo()
+                : { ok: false, reason: '蓝牙读取模块未加载，请刷新页面后重试' };
+            if (!support.ok) {
+                alert(support.reason || '此浏览器不支持蓝牙读取，请使用 Android Chrome');
+                return;
+            }
+            var btn = document.getElementById('miScaleScanBtn');
+            if (btn) btn.disabled = true;
+            var scanHandle = bt.scan(function (result, sourceId) {
+                self._miScaleReading = result;
+                if (sourceId) self._miScaleReading.sourceId = sourceId;
+                if (result.weight) {
+                    document.getElementById('modalWeightValue').value = result.weight.toFixed(1);
+                }
+                if (result.measuredAt) {
+                    var d = result.measuredAt;
+                    var yyyy = d.getFullYear();
+                    var mm = String(d.getMonth() + 1).padStart(2, '0');
+                    var dd = String(d.getDate()).padStart(2, '0');
+                    document.getElementById('modalWeightDate').value = yyyy + '-' + mm + '-' + dd;
+                }
+                var h = parseFloat(document.getElementById('modalHeight').value) ||
+                    (self.db && self.db.health && self.db.health.height) || 0;
+                if (h > 0 && result.weight) {
+                    result.bmi = window.miScalePure.computeBmi(result.weight, h);
+                }
+                if (btn) btn.disabled = false;
+                if (window.toast) toast.show('体重秤读取成功: ' + result.weight.toFixed(1) + ' kg');
+            }, function (err) {
+                if (btn) btn.disabled = false;
+                if (window.toast) toast.show(err.message || '蓝牙扫描失败', 'error');
+            });
         },
 
         deleteWeight(id) {
@@ -55,8 +118,8 @@
                 <div class="weight-head">
                     <div>
                         <span class="cardio-kicker">体重管理</span>
-                        <h3>${latest ? `${latest.weight.toFixed(1)} kg` : '-- kg'}</h3>
-                        <small>${latest ? `${this.escapeHtml(latest.date)}${delta ? ` · 较上次 ${delta > 0 ? '+' : ''}${delta.toFixed(1)} kg` : ''}` : '点击下方添加第一条体重记录'}</small>
+                        <h3>${latest ? `${latest.weight.toFixed(2)} kg` : '-- kg'}</h3>
+                        <small>${latest ? `${this.escapeHtml(latest.date)}${delta ? ` · 较上次 ${delta > 0 ? '+' : ''}${delta.toFixed(2)} kg` : ''}` : '点击下方添加第一条体重记录'}</small>
                     </div>
                     <span class="material-symbols-rounded weight-icon">monitor_weight</span>
                 </div>
@@ -169,12 +232,12 @@
             const lastIdx = coords.length - 1;
             const labelIndices = new Set([minIdx, maxIdx, lastIdx]);
             const labels = coords.map((p, i) => labelIndices.has(i)
-                ? `<text class="weight-dot-label" x="${p.x.toFixed(1)}" y="${(p.y - 8).toFixed(1)}" text-anchor="middle">${Number(p.weight).toFixed(1)}</text>`
+                ? `<text class="weight-dot-label" x="${p.x.toFixed(1)}" y="${(p.y - 8).toFixed(1)}" text-anchor="middle">${Number(p.weight).toFixed(2)}</text>`
                 : '').join('');
 
             const dots = coords.map(p => {
                 const date = this.escapeHtml(p.date || '');
-                const weight = Number(p.weight || 0).toFixed(1);
+                const weight = Number(p.weight || 0).toFixed(2);
                 return `<circle class="weight-dot" cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="6" data-date="${date}" data-weight="${weight}" onclick="data.showWeightTipFromNode(event, this)"><title>${date}: ${weight}kg</title></circle>`;
             }).join('');
 
@@ -411,7 +474,7 @@
             const note = w.note ? `<small>${this.escapeHtml(w.note)}</small>` : '';
             return `<div class="weight-list-item">
                 <span>${this.escapeHtml(w.date || '')}${note}</span>
-                <b>${Number(w.weight || 0).toFixed(1)} kg</b>
+                <b>${Number(w.weight || 0).toFixed(2)} kg</b>
                 <button class="delete-btn" data-id="${this.escapeHtml(w.id || '')}" onclick="data.deleteWeight(this.dataset.id)" type="button"><span class="material-symbols-rounded">delete</span></button>
             </div>`;
         },
@@ -625,7 +688,7 @@
             return {
                 avgText: `${avg > 0 ? '+' : ''}${avg.toFixed(2)} kg/日`,
                 trend,
-                deltaText: `${total > 0 ? '+' : ''}${total.toFixed(1)} kg`
+                deltaText: `${total > 0 ? '+' : ''}${total.toFixed(2)} kg`
             };
         },
 
@@ -804,7 +867,7 @@
             const x = clientX - rect.left;
             const viewportWidth = window.innerWidth || document.documentElement.clientWidth || rect.width;
             const wrapRightInViewport = Math.min(rect.width, viewportWidth - rect.left);
-            const safeText = `${date}  ${Number(weight).toFixed(1)} kg`;
+            const safeText = `${date}  ${Number(weight).toFixed(2)} kg`;
 
             tip.textContent = safeText;
             tip.style.display = 'block';

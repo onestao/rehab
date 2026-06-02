@@ -53,7 +53,7 @@ function buildMetrics(db, period) {
     const weights = active(health.weights).filter(w => inRange(w.date, period.start, period.end)).sort((a, b) => String(a.date).localeCompare(String(b.date)));
     const first = weights[0] || null;
     const last = weights[weights.length - 1] || null;
-    const delta = first && last ? Number((Number(last.weight || 0) - Number(first.weight || 0)).toFixed(1)) : 0;
+    const delta = first && last ? Number((Number(last.weight || 0) - Number(first.weight || 0)).toFixed(2)) : 0;
     const days = first && last ? Math.max(1, Math.round((dateFromKey(last.date).getTime() - dateFromKey(first.date).getTime()) / DAY_MS)) : 1;
     const avgPerDay = Number((delta / days).toFixed(2));
     const trend = Math.abs(avgPerDay) < 0.01 ? 'stable' : avgPerDay < 0 ? 'down' : 'up';
@@ -119,7 +119,7 @@ function summarizeReportPlain(input) {
     const t = metrics.training || {};
     const d = metrics.diet || {};
     const c = metrics.cardio || {};
-    const deltaText = w.start == null || w.end == null ? '体重记录不足' : `体重${w.delta > 0 ? '上升' : w.delta < 0 ? '下降' : '基本稳定'} ${Math.abs(Number(w.delta || 0)).toFixed(1)}kg`;
+    const deltaText = w.start == null || w.end == null ? '体重记录不足' : `体重${w.delta > 0 ? '上升' : w.delta < 0 ? '下降' : '基本稳定'} ${Math.abs(Number(w.delta || 0)).toFixed(2)}kg`;
     return {
         summary: `${deltaText}，训练 ${t.sessions || 0} 次，饮食记录 ${d.daysLogged || 0} 天。`,
         highlights: [

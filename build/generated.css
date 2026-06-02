@@ -4188,6 +4188,14 @@ body.is-training .fab-pip.active {
     transition: none;
 }
 
+.weight-input-row {
+    display: flex;
+    align-items: flex-end;
+    gap: 4px;
+}
+.weight-input-row .md-field { flex: 1; min-width: 0; }
+.weight-input-row .md-icon-btn { margin-bottom: 8px; }
+
 .template-manager-body {
     display: grid;
     gap: 12px;

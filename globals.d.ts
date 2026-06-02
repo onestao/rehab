@@ -19,6 +19,8 @@ declare const storageMigrate: any;
 declare const storageIdb: any;
 declare const swipeActions: any;
 declare const errorBus: any;
+declare const miScalePure: any;
+declare const miScaleBluetooth: any;
 
 interface Window {
   data: any;
@@ -42,6 +44,8 @@ interface Window {
   storageIdb: any;
   swipeActions: any;
   errorBus: any;
+  miScalePure: any;
+  miScaleBluetooth: any;
   renderSafe: any;
   dataRecords: any;
   dataSchema: any;

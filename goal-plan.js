@@ -123,8 +123,8 @@
             const latest = this.sortedWeights().slice(-1)[0];
             const currentWeight = latest?.weight || '';
             const diffText = plan?.meta ? (isGain
-                ? `+${(plan.meta.targetWeight - plan.meta.currentWeight).toFixed(1)} kg`
-                : `-${(plan.meta.currentWeight - plan.meta.targetWeight).toFixed(1)} kg`) : '';
+                ? `+${(plan.meta.targetWeight - plan.meta.currentWeight).toFixed(2)} kg`
+                : `-${(plan.meta.currentWeight - plan.meta.targetWeight).toFixed(2)} kg`) : '';
             const paceLabel = goal ? (isGain
                 ? (goal.pace === 'conservative' ? '精益' : goal.pace === 'moderate' ? '稳定' : '进取')
                 : (goal.pace === 'fast' ? '快速' : goal.pace === 'moderate' ? '中等' : '慢速')) : '';
@@ -146,8 +146,8 @@
             </div>
             <div class="weightloss-form">
                 <div class="md-grid weightloss-grid">
-                    <div class="md-field"><input type="number" id="planCurrentWeight" step="0.1" value="${currentWeight || ''}" placeholder=" "><label>当前体重 kg</label></div>
-                    <div class="md-field"><input type="number" id="planTargetWeight" step="0.1" placeholder=" "><label>目标体重 kg</label></div>
+                    <div class="md-field"><input type="number" id="planCurrentWeight" step="0.01" value="${currentWeight || ''}" placeholder=" "><label>当前体重 kg</label></div>
+                    <div class="md-field"><input type="number" id="planTargetWeight" step="0.01" placeholder=" "><label>目标体重 kg</label></div>
                     <div class="md-field"><input type="number" id="planHeight" step="1" value="${this.db.health?.height || ''}" placeholder=" "><label>身高 cm</label></div>
                     <div class="md-field"><select id="planActivity"><option value="sedentary">久坐</option><option value="light">轻度活动</option><option value="moderate">中等活动</option><option value="active">高强度活动</option></select><label>日常活动水平</label></div>
                     <div class="md-field"><input type="number" id="planTrainMin" value="30" step="5" placeholder=" "><label>每次运动分钟</label></div>
