@@ -209,6 +209,7 @@
 .icon-btn {
     width: 40px;
     height: 40px;
+    min-width: 40px;
     border: none;
     border-radius: var(--md-sys-shape-full);
     background: var(--md-sys-secondary-container);
@@ -217,11 +218,38 @@
     align-items: center;
     justify-content: center;
     cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    position: relative;
+    overflow: hidden;
     transition:
         transform var(--md-sys-motion-duration-medium) var(--md-expressive-spring),
-        background var(--md-sys-motion-duration-short) var(--md-sys-motion-emphasized);
+        background var(--md-sys-motion-duration-short) var(--md-sys-motion-emphasized),
+        color var(--md-sys-motion-duration-short) var(--md-sys-motion-emphasized);
 }
+.icon-btn::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: currentColor;
+    opacity: 0;
+    transition: opacity var(--md-sys-motion-duration-short) var(--md-sys-motion-emphasized);
+    pointer-events: none;
+}
+.icon-btn:hover { color: var(--md-sys-on-secondary-container); }
+.icon-btn:hover::after { opacity: var(--md-state-hover, 0.08); }
 .icon-btn:active { transform: scale(0.9); }
+.icon-btn:active::after { opacity: var(--md-state-press, 0.12); }
+.icon-btn:focus-visible {
+    outline: 3px solid color-mix(in srgb, var(--md-sys-primary) 45%, transparent);
+    outline-offset: 2px;
+}
+.icon-btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.38;
+}
+.icon-btn:disabled::after { display: none; }
+.icon-btn .material-symbols-rounded { position: relative; z-index: 1; font-size: 22px; }
 .calendar-weekdays,
 .calendar-grid {
     display: grid;

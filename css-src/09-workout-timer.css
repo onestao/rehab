@@ -59,13 +59,32 @@
     font-weight: 700;
     letter-spacing: 0;
     line-height: 1;
+    position: relative;
+    overflow: hidden;
+    -webkit-tap-highlight-color: transparent;
     transition:
         transform var(--md-sys-motion-duration-short) var(--md-sys-motion-emphasized),
         color var(--md-sys-motion-duration-short),
         background var(--md-sys-motion-duration-short),
         border-color var(--md-sys-motion-duration-short);
 }
+.timer-tts-btn::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: currentColor;
+    opacity: 0;
+    transition: opacity var(--md-sys-motion-duration-short);
+    pointer-events: none;
+}
+.timer-tts-btn:hover::after { opacity: 0.08; }
 .timer-tts-btn:active { transform: scale(0.96); }
+.timer-tts-btn:active::after { opacity: 0.12; }
+.timer-tts-btn:focus-visible {
+    outline: 2px solid rgba(255, 255, 255, 0.5);
+    outline-offset: 2px;
+}
 .timer-wakelock-btn {
     position: absolute;
     top: 10px;
@@ -75,24 +94,49 @@
     height: 32px;
     border: none;
     border-radius: var(--md-sys-shape-full);
-    background: transparent;
+    background: rgba(255, 255, 255, 0.06);
     color: rgba(255,255,255,0.62);
     display: inline-flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;
+    position: relative;
+    overflow: hidden;
+    transition:
+        background var(--md-sys-motion-duration-short),
+        transform var(--md-sys-motion-duration-short) var(--md-expressive-spring);
+}
+.timer-wakelock-btn::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: currentColor;
+    opacity: 0;
+    transition: opacity var(--md-sys-motion-duration-short);
+    pointer-events: none;
 }
 .timer-wakelock-btn .material-symbols-rounded {
     font-size: 12px;
     line-height: 1;
+    position: relative;
+    z-index: 1;
 }
+.timer-wakelock-btn:hover { background: rgba(255, 255, 255, 0.1); }
+.timer-wakelock-btn:hover::after { opacity: 0.08; }
 .timer-wakelock-btn.is-active {
     color: rgba(255,255,255,0.72);
     pointer-events: none;
 }
 .timer-wakelock-btn:active {
+    transform: scale(0.92);
     background: rgba(255,255,255,0.12);
+}
+.timer-wakelock-btn:active::after { opacity: 0.12; }
+.timer-wakelock-btn:focus-visible {
+    outline: 2px solid rgba(255, 255, 255, 0.5);
+    outline-offset: 2px;
 }
 .timer-tts-btn[data-mode="online-first"] {
     color: var(--md-sys-on-primary-container);

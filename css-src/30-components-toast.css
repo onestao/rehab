@@ -24,4 +24,75 @@
     opacity: 1;
     transform: translate(-50%, 0);
 }
+
+.app-toast {
+    position: fixed;
+    left: 50%;
+    bottom: calc(96px + env(safe-area-inset-bottom));
+    transform: translate(-50%, 12px);
+    min-width: min(88vw, 360px);
+    max-width: 92vw;
+    padding: 12px 16px;
+    border-radius: var(--md-sys-shape-lg);
+    background: var(--glass-bg-strong);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--glass-shadow-inset), var(--glass-shadow-out), var(--md-sys-elevation-3);
+    color: var(--md-sys-on-surface);
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.45;
+    text-align: center;
+    opacity: 0;
+    pointer-events: none;
+    z-index: 200;
+    transition: opacity var(--md-sys-motion-duration-short), transform var(--md-sys-motion-duration-short);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+}
+.app-toast.show {
+    opacity: 1;
+    transform: translate(-50%, 0);
+}
+.app-toast[data-type="error"] {
+    border-color: color-mix(in srgb, var(--md-sys-error) 40%, var(--glass-border));
+    background: color-mix(in srgb, var(--md-sys-error-container) 52%, transparent);
+    color: var(--md-sys-on-error-container);
+}
+.app-toast[data-type="success"] {
+    border-color: color-mix(in srgb, var(--md-sys-primary) 30%, var(--glass-border));
+}
+.app-toast-action {
+    flex: none;
+    height: 32px;
+    padding: 0 14px;
+    border: none;
+    border-radius: var(--md-sys-shape-full);
+    background: var(--md-sys-primary);
+    color: var(--md-sys-on-primary);
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+    -webkit-tap-highlight-color: transparent;
+    transition: transform var(--md-sys-motion-duration-short) var(--md-expressive-spring),
+                box-shadow var(--md-sys-motion-duration-short);
+    box-shadow: var(--md-sys-elevation-1);
+}
+.app-toast-action::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: currentColor;
+    opacity: 0;
+    transition: opacity var(--md-sys-motion-duration-short);
+    border-radius: inherit;
+}
+.app-toast-action:hover::after { opacity: var(--md-state-hover, 0.08); }
+.app-toast-action:active { transform: scale(0.94); }
+.app-toast-action:active::after { opacity: var(--md-state-press, 0.12); }
 

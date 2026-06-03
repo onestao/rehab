@@ -211,6 +211,8 @@ Object.assign(advicePanel, {
     _isComparisonTable(table) {
         if (!table || table.colCount < 3) return false;
         const lastCol = table.header.length - 1;
+        const verdictHeader = String(table.header[lastCol] || '').trim();
+        if (!/^(更优|优选|推荐|判定|判断|结论|结果|胜负|赢家|选择|建议)$/i.test(verdictHeader)) return false;
         const verdictPattern = /胜|负|优|劣|推荐|赢|更好|更佳|最佳|最差|首选|避免|✓|✗|好|差/;
         let matchCount = 0;
         for (const row of table.dataRows) {
@@ -224,7 +226,6 @@ Object.assign(advicePanel, {
         const lastCol = headers.length - 1;
         const itemA = headers[1] || '';
         const itemB = headers[2] || '';
-        const dimensionLabel = headers[0] || '维度';
 
         let winsA = 0;
         let winsB = 0;
@@ -234,15 +235,10 @@ Object.assign(advicePanel, {
             else if (new RegExp(escapeRegExp(itemB.split('(')[0].split('（')[0].trim().slice(0, 2)), 'i').test(verdict)) winsB++;
             else { winsA++; }
         }
-        const total = table.dataRows.length;
         const winnerIdx = winsA >= winsB ? 1 : 2;
         const winnerName = headers[winnerIdx] || '';
         const winnerShort = winnerName.split('(')[0].split('（')[0].trim();
-        const loserIdx = winnerIdx === 1 ? 2 : 1;
-        const loserName = headers[loserIdx] || '';
-        const loserShort = loserName.split('(')[0].split('（')[0].trim();
         const score = winnerIdx === 1 ? `${winsA} : ${winsB}` : `${winsB} : ${winsA}`;
-        const verdictClass = 'win';
 
         const getWinnerMetrics = () => {
             const metrics = [];
@@ -269,16 +265,23 @@ Object.assign(advicePanel, {
             `<div class="ai-sc-m"><div class="ai-sc-ml">${renderInline(m.label)}</div><div class="ai-sc-mv">${renderInline(m.value)}</div></div>`
         ).join('');
 
-        const loserCells = [];
-        for (const row of table.dataRows) {
-            const dim = row[0] || '';
-            const val = row[loserIdx] || '';
-            if (/热量|kcal|蛋白|脂肪|碳水|糖|烹饪|方式/i.test(dim)) {
-                loserCells.push(`<div class="ai-cc"><div class="ai-cl">${renderInline(dim)}</div><div class="ai-cv">${renderInline(val)}</div></div>`);
+        const detailCards = table.dataRows.map(row => {
+            const title = row[0] || headers[0] || '对比项';
+            const verdict = row[lastCol] || '';
+            const cells = [];
+            for (let c = 1; c < headers.length; c++) {
+                const label = headers[c] || '';
+                const value = row[c] || '';
+                cells.push(`<div class="ai-cc"><div class="ai-cl">${renderInline(label)}</div><div class="ai-cv">${renderInline(value)}</div></div>`);
             }
-        }
+            return `<div class="ai-cmp-card"><div class="ai-cmp-header"><span class="ai-cmp-vs">${renderInline(title)}</span>${verdict ? `<span class="ai-cmp-verdict win">${renderInline(verdict)}</span>` : ''}</div><div class="ai-cmp-body">${cells.join('')}</div></div>`;
+        }).join('');
 
-        return `<div class="ai-cmp-winner"><div class="ai-sc-title">${renderInline(winnerShort)} 更优 <span class="ai-sc-badge">${score} 完胜</span></div>${summaryMetricsHtml ? `<div class="ai-sc-grid">${summaryMetricsHtml}</div>` : ''}<div class="ai-sc-note">${summaryParts.length ? summaryParts.join('；') + '。' : ''}</div></div><div class="ai-cmp-cards"><div class="ai-cmp-card"><div class="ai-cmp-header"><span class="ai-cmp-vs">${renderInline(loserShort)} 对比</span><span class="ai-cmp-verdict lose">劣势</span></div><div class="ai-cmp-body">${loserCells.join('')}</div></div></div>`;
+        return `<div class="ai-cmp-winner"><div class="ai-sc-title">${renderInline(winnerShort)} 更优 <span class="ai-sc-badge">${score} 完胜</span></div>${summaryMetricsHtml ? `<div class="ai-sc-grid">${summaryMetricsHtml}</div>` : ''}<div class="ai-sc-note">${summaryParts.length ? summaryParts.join('；') + '。' : ''}</div></div><div class="ai-cmp-cards">${detailCards}</div>`;
+    },
+
+    _renderRawTablePreview(rawTable = '') {
+        return `<details class="ai-raw-table-preview"><summary>查看原始表格</summary><pre><code>${rawTable}</code></pre></details>`;
     },
 
     _renderDimensionCards(table, renderInline) {
@@ -293,6 +296,10 @@ Object.assign(advicePanel, {
             }
             return `<div class="ai-cmp-card"><div class="ai-cmp-header"><span class="ai-cmp-vs">${renderInline(title)}</span></div><div class="ai-cmp-body">${cells.join('')}</div></div>`;
         }).join('');
+    },
+
+    _renderKeyValueGrid(table, renderInline) {
+        return `<div class="ai-kv-grid">${table.dataRows.map(row => `<div class="ai-kv-item"><div class="ai-kv-k">${renderInline(row[0] || '')}</div><div class="ai-kv-v">${renderInline(row[1] || '')}</div></div>`).join('')}</div>`;
     },
 
     _renderScrollTable(table, renderInline) {
@@ -353,14 +360,19 @@ Object.assign(advicePanel, {
             if (isTableLine) {
                 const table = advicePanel._parseMarkdownTable(lines, li);
                 if (table) {
+                    const rawTable = lines.slice(li, table.endIdx).join('\n');
+                    let renderedTable = '';
                     if (inList) { out.push('</ul>'); inList = false; }
                     if (advicePanel._isComparisonTable(table)) {
-                        out.push(advicePanel._renderComparisonCards(table, renderInline));
+                        renderedTable = advicePanel._renderComparisonCards(table, renderInline);
+                    } else if (table.colCount === 2 && table.rowCount <= 8) {
+                        renderedTable = advicePanel._renderKeyValueGrid(table, renderInline);
                     } else if (table.colCount <= 4 && table.rowCount <= 6) {
-                        out.push(`<div class="ai-cmp-cards">${advicePanel._renderDimensionCards(table, renderInline)}</div>`);
+                        renderedTable = `<div class="ai-cmp-cards">${advicePanel._renderDimensionCards(table, renderInline)}</div>`;
                     } else {
-                        out.push(advicePanel._renderScrollTable(table, renderInline));
+                        renderedTable = advicePanel._renderScrollTable(table, renderInline);
                     }
+                    out.push(`${renderedTable}${advicePanel._renderRawTablePreview(rawTable)}`);
                     li = table.endIdx - 1;
                     continue;
                 }

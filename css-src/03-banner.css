@@ -5,13 +5,16 @@
     margin: 10px 16px 0;
     padding: 12px 14px;
     border-radius: 18px;
-    background: color-mix(in srgb, var(--md-sys-primary-container) 82%, white);
+    background: var(--glass-bg-strong);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--glass-border);
     color: var(--md-sys-on-primary-container);
     display: grid;
     grid-template-columns: auto 1fr auto auto;
     align-items: center;
     gap: 10px;
-    box-shadow: var(--md-sys-elevation-2);
+    box-shadow: var(--glass-shadow-inset), var(--glass-shadow-out), var(--md-sys-elevation-2);
 }
 .app-update-banner strong { display: block; font-size: 13px; }
 .app-update-banner small { display: block; font-size: 11px; opacity: 0.85; }

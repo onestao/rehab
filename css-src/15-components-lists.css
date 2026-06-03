@@ -63,9 +63,28 @@
     cursor: pointer;
     color: var(--md-sys-on-surface-variant);
     border-radius: var(--md-sys-shape-xs);
-    transition: background var(--md-sys-motion-duration-short);
+    position: relative;
+    overflow: hidden;
+    -webkit-tap-highlight-color: transparent;
+    transition: background var(--md-sys-motion-duration-short), transform var(--md-sys-motion-duration-short) var(--md-expressive-spring);
 }
-.sort-btn:active { background: var(--md-sys-surface-container-high); }
+.sort-btn::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: currentColor;
+    opacity: 0;
+    transition: opacity var(--md-sys-motion-duration-short);
+    pointer-events: none;
+}
+.sort-btn:hover::after { opacity: var(--md-state-hover, 0.08); }
+.sort-btn:active { transform: scale(0.92); background: var(--md-sys-surface-container-high); }
+.sort-btn:active::after { opacity: var(--md-state-press, 0.12); }
+.sort-btn:focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--md-sys-primary) 45%, transparent);
+    outline-offset: 2px;
+}
 .delete-btn {
     border: none;
     background: none;
@@ -73,10 +92,32 @@
     cursor: pointer;
     padding: 4px;
     border-radius: var(--md-sys-shape-sm);
-    transition: background var(--md-sys-motion-duration-short);
+    position: relative;
+    overflow: hidden;
+    -webkit-tap-highlight-color: transparent;
     opacity: 0.7;
+    transition: background var(--md-sys-motion-duration-short),
+                opacity var(--md-sys-motion-duration-short),
+                transform var(--md-sys-motion-duration-short) var(--md-expressive-spring);
 }
-.delete-btn:active { opacity: 1; background: var(--md-sys-error-container); }
+.delete-btn::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: currentColor;
+    opacity: 0;
+    transition: opacity var(--md-sys-motion-duration-short);
+    pointer-events: none;
+}
+.delete-btn:hover { opacity: 0.9; }
+.delete-btn:hover::after { opacity: 0.08; }
+.delete-btn:active { opacity: 1; transform: scale(0.92); background: var(--md-sys-error-container); }
+.delete-btn:active::after { opacity: 0.12; }
+.delete-btn:focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--md-sys-error) 45%, transparent);
+    outline-offset: 2px;
+}
 .save-lib-btn {
     border: none;
     background: none;
@@ -84,11 +125,33 @@
     cursor: pointer;
     padding: 4px;
     border-radius: var(--md-sys-shape-sm);
-    transition: background var(--md-sys-motion-duration-short);
+    position: relative;
+    overflow: hidden;
+    -webkit-tap-highlight-color: transparent;
     opacity: 0.7;
+    transition: background var(--md-sys-motion-duration-short),
+                opacity var(--md-sys-motion-duration-short),
+                transform var(--md-sys-motion-duration-short) var(--md-expressive-spring);
 }
-.save-lib-btn .material-symbols-rounded { font-size: 20px; }
-.save-lib-btn:active { opacity: 1; background: var(--md-sys-primary-container); }
+.save-lib-btn::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: currentColor;
+    opacity: 0;
+    transition: opacity var(--md-sys-motion-duration-short);
+    pointer-events: none;
+}
+.save-lib-btn .material-symbols-rounded { font-size: 20px; position: relative; z-index: 1; }
+.save-lib-btn:hover { opacity: 0.9; }
+.save-lib-btn:hover::after { opacity: 0.08; }
+.save-lib-btn:active { opacity: 1; transform: scale(0.92); background: var(--md-sys-primary-container); }
+.save-lib-btn:active::after { opacity: 0.12; }
+.save-lib-btn:focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--md-sys-primary) 45%, transparent);
+    outline-offset: 2px;
+}
 
 /* --- Collapsible month / weight history groups --- */
 .history-month-group { display: grid; gap: 4px; margin-bottom: 6px; }
