@@ -22,6 +22,13 @@ Object.assign(workout, {
         document.body.classList.toggle('is-training', this.isPlaying);
         document.body.classList.toggle('is-paused', this.isPlaying && this.isPaused);
         document.body.classList.toggle('is-cardio-mode', this.mode === 'cardio');
+        document.body.classList.toggle('is-strength-log-mode', this.mode === 'strengthLog');
+        const controls = document.querySelector('.workout-controls');
+        if (controls) {
+            const hideControls = this.mode === 'strengthLog';
+            controls.classList.toggle('hidden', hideControls);
+            controls.setAttribute('aria-hidden', String(hideControls));
+        }
         const tweak = document.getElementById('timerTweak');
         if (tweak) tweak.classList.toggle('hidden', !this.isPlaying);
         this.updatePipButton();

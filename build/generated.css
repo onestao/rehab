@@ -514,11 +514,11 @@ mark.ai-hit {
 }
 .timer-tts-btn {
     position: absolute;
-    left: 10px;
-    top: 10px;
+    left: 12px;
+    top: 22px;
     z-index: 2;
     min-width: 42px;
-    height: 24px;
+    height: 26px;
     border: 1px solid color-mix(in srgb, var(--md-sys-primary-container) 42%, transparent);
     border-radius: 8px;
     padding: 0 8px;
@@ -534,7 +534,6 @@ mark.ai-hit {
     font-weight: 700;
     letter-spacing: 0;
     line-height: 1;
-    position: relative;
     overflow: hidden;
     -webkit-tap-highlight-color: transparent;
     transition:
@@ -562,7 +561,7 @@ mark.ai-hit {
 }
 .timer-wakelock-btn {
     position: absolute;
-    top: 10px;
+    top: 19px;
     right: 10px;
     z-index: 2;
     width: 32px;
@@ -576,7 +575,6 @@ mark.ai-hit {
     justify-content: center;
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;
-    position: relative;
     overflow: hidden;
     transition:
         background var(--md-sys-motion-duration-short),
@@ -3841,23 +3839,28 @@ body.is-training .fab-pip.active {
 .skip-btn {
     position: absolute;
     right: 12px;
-    top: 12px;
+    top: 19px;
+    width: 34px;
+    height: 34px;
     opacity: 0.4;
     color: white;
     cursor: pointer;
-    padding: 6px;
+    padding: 0;
     border: none;
     background: rgba(255, 255, 255, 0.06);
     border-radius: var(--md-sys-shape-full);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     transition:
         opacity var(--md-sys-motion-duration-short),
         transform var(--md-sys-motion-duration-short) var(--md-expressive-spring),
         background var(--md-sys-motion-duration-short);
-    position: relative;
     overflow: hidden;
     -webkit-tap-highlight-color: transparent;
     outline: none;
 }
+.skip-btn .material-symbols-rounded { position: relative; z-index: 1; }
 .skip-btn::after {
     content: '';
     position: absolute;
@@ -3877,6 +3880,7 @@ body.is-training .fab-pip.active {
     outline-offset: 2px;
     opacity: 0.7;
 }
+
 
 }
 @layer components {

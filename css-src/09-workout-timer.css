@@ -39,11 +39,11 @@
 }
 .timer-tts-btn {
     position: absolute;
-    left: 10px;
-    top: 10px;
+    left: 12px;
+    top: 22px;
     z-index: 2;
     min-width: 42px;
-    height: 24px;
+    height: 26px;
     border: 1px solid color-mix(in srgb, var(--md-sys-primary-container) 42%, transparent);
     border-radius: 8px;
     padding: 0 8px;
@@ -59,7 +59,6 @@
     font-weight: 700;
     letter-spacing: 0;
     line-height: 1;
-    position: relative;
     overflow: hidden;
     -webkit-tap-highlight-color: transparent;
     transition:
@@ -87,7 +86,7 @@
 }
 .timer-wakelock-btn {
     position: absolute;
-    top: 10px;
+    top: 19px;
     right: 10px;
     z-index: 2;
     width: 32px;
@@ -101,7 +100,6 @@
     justify-content: center;
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;
-    position: relative;
     overflow: hidden;
     transition:
         background var(--md-sys-motion-duration-short),
