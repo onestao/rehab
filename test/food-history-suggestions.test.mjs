@@ -113,3 +113,15 @@ test('AI food name dedupe parser keeps only aliases from input', async () => {
 
     assert.deepEqual(JSON.parse(JSON.stringify(groups)), [{ canonical: '鸡胸肉', aliases: ['鸡胸肉', '煎鸡胸'] }]);
 });
+
+test('AI food add methods are attached with undo support', async () => {
+    const foodLog = await loadFoodLog();
+    const target = {};
+
+    foodLog.attach(target);
+
+    assert.equal(typeof target.addSingleAiFood, 'function');
+    assert.equal(typeof target.addAllAiFoods, 'function');
+    assert.equal(typeof target.rememberRecentAiFoodAdd, 'function');
+    assert.equal(typeof target.undoRecentAiFoodAdd, 'function');
+});

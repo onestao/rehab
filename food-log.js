@@ -32,6 +32,7 @@ const foodLog = {
             renderAiFoodResults: this.renderAiFoodResults,
             addSingleAiFood: this.addSingleAiFood,
             addAllAiFoods: this.addAllAiFoods,
+            rememberRecentAiFoodAdd: this.rememberRecentAiFoodAdd,
             undoRecentAiFoodAdd: this.undoRecentAiFoodAdd,
             aiFoodLog: this.aiFoodLog,
             clearAiResults: this.clearAiResults,
