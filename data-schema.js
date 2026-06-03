@@ -50,6 +50,8 @@
             this.db.aiRetryMode = this.db.aiRetryMode || 'versioned';
             this.db.prefs = this.db.prefs && typeof this.db.prefs === 'object' ? this.db.prefs : {};
             if (typeof this.db.prefs.haptics !== 'boolean') this.db.prefs.haptics = true;
+            this.db.prefs.experiments = this.db.prefs.experiments && typeof this.db.prefs.experiments === 'object' ? this.db.prefs.experiments : {};
+            if (typeof this.db.prefs.experiments.miScaleBle !== 'boolean') this.db.prefs.experiments.miScaleBle = false;
             if (!this.db.prefs.plan && this.db.prefs.rehab) {
                 this.db.prefs.plan = this.db.prefs.rehab;
                 delete this.db.prefs.rehab;

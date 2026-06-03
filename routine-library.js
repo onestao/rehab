@@ -545,14 +545,16 @@
 
             if (!content) return;
 
-            const showSettings = view === 'ai' || view === 'sync';
+            const showSettings = view === 'ai' || view === 'sync' || view === 'experiments';
             const showContent = view === 'library' || view === 'weightloss';
             if (settings) {
                 settings.classList.toggle('hidden', !showSettings);
                 const aiCard   = settings.querySelector('[data-settings="ai"]');
                 const syncCard = settings.querySelector('[data-settings="sync"]');
+                const expCard  = settings.querySelector('[data-settings="experiments"]');
                 aiCard?.classList.toggle('hidden',   view !== 'ai');
                 syncCard?.classList.toggle('hidden', view !== 'sync');
+                expCard?.classList.toggle('hidden',  view !== 'experiments');
                 settings.querySelectorAll('.profile-v6-back-row').forEach(el => el.remove());
             }
 
@@ -573,9 +575,10 @@
                 }
             }
             if (showSettings) {
-                const settingTitle = view === 'ai' ? 'AI 设置' : '云端同步';
+                const settingTitle = view === 'ai' ? 'AI 设置' : view === 'sync' ? '云端同步' : '实验功能';
                 const backBtn = `<div class="profile-v6-back-row"><button class="profile-v6-back-btn" onclick="data.setRoutineView('home');data.renderProfilePage?.()" type="button" aria-label="返回"><span class="material-symbols-rounded">arrow_back</span></button><strong class="profile-v6-back-title">${settingTitle}</strong></div>`;
                 settings.insertAdjacentHTML('afterbegin', backBtn);
+                this.syncExperimentSettingsUi?.();
             }
             clearTimeout(this._routineViewAnimationTimer);
             this._routineViewAnimationTimer = setTimeout(() => {
@@ -599,6 +602,11 @@
                 <div class="setting-row" onclick="data.setRoutineView('sync')" role="button" tabindex="0">
                     <span class="material-symbols-rounded ico">cloud_sync</span>
                     <div class="copy"><strong>云端同步</strong><small>S3 / WebDAV</small></div>
+                    <span class="material-symbols-rounded arrow">chevron_right</span>
+                </div>
+                <div class="setting-row" onclick="data.setRoutineView('experiments')" role="button" tabindex="0">
+                    <span class="material-symbols-rounded ico">science</span>
+                    <div class="copy"><strong>实验功能</strong><small>小米体重秤网页读取等不稳定能力</small></div>
                     <span class="material-symbols-rounded arrow">chevron_right</span>
                 </div>
                 <div class="setting-row" onclick="data.setRoutineView('weightloss')" role="button" tabindex="0">

@@ -98,6 +98,7 @@ rowing
 rule
 save
 schedule
+science
 search
 search_off
 self_improvement

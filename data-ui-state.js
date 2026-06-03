@@ -63,7 +63,7 @@
         },
 
         routineViewOrder() {
-            return ['home', 'library', 'weightloss', 'ai', 'sync'];
+            return ['home', 'library', 'weightloss', 'ai', 'sync', 'experiments'];
         },
 
         normalizeRoutineView(view) {
@@ -317,7 +317,7 @@
             document.getElementById('modalHeight').value = this.db.health.height || '';
             var scanBtn = document.getElementById('miScaleScanBtn');
             if (scanBtn) {
-                scanBtn.style.display = '';
+                scanBtn.style.display = this.isMiScaleExperimentEnabled?.() ? '' : 'none';
                 scanBtn.disabled = false;
             }
             window.navStack?.replaceOrPush?.({

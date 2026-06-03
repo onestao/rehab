@@ -5,6 +5,26 @@
     window.dataHealthWeight = {
         _miScaleReading: null,
 
+        isMiScaleExperimentEnabled() {
+            return !!this.db?.prefs?.experiments?.miScaleBle;
+        },
+
+        toggleMiScaleExperiment(enabled) {
+            this.db.prefs = this.db.prefs || {};
+            this.db.prefs.experiments = this.db.prefs.experiments || {};
+            this.db.prefs.experiments.miScaleBle = !!enabled;
+            this.syncExperimentSettingsUi?.();
+            this.save?.({ render: false });
+            if (window.toast) toast.show(enabled ? '已开启小米体重秤实验功能' : '已关闭小米体重秤实验功能');
+        },
+
+        syncExperimentSettingsUi() {
+            var toggle = document.getElementById('miScaleExperimentToggle');
+            if (!toggle) return;
+            toggle.checked = this.isMiScaleExperimentEnabled();
+            toggle.closest?.('.md-switch')?.setAttribute('aria-checked', String(toggle.checked));
+        },
+
         addWeight() {
             const date = document.getElementById('modalWeightDate').value || this.logicalDateKey();
             const weight = parseFloat(document.getElementById('modalWeightValue').value);
@@ -56,6 +76,10 @@
 
         scanMiScale() {
             var self = this;
+            if (!this.isMiScaleExperimentEnabled()) {
+                alert('小米体重秤读取仍是实验功能，请先在「我的 → 设置 → 实验功能」中开启。');
+                return;
+            }
             var bt = window.miScaleBluetooth;
             var support = bt && typeof bt.supportInfo === 'function'
                 ? bt.supportInfo()
