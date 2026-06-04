@@ -15,7 +15,10 @@ function loadAdvicePanel() {
                     .replace(/>/g, '&gt;')
                     .replace(/"/g, '&quot;')
                     .replace(/'/g, '&#39;');
-            }
+            },
+            logicalDateKey(date = new Date('2026-05-30T00:00:00.000Z')) { return new Date(date).toISOString().slice(0, 10); },
+            parseHistoryDate(value) { return new Date(value || '2026-05-30T00:00:00.000Z'); },
+            isCollapsed() { return false; }
         },
         window: {
             matchMedia() {
@@ -96,4 +99,27 @@ test('renderAdviceMarkdown renders small two-column metric tables as compact key
     assert.match(html, /<strong>529 kcal<\/strong>/);
     assert.match(html, /蛋白质/);
     assert.match(html, /查看原始表格/);
+});
+
+test('renderAdviceMessage previews very long historical assistant replies', () => {
+    const panel = loadAdvicePanel();
+    const longText = `${'一'.repeat(5000)}TAIL${'二'.repeat(8000)}`;
+
+    const html = panel.renderAdviceMessage({ id: 'long-1', role: 'assistant', content: longText, at: '2026-05-30T00:00:00.000Z' }, false, '');
+
+    assert.match(html, /展开完整回复/);
+    assert.doesNotMatch(html, /TAIL/);
+});
+
+test('renderAdviceMessage keeps latest or searched long assistant replies complete', () => {
+    const panel = loadAdvicePanel();
+    const longText = `${'一'.repeat(5000)}TAIL${'二'.repeat(8000)}`;
+
+    const latestHtml = panel.renderAdviceMessage({ id: 'long-1', role: 'assistant', content: longText, at: '2026-05-30T00:00:00.000Z' }, true, '');
+    const searchHtml = panel.renderAdviceMessage({ id: 'long-1', role: 'assistant', content: longText, at: '2026-05-30T00:00:00.000Z' }, false, 'TAIL');
+
+    assert.match(latestHtml, /TAIL/);
+    assert.doesNotMatch(latestHtml, /展开完整回复/);
+    assert.match(searchHtml, /TAIL/);
+    assert.doesNotMatch(searchHtml, /展开完整回复/);
 });

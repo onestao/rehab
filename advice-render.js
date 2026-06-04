@@ -414,13 +414,16 @@ Object.assign(advicePanel, {
         }
     },
 
-    renderAdviceMessages(messages) {
+    renderAdviceMessages(messages, hiddenCount = 0) {
         const currentKeyword = String(this.adviceSearchQuery || '').trim();
         if (!messages.length) {
             return currentKeyword
                 ? '<div class="empty-state advice-empty"><span class="material-symbols-rounded">search_off</span><p>没有匹配的聊天记录</p></div>'
                 : '<div class="empty-state advice-empty"><span class="material-symbols-rounded">forum</span><p>还没有 AI 建议，选择下方快捷问题开始</p></div>';
         }
+        const olderNotice = hiddenCount > 0
+            ? `<div class="advice-history-window"><button type="button" onclick="data.expandAdviceRenderWindow?.()"><span class="material-symbols-rounded">expand_less</span> 加载更早 ${hiddenCount} 条对话</button></div>`
+            : '';
         const groups = messages.reduce((acc, msg, idx) => {
             const date = this.logicalDateKey(this.parseHistoryDate(msg.at));
             if (!acc[date]) acc[date] = [];
@@ -428,7 +431,7 @@ Object.assign(advicePanel, {
             return acc;
         }, {});
         const lastVisibleIdx = messages[messages.length - 1]?.idx ?? messages.length - 1;
-        return Object.keys(groups).sort((a, b) => a.localeCompare(b)).map(date => {
+        return olderNotice + Object.keys(groups).sort((a, b) => a.localeCompare(b)).map(date => {
             const list = groups[date];
             const today = date === this.logicalDateKey();
             const collapsed = this.isCollapsed(`advice_${date}`, !today && list.every(msg => msg.idx < lastVisibleIdx - 4));
@@ -460,12 +463,28 @@ Object.assign(advicePanel, {
             ? ` · $${highlightKeyword(msg.costUsd.toFixed(4), currentKeyword)}`
             : '';
         const rawContent = String(msg.content || '');
+        const isLongAssistant = msg.role === 'assistant'
+            && !latest
+            && !currentKeyword
+            && rawContent.length > 12000;
+        const expandedLongMessage = !!(msg.id && this._expandedAdviceMessageIds?.has?.(msg.id));
+        const displayContent = isLongAssistant && !expandedLongMessage
+            ? rawContent.slice(0, 4000)
+            : rawContent;
         const routineBlocks = msg.role === 'assistant' && !msg.pending && !msg.error && typeof this.extractAdviceRoutineBlocks === 'function'
-            ? this.extractAdviceRoutineBlocks(rawContent)
+            ? this.extractAdviceRoutineBlocks(displayContent)
             : [];
         const content = msg.role === 'assistant'
-            ? (rawContent ? highlightRenderedHtml(this.renderAdviceMarkdown(rawContent), currentKeyword) : '')
-            : `<p>${highlightKeyword(rawContent, currentKeyword).replace(/\n/g, '<br>')}</p>`;
+            ? (displayContent ? highlightRenderedHtml(this.renderAdviceMarkdown(displayContent), currentKeyword) : '')
+            : `<p>${highlightKeyword(displayContent, currentKeyword).replace(/\n/g, '<br>')}</p>`;
+        const longMessageToggle = isLongAssistant && msg.id
+            ? `<div class="advice-long-message-toggle">
+                <button type="button" onclick="data.toggleAdviceMessageExpanded?.('${escapeHtml(msg.id)}')">
+                    <span class="material-symbols-rounded">${expandedLongMessage ? 'expand_less' : 'expand_more'}</span>
+                    ${expandedLongMessage ? '收起长回复' : `展开完整回复（约 ${Math.ceil(rawContent.length / 1000)}k 字）`}
+                </button>
+            </div>`
+            : '';
         const attachments = Array.isArray(msg.attachments) && msg.attachments.length
             ? `<div class="advice-message-attachments">${msg.attachments.map(att => {
                 const icon = att.kind === 'image' ? 'visibility' : att.kind === 'text' ? 'clinical_notes' : 'upload_file';
@@ -522,6 +541,7 @@ Object.assign(advicePanel, {
             </div>
             ${attachments}
             <div class="advice-bubble-content">${msg.pending ? '<div class="skeleton-line skeleton" style="width:80%"></div><div class="skeleton-line skeleton" style="width:60%"></div><div class="skeleton-line skeleton" style="width:90%"></div>' : content}</div>
+            ${longMessageToggle}
             ${routineActions}
             ${actions}
         </div>`;

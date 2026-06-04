@@ -23,6 +23,7 @@ const advicePanel = {
             openEditAdviceMessage: this.openEditAdviceMessage,
             regenerateAdviceFromEditedUser: this.regenerateAdviceFromEditedUser,
             findAssistantReplyForUser: this.findAssistantReplyForUser,
+            toggleAdviceMessageExpanded: this.toggleAdviceMessageExpanded,
             captureAdviceDraft: this.captureAdviceDraft,
             adviceSavedScrollTop: this.adviceSavedScrollTop,
             adviceSavedPageScrollOffset: this.adviceSavedPageScrollOffset,
@@ -92,6 +93,9 @@ const advicePanel = {
             adviceRangeStart: this.adviceRangeStart,
             filterByAdviceRange: this.filterByAdviceRange,
             visibleAdviceMessages: this.visibleAdviceMessages,
+            visibleAdviceWindowMessages: this.visibleAdviceWindowMessages,
+            resetAdviceRenderWindow: this.resetAdviceRenderWindow,
+            expandAdviceRenderWindow: this.expandAdviceRenderWindow,
             adviceMessageSummary: this.adviceMessageSummary,
             iconFallbackSrcs: this.iconFallbackSrcs,
             adviceModelIconHtml: this.adviceModelIconHtml,
@@ -774,6 +778,14 @@ const advicePanel = {
         try { sessionStorage.removeItem(this.DRAFT_KEY); } catch {}
     },
 
+    toggleAdviceMessageExpanded(messageId = '') {
+        if (!messageId) return;
+        this._expandedAdviceMessageIds = this._expandedAdviceMessageIds || new Set();
+        if (this._expandedAdviceMessageIds.has(messageId)) this._expandedAdviceMessageIds.delete(messageId);
+        else this._expandedAdviceMessageIds.add(messageId);
+        this.preserveAdviceScroll?.(() => this.refreshAdviceSearchResults?.());
+    },
+
     adviceSavedScrollTop() {
         if (Number.isFinite(this._adviceScrollTop)) return this._adviceScrollTop;
         try {
@@ -1243,6 +1255,7 @@ const advicePanel = {
 
     onAdviceSearchInput(el) {
         this.adviceSearchQuery = el?.value || '';
+        this.resetAdviceRenderWindow?.();
         this.captureAdviceDraft();
         this.refreshAdviceSearchResults();
     },
@@ -1250,6 +1263,7 @@ const advicePanel = {
     clearAdviceSearch() {
         this.adviceSearchQuery = '';
         this.adviceSearchOpen = false;
+        this.resetAdviceRenderWindow?.();
         this.captureAdviceDraft();
         this.captureAdviceScroll();
         this.rerenderAdvicePanel({ expandChrome: true });
@@ -1261,12 +1275,14 @@ const advicePanel = {
         if (!list) return;
         const messages = this.activeRecords(this.db.health.aiAdviceChat || []);
         const visibleMessages = this.visibleAdviceMessages(messages);
-        list.innerHTML = this.renderAdviceMessages(visibleMessages);
+        const windowed = this.visibleAdviceWindowMessages(visibleMessages);
+        list.innerHTML = this.renderAdviceMessages(windowed.messages, windowed.hiddenCount);
         if (summary) summary.textContent = this.adviceMessageSummary(messages, visibleMessages);
     },
 
     setAdviceRange(range) {
         this.adviceRange = range || 'today';
+        this.resetAdviceRenderWindow?.();
         this.saveAdviceSettings();
         this.captureAdviceDraft();
         this.captureAdviceScroll();
@@ -1362,6 +1378,29 @@ const advicePanel = {
             if (msg.role === 'user' && localIdx + 1 < ranged.length) matched.add(localIdx + 1);
         });
         return ranged.filter((_, localIdx) => matched.has(localIdx));
+    },
+
+    resetAdviceRenderWindow() {
+        this._adviceRenderLimit = 80;
+    },
+
+    visibleAdviceWindowMessages(messages = []) {
+        const limit = Math.max(20, Number(this._adviceRenderLimit || 80));
+        if (this.adviceSearchQuery || messages.length <= limit) {
+            return { messages, hiddenCount: 0, totalCount: messages.length };
+        }
+        return {
+            messages: messages.slice(-limit),
+            hiddenCount: Math.max(0, messages.length - limit),
+            totalCount: messages.length
+        };
+    },
+
+    expandAdviceRenderWindow(step = 80) {
+        const current = Math.max(20, Number(this._adviceRenderLimit || 80));
+        this._adviceRenderLimit = current + Math.max(20, Number(step) || 80);
+        this.captureAdviceDraft?.();
+        this.rerenderAdvicePanel?.();
     },
 
     adviceMessageSummary(messages, visibleMessages) {
@@ -2112,6 +2151,7 @@ const advicePanel = {
     renderAdvicePanel() {
         const messages = this.activeRecords(this.db.health.aiAdviceChat || []);
         const visibleMessages = this.visibleAdviceMessages(messages);
+        const windowedMessages = this.visibleAdviceWindowMessages(visibleMessages);
         const rawDraft = this.restoreAdviceDraft();
         const draft = this.escapeHtml(rawDraft);
         const goalType = this.db.health.dietGoal?.goalType || this.db.health.goalType || 'loss';
@@ -2152,7 +2192,7 @@ const advicePanel = {
             </div>
             <div class="advice-v6-filter-bar">${this.renderAdviceFilterControls()}</div>
             <div class="sect-head"><span class="t">对话</span><button class="a" onclick="data.clearAdviceChat?.()" type="button">清空</button></div>
-            <div class="ai-msg-list">${this.renderAdviceMessages(visibleMessages)}</div>
+            <div class="ai-msg-list advice-chat-list">${this.renderAdviceMessages(windowedMessages.messages, windowedMessages.hiddenCount)}</div>
             <div class="advice-scroll-rail" aria-label="对话快速跳转">
                 <button class="advice-rail-btn" onclick="data.scrollAdviceToTop()" type="button" aria-label="跳到最顶端" title="跳到最顶端"><span class="material-symbols-rounded">vertical_align_top</span></button>
                 <button class="advice-rail-btn" onclick="data.scrollAdviceToPrevBubble()" type="button" aria-label="上一段对话" title="上一段对话"><span class="material-symbols-rounded">expand_less</span></button>

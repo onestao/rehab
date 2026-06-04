@@ -58,6 +58,9 @@ function loadAdvicePanelHarness() {
         findAssistantReplyForUser: context.__advicePanel.findAssistantReplyForUser,
         adviceRangeStart: context.__advicePanel.adviceRangeStart,
         visibleAdviceMessages: context.__advicePanel.visibleAdviceMessages,
+        visibleAdviceWindowMessages: context.__advicePanel.visibleAdviceWindowMessages,
+        resetAdviceRenderWindow: context.__advicePanel.resetAdviceRenderWindow,
+        expandAdviceRenderWindow: context.__advicePanel.expandAdviceRenderWindow,
         adviceConversationContext: context.__advicePanel.adviceConversationContext,
         sendAiAdvice: context.__advicePanel.sendAiAdvice,
         regenerateAdviceFromEditedUser: context.__advicePanel.regenerateAdviceFromEditedUser
@@ -97,4 +100,41 @@ test('advice conversation context excludes inactive overwritten answer versions'
     const context = data.adviceConversationContext();
 
     assert.equal(JSON.stringify(context.map(msg => msg.content)), JSON.stringify(['old question', 'active answer']));
+});
+
+test('advice message window renders recent history by default and can expand', () => {
+    const data = loadAdvicePanelHarness();
+    const messages = Array.from({ length: 120 }, (_, idx) => ({
+        id: `m${idx}`,
+        role: idx % 2 ? 'assistant' : 'user',
+        content: `message ${idx}`,
+        at: `2026-05-30T00:${String(idx % 60).padStart(2, '0')}:00.000Z`,
+        deleted: false,
+        updatedAt: idx
+    }));
+
+    data.resetAdviceRenderWindow();
+    const first = data.visibleAdviceWindowMessages(messages);
+
+    assert.equal(first.messages.length, 80);
+    assert.equal(first.hiddenCount, 40);
+    assert.equal(first.messages[0].id, 'm40');
+
+    data.rerenderAdvicePanel = () => {};
+    data.expandAdviceRenderWindow();
+    const expanded = data.visibleAdviceWindowMessages(messages);
+
+    assert.equal(expanded.messages.length, 120);
+    assert.equal(expanded.hiddenCount, 0);
+});
+
+test('advice message window does not hide search matches', () => {
+    const data = loadAdvicePanelHarness();
+    data.adviceSearchQuery = 'early';
+    const messages = Array.from({ length: 120 }, (_, idx) => ({ id: `m${idx}`, content: idx === 0 ? 'early match' : 'other' }));
+
+    const windowed = data.visibleAdviceWindowMessages(messages);
+
+    assert.equal(windowed.messages.length, 120);
+    assert.equal(windowed.hiddenCount, 0);
 });

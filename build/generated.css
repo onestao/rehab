@@ -9489,6 +9489,14 @@ body.is-training .fab-pip.active {
 .ai-insight-action:active { transform: scale(.96); }
 
 .ai-msg-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+.advice-history-window { display: flex; justify-content: center; padding: 2px 0 6px; }
+.advice-history-window button { display: inline-flex; align-items: center; gap: 4px; min-height: 36px; padding: 6px 14px; border: 1px solid var(--glass-border); border-radius: 999px; background: var(--glass-bg-strong); color: var(--md-sys-on-surface-variant); font-size: 11px; font-weight: 600; cursor: pointer; box-shadow: var(--glass-shadow-inset); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); transition: transform .16s var(--md-sys-motion-spring), background .2s ease, color .2s ease; }
+.advice-history-window button:active { transform: scale(.96); background: var(--md-sys-primary-container); color: var(--md-sys-on-primary-container); }
+.advice-history-window .material-symbols-rounded { font-size: 16px; }
+.advice-long-message-toggle { display: flex; justify-content: flex-start; margin: -2px 0 6px; }
+.advice-long-message-toggle button { display: inline-flex; align-items: center; gap: 4px; min-height: 36px; padding: 5px 12px; border: 1px solid var(--glass-border); border-radius: 999px; background: var(--glass-bg-strong); color: var(--md-sys-primary); font-size: 11px; font-weight: 700; cursor: pointer; box-shadow: var(--glass-shadow-inset); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); transition: transform .16s var(--md-sys-motion-spring), background .2s ease, color .2s ease; }
+.advice-long-message-toggle button:active { transform: scale(.96); background: var(--md-sys-primary-container); color: var(--md-sys-on-primary-container); }
+.advice-long-message-toggle .material-symbols-rounded { font-size: 15px; }
 .ai-msg { max-width: 88%; padding: 10px 14px; border-radius: 18px; font-size: 12px; line-height: 1.5; }
 .ai-msg.user { background: var(--md-sys-primary-container); color: var(--md-sys-on-primary-container); margin-left: auto; border-bottom-right-radius: 4px; }
 .ai-msg.ai { background: var(--glass-bg-strong); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border: 1px solid var(--glass-border); color: var(--md-sys-on-surface); margin-right: auto; border-bottom-left-radius: 4px; box-shadow: var(--glass-shadow-inset); }
