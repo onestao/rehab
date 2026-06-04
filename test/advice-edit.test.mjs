@@ -15,6 +15,8 @@ function loadAdvicePanelHarness() {
         localStorage: { getItem: () => null, setItem: () => {} },
         sessionStorage: { getItem: () => null, setItem: () => {}, removeItem: () => {} },
         requestAnimationFrame: (fn) => fn(),
+        setTimeout: () => 0,
+        clearTimeout: () => {},
         navigator: { maxTouchPoints: 0 },
         performance: { now: () => 0 },
         ai: {
@@ -74,6 +76,15 @@ function loadAdvicePanelHarness() {
         resetAdviceRenderWindow: context.__advicePanel.resetAdviceRenderWindow,
         expandAdviceRenderWindow: context.__advicePanel.expandAdviceRenderWindow,
         _adviceMessageList: context.__advicePanel._adviceMessageList,
+        bindAdviceScrollListener: context.__advicePanel.bindAdviceScrollListener,
+        _handleAdviceStreamScroll: context.__advicePanel._handleAdviceStreamScroll,
+        isAdvicePageActive: () => true,
+        captureAdviceScroll: () => {},
+        _handleAdviceTopChromeScroll: () => {},
+        _handleAdviceTopChromePull: () => {},
+        syncAdviceTopChromeToScroll: () => {},
+        applyAdviceTopChromeOffset: () => {},
+        pauseStreamForScroll: context.__advicePanel.pauseStreamForScroll,
         adviceConversationContext: context.__advicePanel.adviceConversationContext,
         renderAdvicePanel: context.__advicePanel.renderAdvicePanel,
         renderAdviceMessages: () => '',
@@ -199,4 +210,35 @@ test('advice panel attach exposes v6 message list helper for runtime scrolling',
     const data = loadAdvicePanelHarness();
 
     assert.equal(typeof data._adviceMessageList, 'function');
+});
+
+test('touch intent marks stream as user-paused when user scrolls away', () => {
+    const data = loadAdvicePanelHarness();
+    data._adviceSending = true;
+    data._adviceUserScrollPaused = false;
+    data._adviceStreamUi = 'streaming';
+    data.setAdviceStreamUiState = (state) => { data._adviceStreamUi = state; };
+    data.showAdviceNewMessageButton = () => {};
+    data._activeStreamRenderer = { pause: () => {}, resume: () => {} };
+
+    data._adviceScrollContainer = () => ({
+        scrollHeight: 2000,
+        clientHeight: 600,
+        scrollTop: 0,
+        addEventListener: (name, fn) => { if (name === 'touchmove') data.__touchMove = fn; },
+        removeEventListener: () => {}
+    });
+    data._adviceMessageList = () => ({
+        scrollTop: 0,
+        scrollHeight: 2000,
+        clientHeight: 600,
+        closest: () => ({ querySelector: () => null, addEventListener: () => {} })
+    });
+
+    data.bindAdviceScrollListener();
+    data._adviceUserScrollIntent = true;
+    data._handleAdviceStreamScroll({ scrollHeight: 2000, clientHeight: 600, scrollTop: 200 });
+
+    assert.equal(data._adviceStreamUi, 'paused');
+    assert.equal(data._adviceUserScrollPaused, true);
 });

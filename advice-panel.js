@@ -876,6 +876,10 @@ const advicePanel = {
             this._adviceScrollEl.removeEventListener('wheel', this._adviceOnUserIntent);
             this._adviceScrollEl.removeEventListener('keydown', this._adviceOnUserIntent);
         }
+        if (this._adviceScrollEl && this._adviceOnTouchIntent) {
+            this._adviceScrollEl.removeEventListener('touchstart', this._adviceOnTouchIntent);
+            this._adviceScrollEl.removeEventListener('touchmove', this._adviceOnTouchIntent);
+        }
         if (this._adviceScrollEl && this._adviceOnTopChromeTouchMove) {
             this._adviceScrollEl.removeEventListener('touchmove', this._adviceOnTopChromeTouchMove);
         }
@@ -907,6 +911,13 @@ const advicePanel = {
                 this._adviceUserScrollIntent = false;
             }, 600);
         };
+        this._adviceOnTouchIntent = () => {
+            this._adviceUserScrollIntent = true;
+            clearTimeout(this._adviceUserScrollIntentTimer);
+            this._adviceUserScrollIntentTimer = setTimeout(() => {
+                this._adviceUserScrollIntent = false;
+            }, 600);
+        };
         const markTouchIntent = () => {
             this._adviceUserScrollIntent = true;
             clearTimeout(this._adviceUserScrollIntentTimer);
@@ -925,6 +936,8 @@ const advicePanel = {
         scroller.addEventListener('scroll', this._adviceOnScroll, { passive: true });
         scroller.addEventListener('wheel', this._adviceOnUserIntent, { passive: true });
         scroller.addEventListener('keydown', this._adviceOnUserIntent, { passive: true });
+        scroller.addEventListener('touchstart', this._adviceOnTouchIntent, { passive: true });
+        scroller.addEventListener('touchmove', this._adviceOnTouchIntent, { passive: true });
         this._adviceScrollEl = scroller;
         const chrome = list.closest('.advice-chat-shell')?.querySelector('.advice-top-chrome');
         const shell = list.closest('.advice-chat-shell');
