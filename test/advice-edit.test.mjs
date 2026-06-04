@@ -6,7 +6,12 @@ import vm from 'node:vm';
 function loadAdvicePanelHarness() {
     const context = {
         window: {},
-        document: { querySelector: () => null, getElementById: () => null },
+        document: {
+            /** @returns {any} */
+            querySelector: () => null,
+            /** @returns {any} */
+            getElementById: () => null
+        },
         localStorage: { getItem: () => null, setItem: () => {} },
         sessionStorage: { getItem: () => null, setItem: () => {}, removeItem: () => {} },
         requestAnimationFrame: (fn) => fn(),
@@ -31,7 +36,14 @@ function loadAdvicePanelHarness() {
     vm.createContext(context);
     const code = fs.readFileSync(new URL('../advice-panel.js', import.meta.url), 'utf8');
     vm.runInContext(`${code}\nthis.__advicePanel = advicePanel;`, context);
+    const escapeHtml = (value) => String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
     const data = {
+        __context: context,
         db: {
             health: {
                 aiAdviceChat: /** @type {any[]} */ ([
@@ -61,7 +73,21 @@ function loadAdvicePanelHarness() {
         visibleAdviceWindowMessages: context.__advicePanel.visibleAdviceWindowMessages,
         resetAdviceRenderWindow: context.__advicePanel.resetAdviceRenderWindow,
         expandAdviceRenderWindow: context.__advicePanel.expandAdviceRenderWindow,
+        _adviceMessageList: context.__advicePanel._adviceMessageList,
         adviceConversationContext: context.__advicePanel.adviceConversationContext,
+        renderAdvicePanel: context.__advicePanel.renderAdvicePanel,
+        renderAdviceMessages: () => '',
+        renderAdviceFilterControls: () => '',
+        renderAdviceModelChip: () => '',
+        renderAdviceAttachmentChips: () => '',
+        renderAdviceAttachmentInputs: () => '',
+        renderAdviceAttachmentControls: () => '',
+        restoreAdviceDraft: () => '',
+        todayMacros: () => ({ pro: 0, carb: 0, fat: 0 }),
+        sortedWeights: () => [],
+        diagnoseInsight: () => null,
+        buildPlanAnalytics: () => ({}),
+        escapeHtml,
         sendAiAdvice: context.__advicePanel.sendAiAdvice,
         regenerateAdviceFromEditedUser: context.__advicePanel.regenerateAdviceFromEditedUser
     };
@@ -137,4 +163,40 @@ test('advice message window does not hide search matches', () => {
 
     assert.equal(windowed.messages.length, 120);
     assert.equal(windowed.hiddenCount, 0);
+});
+
+test('v6 advice panel does not reuse legacy nested chat scroll class', () => {
+    const data = loadAdvicePanelHarness();
+
+    const html = data.renderAdvicePanel();
+
+    assert.match(html, /class="ai-msg-list advice-v6-chat-list"/);
+    assert.doesNotMatch(html, /class="ai-msg-list advice-chat-list"/);
+});
+
+test('advice message list selector prefers v6 chat list over legacy chat list', () => {
+    const data = loadAdvicePanelHarness();
+    const v6 = { id: 'v6' };
+    const legacy = { id: 'legacy' };
+    const originalDocument = data.__context.document;
+    try {
+        data.__context.document = {
+            getElementById() { return null; },
+            querySelector(selector) {
+                if (selector === '#ai-coach .advice-v6-chat-list') return v6;
+                if (selector === '.advice-chat-list') return legacy;
+                return null;
+            }
+        };
+
+        assert.equal(data._adviceMessageList(), v6);
+    } finally {
+        data.__context.document = originalDocument;
+    }
+});
+
+test('advice panel attach exposes v6 message list helper for runtime scrolling', () => {
+    const data = loadAdvicePanelHarness();
+
+    assert.equal(typeof data._adviceMessageList, 'function');
 });

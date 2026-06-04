@@ -138,6 +138,7 @@ const advicePanel = {
             scrollAdviceToBottom: this.scrollAdviceToBottom,
             scrollAdviceToPrevBubble: this.scrollAdviceToPrevBubble,
             scrollAdviceToNextBubble: this.scrollAdviceToNextBubble,
+            _adviceMessageList: this._adviceMessageList,
             _adviceScrollContainer: this._adviceScrollContainer,
             _adviceCurrentScrollY: this._adviceCurrentScrollY,
             _adviceMaxScrollY: this._adviceMaxScrollY,
@@ -547,8 +548,7 @@ const advicePanel = {
     },
 
     _adviceScrollContainer() {
-        const seed = document.querySelector('#ai-coach .ai-msg-list')
-            || document.querySelector('.advice-chat-list')
+        const seed = this._adviceMessageList?.()
             || document.querySelector('#ai-coach .advice-bubble');
         let el = seed;
         while (el && el !== document.body) {
@@ -560,6 +560,12 @@ const advicePanel = {
             el = el.parentElement;
         }
         return document.scrollingElement || document.documentElement;
+    },
+
+    _adviceMessageList() {
+        return document.querySelector('#ai-coach .advice-v6-chat-list')
+            || document.querySelector('.advice-chat-list')
+            || document.querySelector('#ai-coach .ai-msg-list');
     },
 
     _adviceCurrentScrollY(scroller) {
@@ -808,17 +814,18 @@ const advicePanel = {
         }
     },
 
-    isAdvicePageActive(el = document.querySelector('.advice-chat-list')) {
+    isAdvicePageActive(el = this._adviceMessageList?.()) {
         const page = el?.closest?.('.page');
         return !page || page.classList.contains('active');
     },
 
     captureAdviceScroll() {
-        const list = document.querySelector('.advice-chat-list');
+        const list = this._adviceMessageList?.();
         if (!list) return;
         if (!this.isAdvicePageActive(list)) return;
-        const maxTop = Math.max(0, list.scrollHeight - list.clientHeight);
-        const top = Math.max(0, Math.min(list.scrollTop || 0, maxTop));
+        const scroller = this._adviceScrollContainer();
+        const maxTop = this._adviceMaxScrollY(scroller);
+        const top = Math.max(0, Math.min(this._adviceCurrentScrollY(scroller), maxTop));
         this._adviceScrollTop = top;
         try { sessionStorage.setItem(this.SCROLL_KEY, String(top)); } catch {}
 
@@ -830,13 +837,13 @@ const advicePanel = {
     },
 
     restoreAdviceScroll() {
-        const list = document.querySelector('.advice-chat-list');
+        const list = this._adviceMessageList?.();
         if (!list) return;
         if (!this.isAdvicePageActive(list)) return;
         const savedTop = this.adviceSavedScrollTop();
         if (Number.isFinite(savedTop)) {
-            const maxTop = Math.max(0, list.scrollHeight - list.clientHeight);
-            list.scrollTop = Math.max(0, Math.min(savedTop, maxTop));
+            const scroller = this._adviceScrollContainer();
+            this._adviceSetScrollY(scroller, Math.max(0, Math.min(savedTop, this._adviceMaxScrollY(scroller))), false);
         }
 
         const savedPageOffset = this.adviceSavedPageScrollOffset();
@@ -847,7 +854,7 @@ const advicePanel = {
         window.scrollTo({ top: Math.min(cardTop + savedPageOffset, maxWindowTop), behavior: 'auto' });
     },
 
-    syncAdviceTopChromeToScroll(list = document.querySelector('.advice-chat-list')) {
+    syncAdviceTopChromeToScroll(list = this._adviceMessageList?.()) {
         if (!list || !this.isAdvicePageActive(list)) return;
         const maxOffset = this.measureAdviceTopChrome(list);
         const nextOffset = Math.min(Math.max(0, list.scrollTop || 0), maxOffset);
@@ -857,10 +864,11 @@ const advicePanel = {
     },
 
     bindAdviceScrollListener() {
-        const list = document.querySelector('.advice-chat-list');
+        const list = this._adviceMessageList?.();
         if (!list) return;
         if (!this.isAdvicePageActive(list)) return;
-        if (this._adviceScrollEl === list) return;
+        const scroller = this._adviceScrollContainer();
+        if (this._adviceScrollEl === scroller) return;
         if (this._adviceScrollEl && this._adviceOnScroll) {
             this._adviceScrollEl.removeEventListener('scroll', this._adviceOnScroll);
         }
@@ -889,7 +897,7 @@ const advicePanel = {
         this._adviceOnScroll = () => {
             this.captureAdviceScroll();
             this._handleAdviceTopChromeScroll(list);
-            this._handleAdviceStreamScroll(list);
+            this._handleAdviceStreamScroll(scroller);
         };
         this._adviceOnUserIntent = event => {
             this._adviceUserScrollIntent = true;
@@ -914,10 +922,10 @@ const advicePanel = {
             markTouchIntent();
             this._handleAdviceTopChromePull(list, event);
         };
-        list.addEventListener('scroll', this._adviceOnScroll, { passive: true });
-        list.addEventListener('wheel', this._adviceOnUserIntent, { passive: true });
-        list.addEventListener('keydown', this._adviceOnUserIntent, { passive: true });
-        this._adviceScrollEl = list;
+        scroller.addEventListener('scroll', this._adviceOnScroll, { passive: true });
+        scroller.addEventListener('wheel', this._adviceOnUserIntent, { passive: true });
+        scroller.addEventListener('keydown', this._adviceOnUserIntent, { passive: true });
+        this._adviceScrollEl = scroller;
         const chrome = list.closest('.advice-chat-shell')?.querySelector('.advice-top-chrome');
         const shell = list.closest('.advice-chat-shell');
         shell?.addEventListener('touchstart', this._adviceOnTopChromeTouchStart, { passive: true, capture: true });
@@ -943,7 +951,7 @@ const advicePanel = {
         requestAnimationFrame(() => this.syncAdviceTopChromeToScroll(list));
     },
 
-    measureAdviceTopChrome(list = document.querySelector('.advice-chat-list')) {
+    measureAdviceTopChrome(list = this._adviceMessageList?.()) {
         const chrome = list?.closest?.('.advice-chat-shell')?.querySelector?.('.advice-top-chrome');
         const inner = chrome?.querySelector?.('.advice-top-chrome-inner');
         if (!chrome || !inner) return 0;
@@ -952,7 +960,7 @@ const advicePanel = {
         return height;
     },
 
-    applyAdviceTopChromeOffset(list = document.querySelector('.advice-chat-list'), offset = 0) {
+    applyAdviceTopChromeOffset(list = this._adviceMessageList?.(), offset = 0) {
         const chrome = list?.closest?.('.advice-chat-shell')?.querySelector?.('.advice-top-chrome');
         if (!chrome) return;
         const maxOffset = this.measureAdviceTopChrome(list);
@@ -963,7 +971,7 @@ const advicePanel = {
         chrome.classList.toggle('is-collapsed', next >= maxOffset - 1);
     },
 
-    holdAdviceTopChrome(list = document.querySelector('.advice-chat-list'), expand = true) {
+    holdAdviceTopChrome(list = this._adviceMessageList?.(), expand = true) {
         this._adviceTopChromeHoldUntil = performance.now() + 900;
         this._adviceTopChromeLastScrollTop = list?.scrollTop || 0;
         this.applyAdviceTopChromeOffset(list, expand ? 0 : this._adviceTopChromeOffset || 0);
@@ -972,7 +980,7 @@ const advicePanel = {
     rerenderAdvicePanel(options = {}) {
         const { expandChrome = false, focusSearch = false, refreshMessages = true } = options;
         this._adviceTopChromeHoldUntil = performance.now() + 900;
-        const list = document.querySelector('.advice-chat-list');
+        const list = this._adviceMessageList?.();
         const chromeInner = document.querySelector('.advice-top-chrome-inner');
         if (!list || !chromeInner) {
             this.renderAiCoachPage?.() || this.renderRoutines?.();
@@ -1270,7 +1278,7 @@ const advicePanel = {
     },
 
     refreshAdviceSearchResults() {
-        const list = document.querySelector('.advice-chat-list');
+        const list = this._adviceMessageList?.();
         const summary = document.getElementById('adviceMessageSummary');
         if (!list) return;
         const messages = this.activeRecords(this.db.health.aiAdviceChat || []);
@@ -1434,15 +1442,17 @@ const advicePanel = {
     },
 
     preserveAdviceScroll(fn) {
-        const list = document.querySelector('.advice-chat-list');
-        const beforeTop = list?.scrollTop || 0;
-        const beforeHeight = list?.scrollHeight || 0;
+        const list = this._adviceMessageList?.();
+        const scroller = this._adviceScrollContainer?.();
+        const beforeTop = this._adviceCurrentScrollY?.(scroller) || 0;
+        const beforeHeight = scroller?.scrollHeight || list?.scrollHeight || 0;
         fn();
         requestAnimationFrame(() => {
-            const nextList = document.querySelector('.advice-chat-list');
+            const nextList = this._adviceMessageList?.();
             if (!nextList) return;
-            const heightDelta = nextList.scrollHeight - beforeHeight;
-            nextList.scrollTop = Math.max(0, beforeTop + heightDelta);
+            const nextScroller = this._adviceScrollContainer?.();
+            const heightDelta = (nextScroller?.scrollHeight || nextList.scrollHeight) - beforeHeight;
+            this._adviceSetScrollY?.(nextScroller, Math.max(0, beforeTop + heightDelta), false);
         });
     },
 
@@ -1606,8 +1616,8 @@ const advicePanel = {
                 window.toast?.show?.('当前模型未验证支持图片，仍将尝试识别', 'info');
             }
         }
-        const list = document.querySelector('.advice-chat-list');
-        this._adviceFollowStream = !list || (list.scrollHeight - list.clientHeight - list.scrollTop) < 180;
+        const scroller = this._adviceScrollContainer?.();
+        this._adviceFollowStream = !scroller || (this._adviceMaxScrollY(scroller) - this._adviceCurrentScrollY(scroller)) < 180;
         this._adviceUserScrollPaused = false;
         const isOverride = !!ai.overrideModel && (
             ai.overrideModel.model !== ai.cfg.model ||
@@ -2192,7 +2202,7 @@ const advicePanel = {
             </div>
             <div class="advice-v6-filter-bar">${this.renderAdviceFilterControls()}</div>
             <div class="sect-head"><span class="t">对话</span><button class="a" onclick="data.clearAdviceChat?.()" type="button">清空</button></div>
-            <div class="ai-msg-list advice-chat-list">${this.renderAdviceMessages(windowedMessages.messages, windowedMessages.hiddenCount)}</div>
+            <div class="ai-msg-list advice-v6-chat-list">${this.renderAdviceMessages(windowedMessages.messages, windowedMessages.hiddenCount)}</div>
             <div class="advice-scroll-rail" aria-label="对话快速跳转">
                 <button class="advice-rail-btn" onclick="data.scrollAdviceToTop()" type="button" aria-label="跳到最顶端" title="跳到最顶端"><span class="material-symbols-rounded">vertical_align_top</span></button>
                 <button class="advice-rail-btn" onclick="data.scrollAdviceToPrevBubble()" type="button" aria-label="上一段对话" title="上一段对话"><span class="material-symbols-rounded">expand_less</span></button>

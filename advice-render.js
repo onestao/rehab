@@ -398,14 +398,20 @@ Object.assign(advicePanel, {
     },
 
     scrollAdviceToLatest(force = false, behavior = force ? 'smooth' : 'auto') {
-        const list = document.querySelector('.advice-chat-list');
+        const list = this._adviceMessageList?.()
+            || document.querySelector('.advice-chat-list')
+            || document.querySelector('#ai-coach .ai-msg-list');
         if (list) {
-            const distance = list.scrollHeight - list.clientHeight - list.scrollTop;
+            const scroller = this._adviceScrollContainer?.() || list;
+            const scrollTop = this._adviceCurrentScrollY?.(scroller) ?? (scroller.scrollTop || 0);
+            const maxScroll = this._adviceMaxScrollY?.(scroller) ?? Math.max(0, scroller.scrollHeight - scroller.clientHeight);
+            const distance = maxScroll - scrollTop;
             if (force || distance < 180 || this._adviceFollowStream) {
                 if (!force && this._adviceUserScrollPaused) return;
-                const scrollable = getComputedStyle(list).overflowY !== 'visible' && list.scrollHeight > list.clientHeight + 2;
+                const isDoc = scroller === document.scrollingElement || scroller === document.documentElement || scroller === document.body;
+                const scrollable = isDoc || (getComputedStyle(scroller).overflowY !== 'visible' && scroller.scrollHeight > scroller.clientHeight + 2);
                 if (scrollable) {
-                    list.scrollTo({ top: list.scrollHeight, behavior });
+                    this._adviceSetScrollY?.(scroller, maxScroll, behavior !== 'auto');
                     return;
                 }
                 const latest = list.querySelector('[data-advice-latest="true"]') || list.lastElementChild;
