@@ -58,6 +58,7 @@ const advicePanel = {
             renderAdviceModelPicker: this.renderAdviceModelPicker,
             setAdviceRange: this.setAdviceRange,
             toggleAdviceContext: this.toggleAdviceContext,
+            setAdviceContextMode: this.setAdviceContextMode,
             toggleAdviceContextPanel: this.toggleAdviceContextPanel,
             toggleAdviceV6Insights: this.toggleAdviceV6Insights,
             toggleAdviceSearch: this.toggleAdviceSearch,
@@ -107,6 +108,8 @@ const advicePanel = {
             adviceConversationContext: this.adviceConversationContext,
             buildAdviceMessages: this.buildAdviceMessages,
             parsePromptTargetDate: this.parsePromptTargetDate,
+            classifyAdviceFailure: this.classifyAdviceFailure,
+            renderAdviceErrorRecovery: this.renderAdviceErrorRecovery,
             preserveAdviceScroll: this.preserveAdviceScroll,
             renderAdviceMarkdown: this.renderAdviceMarkdown,
             renderAdviceMessages: this.renderAdviceMessages,
@@ -209,6 +212,10 @@ const advicePanel = {
                 this.adviceContexts = next;
             }
 
+            if (parsed.contextMode === 'auto' || parsed.contextMode === 'light' || parsed.contextMode === 'none') {
+                this.adviceContextMode = parsed.contextMode;
+            }
+
             if (typeof parsed.model === 'string' && parsed.model.trim()) {
                 this.adviceModel = parsed.model;
             }
@@ -234,6 +241,7 @@ const advicePanel = {
                     weight: !!contexts.weight,
                     goal: !!contexts.goal
                 },
+                contextMode: ['auto', 'light', 'none'].includes(this.adviceContextMode) ? this.adviceContextMode : 'auto',
                 model: this.adviceModel || '__current__',
                 templateId: this.db.aiTemplateActiveId || '',
                 retryMode: this.db.aiRetryMode || 'versioned'
@@ -1319,6 +1327,14 @@ const advicePanel = {
         this.rerenderAdvicePanel({ expandChrome: true, refreshMessages: false });
     },
 
+    setAdviceContextMode(mode = 'auto') {
+        this.adviceContextMode = ['auto', 'light', 'none'].includes(mode) ? mode : 'auto';
+        this.saveAdviceSettings();
+        this.captureAdviceDraft();
+        this.captureAdviceScroll();
+        this.rerenderAdvicePanel({ expandChrome: true, refreshMessages: false });
+    },
+
     toggleAdviceContextPanel() {
         this.adviceContextOpen = !this.adviceContextOpen;
         this.captureAdviceDraft();
@@ -1433,6 +1449,7 @@ const advicePanel = {
     },
 
     adviceConversationContext(limit = 12) {
+        if (limit <= 0) return [];
         const messages = this.visibleAdviceMessages(this.activeRecords(this.db.health.aiAdviceChat || []));
         const today = this.logicalDateKey();
         const todayMessages = messages.filter(msg => this.logicalDateKey(this.parseHistoryDate(msg.at)) === today);
@@ -1680,9 +1697,12 @@ const advicePanel = {
         this._activeStreamRenderer = null;
         this._streamRenderers = this._streamRenderers || {};
         this.setAdviceStreamUiState('streaming');
+        let requestMessages = [];
         try {
-            const baseMessages = this.buildAdviceMessages(effectivePrompt, model);
+            const contextMode = ['auto', 'light', 'none'].includes(options?.contextMode || this.adviceContextMode) ? (options?.contextMode || this.adviceContextMode) : 'auto';
+            const baseMessages = this.buildAdviceMessages(effectivePrompt, model, { contextMode });
             const messages = this.applyAdviceAttachmentsToMessages?.(baseMessages, attachments) || baseMessages;
+            requestMessages = messages;
             let full = '';
             let _lastRender = 0;
             let _pendingFrame = 0;
@@ -1790,7 +1810,8 @@ const advicePanel = {
             });
         } catch (e) {
             const idx = this.db.health.aiAdviceChat.findIndex(msg => msg.id === pendingId);
-            const failed = { id: pendingId, role: 'assistant', content: `分析失败：${window.toast ? toast.sanitize(e) : e.message}`, at: new Date().toISOString(), model, provider, temporaryModel: isOverride, error: true, retryPrompt: prompt, deleted: false, updatedAt: Date.now(), replyToId, versionIdx: baseVersionIdx, versionActive: options?.versionActive !== false, versionPinned: !!options?.versionPinned };
+            const failure = this.classifyAdviceFailure?.(e, requestMessages || [], model) || { content: `分析失败：${window.toast ? toast.sanitize(e) : e.message}`, info: {} };
+            const failed = { id: pendingId, role: 'assistant', content: failure.content, at: new Date().toISOString(), model, provider, temporaryModel: isOverride, error: true, errorInfo: failure.info, retryPrompt: prompt, deleted: false, updatedAt: Date.now(), replyToId, versionIdx: baseVersionIdx, versionActive: options?.versionActive !== false, versionPinned: !!options?.versionPinned };
             if (idx >= 0) this.db.health.aiAdviceChat[idx] = failed;
             else this.db.health.aiAdviceChat.push(failed);
             this.save();
@@ -1964,7 +1985,7 @@ const advicePanel = {
         }
     },
 
-    retryAdviceFrom(idx, id = '') {
+    retryAdviceFrom(idx, id = '', contextMode = '') {
         const messages = this.activeRecords(this.db.health.aiAdviceChat || []);
         const msg = this.findAdviceMessage(idx, id);
         if (!msg) return;
@@ -1976,7 +1997,7 @@ const advicePanel = {
                 this.softDeleteById(this.db.health.aiAdviceChat, msg.id);
                 this.db.aiTrash.push({ id: msg.id, deletedAt: Date.now(), payload: { ...msg } });
                 this.save();
-                this.sendAiAdvice(prompt, { skipUserMessage: true });
+                this.sendAiAdvice(prompt, { skipUserMessage: true, contextMode });
                 return;
             }
             const rootId = msg.replyToId || msg.id;
@@ -1993,12 +2014,13 @@ const advicePanel = {
                 replyToId: rootId,
                 versionIdx: nextIdx,
                 skipUserMessage: true,
-                versionActive: nextActive
+                versionActive: nextActive,
+                contextMode
             });
             this.pruneAdviceVersionGroup(rootId, 10);
             return;
         }
-        this.sendAiAdvice(prompt);
+        this.sendAiAdvice(prompt, { contextMode });
     },
 
     regenerateAdvice() {
@@ -2139,18 +2161,21 @@ const advicePanel = {
     renderAdviceFilterControls() {
         const contexts = { diet: true, training: true, weight: true, goal: true, ...(this.adviceContexts || {}) };
         const ctxOpen = !!this.adviceContextOpen;
+        const contextMode = ['auto', 'light', 'none'].includes(this.adviceContextMode) ? this.adviceContextMode : 'auto';
+        const contextModeLabel = { auto: '自动', light: '轻量', none: '仅提问' }[contextMode] || '自动';
         const enabledCount = ['diet','training','weight','goal'].filter(k => contexts[k]).length;
         const range = this.adviceRange || 'today';
         const rawSearchQuery = this.adviceSearchQuery || '';
         const searchQuery = this.escapeHtml(rawSearchQuery);
         const searchOpen = !!this.adviceSearchOpen || !!this.adviceSearchQuery;
+        const modeItems = 'auto,自动,auto_awesome|light,轻量,compress|none,仅提问,short_text'.split('|').map(item => item.split(','));
         return `
             <div class="advice-filter-row">
                 <div class="advice-range-tabs">${[['today','今日'],['week','7天'],['month','30天'],['all','全部']].map(([key, label]) => `<button class="advice-pill ${range === key ? 'active' : ''}" onclick="data.setAdviceRange('${key}')" type="button">${label}</button>`).join('')}</div>
                 <div class="advice-filter-actions">
                     <button class="advice-search-toggle ${ctxOpen ? 'active' : ''}" onclick="data.toggleAdviceContextPanel()" type="button" aria-label="数据维度" title="数据维度">
                         <span class="material-symbols-rounded">tune</span>
-                        ${enabledCount < 4 ? `<span class="advice-ctx-badge">${enabledCount}</span>` : ''}
+                        ${contextMode !== 'auto' ? `<span class="advice-ctx-badge advice-ctx-mode-badge">${this.escapeHtml(contextModeLabel)}</span>` : enabledCount < 4 ? `<span class="advice-ctx-badge">${enabledCount}</span>` : ''}
                     </button>
                     <button class="advice-search-toggle ${searchOpen ? 'active' : ''}" onclick="data.toggleAdviceSearch()" type="button" aria-label="搜索聊天记录"><span class="material-symbols-rounded">search</span></button>
                 </div>
@@ -2165,8 +2190,15 @@ const advicePanel = {
                     <span>选择给 AI 的数据维度</span>
                     <button onclick="data.toggleAdviceContextPanel()" type="button" aria-label="关闭"><span class="material-symbols-rounded">close</span></button>
                 </div>
+                <div class="advice-context-section">
+                    <small>上下文模式</small>
+                    <div class="advice-context-mode-row">${modeItems.map(([key, label, icon]) => `<button class="advice-pill ${contextMode === key ? 'active' : ''}" onclick="data.setAdviceContextMode('${key}')" type="button" aria-pressed="${contextMode === key}"><span class="material-symbols-rounded">${icon}</span>${label}</button>`).join('')}</div>
+                </div>
+                <div class="advice-context-section">
+                    <small>数据维度</small>
                 <div class="advice-context-toggles">${[['diet','饮食','restaurant'],['training','训练','fitness_center'],['weight','体重','monitor_weight'],['goal','目标','flag']].map(([key, label, icon]) => `<button class="advice-pill ${contexts[key] ? 'active' : ''}" onclick="data.toggleAdviceContext('${key}')" type="button"><span class="material-symbols-rounded">${icon}</span>${label}</button>`).join('')}</div>
-                <small class="advice-context-hint">关闭后该维度的记录不会发给 AI，回答会更聚焦</small>
+                </div>
+                <small class="advice-context-hint">自动会按模型预算裁剪；轻量适合网页转 API；仅提问不附带记录。</small>
             </div>` : ''}
         `;
     },

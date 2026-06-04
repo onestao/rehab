@@ -6367,13 +6367,41 @@ body.is-training .fab-pip.active {
     justify-content: center;
     line-height: 1;
 }
+.advice-ctx-mode-badge {
+    right: -10px;
+    min-width: 28px;
+    padding: 0 5px;
+    letter-spacing: -0.02em;
+}
 .advice-context-popover {
-    background: var(--md-sys-surface-container);
-    border-radius: 14px;
-    padding: 10px 12px;
+    position: relative;
+    overflow: hidden;
+    background: linear-gradient(135deg,
+        color-mix(in srgb, var(--glass-bg-strong) 86%, var(--md-sys-primary-container)),
+        color-mix(in srgb, var(--glass-bg) 84%, var(--md-sys-surface-container-high)));
+    border: 1px solid color-mix(in srgb, var(--glass-border) 78%, var(--md-sys-primary) 16%);
+    border-radius: 20px;
+    padding: 12px;
     display: grid;
-    gap: 8px;
+    gap: 10px;
+    box-shadow: var(--glass-shadow-inset), 0 14px 34px color-mix(in srgb, var(--md-sys-primary) 12%, transparent);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
     animation: adviceCtxIn .18s ease;
+}
+.advice-context-popover::before {
+    content: "";
+    position: absolute;
+    inset: 0 auto auto 0;
+    width: 130px;
+    height: 90px;
+    border-radius: 0 0 999px 0;
+    background: radial-gradient(circle at 24% 18%, color-mix(in srgb, var(--md-sys-primary) 20%, transparent), transparent 68%);
+    pointer-events: none;
+}
+.advice-context-popover > * {
+    position: relative;
+    z-index: 1;
 }
 @keyframes adviceCtxIn {
     from { opacity: 0; transform: translateY(-4px); }
@@ -6422,8 +6450,38 @@ body.is-training .fab-pip.active {
     display: inline-flex;
     align-items: center;
     gap: 4px;
+    background: color-mix(in srgb, var(--glass-bg) 82%, var(--md-sys-surface-container));
+    border: 1px solid color-mix(in srgb, var(--glass-border) 74%, transparent);
+    box-shadow: var(--glass-shadow-inset);
+    backdrop-filter: var(--glass-blur-sm);
+    -webkit-backdrop-filter: var(--glass-blur-sm);
+    transition: transform .16s var(--md-sys-motion-spring), background .2s ease, color .2s ease, border-color .2s ease;
 }
+.advice-context-popover .advice-pill.active {
+    background: linear-gradient(135deg, var(--md-sys-secondary-container), color-mix(in srgb, var(--md-sys-primary-container) 72%, var(--glass-bg)));
+    border-color: color-mix(in srgb, var(--md-sys-primary) 28%, var(--glass-border));
+    color: var(--md-sys-on-secondary-container);
+}
+.advice-context-popover .advice-pill:active { transform: scale(0.96); }
 .advice-context-popover .advice-pill .material-symbols-rounded { font-size: 14px; }
+.advice-context-section {
+    display: grid;
+    gap: 6px;
+}
+.advice-context-section > small {
+    color: var(--md-sys-on-surface-variant);
+    font-size: 11px;
+    font-weight: 900;
+    letter-spacing: 0.03em;
+}
+.advice-context-mode-row {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    padding-bottom: 2px;
+    scrollbar-width: none;
+}
+.advice-context-mode-row::-webkit-scrollbar { display: none; }
 .advice-context-hint {
     color: var(--md-sys-on-surface-variant);
     font-size: 11px;
@@ -6518,7 +6576,16 @@ body.is-training .fab-pip.active {
     border: 1px solid color-mix(in srgb, var(--md-sys-outline-variant) 72%, transparent);
 }
 .advice-bubble.pending { opacity: 0.86; }
-.advice-bubble.error { background: var(--md-sys-error-container); color: var(--md-sys-on-error-container); }
+.advice-bubble.error {
+    background: linear-gradient(135deg,
+        color-mix(in srgb, var(--md-sys-error-container) 86%, var(--glass-bg-strong)),
+        color-mix(in srgb, var(--md-sys-error-container) 68%, var(--md-sys-surface-container-lowest)));
+    color: var(--md-sys-on-error-container);
+    border-color: color-mix(in srgb, var(--md-sys-error) 28%, var(--glass-border));
+    box-shadow: var(--glass-shadow-inset), 0 12px 30px color-mix(in srgb, var(--md-sys-error) 12%, transparent);
+    backdrop-filter: var(--glass-blur-sm);
+    -webkit-backdrop-filter: var(--glass-blur-sm);
+}
 .advice-bubble-head { display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; min-width: 0; }
 .advice-bubble b { flex: 1 1 0; min-width: 0; overflow: hidden; font-size: 11px; color: var(--md-sys-on-surface-variant); display: flex; align-items: center; gap: 6px; }
 .advice-bubble b small { font-size: 10px; font-weight: 600; color: var(--md-sys-on-surface-variant); opacity: 0.8; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -6899,6 +6966,57 @@ body.is-training .fab-pip.active {
     padding-bottom: 4px; -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
 }
+.advice-error-recovery {
+    display: grid;
+    gap: 8px;
+    margin-top: 2px;
+    padding: 10px;
+    border-radius: 16px;
+    background: color-mix(in srgb, var(--glass-bg-strong) 72%, var(--md-sys-error-container));
+    border: 1px solid color-mix(in srgb, var(--md-sys-error) 24%, var(--glass-border));
+    box-shadow: var(--glass-shadow-inset);
+    backdrop-filter: var(--glass-blur-sm);
+    -webkit-backdrop-filter: var(--glass-blur-sm);
+}
+.advice-error-hint {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    color: var(--md-sys-on-error-container);
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1.45;
+}
+.advice-error-hint .material-symbols-rounded {
+    font-size: 17px;
+    color: var(--md-sys-error);
+    font-variation-settings: 'FILL' 1;
+}
+.advice-error-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+.advice-error-actions button {
+    min-height: 32px;
+    border: 1px solid color-mix(in srgb, var(--md-sys-error) 18%, var(--glass-border));
+    border-radius: var(--md-sys-shape-full);
+    padding: 0 10px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: color-mix(in srgb, var(--glass-bg) 78%, var(--md-sys-error-container));
+    color: var(--md-sys-on-error-container);
+    font-size: 11px;
+    font-weight: 900;
+    cursor: pointer;
+    box-shadow: var(--glass-shadow-inset);
+    backdrop-filter: var(--glass-blur-sm);
+    -webkit-backdrop-filter: var(--glass-blur-sm);
+    transition: transform .16s var(--md-sys-motion-spring), background .18s ease;
+}
+.advice-error-actions button:active { transform: scale(0.96); }
+.advice-error-actions .material-symbols-rounded { font-size: 15px; }
 .advice-quick-prompts::-webkit-scrollbar { display: none; }
 .advice-quick-prompts > button {
     flex: none; scroll-snap-align: start;

@@ -27,6 +27,7 @@ cloud_done
 cloud_off
 cloud_sync
 compare_arrows
+compress
 content_copy
 dark_mode
 delete
@@ -105,6 +106,7 @@ self_improvement
 send
 settings
 shield
+short_text
 show_chart
 skip_next
 skip_previous

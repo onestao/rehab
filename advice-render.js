@@ -526,6 +526,7 @@ Object.assign(advicePanel, {
                 ${routineBlocks.map((_routine, idx) => `<button class="md-btn md-btn-tonal" onclick="data.openAdviceRoutineSave(this.closest('.advice-bubble')?.dataset.adviceId || '', ${idx})" type="button"><span class="material-symbols-rounded">library_books</span> 保存到方案库${routineBlocks.length > 1 ? ` ${idx + 1}` : ''}</button>`).join('')}
             </div>`
             : '';
+        const errorRecovery = msg.error ? (this.renderAdviceErrorRecovery?.(msg) || '') : '';
         const actions = msg.role === 'assistant'
             ? `<div class="advice-bubble-actions">
                 <button onclick="data.copyAdviceMessage(${msg.idx}, this.closest('.advice-bubble')?.dataset.adviceId || '')" type="button">复制</button>
@@ -547,6 +548,7 @@ Object.assign(advicePanel, {
             </div>
             ${attachments}
             <div class="advice-bubble-content">${msg.pending ? '<div class="skeleton-line skeleton" style="width:80%"></div><div class="skeleton-line skeleton" style="width:60%"></div><div class="skeleton-line skeleton" style="width:90%"></div>' : content}</div>
+            ${errorRecovery}
             ${longMessageToggle}
             ${routineActions}
             ${actions}
