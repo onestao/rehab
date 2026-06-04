@@ -79,8 +79,18 @@
     color: var(--md-sys-on-surface-variant);
     word-break: break-all;
 }
-.profile-version-footer .pvf-copy {
+.profile-version-footer .pvf-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
     margin-top: 4px;
+}
+.profile-version-footer .pvf-action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
     font-size: 11px;
     padding: 4px 12px;
     border-radius: 999px;
@@ -89,4 +99,14 @@
     color: var(--md-sys-on-surface);
     cursor: pointer;
 }
-.profile-version-footer .pvf-copy:active { transform: scale(0.96); }
+.profile-version-footer .pvf-check {
+    background: var(--md-sys-primary-container);
+    color: var(--md-sys-on-primary-container);
+    border-color: transparent;
+}
+.profile-version-footer .pvf-action:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+.profile-version-footer .pvf-action .material-symbols-rounded { font-size: 14px; }
+.profile-version-footer .pvf-action:not(:disabled):active { transform: scale(0.96); }

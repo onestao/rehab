@@ -85,7 +85,7 @@
         },
 
         renderRehabWeeklyCard() {
-            const weeks = this.latestRehabWeekly?.(3) || [];
+            const weeks = this.latestRehabWeekly?.(Number.MAX_SAFE_INTEGER) || [];
             const latest = weeks[0] || null;
             const actions = latest?.actions || [];
             const reviewCount = actions.filter(a => a.needsReview || Number(a.confidence || 100) < 80 || Number(a.painLevel || 0) >= 4).length;
@@ -96,6 +96,17 @@
                     <b>${esc(this, action.name || '未命名动作')}</b>
                     <small>${esc(this, this.rehabSpecLabel(action.spec))}</small>
                 </div>`).join('');
+            const historyRows = weeks.map((week, index) => {
+                const weekActions = week.actions || [];
+                const weekPreview = weekActions.slice(0, 3).map(action => action.name || '未命名动作').join('、') || '暂无动作明细';
+                return `<div class="rehab-week-history-item">
+                    <div>
+                        <strong>${esc(this, week.weekStart || week.visitDate || '')}${index === 0 ? '（最新）' : ''}</strong>
+                        <small>${weekActions.length} 个动作｜${esc(this, weekPreview)}</small>
+                    </div>
+                    <button class="md-btn md-btn-tonal profile-edit-btn" onclick="data.openRehabWeeklySheet('${esc(this, week.weekStart || '')}')" type="button"><span class="material-symbols-rounded">edit</span> 编辑</button>
+                </div>`;
+            }).join('');
             return `<div class="md-card rehab-week-card">
                 <div class="rehab-week-glass-summary">
                     <div class="rehab-week-stat"><strong>${actions.length || 0}</strong><small>动作</small></div>
@@ -117,6 +128,7 @@
                     </div>
                 </div>
                 ${latest ? `<div class="rehab-week-action-list">${actionPreview || '<div class="profile-condition-note">本周处方暂无动作明细</div>'}</div>` : `<div class="profile-condition-note">适合每周从康复中心回来后录入新动作、暂停动作和疼痛反馈。</div>`}
+                ${weeks.length > 1 ? `<details class="rehab-week-history"><summary><span class="material-symbols-rounded">history</span> 查看/编辑旧处方（共 ${weeks.length} 周）</summary><div class="rehab-week-history-list">${historyRows}</div></details>` : ''}
             </div>`;
         },
 

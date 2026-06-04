@@ -53,6 +53,13 @@
         }
     }
 
+    function stripInternalStorageFields(value) {
+        if (!value || Object.prototype.toString.call(value) !== '[object Object]') return value;
+        const next = JSON.parse(JSON.stringify(value));
+        delete next.largeCollections;
+        return next;
+    }
+
     function collectFields(value, prefix, set) {
         if (value == null) return;
         if (Array.isArray(value)) {
@@ -102,18 +109,17 @@
     }
 
     function splitLargeCollections(db) {
-        const source = JSON.parse(JSON.stringify(db || {}));
+        const source = stripInternalStorageFields(db) || {};
         source.health = source.health && typeof source.health === 'object' ? source.health : {};
         const history = Array.isArray(source.history) ? source.history : [];
         const advice = Array.isArray(source.health.aiAdviceChat) ? source.health.aiAdviceChat : [];
         source.history = [];
         source.health.aiAdviceChat = [];
-        source.largeCollections = { ...(source.largeCollections || {}), history: true, advice: true };
         return { meta: source, history, advice };
     }
 
     function hydrateLargeCollections(meta, large) {
-        const next = JSON.parse(JSON.stringify(meta || {}));
+        const next = stripInternalStorageFields(meta) || {};
         next.health = next.health && typeof next.health === 'object' ? next.health : {};
         next.history = Array.isArray(large?.history) ? large.history : (Array.isArray(next.history) ? next.history : []);
         next.health.aiAdviceChat = Array.isArray(large?.advice) ? large.advice : (Array.isArray(next.health.aiAdviceChat) ? next.health.aiAdviceChat : []);
@@ -347,7 +353,7 @@
 
             const sourceDbRaw = localStorage.getItem(dbKey);
             const sourceCfgRaw = localStorage.getItem(cfgKey);
-            const sourceDb = localAdapter.read(dbKey);
+            const sourceDb = stripInternalStorageFields(localAdapter.read(dbKey));
             const sourceCfg = localAdapter.read(cfgKey);
 
             try {

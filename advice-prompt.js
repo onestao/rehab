@@ -130,8 +130,8 @@ Object.assign(advicePanel, {
             const rehabWeeks = this.activeRecords(this.db.health?.rehabWeekly || [])
                 .slice()
                 .sort((a, b) => String(b.weekStart || '').localeCompare(String(a.weekStart || '')) || Number(b.updatedAt || 0) - Number(a.updatedAt || 0))
-                .slice(0, 3);
-            blocks.push(`【近3周康复中心处方】\n${formatRehabWeekly(rehabWeeks) || '暂无康复中心处方'}`);
+                .slice(0, 6);
+            blocks.push(`【近6周康复中心处方】\n${formatRehabWeekly(rehabWeeks) || '暂无康复中心处方'}\n规则：优先遵守最近3周；更早处方用于理解长期禁忌、反复疼痛和动作演变。`);
         }
         if (contexts.weight) {
             blocks.push(`【${rangeLabel}体重记录】\n${formatWeights(rangeWeights) || `${rangeLabel}暂无体重记录`}`);

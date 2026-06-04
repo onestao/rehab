@@ -632,11 +632,26 @@
             const version = this.detectAppVersion?.() || '';
             const cache = (typeof caches !== 'undefined' && this._cachedSwName) ? this._cachedSwName : '';
             const sub = cache ? `Service Worker · ${this.escapeHtml(cache)}` : 'Service Worker · (未注册)';
+            const checking = !!window.appUpdate?.checking;
+            const unsupported = typeof navigator === 'undefined' || !('serviceWorker' in navigator);
             return `<div class="profile-version-footer" id="profileVersionFooter">
                 <div class="pvf-title">版本 ${this.escapeHtml(version || '--')}</div>
                 <div class="pvf-sub">${sub}</div>
-                <button type="button" class="pvf-copy" onclick="data.copyAppVersionInfo?.()">复制版本信息</button>
+                <div class="pvf-actions">
+                    <button type="button" class="pvf-action pvf-check" id="profileUpdateCheckBtn" onclick="data.checkAppUpdate?.()" ${checking || unsupported ? 'disabled' : ''}>
+                        <span class="material-symbols-rounded">system_update</span><span class="pvf-check-label">${checking ? '检测中...' : '检测更新'}</span>
+                    </button>
+                    <button type="button" class="pvf-action pvf-copy" onclick="data.copyAppVersionInfo?.()">复制版本信息</button>
+                </div>
             </div>`;
+        },
+
+        checkAppUpdate() {
+            if (window.appUpdate?.checkNow) {
+                window.appUpdate.checkNow();
+                return;
+            }
+            if (typeof toast?.show === 'function') toast.show('当前环境无法检测更新', 'error');
         },
 
         detectAppVersion() {

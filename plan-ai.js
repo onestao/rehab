@@ -296,7 +296,7 @@
                 workouts: summarizeTodayHistory(this, today),
                 manualExercises: summarizeManualExercises(this, today)
             };
-            const rehabWeekly = summarizeRehabWeekly(this, 3);
+            const rehabWeekly = summarizeRehabWeekly(this, 6);
             const recentPlans = this.activeRecords(this.db.dailyPlans || [])
                 .filter((plan) => types.includes(plan.type || 'rehab'))
                 .slice(0, 14)
@@ -349,8 +349,8 @@
                 `健康档案装备偏好: ${profileEquipment.join(', ') || '无'}`,
                 `最终可用装备池: ${allEquipment.join(', ') || '无'}`,
                 `今日已完成运动摘要: ${JSON.stringify(todayCompleted)}`,
-                `近3周康复中心处方: ${JSON.stringify(rehabWeekly)}`,
-                rehabWeekly.length ? '康复处方规则: 必须优先遵守最近康复中心处方；continued/progressed 动作应保留或参考；dropped 动作不能出现在计划中；new/watch/needsReview 动作不得自动加量，疼痛>=4/10 只能降级或替换。' : '',
+                `近6周康复中心处方: ${JSON.stringify(rehabWeekly)}`,
+                rehabWeekly.length ? '康复处方规则: 必须优先遵守最近3周康复中心处方；continued/progressed 动作应保留或参考；dropped 动作不能出现在计划中；new/watch/needsReview 动作不得自动加量，疼痛>=4/10 只能降级或替换。第4-6周处方仅用于理解长期禁忌、反复疼痛和动作演变。' : '',
                 `最近 7 天对应类型计划摘要: ${JSON.stringify(recentPlans)}`,
                 `健康档案: ${JSON.stringify(profile)}`,
                 `目标类型: ${String(this.db.health?.dietGoal?.goalType || this.db.health?.goalType || '')}`,

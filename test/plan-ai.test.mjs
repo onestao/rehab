@@ -20,7 +20,7 @@ function createContext(api) {
     db: {
       dailyPlans: [],
       history: [],
-      health: { exerciseLogs: [], profile: {}, dietGoal: null }
+      health: { exerciseLogs: [], profile: {}, dietGoal: null, rehabWeekly: [] }
     },
     logicalDateKey() {
       return '2026-05-25';
@@ -220,6 +220,25 @@ test('plan AI context includes today completed workouts and manual exercises', (
   assert.match(prompt, /卧推/);
   assert.match(prompt, /哑铃划船/);
   assert.match(prompt, /背部已疲劳/);
+});
+
+test('plan AI context includes six recent rehab prescriptions', () => {
+  const api = loadPlanAi();
+  const ctx = createContext(api);
+  const weekStarts = ['2026-05-25', '2026-05-18', '2026-05-11', '2026-05-04', '2026-04-27', '2026-04-20', '2026-04-13'];
+  ctx.db.health.rehabWeekly = weekStarts.map((weekStart, index) => ({
+    id: `rw-${index}`,
+    weekStart,
+    actions: [{ name: `康复动作${index + 1}`, status: 'continued' }]
+  }));
+
+  const prompt = api.buildPlanAiContext.call(ctx, 'today', '安排康复训练', ['rehab']);
+
+  assert.match(prompt, /近6周康复中心处方/);
+  assert.match(prompt, /康复动作1/);
+  assert.match(prompt, /康复动作6/);
+  assert.doesNotMatch(prompt, /康复动作7/);
+  assert.match(prompt, /第4-6周处方仅用于理解长期禁忌/);
 });
 
 test('plan AI preview exposes rest and alternation controls', () => {

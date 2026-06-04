@@ -3183,6 +3183,40 @@ body.is-cardio-paused .cardio-card {
     overflow-wrap: anywhere;
 }
 
+[data-settings="experiments"] .md-switch {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+    gap: 12px;
+    padding: 14px 0 4px;
+}
+
+[data-settings="experiments"] .md-switch > span:first-child {
+    min-width: 0;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+}
+
+[data-settings="experiments"] .md-switch small {
+    display: block;
+    margin-top: 4px;
+    color: var(--md-sys-on-surface-variant);
+    font-size: 12px;
+    font-weight: 500;
+}
+
+[data-settings="experiments"] .switch-track {
+    flex: 0 0 auto;
+    margin-top: 1px;
+}
+
+@media (max-width: 360px) {
+    .sync-card[data-settings="experiments"] {
+        padding-inline: 16px;
+    }
+
+}
+
 .voice-sheet-card {
     width: min(94vw, 560px);
     gap: 14px;
@@ -9788,8 +9822,18 @@ body.is-training .fab-pip.active {
     color: var(--md-sys-on-surface-variant);
     word-break: break-all;
 }
-.profile-version-footer .pvf-copy {
+.profile-version-footer .pvf-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
     margin-top: 4px;
+}
+.profile-version-footer .pvf-action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
     font-size: 11px;
     padding: 4px 12px;
     border-radius: 999px;
@@ -9798,7 +9842,17 @@ body.is-training .fab-pip.active {
     color: var(--md-sys-on-surface);
     cursor: pointer;
 }
-.profile-version-footer .pvf-copy:active { transform: scale(0.96); }
+.profile-version-footer .pvf-check {
+    background: var(--md-sys-primary-container);
+    color: var(--md-sys-on-primary-container);
+    border-color: transparent;
+}
+.profile-version-footer .pvf-action:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+.profile-version-footer .pvf-action .material-symbols-rounded { font-size: 14px; }
+.profile-version-footer .pvf-action:not(:disabled):active { transform: scale(0.96); }
 
 }
 @layer components {

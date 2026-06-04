@@ -36,6 +36,40 @@
     overflow-wrap: anywhere;
 }
 
+[data-settings="experiments"] .md-switch {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+    gap: 12px;
+    padding: 14px 0 4px;
+}
+
+[data-settings="experiments"] .md-switch > span:first-child {
+    min-width: 0;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+}
+
+[data-settings="experiments"] .md-switch small {
+    display: block;
+    margin-top: 4px;
+    color: var(--md-sys-on-surface-variant);
+    font-size: 12px;
+    font-weight: 500;
+}
+
+[data-settings="experiments"] .switch-track {
+    flex: 0 0 auto;
+    margin-top: 1px;
+}
+
+@media (max-width: 360px) {
+    .sync-card[data-settings="experiments"] {
+        padding-inline: 16px;
+    }
+
+}
+
 .voice-sheet-card {
     width: min(94vw, 560px);
     gap: 14px;
