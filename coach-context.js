@@ -134,3 +134,7 @@ Object.assign(advicePanel, {
         }
     },
 });
+
+if (typeof window !== 'undefined' && window.data) {
+    advicePanel.attach(window.data);
+}

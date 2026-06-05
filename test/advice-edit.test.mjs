@@ -105,6 +105,41 @@ function loadAdvicePanelHarness() {
     return data;
 }
 
+test('coach context reattaches advice message builder after lazy load', () => {
+    const data = {
+        db: { health: { aiAdviceChat: [] } },
+        adviceRangeStart: () => '',
+        activeRecords: (items) => items || [],
+        sortedWeights: () => [],
+        logicalDateKey: () => '2026-05-30',
+        loadAdviceSettings() {}
+    };
+    const context = {
+        window: {
+            data,
+            matchMedia: () => ({ matches: false, addEventListener: () => {} })
+        },
+        document: {
+            getElementById: () => null,
+            querySelector: () => null
+        },
+        localStorage: { getItem: () => null, setItem: () => {} },
+        requestAnimationFrame: (fn) => fn(),
+        navigator: { maxTouchPoints: 0 }
+    };
+    context.globalThis = context;
+    vm.createContext(context);
+
+    const advicePanelCode = fs.readFileSync(new URL('../advice-panel.js', import.meta.url), 'utf8');
+    vm.runInContext(advicePanelCode, context);
+    assert.equal(typeof data.buildAdviceMessages, 'undefined');
+
+    const coachContextCode = fs.readFileSync(new URL('../coach-context.js', import.meta.url), 'utf8');
+    vm.runInContext(coachContextCode, context);
+
+    assert.equal(typeof data.buildAdviceMessages, 'function');
+});
+
 test('editing a user advice prompt inserts a new active answer version after the original prompt', async () => {
     const data = loadAdvicePanelHarness();
 
