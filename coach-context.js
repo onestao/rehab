@@ -32,17 +32,26 @@ Object.assign(advicePanel, {
             const allFoods = this.activeRecords(this.db.health.foodLogs || []);
             const allExerciseLogs = this.activeRecords(this.db.health.exerciseLogs || []);
             const allWeights = this.sortedWeights();
+            const allDailyPlans = this.activeRecords(this.db.dailyPlans || []);
+            const allReports = this.activeRecords(this.db.health?.reports || []);
+            const allActions = this.activeRecords(this.db.actions || []);
+            const allRoutines = this.activeRecords(this.db.routines || []);
 
             const rangeHistory = contexts.training ? rangeFilter(allHistory, h => this.parseHistoryDate(h.date)) : [];
             const rangeFoods = contexts.diet ? rangeFilter(allFoods, f => f.date ? this.dateFromKey(f.date) : null) : [];
             const rangeExerciseLogs = contexts.training ? rangeFilter(allExerciseLogs, e => e.date ? this.dateFromKey(e.date) : null) : [];
             const rangeWeights = contexts.weight ? rangeFilter(allWeights, w => w.date ? this.dateFromKey(w.date) : null) : [];
+            const rangeDailyPlans = contexts.training ? rangeFilter(allDailyPlans, p => p.date ? this.dateFromKey(p.date) : null) : [];
+            const rangeReports = rangeFilter(allReports, r => this.dateFromKey(r.periodEnd || r.periodStart || r.generatedAt || this.logicalDateKey()));
             const trendWeights = contexts.weight ? allWeights.slice(mode === 'light' ? -10 : -30) : [];
             const todayHistory = contexts.training ? allHistory.filter(h => this.historyDayKey(h) === today) : [];
             const todayFoods = contexts.diet ? allFoods.filter(f => f.date === today) : [];
             const todayExerciseLogs = contexts.training ? allExerciseLogs.filter(e => e.date === today) : [];
             const todayWeights = contexts.weight ? allWeights.filter(w => w.date === today) : [];
+            const todayDailyPlans = contexts.training ? allDailyPlans.filter(p => p.date === today) : [];
             const dietGoal = contexts.goal ? (this.db.health.dietGoal || {}) : {};
+            const bodyPlan = contexts.goal ? (this.db.health.bodyPlan || {}) : {};
+            const weightPlan = contexts.goal ? (this.db.health.weightPlan || {}) : {};
             const targetDate = this.parsePromptTargetDate(prompt);
             const sumMacros = list => list.reduce((a, f) => { a.cal += Number(f.cal || 0); a.pro += Number(f.pro || 0); a.carb += Number(f.carb || 0); a.fat += Number(f.fat || 0); return a; }, { cal: 0, pro: 0, carb: 0, fat: 0 });
             const todayMacros = sumMacros(todayFoods);
@@ -51,6 +60,7 @@ Object.assign(advicePanel, {
             const targetFoods = (targetDate && contexts.diet) ? allFoods.filter(f => f.date === targetDate) : [];
             const targetExerciseLogs = (targetDate && contexts.training) ? allExerciseLogs.filter(e => e.date === targetDate) : [];
             const targetWeights = (targetDate && contexts.weight) ? allWeights.filter(w => w.date === targetDate) : [];
+            const targetDailyPlans = (targetDate && contexts.training) ? allDailyPlans.filter(p => p.date === targetDate) : [];
             const targetMacros = sumMacros(targetFoods);
             const rangeLabel = { today: '今日', week: '最近7天', month: '最近30天', all: '全部记录' }[range];
             const formatTraining = list => list.map(h => {
@@ -58,13 +68,72 @@ Object.assign(advicePanel, {
                 const meta = h.type === 'cardio' ? `${Math.round(h.cardio.calories || 0)} kcal · ${h.cardio?.type || h.cardio?.name || '有氧'}` : `${h.actions.length}个动作`;
                 return `- ${h.date}｜训练时长 ${mins}分${secs}秒｜项目 ${names || '未命名'}｜${meta}`;
             }).join('\n');
-            const formatFoods = list => list.map(f => `- ${f.date}｜${f.meal === 'breakfast' ? '早餐' : f.meal === 'lunch' ? '午餐' : f.meal === 'dinner' ? '晚餐' : '加餐'}｜${f.name}${f.grams ? ' ' + f.grams + 'g' : ''}｜${f.cal} kcal｜P${Number(f.pro || 0).toFixed(0)} C${Number(f.carb || 0).toFixed(0)} F${Number(f.fat || 0).toFixed(0)}`).join('\n');
-            const formatExerciseLogs = list => list.map(e => `- ${e.date}｜${this.exerciseLabel(e.type, e)}｜${e.minutes}分钟｜${e.calories || 0} kcal${e.distance ? `｜${e.distance}km` : ''}`).join('\n');
+            const formatFoods = list => list.map(f => {
+                const meal = f.meal === 'breakfast' ? '早餐' : f.meal === 'lunch' ? '午餐' : f.meal === 'dinner' ? '晚餐' : '加餐';
+                const extras = [];
+                if (f.fiber) extras.push(`纤维${Number(f.fiber || 0).toFixed(1)}g`);
+                if (f.sugar) extras.push(`糖${Number(f.sugar || 0).toFixed(1)}g`);
+                if (f.sodium) extras.push(`钠${Number(f.sodium || 0).toFixed(0)}mg`);
+                if (f.source) extras.push(`来源:${f.source}`);
+                if (f.confidence) extras.push(`置信${f.confidence}%`);
+                if (Array.isArray(f.ingredients) && f.ingredients.length) extras.push(`配料:${f.ingredients.slice(0, 5).join('、')}`);
+                if (f.cooking) extras.push(`烹饪:${f.cooking}`);
+                if (f.note) extras.push(`备注:${f.note}`);
+                return `- ${f.date}｜${meal}｜${f.name}${f.grams ? ' ' + f.grams + 'g' : ''}｜${f.cal} kcal｜P${Number(f.pro || 0).toFixed(0)} C${Number(f.carb || 0).toFixed(0)} F${Number(f.fat || 0).toFixed(0)}${extras.length ? '｜' + extras.join('｜') : ''}`;
+            }).join('\n');
+            const formatExerciseLogs = list => list.map(e => {
+                const label = this.exerciseLabel?.(e.type, e) || e.customName || e.name || e.type || '运动';
+                const details = [`${Number(e.minutes || 0)}分钟`, `${Number(e.calories || 0)} kcal`];
+                if (e.distance) details.push(`${e.distance}km`);
+                if (e.type === 'strength') {
+                    if (e.weightKg) details.push(`${e.weightKg}kg`);
+                    if (e.sets || e.repsPerSet) details.push(`${Number(e.sets || 0)}组${e.repsPerSet ? `×${Number(e.repsPerSet || 0)}次` : ''}`);
+                }
+                if (e.note) details.push(`备注：${e.note}`);
+                return `- ${e.date}｜${label}｜${details.join('｜')}`;
+            }).join('\n');
             const formatWeights = list => list.map(w => `- ${w.date}｜${w.weight.toFixed(2)} kg`).join('\n');
             const formatRehabWeekly = list => list.map(week => {
                 const actions = (week.actions || []).map(a => `${a.name || '未命名'}（${a.status || 'continued'}${a.painLevel ? `，疼痛${a.painLevel}/10` : ''}${a.needsReview ? '，需确认' : ''}${a.coachNote ? '，' + a.coachNote : ''}）`).join('；');
-                return `- ${week.weekStart || week.visitDate || ''}｜${actions || '无动作明细'}${week.therapistAssessment ? '｜评估：' + week.therapistAssessment : ''}`;
+                const extras = [];
+                if (week.visitDate) extras.push(`就诊:${week.visitDate}`);
+                if (week.homework) extras.push(`作业:${week.homework}`);
+                if (week.rawText) extras.push(`原文:${String(week.rawText).slice(0, 160)}`);
+                const specs = (week.actions || []).map(a => a.spec ? `${a.name || '动作'}:${JSON.stringify(a.spec)}` : '').filter(Boolean).slice(0, 4);
+                if (specs.length) extras.push(`规格:${specs.join('；')}`);
+                return `- ${week.weekStart || week.visitDate || ''}｜${actions || '无动作明细'}${week.therapistAssessment ? '｜评估：' + week.therapistAssessment : ''}${extras.length ? '｜' + extras.join('｜') : ''}`;
             }).join('\n');
+            const planTypeLabel = (type = '', title = '') => this.planTypeMeta?.(type, title)?.label || ({ rehab: '康复计划', cut: '减脂日程', bulk: '增肌日程', maintenance: '综合训练', custom: '自定义计划' }[type] || title || type || '训练计划');
+            const formatDailyPlans = list => list.map(plan => {
+                const items = (plan.items || []).filter(item => !item.deleted);
+                const done = items.filter(item => item.status === 'done').length;
+                const briefItems = items.slice(0, mode === 'light' ? 5 : 10).map(item => {
+                    const spec = item.spec || {};
+                    const specText = [spec.sets ? `${spec.sets}组` : '', spec.reps ? `${spec.reps}次` : '', spec.work ? `${spec.work}秒` : '', item.currentLevel ? `L${item.currentLevel}` : '', item.feedback?.rpe ? `RPE${item.feedback.rpe}` : '', item.feedback?.note ? `反馈:${item.feedback.note}` : '', item.aiReasoning ? `原因:${item.aiReasoning}` : ''].filter(Boolean).join(' ');
+                    return `${item.name || '未命名任务'}(${item.status || 'todo'}${specText ? '，' + specText : ''})`;
+                }).join('；');
+                const title = plan.title && plan.title !== planTypeLabel(plan.type, plan.title) ? `｜标题:${plan.title}` : '';
+                return `- ${plan.date}｜${planTypeLabel(plan.type, plan.title)}${title}｜${done}/${items.length}完成｜来源:${plan.source || 'manual'}${plan.notes ? '｜备注:' + plan.notes : ''}${briefItems ? '｜任务:' + briefItems : ''}`;
+            }).join('\n');
+            const formatWeeklyPlan = () => {
+                const labels = [['mon', '周一'], ['tue', '周二'], ['wed', '周三'], ['thu', '周四'], ['fri', '周五'], ['sat', '周六'], ['sun', '周日']];
+                const plan = this.db.weeklyPlan || {};
+                return labels.map(([key, label]) => {
+                    const routine = allRoutines.find(r => r.id === plan[key]);
+                    return routine ? `- ${label}｜${routine.name || '未命名方案'}｜${(routine.actions || []).slice(0, 8).map(a => a.name || '未命名').join('、')}` : '';
+                }).filter(Boolean).join('\n');
+            };
+            const formatCurrentActions = () => allActions.filter(a => !a.libOnly).slice(0, mode === 'light' ? 8 : 16).map(a => `- ${a.name || '未命名'}${a.tags?.length ? '｜标签:' + a.tags.join('、') : ''}${a.note ? '｜备注:' + a.note : ''}`).join('\n');
+            const formatRoutines = () => allRoutines.slice(0, mode === 'light' ? 5 : 10).map(r => `- ${r.name || '未命名方案'}｜${(r.actions || []).length}个动作｜${(r.actions || []).slice(0, 8).map(a => a.name || '未命名').join('、')}${r.note ? '｜备注:' + r.note : ''}`).join('\n');
+            const formatGoalPlans = () => {
+                const lines = [];
+                if (dietGoal && Object.keys(dietGoal).length) lines.push(`饮食目标:${JSON.stringify(dietGoal)}`);
+                if (bodyPlan && Object.keys(bodyPlan).length) lines.push(`身体目标计划:${JSON.stringify(bodyPlan)}`);
+                if (weightPlan && Object.keys(weightPlan).length) lines.push(`体重目标计划:${JSON.stringify(weightPlan)}`);
+                if (this.db.health?.weeklyGoalSessions) lines.push(`每周训练目标:${this.db.health.weeklyGoalSessions}次`);
+                return lines.join('\n');
+            };
+            const formatReports = list => list.slice(0, mode === 'light' ? 2 : 4).map(r => `- ${r.kind || 'report'}｜${r.periodStart || ''}-${r.periodEnd || ''}｜${r.ai?.summary || r.summary || ''}${r.ai?.highlights?.length ? '｜重点:' + r.ai.highlights.join('、') : ''}${r.ai?.suggestions?.length ? '｜建议:' + r.ai.suggestions.join('、') : ''}`).join('\n');
             const enabledLabels = [contexts.diet && '饮食', contexts.training && '训练', contexts.weight && '体重', contexts.goal && '目标'].filter(Boolean).join('、') || '无';
             const prefResult = window.dataAiTemplates?.buildPromptMessages('advice_general', {}, this.db) || {};
             const sys = `当前启用的分析维度：${enabledLabels}。上下文模式：${mode === 'light' ? '轻量' : mode === 'none' ? '仅提问' : '自动'}。未启用的维度不会提供数据，请不要编造，也不要要求用户开启。\n` + (prefResult.messages?.[0]?.content || '');
@@ -83,15 +152,20 @@ Object.assign(advicePanel, {
             if (contexts.training && targetDate) blocks.push(`【该日期训练记录】\n${formatTraining(targetHistory) || '该日期无训练记录'}`);
             if (contexts.diet && targetDate) { blocks.push(`【该日期饮食记录】\n${formatFoods(targetFoods) || '该日期无饮食记录'}`); blocks.push(`【该日期宏量营养】\n蛋白 ${targetMacros.pro.toFixed(1)}g / 碳水 ${targetMacros.carb.toFixed(1)}g / 脂肪 ${targetMacros.fat.toFixed(1)}g`); }
             if (contexts.weight && targetDate) blocks.push(`【该日期体重记录】\n${formatWeights(targetWeights) || '该日期无体重记录'}`);
-            if (contexts.training && targetDate) blocks.push(`【该日期手动运动】\n${formatExerciseLogs(targetExerciseLogs) || '该日期无手动运动记录'}`);
+            const targetExerciseText = formatExerciseLogs(targetExerciseLogs);
+            const todayExerciseText = formatExerciseLogs(todayExerciseLogs);
+            const rangeExerciseText = formatExerciseLogs(rangeExerciseLogs);
+            if (contexts.training && targetDate) blocks.push(`【该日期手动运动】\n${targetExerciseText || '该日期无手动运动记录'}`);
+            if (contexts.training && targetDate) blocks.push(`【该日期训练计划】\n${formatDailyPlans(targetDailyPlans) || '该日期无训练计划'}`);
             if (contexts.diet) { blocks.push(`【今日饮食记录】\n${formatFoods(todayFoods) || '今日无饮食记录'}`); blocks.push(`【今日宏量营养】\n摄入 ${todayMacros.cal || 0} kcal · 蛋白 ${todayMacros.pro.toFixed(1)}g / 碳水 ${todayMacros.carb.toFixed(1)}g / 脂肪 ${todayMacros.fat.toFixed(1)}g`); blocks.push(`【${rangeLabel}饮食记录】\n${formatFoods(rangeFoods) || `${rangeLabel}暂无饮食记录`}`); blocks.push(`【${rangeLabel}宏量营养】\n蛋白 ${rangeMacros.pro.toFixed(1)}g / 碳水 ${rangeMacros.carb.toFixed(1)}g / 脂肪 ${rangeMacros.fat.toFixed(1)}g`); }
-            if (contexts.training) { blocks.push(`【${rangeLabel}训练记录】\n${formatTraining(rangeHistory) || `${rangeLabel}暂无训练记录`}`); blocks.push(`【${rangeLabel}手动运动】\n${formatExerciseLogs(rangeExerciseLogs) || `${rangeLabel}暂无手动运动记录`}`); const rehabWeeks = this.activeRecords(this.db.health?.rehabWeekly || []).slice().sort((a, b) => String(b.weekStart || '').localeCompare(String(a.weekStart || '')) || Number(b.updatedAt || 0) - Number(a.updatedAt || 0)).slice(0, mode === 'light' ? 3 : 6); blocks.push(`【近${mode === 'light' ? '3' : '6'}周康复中心处方】\n${formatRehabWeekly(rehabWeeks) || '暂无康复中心处方'}\n规则：优先遵守最近3周；更早处方用于理解长期禁忌、反复疼痛和动作演变。`); }
+            if (contexts.training) { blocks.push(`【${rangeLabel}训练记录】\n${formatTraining(rangeHistory) || `${rangeLabel}暂无训练记录`}`); blocks.push(`【${rangeLabel}手动运动】\n${rangeExerciseText || `${rangeLabel}暂无手动运动记录`}`); blocks.push(`【${rangeLabel}训练计划】\n${formatDailyPlans(rangeDailyPlans) || `${rangeLabel}暂无训练计划`}`); blocks.push(`【周计划绑定】\n${formatWeeklyPlan() || '暂无周计划绑定'}`); blocks.push(`【当前动作计划】\n${formatCurrentActions() || '暂无当前动作计划'}`); blocks.push(`【方案库摘要】\n${formatRoutines() || '暂无保存方案'}`); const rehabWeeks = this.activeRecords(this.db.health?.rehabWeekly || []).slice().sort((a, b) => String(b.weekStart || '').localeCompare(String(a.weekStart || '')) || Number(b.updatedAt || 0) - Number(a.updatedAt || 0)).slice(0, mode === 'light' ? 3 : 6); blocks.push(`【近${mode === 'light' ? '3' : '6'}周康复中心处方】\n${formatRehabWeekly(rehabWeeks) || '暂无康复中心处方'}\n规则：优先遵守最近3周；更早处方用于理解长期禁忌、反复疼痛和动作演变。`); }
             if (contexts.weight) { blocks.push(`【${rangeLabel}体重记录】\n${formatWeights(rangeWeights) || `${rangeLabel}暂无体重记录`}`); if (range === 'today' && trendWeights.length) blocks.push(`【近${trendWeights.length}条体重记录（用于趋势分析）】\n${formatWeights(trendWeights)}`); }
-            if (contexts.goal && dietGoal.dailyCal) blocks.push(`【饮食目标】\n每日 ${dietGoal.dailyCal} kcal · 目标类型：${dietGoal.goalType === 'gain' ? '增肌' : '减重'}`);
+            if (contexts.goal) blocks.push(`【目标与计划】\n${formatGoalPlans() || '暂无目标计划'}`);
+            if (rangeReports.length) blocks.push(`【近期报告摘要】\n${formatReports(rangeReports)}`);
             const conversation = this.adviceConversationContext(mode === 'none' ? 0 : mode === 'light' ? 2 : 8);
             const template = this.getActiveAdviceTemplate?.() || null;
             if (template) {
-                const vars = this.buildAdviceTemplateVars?.({ prompt, range, blocks, today, todayFoods, todayHistory, todayExerciseLogs, todayWeights, rangeFoods, rangeHistory, rangeExerciseLogs, rangeWeights }) || {};
+                const vars = this.buildAdviceTemplateVars?.({ prompt, range, blocks, today, todayFoods, todayHistory, todayExerciseLogs, todayExerciseText, todayManualExercises: todayExerciseText, todayWeights, todayDailyPlans, rangeFoods, rangeHistory, rangeExerciseLogs, rangeExerciseText, manualExercises: rangeExerciseText, rangeWeights, rangeDailyPlans, targetExerciseLogs, targetExerciseText, targetManualExercises: targetExerciseText, targetDailyPlans }) || {};
                 return [{ role: 'system', content: String(template.system || '').trim() || sys }, ...conversation, { role: 'user', content: this.applyAdviceTemplate?.(template.user || '{prompt}', vars) || blocks.join('\n\n') }];
             }
             return [{ role: 'system', content: sys }, ...conversation, { role: 'user', content: blocks.join('\n\n') }];

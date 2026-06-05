@@ -44,6 +44,7 @@ function loadAdvicePanelHarness() {
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#39;');
+    /** @type {any} */
     const data = {
         __context: context,
         db: {
@@ -138,6 +139,202 @@ test('coach context reattaches advice message builder after lazy load', () => {
     vm.runInContext(coachContextCode, context);
 
     assert.equal(typeof data.buildAdviceMessages, 'function');
+});
+
+/** @returns {{ context: any, data: any }} */
+function loadCoachContextHarness(overrides = {}) {
+    const context = {
+        window: {
+            matchMedia: () => ({ matches: false, addEventListener: () => {} }),
+            dataAiTemplates: null
+        },
+        document: {
+            getElementById: () => null,
+            querySelector: () => null
+        },
+        localStorage: { getItem: () => null, setItem: () => {} },
+        requestAnimationFrame: (fn) => fn(),
+        navigator: { maxTouchPoints: 0 },
+        ai: { overrideModel: null, call: async () => '' }
+    };
+    context.globalThis = context;
+    vm.createContext(context);
+    const advicePanelCode = fs.readFileSync(new URL('../advice-panel.js', import.meta.url), 'utf8');
+    vm.runInContext(`${advicePanelCode}\nthis.__advicePanel = advicePanel;`, context);
+    /** @type {any} */
+    const data = {
+        db: {
+            history: [],
+            health: {
+                foodLogs: [],
+                weights: [],
+                exerciseLogs: [{
+                    id: 'exercise-1',
+                    date: '2026-05-30',
+                    type: 'strength',
+                    customName: '哑铃卧推',
+                    minutes: 18,
+                    calories: 95,
+                    distance: 0,
+                    weightKg: 20,
+                    sets: 4,
+                    repsPerSet: 10,
+                    note: '右肩无痛',
+                    deleted: false
+                }],
+                rehabWeekly: [],
+                reports: [{
+                    id: 'report-1',
+                    kind: 'weekly',
+                    periodStart: '2026-05-24',
+                    periodEnd: '2026-05-30',
+                    ai: { summary: '本周训练稳定', highlights: ['完成率高'], suggestions: ['增加拉伸'] },
+                    deleted: false
+                }],
+                dietGoal: { dailyCal: 2100, goalType: 'gain', protein: 150 },
+                bodyPlan: { goalType: 'gain', targetWeight: 75, weeklyChangeKg: 0.25 },
+                weightPlan: { startWeight: 70, targetWeight: 75, days: 120 },
+                weeklyGoalSessions: 4,
+                aiAdviceChat: []
+            },
+            actions: [{ id: 'action-1', name: '俯卧撑', tags: ['push'], libOnly: false, deleted: false }],
+            routines: [{ id: 'routine-1', name: '上肢康复', actions: [{ name: '弹力带外旋' }], deleted: false }],
+            dailyPlans: [{
+                id: 'plan-1',
+                date: '2026-05-30',
+                type: 'rehab',
+                title: '今日康复计划',
+                source: 'ai',
+                notes: '避免疼痛动作',
+                items: [{
+                    id: 'task-1',
+                    name: '肩胛后缩',
+                    status: 'todo',
+                    currentLevel: 2,
+                    spec: { sets: 3, reps: 12, work: 3 },
+                    feedback: { rpe: 2, note: '轻松' },
+                    aiReasoning: '稳定肩胛',
+                    deleted: false
+                }],
+                deleted: false
+            }],
+            weeklyPlan: { sat: 'routine-1' },
+            aiTemplates: [],
+            aiTemplateActiveId: ''
+        },
+        adviceRange: 'today',
+        adviceContextMode: 'auto',
+        adviceContexts: { diet: false, training: true, weight: false, goal: false },
+        activeRecords(items) { return (items || []).filter(item => !item.deleted); },
+        parseHistoryDate(value) { return new Date(value || '2026-05-30T00:00:00.000Z'); },
+        dateKey(date) { return new Date(date).toISOString().slice(0, 10); },
+        dateFromKey(value) { return new Date(`${value}T00:00:00.000Z`); },
+        logicalDayStart() { return new Date('2026-05-30T00:00:00.000Z'); },
+        logicalDateKey() { return '2026-05-30'; },
+        historyDayKey(entry) { return entry.dayKey || '2026-05-30'; },
+        historyNames(entry) { return (entry.actions || []).map(action => action.name || '未命名'); },
+        sortedWeights() { return []; },
+        exerciseLabel(type = '', entry = /** @type {any} */ (null)) {
+            if (type === 'strength' && entry?.customName) return entry.customName;
+            return type || '运动';
+        },
+        adviceConversationContext: () => [],
+        getActiveAdviceTemplate: () => null,
+        buildAdviceTemplateVars: context.__advicePanel.buildAdviceTemplateVars,
+        applyAdviceTemplate: context.__advicePanel.applyAdviceTemplate,
+        ...overrides
+    };
+    context.window.adviceTemplateManager = {
+        getActiveAdviceTemplate() { return this.db.aiTemplates?.find(template => template.id === this.db.aiTemplateActiveId) || this.db.aiTemplates?.[0] || null; }
+    };
+    Object.assign(data, {
+        adviceRangeStart: context.__advicePanel.adviceRangeStart,
+        buildAdviceMessages: null,
+        parsePromptTargetDate: null
+    });
+    context.window.data = data;
+    const coachContextCode = fs.readFileSync(new URL('../coach-context.js', import.meta.url), 'utf8');
+    vm.runInContext(coachContextCode, context);
+    return { context, data };
+}
+
+test('AI advice prompt includes manual exercise records without health-exercise module', () => {
+    const { data } = loadCoachContextHarness();
+
+    const messages = data.buildAdviceMessages('分析今天训练', 'test-model');
+    const userContent = messages.find(message => message.role === 'user')?.content || '';
+
+    assert.match(userContent, /【今日手动运动】/);
+    assert.match(userContent, /哑铃卧推/);
+    assert.match(userContent, /18分钟/);
+    assert.match(userContent, /95 kcal/);
+    assert.match(userContent, /20kg/);
+    assert.match(userContent, /4组/);
+    assert.match(userContent, /10次/);
+    assert.match(userContent, /右肩无痛/);
+});
+
+test('AI advice prompt includes plans goals libraries and reports', () => {
+    const { data } = loadCoachContextHarness({
+        adviceContexts: { diet: true, training: true, weight: true, goal: true }
+    });
+
+    const messages = data.buildAdviceMessages('结合我的计划和目标分析今天', 'test-model');
+    const userContent = messages.find(message => message.role === 'user')?.content || '';
+
+    assert.match(userContent, /【今日训练计划】/);
+    assert.match(userContent, /今日康复计划/);
+    assert.match(userContent, /肩胛后缩/);
+    assert.match(userContent, /RPE2/);
+    assert.match(userContent, /【周计划绑定】/);
+    assert.match(userContent, /周六｜上肢康复/);
+    assert.match(userContent, /【当前动作计划】/);
+    assert.match(userContent, /俯卧撑/);
+    assert.match(userContent, /【方案库摘要】/);
+    assert.match(userContent, /弹力带外旋/);
+    assert.match(userContent, /【目标与计划】/);
+    assert.match(userContent, /每周训练目标:4次/);
+    assert.match(userContent, /targetWeight/);
+    assert.match(userContent, /【近期报告摘要】/);
+    assert.match(userContent, /本周训练稳定/);
+});
+
+test('custom advice template can access manual exercise variables', () => {
+    const { data } = loadCoachContextHarness({
+        db: {
+            history: [],
+            health: {
+                foodLogs: [],
+                weights: [],
+                exerciseLogs: [{
+                    id: 'exercise-1',
+                    date: '2026-05-30',
+                    type: 'strength',
+                    customName: '哑铃卧推',
+                    minutes: 18,
+                    calories: 95,
+                    weightKg: 20,
+                    sets: 4,
+                    repsPerSet: 10,
+                    deleted: false
+                }],
+                rehabWeekly: [],
+                dietGoal: null,
+                aiAdviceChat: []
+            },
+            aiTemplates: [{ id: 'tpl-1', system: '系统', user: '手动运动：{manualExercises}\n今日：{todayManualExercises}\n问题：{prompt}' }],
+            aiTemplateActiveId: 'tpl-1'
+        },
+        getActiveAdviceTemplate() { return this.db.aiTemplates[0]; }
+    });
+
+    const messages = data.buildAdviceMessages('分析今天训练', 'test-model');
+    const userContent = messages.find(message => message.role === 'user')?.content || '';
+
+    assert.match(userContent, /手动运动：- 2026-05-30｜哑铃卧推/);
+    assert.match(userContent, /今日：- 2026-05-30｜哑铃卧推/);
+    assert.doesNotMatch(userContent, /\{manualExercises\}/);
+    assert.doesNotMatch(userContent, /\{todayManualExercises\}/);
 });
 
 test('editing a user advice prompt inserts a new active answer version after the original prompt', async () => {

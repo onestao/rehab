@@ -285,7 +285,13 @@ const advicePanel = {
             height,
             age,
             gender,
-            recentRecords
+            recentRecords,
+            manualExercises: context.manualExercises || context.rangeExerciseText || '',
+            todayManualExercises: context.todayManualExercises || context.todayExerciseText || '',
+            targetManualExercises: context.targetManualExercises || context.targetExerciseText || '',
+            dailyPlans: Array.isArray(context.rangeDailyPlans) ? JSON.stringify(context.rangeDailyPlans) : (context.dailyPlans || ''),
+            todayDailyPlans: Array.isArray(context.todayDailyPlans) ? JSON.stringify(context.todayDailyPlans) : '',
+            targetDailyPlans: Array.isArray(context.targetDailyPlans) ? JSON.stringify(context.targetDailyPlans) : ''
         };
     },
 
