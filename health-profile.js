@@ -247,13 +247,12 @@
 
         openProfileModal() {
             const p = this.db.health?.profile || {};
-            const modal = document.getElementById('profileModal');
-            if (modal) modal.remove();
+            this.closeProfileModalInternal();
             const html = `<div class="md-modal-overlay" id="profileModal" onclick="if(event.target===this)data.closeProfileModal()">
-                <div class="md-modal profile-modal">
+                <div class="md-modal profile-modal" data-drag-dismiss>
                     <div class="md-modal-head">
                         <h3><span class="profile-modal-title-icon material-symbols-rounded">clinical_notes</span>编辑健康档案</h3>
-                        <button class="md-icon-btn" onclick="data.closeProfileModal()" type="button"><span class="material-symbols-rounded">close</span></button>
+                        <button class="md-icon-btn" data-modal-close onclick="data.closeProfileModal()" type="button"><span class="material-symbols-rounded">close</span></button>
                     </div>
                     <div class="md-modal-body">
                         <div class="profile-form-section profile-form-basic">
@@ -292,12 +291,14 @@
                         <p class="profile-privacy"><span class="material-symbols-rounded">shield</span>数据仅保存在本机或你的同步账号，不会上传第三方服务</p>
                     </div>
                     <div class="md-modal-foot">
-                        <button class="md-btn" onclick="data.closeProfileModal()" type="button">取消</button>
+                        <button class="md-btn" data-modal-close onclick="data.closeProfileModal()" type="button">取消</button>
                         <button class="md-btn md-btn-filled" onclick="data.saveProfileFromModal()" type="button">保存</button>
                     </div>
                 </div>
             </div>`;
             document.body.insertAdjacentHTML('beforeend', html);
+            window.navStack?.replaceOrPush?.({ type: 'modal', id: 'profileModal', close: () => this.closeProfileModalInternal() });
+            window.focusTrap?.trap?.(document.getElementById('profileModal'));
             this.autoResizeProfileTextareas(document.getElementById('profileModal'));
         },
 
@@ -434,6 +435,7 @@
         },
 
         openRehabWeeklySheet(editWeekStart) {
+            this.closeRehabWeeklySheetInternal();
             const weekStart = editWeekStart || this.rehabWeekStart?.() || this.logicalDateKey?.() || this.dateKey(new Date());
             const visitDate = this.logicalDateKey?.() || this.dateKey(new Date());
             let existingRecord = null;
@@ -441,12 +443,11 @@
                 existingRecord = (this.activeRecords?.(this.db.health?.rehabWeekly || []) || []).find(r => r.weekStart === editWeekStart) || null;
             }
             this._rehabWeeklyDraft = existingRecord ? this.normalizeRehabWeeklyPayload(existingRecord, { weekStart: existingRecord.weekStart, visitDate: existingRecord.visitDate, rawText: existingRecord.rawText || '' }) : null;
-            document.getElementById('rehabWeeklySheet')?.remove();
             const html = `<div class="md-modal-overlay rehab-week-overlay" id="rehabWeeklySheet" onclick="if(event.target===this)data.closeRehabWeeklySheet()">
-                <div class="md-modal rehab-week-modal">
+                <div class="md-modal rehab-week-modal" data-drag-dismiss>
                     <div class="md-modal-head rehab-week-modal-head">
                         <h3><span class="profile-modal-title-icon material-symbols-rounded">clinical_notes</span>录入康复周处方</h3>
-                        <button class="md-icon-btn" onclick="data.closeRehabWeeklySheet()" type="button"><span class="material-symbols-rounded">close</span></button>
+                        <button class="md-icon-btn" data-modal-close onclick="data.closeRehabWeeklySheet()" type="button"><span class="material-symbols-rounded">close</span></button>
                     </div>
                     <div class="rehab-week-mobile-summary" aria-label="康复周处方摘要">
                         <div class="rehab-week-stat"><strong id="rehabDraftActions">0</strong><small>动作</small></div>
@@ -463,6 +464,8 @@
                 </div>
             </div>`;
             document.body.insertAdjacentHTML('beforeend', html);
+            window.navStack?.replaceOrPush?.({ type: 'modal', id: 'rehabWeeklySheet', close: () => this.closeRehabWeeklySheetInternal() });
+            window.focusTrap?.trap?.(document.getElementById('rehabWeeklySheet'));
             if (existingRecord) {
                 const textarea = document.getElementById('rehabPrescriptionText');
                 if (textarea) textarea.value = existingRecord.rawText || '';
@@ -540,8 +543,14 @@
         },
 
         closeRehabWeeklySheet() {
+            if (!window.navStack?.requestClose?.('modal')) this.closeRehabWeeklySheetInternal();
+        },
+
+        closeRehabWeeklySheetInternal() {
             document.getElementById('rehabWeeklySheet')?.remove();
             this._rehabWeeklyDraft = null;
+            window.focusTrap?.release?.();
+            return true;
         },
 
         openRehabWeeklyStep(id) {
@@ -836,7 +845,13 @@
         },
 
         closeProfileModal() {
+            if (!window.navStack?.requestClose?.('modal')) this.closeProfileModalInternal();
+        },
+
+        closeProfileModalInternal() {
             document.getElementById('profileModal')?.remove();
+            window.focusTrap?.release?.();
+            return true;
         }
     };
 })();

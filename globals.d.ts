@@ -72,4 +72,7 @@ interface Window {
   cardioPure: any;
   prTracker: any;
   volumeHeatmap: any;
+  dataPlanAi: any;
+  planAiPure: any;
+  loadAppScript: (name: string) => Promise<void>;
 }

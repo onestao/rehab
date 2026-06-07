@@ -72,6 +72,15 @@ function attachPlanAliases() {
     data.openPlanWeeklySheet = data.openPlanWeeklySheet || function (...args) {
         return window['planWeekly']?.open?.(...args);
     };
+    data.openPlanAiSheet = data.openPlanAiSheet || async function (...args) {
+        if (typeof window.loadAppScript === 'function' && !window.dataPlanAi?.openPlanAiSheet) {
+            await window.loadAppScript('plan-ai');
+        }
+        data.refreshModules?.();
+        const open = window.dataPlanAi?.openPlanAiSheet;
+        if (typeof open === 'function') return open.apply(data, args);
+        window.toast?.show?.('AI 计划模块尚未加载完成，请稍后重试。', 'error');
+    };
     data.renderPlanEquipmentPanel = data.renderPlanEquipmentPanel || data.renderPlanEquipmentCard;
 }
 

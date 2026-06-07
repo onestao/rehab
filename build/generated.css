@@ -4447,6 +4447,14 @@ body.is-training .fab-pip.active {
     transform: translateY(var(--sheet-drag-y, 0));
     transition: transform var(--md-sys-motion-duration-medium2, 300ms) var(--md-expressive-spring);
 }
+.md-modal[data-drag-dismiss] {
+    transform: translateY(var(--sheet-drag-y, 0));
+    transition: transform var(--md-sys-motion-duration-medium2, 300ms) var(--md-expressive-spring);
+    touch-action: pan-y;
+}
+.md-modal[data-drag-dismiss].is-dragging {
+    transition: none;
+}
 .md-modal-sheet-card::before {
     content: '';
     position: absolute;

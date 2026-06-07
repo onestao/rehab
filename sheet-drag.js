@@ -40,8 +40,8 @@
     }
 
     function closeSheet(card) {
-        const modal = card.closest('.md-modal-sheet');
-        const close = modal?.querySelector('[data-modal-close], .md-modal-head .icon-btn');
+        const modal = card.closest('.md-modal-sheet, .md-modal-overlay');
+        const close = modal?.querySelector('[data-modal-close], .md-modal-head .icon-btn, .md-modal-head .md-icon-btn');
         if (close instanceof HTMLElement) {
             close.click();
             return;
@@ -49,12 +49,20 @@
         modal?.querySelector('.md-modal-backdrop')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     }
 
+    function findDraggableCard(target) {
+        const sheetCard = target?.closest?.('.md-modal-sheet-card');
+        if (sheetCard && !sheetCard.closest('.hidden')) return sheetCard;
+        const modalCard = target?.closest?.('.md-modal[data-drag-dismiss]');
+        if (!modalCard || modalCard.closest('.hidden')) return null;
+        return modalCard;
+    }
+
     function onStart(event) {
         if (event.touches?.length !== 1) return;
         const touch = event.touches?.[0];
         if (!touch) return;
-        const card = event.target?.closest?.('.md-modal-sheet-card');
-        if (!card || card.closest('.hidden')) return;
+        const card = findDraggableCard(event.target);
+        if (!card) return;
         const rect = card.getBoundingClientRect();
         const fromHead = !!event.target?.closest?.('.md-modal-head');
         const fromHandle = touch.clientY - rect.top <= DRAG_HANDLE_HEIGHT;

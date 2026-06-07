@@ -4,12 +4,14 @@ import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 
 function loadPlanAi() {
+  const pureCode = readFileSync(new URL('../plan-ai-pure.js', import.meta.url), 'utf8');
   const code = readFileSync(new URL('../plan-ai.js', import.meta.url), 'utf8');
   const sandbox = {
     window: { toast: { show() {} } },
     document: {},
     console
   };
+  vm.runInNewContext(pureCode, sandbox);
   vm.runInNewContext(code, sandbox);
   return sandbox.window.dataPlanAi;
 }
