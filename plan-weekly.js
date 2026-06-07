@@ -52,6 +52,7 @@
             this.selectedDate = this.selectedDate || data.logicalDateKey?.() || data.dateKey(new Date());
             body.innerHTML = this.render();
             this.bindDrag(body);
+            this.bindActions(body);
             sheet.classList.remove('hidden');
             sheet.setAttribute('aria-hidden', 'false');
             window.navStack?.push?.({
@@ -74,6 +75,7 @@
             if (body) {
                 body.innerHTML = this.render();
                 this.bindDrag(body);
+                this.bindActions(body);
             }
         },
 
@@ -138,6 +140,7 @@
                     if (body) {
                         body.innerHTML = this.render();
                         this.bindDrag(body);
+                        this.bindActions(body);
                     }
                     data.render?.('today');
                     window.toast?.show?.('已移动到目标日期', 'success');
@@ -156,6 +159,22 @@
             root.addEventListener('pointerup', finishDrag, { passive: true });
             root.addEventListener('pointercancel', reset, { passive: true });
             root.addEventListener('pointerleave', () => clearTimer(), { passive: true });
+        },
+
+        bindActions(root) {
+            if (!root || root.dataset.planWeeklyActionsBound === '1') return;
+            root.dataset.planWeeklyActionsBound = '1';
+            root.addEventListener('click', (event) => {
+                const btn = event.target?.closest?.('[data-plan-weekly-action]');
+                if (!btn || !root.contains(btn)) return;
+                const action = btn.getAttribute('data-plan-weekly-action') || '';
+                const planId = btn.getAttribute('data-plan-id') || '';
+                const taskId = btn.getAttribute('data-task-id') || '';
+
+                event.preventDefault();
+                if (action === 'task-tap') data.handlePlanTaskTap?.(planId, taskId);
+                else if (action === 'task-menu') data.openPlanTaskMenu?.(planId, taskId);
+            });
         },
 
         render() {
@@ -184,13 +203,15 @@
                         return plans.flatMap((plan) => (plan.items || []).filter((item) => !item.deleted).map((item) => `
                             ${(() => {
                                 const meta = statusMeta(item);
-                                return `<div class="plan-weekly-task ${meta.className}" data-plan-id="${plan.id}" data-task-id="${item.id}" data-date="${plan.date}">
-                                <button class="plan-weekly-task-main" type="button" onclick="data.handlePlanTaskTap('${plan.id}','${item.id}')">
+                                const planId = data.escapeHtml(plan.id || '');
+                                const taskId = data.escapeHtml(item.id || '');
+                                return `<div class="plan-weekly-task ${meta.className}" data-plan-id="${planId}" data-task-id="${taskId}" data-date="${data.escapeHtml(plan.date || '')}">
+                                <button class="plan-weekly-task-main" type="button" data-plan-weekly-action="task-tap" data-plan-id="${planId}" data-task-id="${taskId}">
                                     <span class="material-symbols-rounded">${meta.icon}</span>
                                     <strong>${data.escapeHtml(item.name || '未命名任务')}</strong>
                                     <small>${meta.label}</small>
                                 </button>
-                                <button class="md-icon-btn" type="button" onclick="data.openPlanTaskMenu('${plan.id}','${item.id}')"><span class="material-symbols-rounded">more_vert</span></button>
+                                <button class="md-icon-btn" type="button" data-plan-weekly-action="task-menu" data-plan-id="${planId}" data-task-id="${taskId}"><span class="material-symbols-rounded">more_vert</span></button>
                             </div>`;
                             })()}
                         `)).join('');

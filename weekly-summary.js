@@ -101,7 +101,8 @@
             const profileLines = [];
             const conditionType = { injury: '运动损伤', chronic: '慢性病', allergy: '过敏', surgery: '手术史', medication: '用药', other: '其他' };
             if (profile.gender || profile.age || this.db.health?.height) profileLines.push(`基础：${profile.gender === 'female' ? '女' : '男'} · ${profile.age || '?'}岁${this.db.health?.height ? ' · 身高' + this.db.health.height + 'cm' : ''}`);
-            if (profile.conditions?.length) profile.conditions.forEach(c => profileLines.push(`- [${conditionType[c.type] || c.type || '健康状况'}] ${c.label || '未命名'}${c.severity ? '（' + c.severity + '）' : ''}${c.avoid?.length ? '；避免：' + c.avoid.join('、') : ''}${c.note ? '；备注：' + c.note : ''}`));
+            if (profile.conditions?.length) profile.conditions.forEach(c => profileLines.push(`- [诊断:${conditionType[c.type] || c.type || '健康状况'}] ${c.label || '未命名'}${c.severity ? '（' + c.severity + '）' : ''}${c.bodyPart ? '；部位：' + c.bodyPart : ''}${c.avoid?.length ? '；避免：' + c.avoid.join('、') : ''}${c.note ? '；备注：' + c.note : ''}`));
+            if (profile.examResults?.length) profile.examResults.forEach(exam => profileLines.push(`- [检查结果] ${exam.item || '检查'}${exam.date ? '（' + exam.date + '）' : ''}${exam.bodyPart ? '；部位：' + exam.bodyPart : ''}${exam.conditionLabel ? '；关联诊断：' + exam.conditionLabel : ''}${exam.result ? '；结果：' + exam.result : ''}${exam.note ? '；备注：' + exam.note : ''}`));
             if (profile.allergies?.length) profileLines.push(`过敏/不耐受：${profile.allergies.join('、')}`);
             if (profile.preferences?.equipment?.length) profileLines.push(`可用器材：${profile.preferences.equipment.join('、')}`);
             if (profile.preferences?.sports?.length) profileLines.push(`偏好运动：${profile.preferences.sports.join('、')}`);

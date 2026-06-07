@@ -2,7 +2,10 @@
 (function () {
     function refreshContent(ctx) {
         const content = document.getElementById('aiTemplateManagerContent');
-        if (content) content.innerHTML = ctx.renderTemplateManagerContent();
+        if (content) {
+            content.innerHTML = ctx.renderTemplateManagerContent();
+            ctx.bindTemplateManagerActions?.(content);
+        }
     }
 
     function renderChipGroup(ctx, taskId, field, currentValue) {
@@ -103,8 +106,30 @@
             const content = document.getElementById('aiTemplateManagerContent');
             if (!sheet || !content) return;
             content.innerHTML = this.renderTemplateManagerContent();
+            this.bindTemplateManagerActions(content);
             sheet.classList.toggle('hidden', !this._templateManagerOpen);
             sheet.setAttribute('aria-hidden', this._templateManagerOpen ? 'false' : 'true');
+        },
+
+        bindTemplateManagerActions(root) {
+            if (!root || root.dataset.templateManagerActionsBound === '1') return;
+            root.dataset.templateManagerActionsBound = '1';
+            root.addEventListener('click', (event) => {
+                const btn = event.target?.closest?.('[data-template-action]');
+                if (!btn || !root.contains(btn)) return;
+                const action = btn.getAttribute('data-template-action') || '';
+                const id = btn.getAttribute('data-template-id') || '';
+
+                event.preventDefault();
+                if (action === 'select') this.selectAdviceTemplate(id);
+                else if (action === 'edit') {
+                    event.stopPropagation();
+                    this.editTemplateById(id);
+                } else if (action === 'delete') {
+                    event.stopPropagation();
+                    this.deleteTemplateById(id);
+                }
+            });
         },
 
         closeTemplateManager() {
@@ -307,14 +332,14 @@
                 <div class="pref-advanced-warning"><span class="material-symbols-rounded">warning</span> 实验性：修改可能导致功能异常</div>
                 <div class="template-manager-body">
                     <div class="template-manager-list">
-                        ${templates.map(t => `<button class="template-manager-item ${t.id === activeId ? 'active' : ''}" onclick="data.selectAdviceTemplate('${this.escapeHtml(t.id)}')" type="button">
+                        ${templates.map(t => `<button class="template-manager-item ${t.id === activeId ? 'active' : ''}" data-template-action="select" data-template-id="${this.escapeHtml(t.id)}" type="button">
                             <div class="template-manager-item-main">
                                 <strong>${this.escapeHtml(t.name)}</strong>
                                 <small>${this.escapeHtml(t.scenario)}</small>
                             </div>
                             <span class="template-manager-item-actions">
-                                <span class="material-symbols-rounded" onclick="event.stopPropagation();data.editTemplateById('${this.escapeHtml(t.id)}')">edit</span>
-                                <span class="material-symbols-rounded" onclick="event.stopPropagation();data.deleteTemplateById('${this.escapeHtml(t.id)}')">delete</span>
+                                <span class="material-symbols-rounded" data-template-action="edit" data-template-id="${this.escapeHtml(t.id)}">edit</span>
+                                <span class="material-symbols-rounded" data-template-action="delete" data-template-id="${this.escapeHtml(t.id)}">delete</span>
                             </span>
                         </button>`).join('')}
                     </div>

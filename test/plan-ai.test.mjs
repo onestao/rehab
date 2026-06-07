@@ -6,7 +6,7 @@ import vm from 'node:vm';
 function loadPlanAi() {
   const code = readFileSync(new URL('../plan-ai.js', import.meta.url), 'utf8');
   const sandbox = {
-    window: {},
+    window: { toast: { show() {} } },
     document: {},
     console
   };
@@ -241,6 +241,115 @@ test('plan AI context includes six recent rehab prescriptions', () => {
   assert.match(prompt, /第4-6周处方仅用于理解长期禁忌/);
 });
 
+test('plan AI context includes current target plan and body part constraints', () => {
+  const api = loadPlanAi();
+  const ctx = createContext(api);
+  ctx.db.dailyPlans = [{
+    id: 'today-rehab',
+    date: '2026-05-25',
+    type: 'rehab',
+    title: '今日康复',
+    notes: '原计划备注',
+    items: [
+      { id: 'done-knee', name: '靠墙蹲', category: 'main', status: 'done', spec: { sets: 2, reps: 0, work: 30 }, feedback: { rpe: 3 }, userOverride: false },
+      { id: 'todo-ankle', name: '踝泵', category: 'main', status: 'todo', spec: { sets: 2, reps: 15, work: 1 }, userOverride: true }
+    ]
+  }];
+  ctx.db.health.profile = {
+    conditions: [{ type: 'injury', label: '左膝半月板损伤', severity: 'moderate', avoid: ['深蹲大重量'] }]
+  };
+  ctx.db.health.rehabWeekly = [{
+    weekStart: '2026-05-25',
+    actions: [
+      { name: '台阶下放', bodyPart: '膝', status: 'watch', painLevel: 4, needsReview: true },
+      { name: '跪姿后踢腿', bodyPart: '髋', status: 'dropped' }
+    ]
+  }];
+
+  const prompt = api.buildPlanAiContext.call(ctx, 'today', '优化现有计划', ['rehab']);
+
+  assert.match(prompt, /目标当前计划完整摘要/);
+  assert.match(prompt, /今日康复/);
+  assert.match(prompt, /靠墙蹲/);
+  assert.match(prompt, /userOverride":true/);
+  assert.match(prompt, /诊断\/处方部位约束/);
+  assert.match(prompt, /"bodyPart":"膝"/);
+  assert.match(prompt, /台阶下放\(疼痛4\/10\)/);
+  assert.match(prompt, /跪姿后踢腿/);
+  assert.match(prompt, /安全\/健康禁忌\/疼痛阈值 > 最近3周康复处方 > 当前计划保留\/改造/);
+});
+
+test('plan AI context scopes rehab prescriptions to selected conditions', () => {
+  const api = loadPlanAi();
+  const ctx = createContext(api);
+  ctx.db.health.profile = {
+    conditions: [
+      { id: 'cond-knee', type: 'injury', label: '左膝半月板损伤', bodyPart: '膝', severity: 'moderate', avoid: ['深蹲大重量'] },
+      { id: 'cond-shoulder', type: 'injury', label: '右肩撞击综合征', bodyPart: '肩', severity: 'mild', avoid: ['过顶推举'] }
+    ]
+  };
+  ctx._planAiConditionIds = ['cond-knee'];
+  ctx.db.health.rehabWeekly = [{
+    weekStart: '2026-05-25',
+    actions: [
+      { name: '台阶下放', bodyPart: '膝', conditionId: 'cond-knee', conditionLabel: '左膝半月板损伤', status: 'continued' },
+      { name: '肩外旋', bodyPart: '肩', conditionId: 'cond-shoulder', conditionLabel: '右肩撞击综合征', status: 'continued' }
+    ]
+  }];
+
+  const prompt = api.buildPlanAiContext.call(ctx, 'today', '只练膝盖康复', ['rehab']);
+
+  assert.match(prompt, /本次选中训练病症/);
+  assert.match(prompt, /左膝半月板损伤/);
+  assert.match(prompt, /未选中病症安全限制/);
+  assert.match(prompt, /右肩撞击综合征/);
+  assert.match(prompt, /选中病症相关处方强规则:[\s\S]*台阶下放/);
+  assert.doesNotMatch(prompt, /选中病症相关处方强规则:[\s\S]*肩外旋[\s\S]*其他病症处方安全限制/);
+  assert.match(prompt, /其他病症处方安全限制:[\s\S]*肩外旋/);
+  assert.match(prompt, /即使某个目标没有对应康复中心处方，也要根据诊断、检查结果/);
+});
+
+test('plan AI condition chips default to injury and surgery conditions', () => {
+  const api = loadPlanAi();
+  const ctx = createContext(api);
+  ctx.db.health.profile = {
+    conditions: [
+      { id: 'cond-knee', type: 'injury', label: '左膝损伤', bodyPart: '膝' },
+      { id: 'cond-bp', type: 'chronic', label: '高血压', bodyPart: '全身' },
+      { id: 'cond-acl', type: 'surgery', label: '前交叉韧带术后', bodyPart: '膝' }
+    ]
+  };
+
+  const html = api.renderPlanAiConditionChips.call(ctx);
+
+  assert.match(html, /左膝损伤/);
+  assert.match(html, /高血压/);
+  assert.match(html, /前交叉韧带术后/);
+  assert.match(html, /cond-knee[\s\S]*aria-pressed="true"/);
+  assert.match(html, /cond-bp[\s\S]*aria-pressed="false"/);
+  assert.match(html, /cond-acl[\s\S]*aria-pressed="true"/);
+});
+
+test('plan AI can target exam results when diagnoses are missing', () => {
+  const api = loadPlanAi();
+  const ctx = createContext(api);
+  ctx.db.health.profile = {
+    conditions: [],
+    examResults: [{ id: 'exam-mri', item: '膝关节 MRI', result: '左膝半月板后角损伤，少量积液', bodyPart: '膝', date: '2026-05-20' }]
+  };
+
+  const html = api.renderPlanAiConditionChips.call(ctx);
+  const prompt = api.buildPlanAiContext.call(ctx, 'today', '根据检查结果安排康复', ['rehab']);
+
+  assert.match(html, /膝关节 MRI/);
+  assert.match(html, /exam:exam-mri[\s\S]*aria-pressed="true"/);
+  assert.match(prompt, /本次选中训练病症/);
+  assert.match(prompt, /膝关节 MRI/);
+  assert.match(prompt, /半月板后角损伤/);
+  assert.match(prompt, /诊断潦草或没有诊断时，可依赖检查结果作为目标来源/);
+  assert.match(prompt, /requiresUserConfirm 必须为 true/);
+});
+
 test('plan AI preview exposes rest and alternation controls', () => {
   const api = loadPlanAi();
   const html = api.renderPlanAiPreviewItem.call(createContext(api), 0, 0, {
@@ -276,4 +385,78 @@ test('plan AI cleanup deletes stale empty unselected plan types only', () => {
   assert.equal(ctx.db.dailyPlans[1].deleted, true);
   assert.equal(ctx.db.dailyPlans[2].deleted, undefined);
   assert.equal(ctx.selectedPlanId, '');
+});
+
+test('plan AI confirmation preserves completed and locked tasks while replacing unfinished unlocked tasks', () => {
+  const api = loadPlanAi();
+  const ctx = createContext(api);
+  ctx.selectedPlanId = '';
+  ctx.db.dailyPlans = [{
+    id: 'existing-rehab',
+    date: '2026-05-25',
+    type: 'rehab',
+    title: '旧康复计划',
+    items: [
+      { id: 'done-task', name: '已完成动作', status: 'done', category: 'main', spec: { sets: 1, reps: 10, work: 2 }, userOverride: false },
+      { id: 'locked-task', name: '锁定动作', status: 'todo', category: 'main', spec: { sets: 1, reps: 10, work: 2 }, userOverride: true },
+      { id: 'todo-task', name: '应被替换动作', status: 'todo', category: 'main', spec: { sets: 1, reps: 10, work: 2 }, userOverride: false }
+    ]
+  }];
+  ctx._pendingPlanAiPlans = [{
+    date: '2026-05-25',
+    type: 'rehab',
+    title: 'AI 康复计划',
+    notes: 'AI notes',
+    items: [{ name: 'AI 新动作', category: 'main', spec: { sets: 2, reps: 12, work: 3, repRest: 0, actionRest: 30, isAlt: false, mode: 'reps' } }]
+  }];
+  ctx.collectPlanAiPreviewPlans = () => ctx._pendingPlanAiPlans;
+  ctx.ensureTaskShape = (item) => ({ id: item.id || `task-${item.name}`, status: item.status || 'todo', deleted: false, ...item });
+  ctx.ensureDailyPlanShape = (plan) => ({ id: plan.id || 'existing-rehab', deleted: false, ...plan });
+  ctx.getDailyPlans = (date) => ctx.db.dailyPlans.filter((plan) => plan.date === date && !plan.deleted);
+  ctx.saveDailyPlan = (plan) => {
+    const index = ctx.db.dailyPlans.findIndex((item) => item.id === plan.id || (!item.deleted && item.date === plan.date && item.type === plan.type));
+    if (index >= 0) ctx.db.dailyPlans[index] = plan;
+    else ctx.db.dailyPlans.unshift(plan);
+  };
+  ctx.cleanupEmptyUnselectedPlanTypes = () => {};
+  ctx.save = () => { ctx.saved = true; };
+  ctx.closePlanAiSheet = () => { ctx.closedSheet = true; };
+  ctx._closeActiveModal = () => { ctx.closedModal = true; };
+  ctx.render = () => { ctx.rendered = true; };
+  api.confirmPlanAiPlans.call(ctx);
+
+  const names = JSON.parse(JSON.stringify(ctx.db.dailyPlans[0].items.map((item) => item.name)));
+  assert.deepEqual(names, ['已完成动作', '锁定动作', 'AI 新动作']);
+  assert.equal(ctx.db.dailyPlans[0].source, 'ai');
+  assert.equal(ctx.saved, true);
+  assert.equal(ctx.closedSheet, true);
+  assert.equal(ctx.closedModal, true);
+  assert.equal(ctx.rendered, true);
+});
+
+test('plan AI confirmation blocks unconfirmed non-prescription suggestions', () => {
+  const api = loadPlanAi();
+  const ctx = createContext(api);
+  ctx.db.dailyPlans = [];
+  ctx._pendingPlanAiPlans = [{
+    date: '2026-05-25',
+    type: 'rehab',
+    title: 'AI 康复计划',
+    notes: '',
+    items: [{ name: '低风险膝关节控制练习', category: 'main', requiresUserConfirm: true, userConfirmed: false, spec: { sets: 2, reps: 8, work: 3, repRest: 0, actionRest: 30, isAlt: false, mode: 'reps' } }]
+  }];
+  ctx.collectPlanAiPreviewPlans = () => ctx._pendingPlanAiPlans;
+  ctx.save = () => { ctx.saved = true; };
+  ctx.ensureTaskShape = (item) => item;
+  ctx.ensureDailyPlanShape = (plan) => plan;
+  ctx.getDailyPlans = () => [];
+  api.confirmPlanAiPlans.call({
+    ...ctx,
+    activeRecords: ctx.activeRecords,
+    cleanupEmptyUnselectedPlanTypes: () => {},
+    saveDailyPlan: () => { ctx.savedPlan = true; }
+  });
+
+  assert.equal(ctx.saved, undefined);
+  assert.equal(ctx.savedPlan, undefined);
 });

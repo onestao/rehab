@@ -23,8 +23,9 @@
             if (statusEl) statusEl.textContent = 'AI 分析中...';
             try {
                 const conditions = profile.conditions || [];
+                const examResults = profile.examResults || [];
                 const allergies = profile.allergies || [];
-                const plan = await ai.bodyGoalPlan({ goalType, currentWeight, targetWeight, activityLevel, dailyTrainMin, height, weeklyFreq, intensity, sportType, experience, gender: profile.gender, age: profile.age, conditions, allergies });
+                const plan = await ai.bodyGoalPlan({ goalType, currentWeight, targetWeight, activityLevel, dailyTrainMin, height, weeklyFreq, intensity, sportType, experience, gender: profile.gender, age: profile.age, conditions, examResults, allergies });
                 const normalized = this.normalizeBodyPlan(plan, { currentWeight, targetWeight }, goalType);
                 this.db.health.bodyPlan = normalized;
                 this.db.health.weightPlan = normalized;

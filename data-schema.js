@@ -74,6 +74,7 @@
             this.db.health.profile.gender = this.db.health.profile.gender || 'male';
             this.db.health.profile.age = this.db.health.profile.age || null;
             this.db.health.profile.conditions = this.db.health.profile.conditions || [];
+            this.db.health.profile.examResults = this.db.health.profile.examResults || [];
             this.db.health.profile.allergies = this.db.health.profile.allergies || [];
             this.db.health.profile.preferences = this.db.health.profile.preferences || { equipment: [], sports: [] };
             this.db.health.profile.vitals = this.db.health.profile.vitals || { restingHR: null };

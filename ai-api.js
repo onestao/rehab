@@ -783,6 +783,12 @@ Object.assign(ai, {
         const prefResult = tpl?.buildPromptMessages(taskId, {}, window.data?.db) || {};
         const prefTags = prefResult.prefTags || '';
         const sysMsg = prefResult.messages?.find(m => m.role === 'system')?.content || '你是运动营养师，只返回纯 JSON，不要 markdown，不要解释。';
+        const healthContext = [
+            Array.isArray(params.conditions) && params.conditions.length ? `诊断结果/禁忌:${JSON.stringify(params.conditions)}` : '',
+            Array.isArray(params.examResults) && params.examResults.length ? `检查结果:${JSON.stringify(params.examResults)}` : '',
+            Array.isArray(params.allergies) && params.allergies.length ? `过敏/不耐受:${params.allergies.join('、')}` : ''
+        ].filter(Boolean).join('\n');
+        const healthPrompt = healthContext ? `\n健康档案（必须参考，检查结果可细化潦草诊断；如缺少诊断则按检查结果保守规避风险）：\n${healthContext}` : '';
         let prompt;
         if (isGain) {
             prompt = `你是运动营养师。请为用户制定增肌计划。\n用户信息：\n- 当前体重：${currentWeight} kg\n- 目标体重：${targetWeight} kg（需增 ${diff.toFixed(2)} kg）\n- 身高：${height || '未知'} cm\n- 日常活动水平：${activityMap[activityLevel] || activityLevel}\n- 每次运动时间：${dailyTrainMin} 分钟\n- 每周运动次数：${weeklyFreq} 次\n- 运动强度：${intensityMap[intensity] || intensity}\n- 主要运动项目：${sportMap[sportType] || sportType}\n- 训练经验：${experienceMap[experience] || experience || '未知'}
@@ -790,6 +796,8 @@ Object.assign(ai, {
         } else {
             prompt = `你是运动营养师。请为用户制定减重计划。\n用户信息：\n- 当前体重：${currentWeight} kg\n- 目标体重：${targetWeight} kg（需减 ${diff.toFixed(2)} kg）\n- 身高：${height || '未知'} cm\n- 日常活动水平：${activityMap[activityLevel] || activityLevel}\n- 每次运动时间：${dailyTrainMin} 分钟\n- 每周运动次数：${weeklyFreq} 次\n- 运动强度：${intensityMap[intensity] || intensity}\n- 主要运动项目：${sportMap[sportType] || sportType}\n- 用户性别：${gender === 'female' ? '女' : '男'}，年龄：${age} 岁。${tpl?.buildFormulaTag?.(prefResult.prefs?.formulaPreference || 'mifflin_st_jeor') || '请使用 Mifflin-St Jeor 公式计算 BMR 和 TDEE'}\n\n${prefTags ? prefTags + '\n' : ''}请严格只返回如下 JSON，不要其他文字：\n{\n  "fast": { "days": 天数, "weeklyLoss": 每周减重kg, "dailyCal": 建议每日摄入kcal, "deficit": 每日热量缺口kcal, "proteinGoal": 蛋白质目标g, "carbGoal": 碳水目标g, "fatGoal": 脂肪目标g, "desc": "一句话说明" },\n  "moderate": { "days": 天数, "weeklyLoss": 每周减重kg, "dailyCal": 建议每日摄入kcal, "deficit": 每日热量缺口kcal, "proteinGoal": 蛋白质目标g, "carbGoal": 碳水目标g, "fatGoal": 脂肪目标g, "desc": "一句话说明" },\n  "slow": { "days": 天数, "weeklyLoss": 每周减重kg, "dailyCal": 建议每日摄入kcal, "deficit": 每日热量缺口kcal, "proteinGoal": 蛋白质目标g, "carbGoal": 碳水目标g, "fatGoal": 脂肪目标g, "desc": "一句话说明" },\n  "tips": ["建议1", "建议2", "建议3"]\n}`;
         }
+        if (healthPrompt) prompt = prompt.replace('\n\n请严格只返回', `${healthPrompt}\n\n请严格只返回`);
+        if (healthPrompt && prefTags) prompt = prompt.replace(`\n\n${prefTags}\n`, `${healthPrompt}\n\n${prefTags}\n`);
         const raw = await this.call([
             { role: 'system', content: sysMsg },
             { role: 'user', content: prompt }

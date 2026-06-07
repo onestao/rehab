@@ -51,6 +51,7 @@ const advicePanel = {
             providerKeyForModel: this.providerKeyForModel,
             providerIcon: this.providerIcon,
             modelShortName: this.modelShortName,
+            bindAdviceModelPickerActions: this.bindAdviceModelPickerActions,
             openAdviceModelPicker: this.openAdviceModelPicker,
             closeAdviceModelPicker: this.closeAdviceModelPicker,
             chooseAdviceModel: this.chooseAdviceModel,
@@ -1182,6 +1183,7 @@ const advicePanel = {
         const content = document.getElementById('aiModelPickerContent');
         if (!modal || !content) return;
         content.innerHTML = this.renderAdviceModelPicker();
+        this.bindAdviceModelPickerActions(content);
         modal.classList.remove('hidden');
         modal.setAttribute('aria-hidden', 'false');
     },
@@ -1196,7 +1198,25 @@ const advicePanel = {
         const allowed = new Set(['current', 'others', 'cached']);
         this.adviceModelPickerScope = allowed.has(scope) ? scope : 'current';
         const content = document.getElementById('aiModelPickerContent');
-        if (content) content.innerHTML = this.renderAdviceModelPicker();
+        if (content) {
+            content.innerHTML = this.renderAdviceModelPicker();
+            this.bindAdviceModelPickerActions(content);
+        }
+    },
+
+    bindAdviceModelPickerActions(root) {
+        if (!root || root.dataset.adviceModelPickerActionsBound === '1') return;
+        root.dataset.adviceModelPickerActionsBound = '1';
+        root.addEventListener('click', (event) => {
+            const row = event.target?.closest?.('[data-advice-model-action="choose"]');
+            if (!row || !root.contains(row)) return;
+            event.preventDefault();
+            this.chooseAdviceModel(
+                row.getAttribute('data-profile-id') || '',
+                row.getAttribute('data-provider') || '',
+                row.getAttribute('data-model') || ''
+            );
+        });
     },
 
     chooseAdviceModel(profileId, provider, model) {
@@ -1269,7 +1289,7 @@ const advicePanel = {
             ${deduped.map(row => {
                 const visual = this.adviceModelVisual(row.model);
                 const style = this.adviceModelThemeStyle(visual);
-                return `<button class="model-picker-row advice-model-${visual.key} ${row.model === effective.model && row.provider === effective.provider ? 'is-selected' : ''}" ${style ? `style="${this.escapeHtml(style)}"` : ''} type="button" aria-disabled="${row.disabled}" title="${row.disabled ? '未配置 API Key' : ''}" onclick="data.chooseAdviceModel('${this.escapeHtml(row.profileId)}','${this.escapeHtml(row.provider)}','${this.escapeHtml(row.model)}')">
+                return `<button class="model-picker-row advice-model-${visual.key} ${row.model === effective.model && row.provider === effective.provider ? 'is-selected' : ''}" ${style ? `style="${this.escapeHtml(style)}"` : ''} type="button" aria-disabled="${row.disabled}" title="${row.disabled ? '未配置 API Key' : ''}" data-advice-model-action="choose" data-profile-id="${this.escapeHtml(row.profileId)}" data-provider="${this.escapeHtml(row.provider)}" data-model="${this.escapeHtml(row.model)}">
                     <span class="advice-model-mark">${this.adviceModelIconHtml(visual)}</span>
                     <span class="model-picker-main"><strong>${this.escapeHtml(row.label)}</strong><small>${this.escapeHtml(row.provider)} · ${this.escapeHtml(row.tag)}</small></span>
                     ${row.model === effective.model && row.provider === effective.provider ? '<span class="material-symbols-rounded">check</span>' : ''}

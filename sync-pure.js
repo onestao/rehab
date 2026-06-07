@@ -54,6 +54,7 @@ function buildS3ObjectKey(remotePath, prefix = 'rehab') {
 function hasMeaningfulHealthProfile(profile) {
     if (!profile || typeof profile !== 'object') return false;
     const conditions = Array.isArray(profile.conditions) ? profile.conditions : [];
+    const examResults = Array.isArray(profile.examResults) ? profile.examResults : [];
     const allergies = Array.isArray(profile.allergies) ? profile.allergies : [];
     const prefs = profile.preferences && typeof profile.preferences === 'object' ? profile.preferences : {};
     const equipment = Array.isArray(prefs.equipment) ? prefs.equipment : [];
@@ -63,6 +64,7 @@ function hasMeaningfulHealthProfile(profile) {
         Number(profile.age || 0) ||
         profile.gender === 'female' ||
         conditions.length ||
+        examResults.length ||
         allergies.length ||
         equipment.length ||
         sports.length ||

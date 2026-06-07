@@ -4,6 +4,40 @@
 
     let active = null;
     const DRAG_HANDLE_HEIGHT = 36;
+    const SCROLL_EPSILON = 1;
+    const DIRECTION_THRESHOLD = 6;
+
+    function isInteractiveTarget(target) {
+        return !!target?.closest?.('input, textarea, select, button, a, label, summary, details, [role="button"], [tabindex], [onclick], [contenteditable="true"]');
+    }
+
+    function getScrollableAncestors(target, card) {
+        const scrollers = [];
+        let node = target instanceof Element ? target : null;
+        while (node && node !== card.parentElement) {
+            if (node instanceof HTMLElement) {
+                const style = getComputedStyle(node);
+                const overflowY = style.overflowY;
+                const canScroll = /(auto|scroll|overlay)/.test(overflowY) && node.scrollHeight > node.clientHeight + SCROLL_EPSILON;
+                if (canScroll) scrollers.push(node);
+            }
+            if (node === card) break;
+            node = node.parentElement;
+        }
+        return scrollers;
+    }
+
+    function canDragFromBody(event, card) {
+        if (isInteractiveTarget(event.target)) return false;
+        return getScrollableAncestors(event.target, card).every((scroller) => scroller.scrollTop <= SCROLL_EPSILON);
+    }
+
+    function resetActive() {
+        if (!active) return;
+        active.card.classList.remove('is-dragging');
+        active.card.style.removeProperty('--sheet-drag-y');
+        active = null;
+    }
 
     function closeSheet(card) {
         const modal = card.closest('.md-modal-sheet');
@@ -16,6 +50,7 @@
     }
 
     function onStart(event) {
+        if (event.touches?.length !== 1) return;
         const touch = event.touches?.[0];
         if (!touch) return;
         const card = event.target?.closest?.('.md-modal-sheet-card');
@@ -23,9 +58,11 @@
         const rect = card.getBoundingClientRect();
         const fromHead = !!event.target?.closest?.('.md-modal-head');
         const fromHandle = touch.clientY - rect.top <= DRAG_HANDLE_HEIGHT;
-        if (!fromHead && !fromHandle) return;
+        const fromBodyTop = !fromHead && !fromHandle && canDragFromBody(event, card);
+        if (!fromHead && !fromHandle && !fromBodyTop) return;
         active = {
             card,
+            fromBodyTop,
             startY: touch.clientY,
             lastY: touch.clientY,
             startAt: performance.now(),
@@ -36,9 +73,17 @@
 
     function onMove(event) {
         if (!active) return;
+        if (event.touches?.length !== 1) {
+            resetActive();
+            return;
+        }
         const touch = event.touches?.[0];
         if (!touch) return;
         const rawDy = touch.clientY - active.startY;
+        if (active.fromBodyTop && rawDy < -DIRECTION_THRESHOLD) {
+            resetActive();
+            return;
+        }
         if (rawDy < 0) {
             active.lastY = touch.clientY;
             active.card.style.removeProperty('--sheet-drag-y');
@@ -57,9 +102,7 @@
         const velocity = dy / dt;
         const shouldClose = dy > active.height / 3 || velocity > 0.6;
         const card = active.card;
-        card.classList.remove('is-dragging');
-        card.style.removeProperty('--sheet-drag-y');
-        active = null;
+        resetActive();
         if (shouldClose) closeSheet(card);
     }
 

@@ -34,6 +34,32 @@
         };
     }
 
+    function inferBodyPart(value = '') {
+        const text = String(value || '').toLowerCase();
+        const rules = [
+            ['膝', /膝|髌|半月板|股四头|台阶|靠墙蹲|knee|patella|quad/],
+            ['踝', /踝|跟腱|足底|小腿|提踵|踝泵|ankle|achilles|calf/],
+            ['髋', /髋|臀|梨状|蚌式|髋外展|后踢腿|hip|glute/],
+            ['腰背', /腰|背|脊柱|竖脊|核心|腰椎|low back|lumbar|spine|core/],
+            ['肩', /肩|肩胛|袖|外旋|内旋|shoulder|scapula|rotator/],
+            ['肘腕', /肘|腕|前臂|手腕|elbow|wrist|forearm/],
+            ['颈', /颈|斜方|neck|cervical/]
+        ];
+        return rules.find(([, pattern]) => pattern.test(text))?.[0] || '';
+    }
+
+    function conditionKey(condition = {}) {
+        return String(condition.id || `${condition.type || 'other'}:${condition.label || ''}:${condition.addedAt || ''}`).trim();
+    }
+
+    function createConditionId() {
+        return `cond-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    }
+
+    function createExamResultId() {
+        return `exam-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    }
+
     function extractJsonObject(raw = '') {
         const text = String(raw || '').trim();
         try { return JSON.parse(text); } catch {}
@@ -135,10 +161,11 @@
         renderHealthProfileCard() {
             const p = this.db.health?.profile || {};
             const conds = p.conditions || [];
+            const examResults = p.examResults || [];
             const allergies = p.allergies || [];
             const equipment = p.preferences?.equipment || [];
             const sports = p.preferences?.sports || [];
-            const hasAny = conds.length || allergies.length || equipment.length || sports.length || p.age || p.vitals?.restingHR;
+            const hasAny = conds.length || examResults.length || allergies.length || equipment.length || sports.length || p.age || p.vitals?.restingHR;
 
             const typeLabel = { injury: '运动损伤', chronic: '慢性病', allergy: '过敏', surgery: '手术史', medication: '用药', other: '其他' };
             const sevLabel = { mild: '轻', moderate: '中', severe: '重' };
@@ -154,11 +181,27 @@
                     ${c.note ? `<div class="profile-condition-note">${this.escapeHtml ? this.escapeHtml(c.note) : c.note}</div>` : ''}
                 </div>
             `).join('');
+            const examRows = examResults.map((exam) => {
+                const linked = conds.find((condition) => conditionKey(condition) === exam.conditionId);
+                return `<div class="profile-exam-result">
+                    <div class="profile-exam-head">
+                        <b>${this.escapeHtml ? this.escapeHtml(exam.item || '检查结果') : exam.item || '检查结果'}</b>
+                        ${exam.date ? `<span>${this.escapeHtml ? this.escapeHtml(exam.date) : exam.date}</span>` : ''}
+                    </div>
+                    <small>${[exam.bodyPart, linked?.label ? '关联：' + linked.label : ''].filter(Boolean).map((value) => this.escapeHtml ? this.escapeHtml(value) : value).join(' · ')}</small>
+                    <p>${this.escapeHtml ? this.escapeHtml(exam.result || '') : exam.result || ''}</p>
+                    ${exam.note ? `<em>${this.escapeHtml ? this.escapeHtml(exam.note) : exam.note}</em>` : ''}
+                </div>`;
+            }).join('');
 
             const detailSections = `
                 ${conds.length ? `<div class="profile-section">
-                    <div class="profile-section-title"><span class="material-symbols-rounded">warning</span> 训练禁忌与健康状况（${conds.length}）</div>
+                    <div class="profile-section-title"><span class="material-symbols-rounded">diagnosis</span> 诊断结果（${conds.length}）</div>
                     <div class="profile-condition-list">${condChips}</div>
+                </div>` : ''}
+                ${examResults.length ? `<div class="profile-section">
+                    <div class="profile-section-title"><span class="material-symbols-rounded">biotech</span> 检查结果（${examResults.length}）</div>
+                    <div class="profile-exam-list">${examRows}</div>
                 </div>` : ''}
                 ${allergies.length ? `<div class="profile-section">
                     <div class="profile-section-title"><span class="material-symbols-rounded">no_food</span> 过敏 / 不耐受</div>
@@ -228,9 +271,14 @@
                             </div>
                         </div>
                         <div class="profile-form-section profile-form-health">
-                            <h4><span class="profile-section-icon material-symbols-rounded">health_and_safety</span>健康状况 / 训练禁忌</h4>
+                            <h4><span class="profile-section-icon material-symbols-rounded">diagnosis</span>诊断结果 / 训练禁忌</h4>
                             <div id="profCondList">${(p.conditions || []).map((c, i) => data.renderConditionEditor(c, i)).join('')}</div>
-                            <button class="md-btn md-btn-tonal" onclick="data.addConditionRow()" type="button"><span class="material-symbols-rounded">add</span> 添加一条</button>
+                            <button class="md-btn md-btn-tonal" onclick="data.addConditionRow()" type="button"><span class="material-symbols-rounded">add</span> 添加诊断</button>
+                        </div>
+                        <div class="profile-form-section profile-form-exams">
+                            <h4><span class="profile-section-icon material-symbols-rounded">biotech</span>检查结果</h4>
+                            <div id="profExamList">${(p.examResults || []).map((exam, i) => data.renderExamResultEditor(exam, i)).join('')}</div>
+                            <button class="md-btn md-btn-tonal" onclick="data.addExamResultRow()" type="button"><span class="material-symbols-rounded">add</span> 添加检查结果</button>
                         </div>
                         <div class="profile-form-section profile-form-allergy">
                             <h4><span class="profile-section-icon material-symbols-rounded">no_food</span>过敏 / 不耐受</h4>
@@ -258,7 +306,7 @@
             const esc = value => this.escapeHtml ? this.escapeHtml(value || '') : String(value || '');
             const types = [['injury', '运动损伤'], ['chronic', '慢性病'], ['allergy', '过敏'], ['surgery', '手术史'], ['medication', '用药'], ['other', '其他']];
             const sevs = [['mild', '轻'], ['moderate', '中'], ['severe', '重']];
-            return `<div class="profile-cond-row" data-idx="${i}">
+            return `<div class="profile-cond-row" data-idx="${i}" data-condition-id="${esc(c.id || '')}">
                 <div class="md-grid profile-cond-meta-grid">
                     <div class="md-field profile-cond-type-field">
                         <select class="prof-cond-type">${types.map(([v, l]) => `<option value="${v}" ${c.type === v ? 'selected' : ''}>${l}</option>`).join('')}</select>
@@ -269,10 +317,31 @@
                         <label>严重程度</label>
                     </div>
                 </div>
-                <div class="md-field"><textarea class="prof-cond-label profile-auto-textarea" rows="1" placeholder=" " oninput="data.autoResizeProfileTextareas(this)">${esc(c.label)}</textarea><label>描述（如：左膝半月板二级损伤）</label></div>
+                <div class="md-field"><textarea class="prof-cond-label profile-auto-textarea" rows="1" placeholder=" " oninput="data.autoResizeProfileTextareas(this)">${esc(c.label)}</textarea><label>诊断结果（如：左膝半月板二级损伤）</label></div>
+                <div class="md-field"><textarea class="prof-cond-body-part profile-auto-textarea" rows="1" placeholder=" " oninput="data.autoResizeProfileTextareas(this)">${esc(c.bodyPart || inferBodyPart(`${c.label || ''} ${c.note || ''}`))}</textarea><label>主要部位（如：膝、踝、肩）</label></div>
                 <div class="md-field"><textarea class="prof-cond-avoid profile-auto-textarea" rows="1" placeholder=" " oninput="data.autoResizeProfileTextareas(this)">${esc((c.avoid || []).join('、'))}</textarea><label>需避免的动作/食物，「、」分隔</label></div>
                 <div class="md-field"><textarea class="prof-cond-note profile-auto-textarea" rows="1" placeholder=" " oninput="data.autoResizeProfileTextareas(this)">${esc(c.note)}</textarea><label>备注（可选）</label></div>
                 <button class="md-btn profile-cond-del" onclick="data.removeConditionRow(this)" type="button"><span class="material-symbols-rounded">delete</span> 删除此条</button>
+            </div>`;
+        },
+
+        renderExamResultEditor(exam, i) {
+            exam = exam || {};
+            const escValue = value => this.escapeHtml ? this.escapeHtml(value || '') : String(value || '');
+            const conditions = this.db.health?.profile?.conditions || [];
+            return `<div class="profile-exam-row" data-idx="${i}" data-exam-id="${escValue(exam.id || '')}">
+                <div class="md-grid profile-cond-meta-grid">
+                    <div class="md-field"><input class="prof-exam-date" type="date" value="${escValue(exam.date || '')}" placeholder=" "><label>检查日期</label></div>
+                    <div class="md-field"><select class="prof-exam-condition"><option value="">不关联诊断</option>${conditions.map((condition) => {
+                        const id = conditionKey(condition);
+                        return `<option value="${escValue(id)}" ${exam.conditionId === id ? 'selected' : ''}>${escValue(condition.label || id)}</option>`;
+                    }).join('')}</select><label>关联诊断</label></div>
+                </div>
+                <div class="md-field"><textarea class="prof-exam-item profile-auto-textarea" rows="1" placeholder=" " oninput="data.autoResizeProfileTextareas(this)">${escValue(exam.item)}</textarea><label>检查项目（如：MRI、X 光、血压、肌力评估）</label></div>
+                <div class="md-field"><textarea class="prof-exam-body-part profile-auto-textarea" rows="1" placeholder=" " oninput="data.autoResizeProfileTextareas(this)">${escValue(exam.bodyPart || inferBodyPart(`${exam.item || ''} ${exam.result || ''}`))}</textarea><label>相关部位</label></div>
+                <div class="md-field"><textarea class="prof-exam-result profile-auto-textarea" rows="1" placeholder=" " oninput="data.autoResizeProfileTextareas(this)">${escValue(exam.result)}</textarea><label>检查结果 / 影像描述</label></div>
+                <div class="md-field"><textarea class="prof-exam-note profile-auto-textarea" rows="1" placeholder=" " oninput="data.autoResizeProfileTextareas(this)">${escValue(exam.note)}</textarea><label>备注（可选）</label></div>
+                <button class="md-btn profile-cond-del" onclick="data.removeExamResultRow(this)" type="button"><span class="material-symbols-rounded">delete</span> 删除此检查</button>
             </div>`;
         },
 
@@ -297,6 +366,19 @@
             if (row) row.remove();
         },
 
+        addExamResultRow() {
+            const list = document.getElementById('profExamList');
+            if (!list) return;
+            const idx = list.children.length;
+            list.insertAdjacentHTML('beforeend', this.renderExamResultEditor({}, idx));
+            this.autoResizeProfileTextareas(list.lastElementChild);
+        },
+
+        removeExamResultRow(btn) {
+            const row = btn.closest('.profile-exam-row');
+            if (row) row.remove();
+        },
+
         saveProfileFromModal() {
             const p = this.db.health.profile = this.db.health.profile || {};
             p.gender = document.getElementById('profGender')?.value || 'male';
@@ -314,16 +396,37 @@
                 const label = row.querySelector('.prof-cond-label')?.value.trim();
                 if (!label) return;
                 conds.push({
-                    id: 'c' + Date.now() + Math.random().toString(36).slice(2, 6),
+                    id: row.getAttribute('data-condition-id') || createConditionId(),
                     type: row.querySelector('.prof-cond-type')?.value || 'other',
                     severity: row.querySelector('.prof-cond-sev')?.value || 'mild',
                     label,
+                    bodyPart: row.querySelector('.prof-cond-body-part')?.value.trim() || inferBodyPart(label),
                     avoid: splitFn(row.querySelector('.prof-cond-avoid')?.value),
                     note: row.querySelector('.prof-cond-note')?.value.trim() || '',
                     addedAt: new Date().toISOString().slice(0, 10)
                 });
             });
             p.conditions = conds;
+            const examRows = document.querySelectorAll('#profExamList .profile-exam-row');
+            const examResults = [];
+            examRows.forEach(row => {
+                const item = row.querySelector('.prof-exam-item')?.value.trim();
+                const result = row.querySelector('.prof-exam-result')?.value.trim();
+                if (!item && !result) return;
+                const conditionId = row.querySelector('.prof-exam-condition')?.value || '';
+                const matchedCondition = conds.find((condition) => conditionKey(condition) === conditionId);
+                examResults.push({
+                    id: row.getAttribute('data-exam-id') || createExamResultId(),
+                    date: row.querySelector('.prof-exam-date')?.value || '',
+                    item,
+                    bodyPart: row.querySelector('.prof-exam-body-part')?.value.trim() || inferBodyPart(`${item} ${result}`),
+                    result,
+                    note: row.querySelector('.prof-exam-note')?.value.trim() || '',
+                    conditionId,
+                    conditionLabel: matchedCondition?.label || ''
+                });
+            });
+            p.examResults = examResults;
             this.touchRecord(p);
             this.saveAndBackup();
             this.closeProfileModal();
@@ -483,6 +586,9 @@
                     name: action.name || '',
                     status: normalizeRehabStatus(action.status),
                     rawDescription: action.rawDescription || action.raw || '',
+                    bodyPart: action.bodyPart || '',
+                    conditionId: action.conditionId || '',
+                    conditionLabel: action.conditionLabel || '',
                     spec: action.spec || null,
                     painLevel: Number(action.painLevel || 0),
                     coachNote: action.coachNote || '',
@@ -502,11 +608,16 @@
             const conds = (p.conditions || []).map(c => {
                 const sev = c.severity ? `（${c.severity === 'severe' ? '严重' : c.severity === 'moderate' ? '中度' : '轻度'}）` : '';
                 const avoid = c.avoid?.length ? `，避免：${c.avoid.join('、')}` : '';
-                return `${c.label}${sev}${avoid}${c.note ? '，备注：' + c.note : ''}`;
+                return `${conditionKey(c)}｜${c.label}${sev}${c.bodyPart ? '，部位：' + c.bodyPart : ''}${avoid}${c.note ? '，备注：' + c.note : ''}`;
+            });
+            const examResults = (p.examResults || []).map(exam => {
+                const linked = (p.conditions || []).find(c => conditionKey(c) === exam.conditionId);
+                return `${exam.id || ''}｜${exam.item || '检查'}${exam.date ? '，日期：' + exam.date : ''}${exam.bodyPart ? '，部位：' + exam.bodyPart : ''}${linked?.label ? '，关联诊断：' + linked.label : ''}${exam.result ? '，结果：' + exam.result : ''}${exam.note ? '，备注：' + exam.note : ''}`;
             });
             const equipment = p.preferences?.equipment || [];
             const profileBlock = [
                 conds.length ? `健康状况/训练禁忌：${conds.join('；')}` : '',
+                examResults.length ? `检查结果：${examResults.join('；')}` : '',
                 equipment.length ? `可用器材：${equipment.join('、')}` : '',
                 p.age ? `年龄：${p.age}` : ''
             ].filter(Boolean).join('\n');
@@ -514,9 +625,11 @@
             const confidenceThreshold = prefs.lowConfidenceThreshold || 80;
             return [
                 prefSys || '你是康复训练处方结构化助手。用户只能提供康复师的自然语言描述，你需要把它解析为本周康复处方。\n必须只返回严格 JSON，不要 Markdown，不要解释。',
-                'JSON 结构：{"weekStart":"YYYY-MM-DD","visitDate":"YYYY-MM-DD","therapistAssessment":"...","homework":"...","actions":[{"name":"标准化动作名","rawDescription":"用户原话片段","status":"new|continued|progressed|dropped|watch","confidence":0-100,"spec":{"sets":number,"reps":number,"work":number,"mode":"reps|hold|alt-reps|alt-hold","actionRest":number}|null,"painLevel":0-10,"coachNote":"...","needsReview":true|false,"progressesFrom":number|null}]}',
+                'JSON 结构：{"weekStart":"YYYY-MM-DD","visitDate":"YYYY-MM-DD","therapistAssessment":"...","homework":"...","actions":[{"name":"标准化动作名","rawDescription":"用户原话片段","bodyPart":"膝|踝|髋|腰背|肩|肘腕|颈|全身|其他","conditionId":"健康档案病症ID或空字符串","conditionLabel":"对应病症名称或空字符串","status":"new|continued|progressed|dropped|watch","confidence":0-100,"spec":{"sets":number,"reps":number,"work":number,"mode":"reps|hold|alt-reps|alt-hold","actionRest":number}|null,"painLevel":0-10,"coachNote":"...","needsReview":true|false,"progressesFrom":number|null}]}',
                 '规则：',
                 '- name 要尽量归一化为可执行动作名；如果不确定，在 name 中保留候选，如"弹力带髋外展 / 蚌式开合"。',
+                '- bodyPart 表示该动作或诊断主要影响部位；能判断时必须填写膝/踝/髋/腰背/肩/肘腕/颈/全身/其他之一。',
+                '- conditionId/conditionLabel 必须尽量匹配【用户健康档案】中最相关的病症；无法匹配时 conditionId 为空，但 conditionLabel 要解释归属。',
                 '- status 必须通过本周描述和最近处方对比判断：首次出现为 new；延续为 continued；加量/改强度为 progressed；明确停做为 dropped；疼痛或需观察为 watch。',
                 `- 低置信动作 confidence < ${confidenceThreshold} 或疼痛 >= ${painThreshold} 必须 needsReview=true。`,
                 '- dropped 动作 spec 可以为 null。',
@@ -538,9 +651,13 @@
                 const status = normalizeRehabStatus(action.status);
                 const painLevel = Math.max(0, Math.min(10, Math.round(Number(action.painLevel || 0))));
                 const confidence = Math.max(0, Math.min(100, Math.round(Number(action.confidence || 0)) || 75));
+                const bodyPart = String(action.bodyPart || inferBodyPart(`${name} ${action.rawDescription || action.raw || ''} ${action.coachNote || ''}`) || '').slice(0, 20);
                 return {
                     name,
                     rawDescription: String(action.rawDescription || action.raw || '').slice(0, 220),
+                    ...(bodyPart ? { bodyPart } : {}),
+                    conditionId: String(action.conditionId || action.conditionKey || '').slice(0, 120),
+                    conditionLabel: String(action.conditionLabel || '').slice(0, 120),
                     status,
                     confidence,
                     spec: status === 'dropped' ? null : normalizeRehabSpec(action.spec),
@@ -642,6 +759,11 @@
                 <div class="rehab-review-grid">
                     <label class="mini-field"><span>状态</span><select data-field="status"><option value="continued" ${status === 'continued' ? 'selected' : ''}>继续</option><option value="new" ${status === 'new' ? 'selected' : ''}>新增</option><option value="progressed" ${status === 'progressed' ? 'selected' : ''}>进阶</option><option value="dropped" ${status === 'dropped' ? 'selected' : ''}>暂停</option><option value="watch" ${status === 'watch' ? 'selected' : ''}>观察</option></select></label>
                     <label class="mini-field"><span>动作名</span><input data-field="name" value="${esc(this, action.name)}"></label>
+                    <label class="mini-field"><span>部位</span><input data-field="bodyPart" value="${esc(this, action.bodyPart || '')}" placeholder="膝/踝/髋/肩..."></label>
+                    <label class="mini-field"><span>对应病症</span><select data-field="conditionId"><option value="">未绑定</option>${(this.db.health?.profile?.conditions || []).map((condition) => {
+                        const id = conditionKey(condition);
+                        return `<option value="${esc(this, id)}" ${action.conditionId === id ? 'selected' : ''}>${esc(this, condition.label || id)}</option>`;
+                    }).join('')}</select></label>
                     <label class="mini-field"><span>疼痛</span><input data-field="painLevel" type="number" min="0" max="10" value="${Number(action.painLevel || 0)}"></label>
                     ${progressesFromOptions ? `<label class="mini-field"><span>进阶自</span><select data-field="progressesFrom"><option value="">无</option>${progressesFromOptions}</select></label>` : ''}
                 </div>
@@ -662,6 +784,10 @@
                 if (!action) return;
                 action.status = normalizeRehabStatus(row.querySelector('[data-field="status"]')?.value);
                 action.name = String(row.querySelector('[data-field="name"]')?.value || action.name).trim() || action.name;
+                action.bodyPart = String(row.querySelector('[data-field="bodyPart"]')?.value || action.bodyPart || inferBodyPart(`${action.name || ''} ${action.rawDescription || ''} ${action.coachNote || ''}`) || '').trim();
+                action.conditionId = String(row.querySelector('[data-field="conditionId"]')?.value || '').trim();
+                const matchedCondition = (this.db.health?.profile?.conditions || []).find((condition) => conditionKey(condition) === action.conditionId);
+                action.conditionLabel = matchedCondition?.label || action.conditionLabel || '';
                 action.painLevel = Math.max(0, Math.min(10, Math.round(Number(row.querySelector('[data-field="painLevel"]')?.value || 0))));
                 action.needsReview = action.needsReview || action.painLevel >= 4 || Number(action.confidence || 100) < 80;
                 if (action.status === 'dropped') action.spec = null;

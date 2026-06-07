@@ -3,7 +3,7 @@
     if (window.dataPlanAi) return;
 
     function bodyValue(id) {
-        return document.getElementById(id)?.value || '';
+        return document.getElementById?.(id)?.value || '';
     }
 
     function safeJsonParse(text) {
@@ -159,6 +159,183 @@
         return normalized.length ? [...new Set(normalized)] : ['rehab'];
     }
 
+    function splitTags(value = '') {
+        return String(value || '').split(/[、,，\n]/).map((item) => item.trim()).filter(Boolean);
+    }
+
+    function inferBodyPart(value = '') {
+        const text = String(value || '').toLowerCase();
+        const rules = [
+            ['膝', /膝|髌|半月板|股四头|台阶|靠墙蹲|knee|patella|quad/],
+            ['踝', /踝|跟腱|足底|小腿|提踵|踝泵|ankle|achilles|calf/],
+            ['髋', /髋|臀|梨状|蚌式|髋外展|后踢腿|hip|glute/],
+            ['腰背', /腰|背|脊柱|竖脊|核心|腰椎|low back|lumbar|spine|core/],
+            ['肩', /肩|肩胛|袖|外旋|内旋|shoulder|scapula|rotator/],
+            ['肘腕', /肘|腕|前臂|手腕|elbow|wrist|forearm/],
+            ['颈', /颈|斜方|neck|cervical/]
+        ];
+        return rules.find(([, pattern]) => pattern.test(text))?.[0] || '';
+    }
+
+    function conditionKey(condition = {}) {
+        return String(condition.id || `${condition.type || 'other'}:${condition.label || ''}:${condition.addedAt || ''}`).trim();
+    }
+
+    function normalizeCondition(condition = {}) {
+        const label = String(condition.label || '').trim();
+        return {
+            id: conditionKey(condition),
+            label,
+            type: condition.type || 'other',
+            severity: condition.severity || '',
+            bodyPart: condition.bodyPart || inferBodyPart(`${label} ${(condition.avoid || []).join(' ')} ${condition.note || ''}`),
+            avoid: Array.isArray(condition.avoid) ? condition.avoid : [],
+            note: condition.note || ''
+        };
+    }
+
+    function normalizeExamResult(exam = {}) {
+        const item = String(exam.item || '').trim();
+        const result = String(exam.result || '').trim();
+        return {
+            id: String(exam.id || `exam:${item}:${exam.date || ''}`).trim(),
+            item,
+            date: exam.date || '',
+            bodyPart: exam.bodyPart || inferBodyPart(`${item} ${result} ${exam.note || ''}`),
+            result,
+            note: exam.note || '',
+            conditionId: exam.conditionId || '',
+            conditionLabel: exam.conditionLabel || ''
+        };
+    }
+
+    function defaultSelectedConditionIds(profile = {}) {
+        const preferred = new Set(['injury', 'surgery']);
+        const selected = (profile.conditions || [])
+            .filter((condition) => preferred.has(condition.type || ''))
+            .map(conditionKey)
+            .filter(Boolean);
+        if (selected.length) return selected;
+        return (profile.examResults || [])
+            .map((exam) => `exam:${normalizeExamResult(exam).id}`)
+            .filter(Boolean);
+    }
+
+    function currentSelectedConditionIds(ctx, profile = {}) {
+        const existing = Array.isArray(ctx._planAiConditionIds) ? ctx._planAiConditionIds : defaultSelectedConditionIds(profile);
+        const valid = new Set([
+            ...(profile.conditions || []).map(conditionKey),
+            ...(profile.examResults || []).map((exam) => `exam:${normalizeExamResult(exam).id}`)
+        ]);
+        return existing.filter((id) => valid.has(id));
+    }
+
+    function currentTemporaryConditions(ctx) {
+        const input = bodyValue('planAiTempConditions');
+        const source = input || (Array.isArray(ctx._planAiTemporaryConditions) ? ctx._planAiTemporaryConditions.join('、') : '');
+        return splitTags(source).map((label, index) => ({
+            id: `temp:${label}`,
+            label,
+            type: 'temporary',
+            severity: '',
+            bodyPart: inferBodyPart(label),
+            avoid: [],
+            note: index === 0 ? '本次生成临时指定' : ''
+        }));
+    }
+
+    function buildConditionTargets(profile = {}, selectedIds = [], temporaryConditions = []) {
+        const selected = new Set(selectedIds);
+        const known = (profile.conditions || []).map(normalizeCondition);
+        const exams = (profile.examResults || []).map(normalizeExamResult);
+        const selectedExams = exams.filter((exam) => selected.has(`exam:${exam.id}`));
+        const target = [
+            ...known.filter((condition) => selected.has(condition.id)),
+            ...selectedExams.map((exam) => ({ ...exam, type: 'exam-result', label: exam.item || exam.result || '检查结果', severity: '', avoid: [], note: [exam.result, exam.note].filter(Boolean).join('；') })),
+            ...temporaryConditions
+        ];
+        const safetyOnly = known.filter((condition) => !selected.has(condition.id));
+        const examEvidence = exams.filter((exam) => !selected.has(`exam:${exam.id}`));
+        return { target, safetyOnly, examEvidence };
+    }
+
+    function partitionRehabWeeklyByConditions(rehabWeekly = [], selectedIds = [], temporaryConditions = [], profile = {}) {
+        const selected = new Set(selectedIds);
+        const selectedParts = new Set((profile.conditions || []).filter((condition) => selected.has(conditionKey(condition))).map((condition) => normalizeCondition(condition).bodyPart).filter(Boolean));
+        (profile.examResults || []).filter((exam) => selected.has(`exam:${normalizeExamResult(exam).id}`)).forEach((exam) => {
+            const part = normalizeExamResult(exam).bodyPart;
+            if (part) selectedParts.add(part);
+        });
+        const temporaryParts = new Set(temporaryConditions.map((condition) => condition.bodyPart).filter(Boolean));
+        const target = [];
+        const safetyOnly = [];
+        (rehabWeekly || []).forEach((week) => {
+            const base = { weekStart: week.weekStart || '', visitDate: week.visitDate || '', therapistAssessment: week.therapistAssessment || '', homework: week.homework || '' };
+            const targetActions = [];
+            const safetyActions = [];
+            (week.actions || []).forEach((action) => {
+                const part = action.bodyPart || inferBodyPart(`${action.name || ''} ${action.rawDescription || ''} ${action.coachNote || ''}`);
+                const linked = action.conditionId && selected.has(action.conditionId);
+                const inferredMatch = !action.conditionId && part && (selectedParts.has(part) || temporaryParts.has(part));
+                if (linked || inferredMatch) targetActions.push(action);
+                else safetyActions.push(action);
+            });
+            if (targetActions.length) target.push({ ...base, actions: targetActions });
+            if (safetyActions.length) safetyOnly.push({ ...base, actions: safetyActions });
+        });
+        return { target, safetyOnly };
+    }
+
+    function summarizeBodyPartConstraints(profile = {}, rehabWeekly = [], selectedIds = [], temporaryConditions = []) {
+        const map = new Map();
+        const selected = new Set(selectedIds);
+        const ensure = (part) => {
+            const key = String(part || '').trim();
+            if (!key) return null;
+            if (!map.has(key)) map.set(key, { bodyPart: key, sources: [], avoid: [], required: [], cautious: [], dropped: [], maxIntensity: '' });
+            return map.get(key);
+        };
+        [...(profile.conditions || []), ...temporaryConditions].forEach((condition) => {
+            const normalized = normalizeCondition(condition);
+            const part = normalized.bodyPart || inferBodyPart(`${normalized.label || ''} ${(normalized.avoid || []).join(' ')} ${normalized.note || ''}`);
+            const row = ensure(part || '其他');
+            if (!row) return;
+            row.sources.push(`${selected.has(normalized.id) || normalized.type === 'temporary' ? '目标病症' : '安全病症'}:${normalized.label || '未命名'}`);
+            if (normalized.severity) row.maxIntensity = normalized.severity === 'severe' ? '低强度/康复优先' : (normalized.severity === 'moderate' ? '中低强度' : row.maxIntensity);
+            row.avoid.push(...(normalized.avoid || []));
+        });
+        (profile.examResults || []).forEach((exam) => {
+            const normalized = normalizeExamResult(exam);
+            const row = ensure(normalized.bodyPart || '其他');
+            if (!row) return;
+            row.sources.push(`检查结果:${normalized.item || normalized.result || '未命名'}`);
+            if (normalized.result) row.cautious.push(normalized.result.slice(0, 80));
+        });
+        (rehabWeekly || []).slice(0, 3).forEach((week) => {
+            (week.actions || []).forEach((action) => {
+                const part = action.bodyPart || inferBodyPart(`${action.name || ''} ${action.rawDescription || ''} ${action.coachNote || ''}`);
+                const row = ensure(part || '其他');
+                if (!row) return;
+                const name = action.name || '未命名动作';
+                const status = action.status || 'continued';
+                const isTarget = action.conditionId && selected.has(action.conditionId);
+                if (['continued', 'progressed'].includes(status)) row.required.push(name);
+                if (status === 'dropped') row.dropped.push(name);
+                if (status === 'new' || status === 'watch' || action.needsReview || Number(action.painLevel || 0) >= 4) row.cautious.push(`${name}${Number(action.painLevel || 0) ? `(疼痛${Number(action.painLevel || 0)}/10)` : ''}`);
+                row.sources.push(`${isTarget ? '目标处方' : '安全处方'}:${week.weekStart || week.visitDate || '未知周'}:${name}`);
+            });
+        });
+        return Array.from(map.values()).map((row) => ({
+            bodyPart: row.bodyPart,
+            sources: [...new Set(row.sources)].slice(0, 6),
+            avoid: [...new Set(row.avoid)].slice(0, 8),
+            required: [...new Set(row.required)].slice(0, 8),
+            cautious: [...new Set(row.cautious)].slice(0, 8),
+            dropped: [...new Set(row.dropped)].slice(0, 8),
+            maxIntensity: row.maxIntensity || ''
+        }));
+    }
+
     function profileContext(profile = {}) {
         return {
             gender: profile.gender || '',
@@ -166,6 +343,7 @@
             height: profile.height || null,
             weight: profile.weight || null,
             conditions: Array.isArray(profile.conditions) ? profile.conditions : [],
+            examResults: Array.isArray(profile.examResults) ? profile.examResults : [],
             allergies: Array.isArray(profile.allergies) ? profile.allergies : [],
             preferences: profile.preferences || { equipment: [], sports: [] },
             vitals: profile.vitals || { restingHR: null }
@@ -247,6 +425,7 @@
                     name: action.name || '',
                     status: action.status || 'continued',
                     rawDescription: action.rawDescription || '',
+                    bodyPart: action.bodyPart || '',
                     spec: action.spec || null,
                     painLevel: Number(action.painLevel || 0),
                     confidence: Number(action.confidence || 0),
@@ -278,6 +457,52 @@
             }).join('');
         },
 
+        renderPlanAiConditionChips() {
+            const profile = profileContext(this.db.health?.profile || {});
+            const selected = new Set(currentSelectedConditionIds(this, profile));
+            const conditions = (profile.conditions || []).map(normalizeCondition).filter((condition) => condition.label);
+            const exams = (profile.examResults || []).map(normalizeExamResult).filter((exam) => exam.item || exam.result);
+            if (!conditions.length && !exams.length) return '<div class="plan-ai-condition-empty">健康档案暂无诊断/检查结果；可在下方填写本次临时病症。</div>';
+            const conditionHtml = conditions.map((condition) => {
+                const active = selected.has(condition.id);
+                const meta = [condition.bodyPart, condition.severity].filter(Boolean).join(' · ');
+                return `<button class="md-chip plan-ai-condition-chip ${active ? 'active' : ''}" type="button" data-plan-ai-condition-id="${this.escapeHtml(condition.id)}" onclick="data.togglePlanAiConditionFromEvent(event)" aria-pressed="${active}">${this.escapeHtml(condition.label)}${meta ? `<small>${this.escapeHtml(meta)}</small>` : ''}</button>`;
+            }).join('');
+            const examHtml = exams.map((exam) => {
+                const id = `exam:${exam.id}`;
+                const active = selected.has(id);
+                const label = exam.item || exam.result || '检查结果';
+                const meta = [exam.bodyPart, exam.date].filter(Boolean).join(' · ');
+                return `<button class="md-chip plan-ai-condition-chip plan-ai-exam-chip ${active ? 'active' : ''}" type="button" data-plan-ai-condition-id="${this.escapeHtml(id)}" onclick="data.togglePlanAiConditionFromEvent(event)" aria-pressed="${active}">${this.escapeHtml(label)}${meta ? `<small>${this.escapeHtml(meta)}</small>` : ''}</button>`;
+            }).join('');
+            return [conditionHtml, examHtml].filter(Boolean).join('');
+        },
+
+        refreshPlanAiConditionChips() {
+            const row = document.getElementById('planAiConditionChipRow');
+            if (row) row.innerHTML = this.renderPlanAiConditionChips();
+        },
+
+        togglePlanAiCondition(conditionId = '') {
+            const profile = profileContext(this.db.health?.profile || {});
+            const valid = new Set([
+                ...(profile.conditions || []).map(conditionKey),
+                ...(profile.examResults || []).map((exam) => `exam:${normalizeExamResult(exam).id}`)
+            ]);
+            const id = String(conditionId || '');
+            if (!valid.has(id)) return;
+            const set = new Set(currentSelectedConditionIds(this, profile));
+            if (set.has(id)) set.delete(id);
+            else set.add(id);
+            this._planAiConditionIds = [...set];
+            this.refreshPlanAiConditionChips();
+        },
+
+        togglePlanAiConditionFromEvent(event) {
+            const id = event?.currentTarget?.getAttribute?.('data-plan-ai-condition-id') || '';
+            this.togglePlanAiCondition(id);
+        },
+
         buildPlanAiContext(mode = 'today', userText = '', typesInput = 'rehab') {
             const prefs = this.ensurePlanPrefs?.() || {};
             const tpl = window.dataAiTemplates;
@@ -289,6 +514,9 @@
             const metas = types.map((type) => this.planTypeMeta?.(type) || { label: '训练计划' });
             const prefEquipment = equipmentLabels(prefs, this.planEquipmentOptions?.() || []);
             const profile = profileContext(this.db.health?.profile || {});
+            const selectedConditionIds = currentSelectedConditionIds(this, profile);
+            const temporaryConditions = currentTemporaryConditions(this);
+            const conditionTargets = buildConditionTargets(profile, selectedConditionIds, temporaryConditions);
             const profileEquipment = Array.isArray(profile.preferences?.equipment) ? profile.preferences.equipment : [];
             const allEquipment = [...new Set([...prefEquipment, ...profileEquipment].map((item) => String(item || '').trim()).filter(Boolean))];
             const todayCompleted = {
@@ -297,6 +525,8 @@
                 manualExercises: summarizeManualExercises(this, today)
             };
             const rehabWeekly = summarizeRehabWeekly(this, 6);
+            const rehabByCondition = partitionRehabWeeklyByConditions(rehabWeekly, selectedConditionIds, temporaryConditions, profile);
+            const bodyPartConstraints = summarizeBodyPartConstraints(profile, rehabWeekly, selectedConditionIds, temporaryConditions);
             const recentPlans = this.activeRecords(this.db.dailyPlans || [])
                 .filter((plan) => types.includes(plan.type || 'rehab'))
                 .slice(0, 14)
@@ -314,9 +544,38 @@
                     userOverride: !!item.userOverride
                 }))
             }));
+            const targetDates = mode === 'week'
+                ? Array.from({ length: 7 }, (_, index) => {
+                    const date = new Date(today);
+                    date.setDate(date.getDate() + index);
+                    return this.dateKey ? this.dateKey(date) : date.toISOString().slice(0, 10);
+                })
+                : [today];
+            const currentTargetPlans = this.activeRecords(this.db.dailyPlans || [])
+                .filter((plan) => targetDates.includes(plan.date) && types.includes(plan.type || 'rehab'))
+                .map((plan) => ({
+                    id: plan.id || '',
+                    date: plan.date,
+                    type: plan.type || 'rehab',
+                    title: plan.title || '',
+                    notes: plan.notes || '',
+                    completion: this.completionRate?.(plan),
+                    items: (plan.items || []).filter((item) => item && !item.deleted).map((item) => ({
+                        id: item.id || '',
+                        name: item.name || '',
+                        category: item.category || 'main',
+                        status: item.status || 'todo',
+                        spec: item.spec || {},
+                        currentLevel: item.currentLevel ?? null,
+                        feedback: item.feedback || null,
+                        userOverride: !!item.userOverride,
+                        aiReasoning: item.aiReasoning || '',
+                        bodyPart: inferBodyPart(`${item.name || ''} ${item.aiReasoning || ''}`)
+                    }))
+                }));
             const promptMode = mode === 'week'
-                ? '请为接下来 7 天输出严格 JSON，结构为：{"plans":[{"date":"YYYY-MM-DD","type":"<rehab|cut|bulk|maintenance|custom>","title":"...","notes":"...","items":[{"name":"...","category":"<warmup|main|cooldown>","chainHint":"","spec":{"sets":<int>,"reps":<int>,"work":<int>,"repRest":<int>,"actionRest":<int>,"isAlt":<bool>,"mode":"<reps|hold|alt-reps|alt-hold>"},"cooldownRefs":[],"aiReasoning":"...","durationEstHint":""}]}]}'
-                : '请输出严格 JSON，结构为：{"date":"YYYY-MM-DD","type":"<rehab|cut|bulk|maintenance|custom>","title":"...","notes":"...","items":[{"name":"...","category":"<warmup|main|cooldown>","chainHint":"","spec":{"sets":<int>,"reps":<int>,"work":<int>,"repRest":<int>,"actionRest":<int>,"isAlt":<bool>,"mode":"<reps|hold|alt-reps|alt-hold>"},"cooldownRefs":[],"aiReasoning":"...","durationEstHint":""}]}';
+                ? '请为接下来 7 天输出严格 JSON，结构为：{"plans":[{"date":"YYYY-MM-DD","type":"<rehab|cut|bulk|maintenance|custom>","title":"...","notes":"...","items":[{"name":"...","category":"<warmup|main|cooldown>","chainHint":"","spec":{"sets":<int>,"reps":<int>,"work":<int>,"repRest":<int>,"actionRest":<int>,"isAlt":<bool>,"mode":"<reps|hold|alt-reps|alt-hold>"},"cooldownRefs":[],"aiReasoning":"...","durationEstHint":"","requiresUserConfirm":false}]}]}'
+                : '请输出严格 JSON，结构为：{"date":"YYYY-MM-DD","type":"<rehab|cut|bulk|maintenance|custom>","title":"...","notes":"...","items":[{"name":"...","category":"<warmup|main|cooldown>","chainHint":"","spec":{"sets":<int>,"reps":<int>,"work":<int>,"repRest":<int>,"actionRest":<int>,"isAlt":<bool>,"mode":"<reps|hold|alt-reps|alt-hold>"},"cooldownRefs":[],"aiReasoning":"...","durationEstHint":"","requiresUserConfirm":false}]}';
             const specRules = [
                 '只输出 JSON 本体，不要使用 Markdown 代码块、不要前后加自然语言、不要注释。所有数值字段必须是 number 类型，布尔字段必须是 true/false，禁止用字符串如 "3"、"true"。',
                 '每个 item 必须填齐：name(string)、category(枚举 warmup/main/cooldown)、spec.sets(int≥1)、spec.reps(int≥0)、spec.work(int>0)、spec.repRest(int 0..30)、spec.actionRest(int 0..90)、spec.isAlt(bool)、spec.mode(枚举 reps/hold/alt-reps/alt-hold)。任一字段缺失或为 0/空都视为不合规，必须重填。',
@@ -335,11 +594,31 @@
                 '  双侧交替: {"name":"侧弓步","category":"main","spec":{"sets":3,"reps":10,"work":3,"repRest":0,"actionRest":45,"isAlt":true,"mode":"alt-reps"}}',
                 '必须参考今日已完成运动摘要；如果今天已经高强度训练过同动作或同部位，后续计划应降低重复负荷、改为恢复/拉伸/低强度技术练习，除非用户明确要求继续加量。'
             ].join('\n');
+            const overwriteRules = [
+                '当前计划覆盖规则: 你正在重写目标日期/类型的计划，而不是只追加动作。必须先参考“目标当前计划完整摘要”。',
+                '同日期同类型保存时客户端会保留已完成任务和用户锁定(userOverride=true)任务；你输出的 items 应作为未完成未锁定部分的替代方案。',
+                '若当前计划中的未完成动作仍安全且符合最新处方，可保留或微调；若与禁忌、dropped 处方、疼痛>=4/10 或部位排程冲突，必须替换、降级或移到其他日期。'
+            ].join('\n');
+            const conditionRules = [
+                '病症目标规则: 本次康复计划必须围绕“本次选中训练病症/检查结果”制定；即使某个目标没有对应康复中心处方，也要根据诊断、检查结果、严重程度、禁忌和器材安排中低风险训练。',
+                '检查结果规则: 有诊断时检查结果用于细化风险、部位和动作选择；诊断潦草或没有诊断时，可依赖检查结果作为目标来源，但必须更保守并要求用户确认。',
+                '目标病症有对应处方时，相关处方是强规则；目标病症没有处方时，可推荐中低风险动作，但必须在 aiReasoning 中写明“非处方建议/需用户确认/风险点”。',
+                '未选中病症不能驱动主训练动作；它们只作为安全限制，尤其是禁忌、dropped、watch、疼痛>=4/10 的动作或部位。',
+                '不要把不同病症的处方混用：每个康复动作必须能说明服务于哪个目标病症或为什么只是安全替代。'
+            ].join('\n');
+            const bodyPartRules = mode === 'week'
+                ? '部位排程规则: 生成 7 天计划时必须按 bodyPart 分配频次和恢复日；同一疼痛/损伤部位避免连续高负荷训练，优先把处方 required 动作分散到合适日期；cautious/new/watch 动作只能低强度观察，不得自动加量；dropped/avoid 动作不得出现。'
+                : '部位排程规则: 生成今日计划时按 warmup → 处方/主训练 → 辅助 → cooldown 排序；同一 bodyPart 动作可分段聚合，但疼痛/损伤部位不得连续高负荷，必须穿插恢复、低强度技术练习或放松；dropped/avoid 动作不得出现。';
+            const confirmationRules = '确认规则: 任何非康复中心处方、仅基于诊断推断的中低风险康复动作，requiresUserConfirm 必须为 true，且 aiReasoning 必须说明风险点和用户需确认内容；来自目标病症处方且无疼痛/低置信问题的动作可为 false。';
             const typeInstructions = types.map((type, index) => `${index + 1}. ${type} / ${this.planTypeMeta?.(type)?.label || type}`).join('\n');
             return [
                 prefSys || '你是训练日程计划助手。只输出严格 JSON 文本，不要 Markdown 代码块、不要解释、不要追加任何说明。',
                 promptMode,
                 specRules,
+                overwriteRules,
+                conditionRules,
+                bodyPartRules,
+                confirmationRules,
                 '所有 spec 字段（sets/reps/work/repRest/actionRest/isAlt/mode）都必须由你显式填写，不能依赖客户端推断；如果你拿不准就按规则中的默认值填上，但绝不能省略字段或填 0/空。mode 必须根据动作类型正确选择 reps/hold/alt-reps/alt-hold。',
                 types.length > 1
                     ? `本次需要同时生成多个计划类型，请分别输出到 plans 数组中，每个选中类型各生成 1 个 plan：\n${typeInstructions}`
@@ -348,9 +627,17 @@
                 `设计偏好装备: ${prefEquipment.join(', ') || '无'}`,
                 `健康档案装备偏好: ${profileEquipment.join(', ') || '无'}`,
                 `最终可用装备池: ${allEquipment.join(', ') || '无'}`,
+                `本次选中训练病症: ${JSON.stringify(conditionTargets.target)}`,
+                `未选中病症安全限制: ${JSON.stringify(conditionTargets.safetyOnly)}`,
+                `检查结果证据/安全背景: ${JSON.stringify(conditionTargets.examEvidence || [])}`,
+                `目标当前计划完整摘要: ${JSON.stringify(currentTargetPlans)}`,
                 `今日已完成运动摘要: ${JSON.stringify(todayCompleted)}`,
                 `近6周康复中心处方: ${JSON.stringify(rehabWeekly)}`,
+                `选中病症相关处方强规则: ${JSON.stringify(rehabByCondition.target)}`,
+                `其他病症处方安全限制: ${JSON.stringify(rehabByCondition.safetyOnly)}`,
+                `诊断/处方部位约束: ${JSON.stringify(bodyPartConstraints)}`,
                 rehabWeekly.length ? '康复处方规则: 必须优先遵守最近3周康复中心处方；continued/progressed 动作应保留或参考；dropped 动作不能出现在计划中；new/watch/needsReview 动作不得自动加量，疼痛>=4/10 只能降级或替换。第4-6周处方仅用于理解长期禁忌、反复疼痛和动作演变。' : '',
+                '冲突优先级: 安全/健康禁忌/疼痛阈值 > 最近3周康复处方 > 当前计划保留/改造 > 用户临时目标。',
                 `最近 7 天对应类型计划摘要: ${JSON.stringify(recentPlans)}`,
                 `健康档案: ${JSON.stringify(profile)}`,
                 `目标类型: ${String(this.db.health?.dietGoal?.goalType || this.db.health?.goalType || '')}`,
@@ -366,6 +653,8 @@
             const types = normalizePlanTypes(typesInput);
             const meta = this.planTypeMeta?.(types[0]) || { label: '训练计划', icon: 'event_note' };
             this._planAiTypes = types;
+            const profile = profileContext(this.db.health?.profile || {});
+            this._planAiConditionIds = currentSelectedConditionIds(this, profile);
             body.innerHTML = `
                 <div class="plan-ai-sheet">
                     <div class="plan-sheet-head">
@@ -380,6 +669,16 @@
                     </div>
                     <div class="plan-ai-chip-row">
                         ${this.planAiQuickPrompts().map((text) => `<button class="md-chip" type="button" onclick="data.handlePlanAiQuickPrompt('${this.escapeHtml(text)}')">${this.escapeHtml(text)}</button>`).join('')}
+                    </div>
+                    <div class="plan-ai-condition-box">
+                        <div class="plan-ai-condition-head"><span>本次康复目标病症</span><small>未选中病症仅作为安全限制</small></div>
+                        <div id="planAiConditionChipRow" class="plan-ai-chip-row plan-ai-condition-row">
+                            ${this.renderPlanAiConditionChips()}
+                        </div>
+                        <div class="md-field">
+                            <input id="planAiTempConditions" type="text" placeholder=" ">
+                            <label>临时病症/部位（可选，用「、」分隔）</label>
+                        </div>
                     </div>
                     <div class="md-field">
                         <textarea id="planAiPrompt" rows="5" placeholder=" "></textarea>
@@ -401,6 +700,8 @@
             sheet?.classList.add('hidden');
             sheet?.setAttribute('aria-hidden', 'true');
             this._planAiTypes = null;
+            this._planAiConditionIds = null;
+            this._planAiTemporaryConditions = null;
             return true;
         },
 
@@ -474,6 +775,7 @@
                         cooldownRefs: Array.isArray(item.cooldownRefs) ? item.cooldownRefs.map((value) => String(value || '')) : [],
                         aiReasoning: String(item.aiReasoning || ''),
                         durationEstHint: String(item.durationEstHint || ''),
+                        requiresUserConfirm: !!(item.requiresUserConfirm || item.requiresConfirmation || item.needsReview),
                         status: 'todo',
                         doneSets: 0,
                         userOverride: false,
@@ -655,6 +957,7 @@
                     <input type="text" data-preview-reason value="${this.escapeHtml(item.aiReasoning || '')}" placeholder=" ">
                     <label>理由</label>
                 </div>
+                ${item.requiresUserConfirm ? `<label class="plan-ai-preview-confirm"><input type="checkbox" data-preview-user-confirm><span>我确认接受此非处方/中低风险建议</span></label>` : ''}
                 <button class="md-icon-btn" type="button" onclick="data.deletePlanAiPreviewItem(${planIndex}, ${itemIndex})" aria-label="删除动作"><span class="material-symbols-rounded">delete</span></button>
             </div>`;
         },
@@ -675,7 +978,8 @@
                 status: 'todo',
                 doneSets: 0,
                 userOverride: false,
-                excludeFromPr: true
+                excludeFromPr: true,
+                requiresUserConfirm: false
             });
             this.previewPlanAiPlans(plans);
         },
@@ -729,6 +1033,8 @@
                         cooldownRefs: [],
                         aiReasoning: String(itemEl.querySelector('[data-preview-reason]')?.value || '').trim(),
                         durationEstHint: '',
+                        requiresUserConfirm: !!itemEl.querySelector('[data-preview-user-confirm]'),
+                        userConfirmed: itemEl.querySelector('[data-preview-user-confirm]')?.checked !== false,
                         status: 'todo',
                         doneSets: 0,
                         userOverride: false,
@@ -779,6 +1085,11 @@
                 window.toast?.show?.('预览里没有可保存的训练动作', 'error');
                 return;
             }
+            const unconfirmed = plans.flatMap((plan) => plan.items || []).filter((item) => item.requiresUserConfirm && !item.userConfirmed);
+            if (unconfirmed.length) {
+                window.toast?.show?.(`有 ${unconfirmed.length} 个非处方建议尚未确认`, 'error');
+                return;
+            }
             const hasAutoFilled = plans.some((plan) => plan.items.some((item) => item.autoFilled?.length));
             plans.forEach((plan) => {
                 const sameDay = this.activeRecords(this.db.dailyPlans || []).filter((p) => p.date === plan.date && !p.deleted);
@@ -791,11 +1102,15 @@
                     if (this.selectedPlanId === old.id) this.selectedPlanId = '';
                 });
                 const current = this.getDailyPlans?.(plan.date)?.find((item) => (item.type || 'rehab') === (plan.type || 'rehab'));
-                const locked = (current?.items || []).filter((item) => item.userOverride && !item.deleted);
-                const aiItems = plan.items.map((item) => this.ensureTaskShape({
-                    ...item,
+                const preserved = (current?.items || []).filter((item) => item && !item.deleted && (item.userOverride || item.status === 'done'));
+                const aiItems = plan.items.map((item) => {
+                    const { userConfirmed, ...taskItem } = item;
+                    void userConfirmed;
+                    return this.ensureTaskShape({
+                    ...taskItem,
                     chainId: (this.activeRecords(this.db.progressionChains || []).find((chain) => chain.id === item.chainId || chain.group === item.chainId)?.id) || ''
-                }));
+                    });
+                });
                 const merged = this.ensureDailyPlanShape({
                     ...(current || {}),
                     date: plan.date,
@@ -803,7 +1118,7 @@
                     title: plan.title || this.planTypeMeta?.(plan.type)?.label || '训练计划',
                     source: 'ai',
                     notes: plan.notes,
-                    items: [...locked, ...aiItems]
+                    items: [...preserved, ...aiItems]
                 });
                 this.saveDailyPlan?.(merged, { save: false });
             });

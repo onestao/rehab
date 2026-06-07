@@ -73,6 +73,21 @@ test('health profile merge keeps meaningful profile over newer empty default', (
     assert.equal(mergeHealthProfileRecord(realProfile, emptyDefault), realProfile);
 });
 
+test('health profile with only exam results is meaningful', () => {
+    const profile = {
+        id: 'profile',
+        gender: 'male',
+        age: null,
+        conditions: [],
+        examResults: [{ item: 'MRI', result: '左膝半月板后角损伤', bodyPart: '膝' }],
+        allergies: [],
+        preferences: { equipment: [], sports: [] },
+        vitals: { restingHR: null }
+    };
+
+    assert.equal(hasMeaningfulHealthProfile(profile), true);
+});
+
 test('health profile merge uses LWW when both profiles have content', () => {
     const oldProfile = { id: 'profile', updatedAt: 100, age: 30 };
     const newProfile = { id: 'profile', updatedAt: 200, age: 31 };

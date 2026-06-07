@@ -137,11 +137,18 @@ const workoutState = {
         workout.acquireWakeLock();
         workout.setupMediaSession();
         clearInterval(workout.sessionInt);
+        workout._sessionLastTick = Date.now();
         workout.sessionInt = setInterval(() => {
-            if (!workout.isPaused) {
-                workout.totalSec++;
-                workout.updateUI();
+            if (workout.isPaused) {
+                workout._sessionLastTick = Date.now();
+                return;
             }
+            const now = Date.now();
+            const delta = Math.max(0, Math.floor((now - Number(workout._sessionLastTick || now)) / 1000));
+            if (delta <= 0) return;
+            workout._sessionLastTick = Number(workout._sessionLastTick || now) + delta * 1000;
+            workout.totalSec += delta;
+            workout.updateUI();
         }, 1000);
         workout._lastActiveAt = new Date(snapshot.updatedAt || Date.now()).getTime();
         workoutEngine.restore(snapshot.strength, snapshot.labels, snapshot.updatedAt);

@@ -565,6 +565,7 @@
                 const backBtn = `<div class="profile-v6-back-row"><button class="profile-v6-back-btn" onclick="data.setRoutineView('home');data.renderProfilePage?.()" type="button" aria-label="返回"><span class="material-symbols-rounded">arrow_back</span></button><strong class="profile-v6-back-title">${pageTitle}</strong></div>`;
                 if (view === 'library') {
                     content.innerHTML = backBtn + (this.renderPlanEquipmentCard?.() || '') + this.renderLibrarySegment() + this.renderLibraryDeck();
+                    this.bindLibraryActions?.(content);
                     requestAnimationFrame(() => {
                         this.syncLibraryDeckPosition?.(false);
                         this.updateLibraryTabActive?.();
@@ -585,6 +586,32 @@
                 content.classList.remove('profile-view-forward', 'profile-view-back');
                 settings?.classList.remove('profile-view-forward', 'profile-view-back');
             }, 360);
+        },
+
+        bindLibraryActions(root) {
+            if (!root || root.dataset.libraryActionsBound === '1') return;
+            root.dataset.libraryActionsBound = '1';
+            root.addEventListener('click', (event) => {
+                const btn = event.target?.closest?.('[data-rl-action]');
+                if (!btn || !root.contains(btn)) return;
+                const action = btn.getAttribute('data-rl-action') || '';
+                const routineId = btn.getAttribute('data-routine-id') || '';
+                const actionIndex = Number(btn.getAttribute('data-action-index') || 0);
+
+                event.preventDefault();
+                if (action !== 'toggle-routine-collapse') event.stopPropagation();
+
+                if (action === 'set-library-tag') this.setLibraryFilterTag(btn.getAttribute('data-library-tag') || '');
+                else if (action === 'toggle-routine-collapse') this.toggleCollapse('routine_lib_' + routineId);
+                else if (action === 'move-routine-action') this.moveRoutineAction(routineId, actionIndex, Number(btn.getAttribute('data-direction') || 0));
+                else if (action === 'save-action-from-routine') this.saveActionFromRoutine(routineId, actionIndex);
+                else if (action === 'remove-routine-action') this.removeRoutineAction(routineId, actionIndex);
+                else if (action === 'load-routine') this.loadRoutineById(routineId);
+                else if (action === 'rename-routine') this.renameRoutineFromLibrary(routineId);
+                else if (action === 'edit-routine-tags') this.editRoutineTags(routineId);
+                else if (action === 'derive-routine') this.deriveRoutineFromLibrary(routineId);
+                else if (action === 'delete-routine') this.deleteRoutineById(routineId);
+            });
         },
 
         renderProfileV6Cards() {
@@ -717,8 +744,8 @@
         renderLibraryTagChips(tags, activeTag) {
             if (!tags.length) return '';
             return `<div class="library-tag-chips">
-                <button class="routine-tag-chip md-btn md-btn-tonal${!activeTag ? ' active' : ''}" onclick="data.setLibraryFilterTag('')" type="button">全部</button>
-                ${tags.map(t => `<button class="routine-tag-chip md-btn md-btn-tonal${activeTag===t ? ' active' : ''}" onclick="data.setLibraryFilterTag('${this.escapeHtml(t)}')" type="button">${this.escapeHtml(t)}</button>`).join('')}
+                <button class="routine-tag-chip md-btn md-btn-tonal${!activeTag ? ' active' : ''}" data-rl-action="set-library-tag" data-library-tag="" type="button">全部</button>
+                ${tags.map(t => `<button class="routine-tag-chip md-btn md-btn-tonal${activeTag===t ? ' active' : ''}" data-rl-action="set-library-tag" data-library-tag="${this.escapeHtml(t)}" type="button">${this.escapeHtml(t)}</button>`).join('')}
             </div>`;
         },
 
@@ -1110,8 +1137,9 @@
                 ${filtered.map(r => {
                     const expanded = this.isCollapsed('routine_lib_' + r.id, true) === false;
                     const rtTags = Array.isArray(r.tags) ? r.tags : [];
+                    const routineId = this.escapeHtml(r.id || '');
                     return `<div class="routine-card library-card">
-                        <div class="routine-card-head" onclick="data.toggleCollapse('routine_lib_${r.id}')">
+                        <div class="routine-card-head" data-rl-action="toggle-routine-collapse" data-routine-id="${routineId}">
                             <div style="flex:1;min-width:0">
                                 <strong>${this.escapeHtml(r.name || '未命名方案')}</strong>
                                 <small>${(r.actions || []).length}个动作 ${r.created ? '&middot; ' + this.escapeHtml(r.created) : ''}</small>
@@ -1125,18 +1153,18 @@
                                 <span class="routine-action-name">${this.escapeHtml(a.name || '未命名动作')}</span>
                                 <small>${a.sets || 1}组×${a.reps || 1}次·${a.work || 5}s</small>
                                 <div class="routine-inline-actions">
-                                    <button class="icon-btn" onclick="event.stopPropagation();data.moveRoutineAction('${r.id}', ${ai}, -1)" type="button" aria-label="上移"><span class="material-symbols-rounded">expand_less</span></button>
-                                    <button class="icon-btn" onclick="event.stopPropagation();data.moveRoutineAction('${r.id}', ${ai}, 1)" type="button" aria-label="下移"><span class="material-symbols-rounded">expand_more</span></button>
-                                    <button class="icon-btn" onclick="event.stopPropagation();data.saveActionFromRoutine('${r.id}', ${ai})" type="button" aria-label="保存到动作库"><span class="material-symbols-rounded">bookmark_add</span></button>
-                                    <button class="icon-btn" onclick="event.stopPropagation();data.removeRoutineAction('${r.id}', ${ai})" type="button" aria-label="删除"><span class="material-symbols-rounded">delete</span></button>
+                                    <button class="icon-btn" data-rl-action="move-routine-action" data-routine-id="${routineId}" data-action-index="${ai}" data-direction="-1" type="button" aria-label="上移"><span class="material-symbols-rounded">expand_less</span></button>
+                                    <button class="icon-btn" data-rl-action="move-routine-action" data-routine-id="${routineId}" data-action-index="${ai}" data-direction="1" type="button" aria-label="下移"><span class="material-symbols-rounded">expand_more</span></button>
+                                    <button class="icon-btn" data-rl-action="save-action-from-routine" data-routine-id="${routineId}" data-action-index="${ai}" type="button" aria-label="保存到动作库"><span class="material-symbols-rounded">bookmark_add</span></button>
+                                    <button class="icon-btn" data-rl-action="remove-routine-action" data-routine-id="${routineId}" data-action-index="${ai}" type="button" aria-label="删除"><span class="material-symbols-rounded">delete</span></button>
                                 </div>
                             </div>`).join('')}
                             <div class="library-card-actions">
-                                <button class="md-btn md-btn-tonal" onclick="event.stopPropagation();data.loadRoutineById('${r.id}')" type="button"><span class="material-symbols-rounded">upload</span>载入</button>
-                                <button class="md-btn md-btn-tonal" onclick="event.stopPropagation();data.renameRoutineFromLibrary('${r.id}')" type="button"><span class="material-symbols-rounded">edit</span>改名</button>
-                                <button class="md-btn md-btn-tonal" onclick="event.stopPropagation();data.editRoutineTags('${r.id}')" type="button"><span class="material-symbols-rounded">bookmark_add</span>标签</button>
-                                <button class="md-btn md-btn-tonal" onclick="event.stopPropagation();data.deriveRoutineFromLibrary('${r.id}')" type="button"><span class="material-symbols-rounded">add_circle</span>派生</button>
-                                <button class="md-btn md-btn-tonal" onclick="event.stopPropagation();data.deleteRoutineById('${r.id}')" type="button"><span class="material-symbols-rounded">delete</span>删除</button>
+                                <button class="md-btn md-btn-tonal" data-rl-action="load-routine" data-routine-id="${routineId}" type="button"><span class="material-symbols-rounded">upload</span>载入</button>
+                                <button class="md-btn md-btn-tonal" data-rl-action="rename-routine" data-routine-id="${routineId}" type="button"><span class="material-symbols-rounded">edit</span>改名</button>
+                                <button class="md-btn md-btn-tonal" data-rl-action="edit-routine-tags" data-routine-id="${routineId}" type="button"><span class="material-symbols-rounded">bookmark_add</span>标签</button>
+                                <button class="md-btn md-btn-tonal" data-rl-action="derive-routine" data-routine-id="${routineId}" type="button"><span class="material-symbols-rounded">add_circle</span>派生</button>
+                                <button class="md-btn md-btn-tonal" data-rl-action="delete-routine" data-routine-id="${routineId}" type="button"><span class="material-symbols-rounded">delete</span>删除</button>
                             </div>
                         </div>` : ''}
                     </div>`;

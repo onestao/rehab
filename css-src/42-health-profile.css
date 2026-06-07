@@ -268,6 +268,54 @@
     font-style: italic;
 }
 
+.profile-exam-list {
+    display: grid;
+    gap: 8px;
+}
+
+.profile-exam-result {
+    min-width: 0;
+    padding: 10px 12px;
+    border-radius: 16px;
+    background: var(--md-sys-surface-container-low);
+    border: 1px solid color-mix(in srgb, var(--md-sys-outline-variant) 72%, transparent);
+}
+
+.profile-exam-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    min-width: 0;
+}
+
+.profile-exam-head b {
+    min-width: 0;
+    font-size: 13px;
+    overflow-wrap: anywhere;
+}
+
+.profile-exam-head span,
+.profile-exam-result small,
+.profile-exam-result em {
+    color: var(--md-sys-on-surface-variant);
+    font-size: 11px;
+    line-height: 15px;
+}
+
+.profile-exam-result p {
+    margin: 5px 0 0;
+    font-size: 12px;
+    line-height: 17px;
+    overflow-wrap: anywhere;
+}
+
+.profile-exam-result em {
+    display: block;
+    margin-top: 4px;
+    font-style: normal;
+}
+
 .rehab-week-card {
     padding: 14px;
     border-radius: 24px;
@@ -542,20 +590,21 @@
 .rehab-diff-card strong { display: block; font-size: 18px; line-height: 1; }
 .rehab-diff-card small { display: block; color: var(--md-sys-on-surface-variant); font-size: 10px; font-weight: 800; }
 .rehab-diff-list { display: grid; gap: 0; margin-top: 8px; }
-.rehab-action-review { padding: 10px; margin-bottom: 8px; }
-.rehab-action-review-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
-.rehab-action-review-head strong { display: block; font-size: 14px; line-height: 19px; }
-.rehab-action-review-head small { display: block; color: var(--md-sys-on-surface-variant); font-size: 11px; line-height: 15px; }
+.rehab-action-review { min-width: 0; padding: 10px; margin-bottom: 8px; overflow: hidden; }
+.rehab-action-review-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; min-width: 0; }
+.rehab-action-review-head > div:first-child { min-width: 0; }
+.rehab-action-review-head strong { display: block; min-width: 0; font-size: 14px; line-height: 19px; overflow-wrap: anywhere; }
+.rehab-action-review-head small { display: block; min-width: 0; color: var(--md-sys-on-surface-variant); font-size: 11px; line-height: 15px; overflow-wrap: anywhere; }
 .rehab-action-review-head-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
 .rehab-action-del-btn { width: 32px; height: 32px; border: 0; border-radius: 50%; display: inline-grid; place-items: center; background: transparent; color: var(--md-sys-error); cursor: pointer; transition: background .15s; }
 .rehab-action-del-btn:hover { background: var(--md-sys-error-container); }
 .rehab-action-del-btn .material-symbols-rounded { font-size: 18px; }
-.rehab-review-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 8px; }
+.rehab-review-grid { display: grid; grid-template-columns: 1fr; gap: 6px; margin-top: 8px; min-width: 0; }
 .profile-edit-btn-row { display: flex; gap: 6px; flex-wrap: wrap; }
-.mini-field { display: grid; gap: 4px; }
+.mini-field { display: grid; gap: 4px; min-width: 0; }
 .mini-field span { color: var(--md-sys-primary); font-size: 10px; font-weight: 800; }
 .mini-field input,
-.mini-field select { height: 34px; border: 1px solid var(--md-sys-outline-variant); border-radius: 12px; background: var(--md-sys-surface-container-lowest); padding: 0 10px; }
+.mini-field select { min-width: 0; width: 100%; height: 34px; border: 1px solid var(--md-sys-outline-variant); border-radius: 12px; background: var(--md-sys-surface-container-lowest); padding: 0 10px; }
 .rehab-json { max-height: 170px; overflow: auto; margin: 0; padding: 10px; border-radius: 14px; background: #101820; color: #d9f8ff; font-size: 10px; line-height: 1.55; white-space: pre-wrap; }
 
 @media (min-width: 640px) {
@@ -736,15 +785,22 @@
 }
 
 .profile-form-health .profile-section-icon { background: var(--md-sys-tertiary-container); color: var(--md-sys-on-tertiary-container); }
+.profile-form-exams .profile-section-icon { background: var(--md-sys-secondary-container); color: var(--md-sys-on-secondary-container); }
 .profile-form-allergy .profile-section-icon { background: var(--md-sys-amber-container); color: var(--md-sys-on-amber-container); }
 .profile-form-preference .profile-section-icon { background: var(--md-sys-secondary-container); color: var(--md-sys-on-secondary-container); }
 
-.profile-cond-row {
+.profile-cond-row,
+.profile-exam-row {
     background: linear-gradient(135deg, color-mix(in srgb, var(--md-sys-tertiary-container) 24%, var(--md-sys-surface-container-lowest)), var(--md-sys-surface-container));
     padding: 12px;
     border-radius: var(--md-sys-shape-md);
     margin-bottom: 10px;
     border-left: 3px solid var(--md-sys-tertiary);
+}
+
+.profile-exam-row {
+    background: linear-gradient(135deg, color-mix(in srgb, var(--md-sys-secondary-container) 24%, var(--md-sys-surface-container-lowest)), var(--md-sys-surface-container));
+    border-left-color: var(--md-sys-secondary);
 }
 
 .profile-cond-meta-grid {

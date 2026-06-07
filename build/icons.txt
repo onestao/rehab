@@ -7,6 +7,7 @@ auto_awesome
 backup
 badge
 balance
+biotech
 block
 bookmark_add
 bookmark_border
@@ -31,6 +32,7 @@ compress
 content_copy
 dark_mode
 delete
+diagnosis
 directions_bike
 directions_run
 directions_walk

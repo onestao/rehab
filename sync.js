@@ -513,6 +513,9 @@ const sync = {
         const localBefore = JSON.parse(JSON.stringify(data.db));
         data.db = remoteDb || {};
         data.normalizeDb();
+        if (!data.db.aiCipher && localBefore.aiCipher) data.db.aiCipher = localBefore.aiCipher;
+        if (!data.db.encryptedAi && localBefore.encryptedAi) data.db.encryptedAi = localBefore.encryptedAi;
+        if (data.db.aiCipher?.payload && !data.db.encryptedAi) data.db.encryptedAi = data.db.aiCipher.payload;
         const entities = Object.keys(this.remoteEntityMap());
         entities.forEach(entity => {
             const localRef = this.getEntityRef(localBefore, entity);
@@ -733,7 +736,14 @@ const sync = {
             }
             remoteManifest.lastIncrementalTs = Math.max(Number(remoteManifest.lastIncrementalTs || 0), ts);
             remoteManifest.schemaVersion = Number(data.SCHEMA_VERSION || remoteManifest.schemaVersion || 2);
-            await this.withRetry(() => this.writeJson(this.REMOTE_MANIFEST, remoteManifest, this.REMOTE_MANIFEST));
+            try {
+                await this.withRetry(() => this.writeJson(this.REMOTE_MANIFEST, remoteManifest, this.REMOTE_MANIFEST));
+            } catch (error) {
+                if (!/已加入重试队列/.test(String(error?.message || error || ''))) {
+                    this.queueRetry({ remotePath: this.REMOTE_MANIFEST, payload: remoteManifest, etagKey: this.REMOTE_MANIFEST }, 'manifest_commit_failed');
+                }
+                throw error;
+            }
 
             localMeta.lastSyncAt = Date.now();
             localMeta.lastIncrementalTs = Number(remoteManifest.lastIncrementalTs || ts);
