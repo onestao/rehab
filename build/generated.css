@@ -6767,7 +6767,7 @@ body.is-training .fab-pip.active {
     opacity: 0;
     transition: opacity var(--md-sys-motion-duration-short) ease;
 }
-.advice-bubble-actions .advice-action-btn .material-symbols-rounded { font-size: 18px; }
+.advice-bubble-actions .advice-action-btn .material-symbols-rounded { position: relative; z-index: 1; font-size: 18px; }
 .advice-bubble-actions .advice-action-btn:active { transform: scale(0.9); }
 .advice-bubble-actions .advice-action-btn:active::after { opacity: var(--md-state-press); }
 .advice-bubble-actions .advice-action-danger:active {
@@ -6779,9 +6779,36 @@ body.is-training .fab-pip.active {
     margin-left: auto;
 }
 .advice-bubble.user .advice-bubble-actions button {
-    background: color-mix(in srgb, var(--md-sys-on-primary-container) 14%, transparent);
-    border-color: color-mix(in srgb, var(--md-sys-on-primary-container) 16%, transparent);
+    background: linear-gradient(145deg,
+        color-mix(in srgb, var(--md-sys-surface-container-lowest) 13%, transparent),
+        color-mix(in srgb, var(--md-sys-primary-container) 10%, transparent));
+    border-color: color-mix(in srgb, var(--md-sys-surface-container-lowest) 24%, transparent);
     color: var(--md-sys-on-primary-container);
+    box-shadow:
+        inset 0 1px 0 color-mix(in srgb, var(--md-sys-surface-container-lowest) 28%, transparent),
+        inset 0 -1px 0 color-mix(in srgb, var(--md-sys-primary) 9%, transparent),
+        0 9px 22px -10px color-mix(in srgb, var(--md-sys-primary) 46%, transparent),
+        0 2px 5px -3px color-mix(in srgb, var(--md-sys-on-primary-container) 16%, transparent);
+    backdrop-filter: blur(26px) saturate(1.36) brightness(0.98);
+    -webkit-backdrop-filter: blur(26px) saturate(1.36) brightness(0.98);
+}
+.advice-bubble.user .advice-bubble-actions .advice-action-btn::before {
+    content: '';
+    position: absolute;
+    inset: 1px;
+    border-radius: inherit;
+    background: linear-gradient(145deg,
+        color-mix(in srgb, var(--md-sys-surface-container-lowest) 16%, transparent),
+        transparent 48%);
+    pointer-events: none;
+}
+.advice-bubble.user .advice-bubble-actions .advice-action-btn:active {
+    background: linear-gradient(145deg,
+        color-mix(in srgb, var(--md-sys-surface-container-lowest) 16%, transparent),
+        color-mix(in srgb, var(--md-sys-primary-container) 12%, transparent));
+    box-shadow:
+        inset 0 1px 0 color-mix(in srgb, var(--md-sys-surface-container-lowest) 24%, transparent),
+        0 5px 14px -10px color-mix(in srgb, var(--md-sys-primary) 34%, transparent);
 }
 .advice-routine-actions {
     display: flex;
