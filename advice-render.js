@@ -530,22 +530,21 @@ Object.assign(advicePanel, {
         const errorRecovery = msg.error ? (this.renderAdviceErrorRecovery?.(msg) || '') : '';
         const stoppedNotice = msg.stopped ? '<div class="advice-stopped-notice"><span class="material-symbols-rounded">stop</span>已停止生成，已保留上方部分回复。</div>' : '';
         const actions = msg.role === 'assistant'
-            ? `<div class="advice-bubble-actions">
-                <button onclick="data.copyAdviceMessage(${msg.idx}, this.closest('.advice-bubble')?.dataset.adviceId || '')" type="button">复制</button>
-                <button onclick="data.shareAdviceMessage(${msg.idx}, this.closest('.advice-bubble')?.dataset.adviceId || '')" type="button">分享</button>
-                ${(msg.error || !msg.pending) ? `<button onclick="data.retryAdviceFrom(${msg.idx}, this.closest('.advice-bubble')?.dataset.adviceId || '')" type="button">重试</button>` : ''}
+            ? `<div class="advice-bubble-actions" aria-label="AI 回答操作">
+                <button class="advice-action-btn" onclick="data.copyAdviceMessage(${msg.idx}, this.closest('.advice-bubble')?.dataset.adviceId || '')" type="button" aria-label="复制" title="复制"><span class="material-symbols-rounded">content_copy</span></button>
+                ${(msg.error || !msg.pending) ? `<button class="advice-action-btn" onclick="data.retryAdviceFrom(${msg.idx}, this.closest('.advice-bubble')?.dataset.adviceId || '')" type="button" aria-label="重试" title="重试"><span class="material-symbols-rounded">refresh</span></button>` : ''}
                 ${versionGroup && versionGroup.length > 1
-                    ? `<button onclick="data.deleteAdviceVersion(this.closest('.advice-bubble')?.querySelector('.advice-version-switcher')?.dataset.adviceVersionRoot || '', this.closest('.advice-bubble')?.dataset.adviceId || '')" type="button">删除版本</button>`
-                    : `<button onclick="data.deleteAiAdviceMessage(${msg.idx}, this.closest('.advice-bubble')?.dataset.adviceId || '')" type="button">删除</button>`}
+                    ? `<button class="advice-action-btn advice-action-danger" onclick="data.deleteAdviceVersion(this.closest('.advice-bubble')?.querySelector('.advice-version-switcher')?.dataset.adviceVersionRoot || '', this.closest('.advice-bubble')?.dataset.adviceId || '')" type="button" aria-label="删除当前版本" title="删除当前版本"><span class="material-symbols-rounded">delete</span></button>`
+                    : `<button class="advice-action-btn advice-action-danger" onclick="data.deleteAiAdviceMessage(${msg.idx}, this.closest('.advice-bubble')?.dataset.adviceId || '')" type="button" aria-label="删除" title="删除"><span class="material-symbols-rounded">delete</span></button>`}
+                ${versionSwitcher}
             </div>`
-            : `<div class="advice-bubble-actions">
-                <button onclick="data.openEditAdviceMessage(${msg.idx}, this.closest('.advice-bubble')?.dataset.adviceId || '')" type="button">编辑重问</button>
-                <button onclick="data.deleteAiAdviceMessage(${msg.idx}, this.closest('.advice-bubble')?.dataset.adviceId || '')" type="button">删除</button>
+            : `<div class="advice-bubble-actions" aria-label="提问操作">
+                <button class="advice-action-btn" onclick="data.openEditAdviceMessage(${msg.idx}, this.closest('.advice-bubble')?.dataset.adviceId || '')" type="button" aria-label="编辑重问" title="编辑重问"><span class="material-symbols-rounded">edit_square</span></button>
+                <button class="advice-action-btn advice-action-danger" onclick="data.deleteAiAdviceMessage(${msg.idx}, this.closest('.advice-bubble')?.dataset.adviceId || '')" type="button" aria-label="删除" title="删除"><span class="material-symbols-rounded">delete</span></button>
             </div>`;
         return `<div class="advice-bubble ${msg.role}${state}" ${safeId ? `data-advice-id="${safeId}"` : ''} ${latest ? 'data-advice-latest="true"' : ''}>
             <div class="advice-bubble-head">
                 <b>${label}<small>${time}${model}${usage}${cost}${stoppedBadge}</small></b>
-                ${versionSwitcher}
                 ${msg.pending ? '<span class="advice-typing-dot"></span>' : ''}
             </div>
             ${attachments}

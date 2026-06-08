@@ -771,7 +771,7 @@ mark.ai-hit
 
 .advice-bubble.assistant
   files: 36-responsive.css, 46-advice-ai.css
-    max-width: 100% | 96% (36-responsive.css / 46-advice-ai.css)
+    max-width: 100% | var(--advice-assistant-bubble-max-width, 96%) (36-responsive.css / 46-advice-ai.css)
 
 .advice-bubble-content
   files: 36-responsive.css, 46-advice-ai.css
@@ -1321,7 +1321,7 @@ mark.ai-hit
   files: 49-plan.css, 49-plan-ai.css
     color: var(--md-sys-on-surface-variant) (49-plan.css / 49-plan-ai.css)
 
-## COMPLEMENTS (same selector, disjoint properties): 93
+## COMPLEMENTS (same selector, disjoint properties): 99
 .bar-leading
   files: 04-layout-appbar.css, 50-v6-ui.css
 
@@ -1421,6 +1421,9 @@ body.is-paused .fab-play
 .profile-view-back
   files: 43-identity-card.css
 
+#ai-coach.page
+  files: 46-advice-ai.css
+
 .advice-status-line
   files: 46-advice-ai.css
 
@@ -1430,6 +1433,9 @@ body.is-paused .fab-play
 .advice-bubble
   files: 46-advice-ai.css, 41-m3e-effects.css
 
+.advice-bubble b small
+  files: 46-advice-ai.css
+
 .advice-bubble-content h1
   files: 46-advice-ai.css
 
@@ -1437,6 +1443,12 @@ body.is-paused .fab-play
   files: 46-advice-ai.css
 
 .advice-bubble-content h3
+  files: 46-advice-ai.css
+
+.advice-bubble-actions
+  files: 46-advice-ai.css
+
+.advice-error-actions button
   files: 46-advice-ai.css
 
 .plan-progress-ring
@@ -1563,6 +1575,12 @@ body.is-paused .fab-play
   files: 54-v6-ai.css
 
 .advice-v6-page .advice-bubble-content
+  files: 54-v6-ai.css
+
+.advice-v6-page .advice-version-switcher
+  files: 54-v6-ai.css
+
+.advice-v6-page .advice-bubble-actions
   files: 54-v6-ai.css
 
 .advice-v6-page .advice-bubble b small

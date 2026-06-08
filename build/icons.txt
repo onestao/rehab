@@ -42,6 +42,7 @@ download
 download_for_offline
 edit
 edit_note
+edit_square
 egg_alt
 error
 event

@@ -100,17 +100,19 @@
 .advice-version-switcher {
     display: inline-flex;
     align-items: center;
-    gap: 2px;
-    padding: 2px 4px;
+    gap: var(--advice-version-switcher-gap, 2px);
+    justify-content: var(--advice-version-switcher-justify-content, flex-start);
+    max-width: 100%;
+    margin: var(--advice-version-switcher-margin, 2px 0 0);
+    padding: 3px 5px;
     border-radius: var(--md-sys-shape-full);
     background: color-mix(in srgb, var(--md-sys-surface-container-highest) 70%, transparent);
     color: var(--md-sys-on-surface-variant);
-    margin-left: 4px;
     flex-shrink: 0;
 }
 .advice-version-switcher .advice-version-btn {
-    width: 22px;
-    height: 22px;
+    width: 28px;
+    height: 28px;
     border: none;
     border-radius: var(--md-sys-shape-full);
     background: transparent;
@@ -121,7 +123,7 @@
     justify-content: center;
     -webkit-tap-highlight-color: transparent;
 }
-.advice-version-switcher .advice-version-btn .material-symbols-rounded { font-size: 16px; }
+.advice-version-switcher .advice-version-btn .material-symbols-rounded { font-size: 17px; }
 .advice-version-switcher .advice-version-btn.active {
     background: var(--md-sys-primary-container);
     color: var(--md-sys-on-primary-container);
@@ -496,8 +498,8 @@
 .advice-date-content { display: flex; flex-direction: column; gap: 8px; }
 .advice-date-group.collapsed .advice-date-content { display: none; }
 .advice-bubble {
-    max-width: 88%;
-    padding: 12px 14px;
+    max-width: var(--advice-bubble-max-width, 88%);
+    padding: var(--advice-bubble-padding, 12px 14px);
     border-radius: 18px;
     background: var(--md-sys-surface-container-lowest);
     display: grid;
@@ -512,7 +514,7 @@
 }
 .advice-bubble.assistant {
     align-self: flex-start;
-    max-width: 96%;
+    max-width: var(--advice-assistant-bubble-max-width, 96%);
     border-bottom-left-radius: 6px;
     background: var(--md-sys-surface-container-lowest);
     border: 1px solid color-mix(in srgb, var(--md-sys-outline-variant) 72%, transparent);
@@ -534,8 +536,8 @@
     backdrop-filter: var(--glass-blur-sm);
     -webkit-backdrop-filter: var(--glass-blur-sm);
 }
-.advice-bubble-head { display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; min-width: 0; }
-.advice-bubble b { flex: 1 1 0; min-width: 0; overflow: hidden; font-size: 11px; color: var(--md-sys-on-surface-variant); display: flex; align-items: center; gap: 6px; }
+.advice-bubble-head { display: flex; align-items: center; gap: var(--advice-bubble-head-gap, 8px); flex-wrap: nowrap; min-width: 0; }
+.advice-bubble b { flex: 1 1 0; min-width: 0; overflow: hidden; font-size: 11px; color: var(--md-sys-on-surface-variant); display: var(--advice-bubble-meta-display, flex); align-items: center; gap: var(--advice-bubble-meta-gap, 6px); }
 .advice-bubble b small { font-size: 10px; font-weight: 600; color: var(--md-sys-on-surface-variant); opacity: 0.8; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .advice-stopped-badge {
     display: inline-flex;
@@ -633,8 +635,9 @@
 .advice-delete-btn .material-symbols-rounded { font-size: 17px; }
 .advice-bubble-actions {
     display: flex;
-    gap: 6px;
+    gap: var(--advice-bubble-actions-gap, 6px);
     flex-wrap: wrap;
+    align-items: center;
     margin-top: 2px;
 }
 .advice-bubble-actions button {
@@ -647,6 +650,27 @@
     min-height: 26px;
     padding: 0 10px;
     cursor: pointer;
+}
+.advice-bubble-actions .advice-action-btn {
+    width: 34px;
+    height: 34px;
+    min-height: 34px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+}
+.advice-bubble-actions .advice-action-btn .material-symbols-rounded { font-size: 18px; }
+.advice-bubble-actions .advice-action-btn:active { transform: scale(0.94); }
+.advice-bubble-actions .advice-action-danger:active {
+    background: var(--md-sys-error-container);
+    color: var(--md-sys-on-error-container);
+}
+.advice-bubble-actions .advice-version-switcher {
+    margin-left: auto;
 }
 .advice-bubble.user .advice-bubble-actions button {
     background: color-mix(in srgb, var(--md-sys-on-primary-container) 12%, transparent);
@@ -1014,21 +1038,22 @@
     font-size: 10px;
 }
 .advice-error-actions {
-    display: flex;
+    display: var(--advice-error-actions-display, flex);
     flex-wrap: wrap;
     gap: 6px;
+    grid-template-columns: var(--advice-error-actions-grid-template, none);
 }
 .advice-error-actions button {
     min-height: 32px;
     border: 1px solid color-mix(in srgb, var(--md-sys-error) 18%, var(--glass-border));
     border-radius: var(--md-sys-shape-full);
-    padding: 0 10px;
+    padding: var(--advice-error-action-padding, 0 10px);
     display: inline-flex;
     align-items: center;
     gap: 4px;
     background: color-mix(in srgb, var(--glass-bg) 78%, var(--md-sys-error-container));
     color: var(--md-sys-on-error-container);
-    font-size: 11px;
+    font-size: var(--advice-error-action-font-size, 11px);
     font-weight: 900;
     cursor: pointer;
     box-shadow: var(--glass-shadow-inset);
@@ -1038,6 +1063,31 @@
 }
 .advice-error-actions button:active { transform: scale(0.96); }
 .advice-error-actions .material-symbols-rounded { font-size: 15px; }
+@media (max-width: 480px) {
+    #ai-coach.page {
+        --advice-bubble-max-width: 94%;
+        --advice-bubble-padding: 11px 12px;
+        --advice-assistant-bubble-max-width: 100%;
+        --advice-bubble-head-gap: 6px;
+        --advice-bubble-meta-display: grid;
+        --advice-bubble-meta-gap: 2px;
+        --advice-version-switcher-margin: 0;
+        --advice-bubble-actions-gap: 5px;
+        --advice-error-actions-display: grid;
+        --advice-error-actions-grid-template: repeat(3, minmax(0, 1fr));
+        --advice-error-action-padding: 0 8px;
+        --advice-error-action-font-size: 10px;
+    }
+    .advice-bubble b small { max-width: 100%; }
+    .advice-bubble-actions {
+        justify-content: flex-start;
+    }
+    .advice-bubble.user .advice-bubble-actions { justify-content: flex-start; }
+    .advice-error-actions button {
+        min-width: 0;
+        justify-content: center;
+    }
+}
 .advice-quick-prompts::-webkit-scrollbar { display: none; }
 .advice-quick-prompts > button {
     flex: none; scroll-snap-align: start;

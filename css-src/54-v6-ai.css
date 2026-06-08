@@ -136,6 +136,13 @@
     font-size: 12px;
     line-height: 1.5;
 }
+.advice-v6-page .advice-bubble.assistant {
+    max-width: min(100%, 680px);
+}
+.advice-v6-page .advice-version-switcher,
+.advice-v6-page .advice-bubble-actions {
+    max-width: 100%;
+}
 .advice-v6-page .advice-bubble-content {
     font-size: 12px;
     line-height: 1.5;

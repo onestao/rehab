@@ -168,8 +168,7 @@ const advicePanel = {
             cycleAdviceVersion: this.cycleAdviceVersion,
             _isVersionActive: this._isVersionActive,
             pinAdviceVersion: this.pinAdviceVersion,
-            deleteAdviceVersion: this.deleteAdviceVersion,
-            shareAdviceMessage: this.shareAdviceMessage
+            deleteAdviceVersion: this.deleteAdviceVersion
         });
         Object.assign(target, window.adviceTemplateManager || {});
         Object.assign(target, window.adviceAttachments || {});
@@ -2263,28 +2262,6 @@ const advicePanel = {
         if (!msg?.content) return;
         navigator.clipboard?.writeText(msg.content).catch(() => {});
         workout?.showToast?.('已复制 AI 回答');
-    },
-
-    async shareAdviceMessage(idx, id = '') {
-        const msg = this.findAdviceMessage(idx, id);
-        if (!msg?.content) return;
-        const text = String(msg.content || '').trim();
-        if (!text) return;
-        try {
-            await navigator.clipboard.writeText(text);
-            workout?.showToast?.('已复制 Markdown');
-        } catch {
-            const textarea = document.createElement('textarea');
-            textarea.value = text;
-            textarea.setAttribute('readonly', 'true');
-            textarea.style.position = 'fixed';
-            textarea.style.left = '-9999px';
-            document.body.appendChild(textarea);
-            textarea.select();
-            document.execCommand('copy');
-            textarea.remove();
-            workout?.showToast?.('已复制 Markdown');
-        }
     },
 
     retryAdviceFrom(idx, id = '', contextMode = '') {

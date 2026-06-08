@@ -103,6 +103,7 @@ function loadAdvicePanelHarness() {
         pauseStreamForScroll: context.__advicePanel.pauseStreamForScroll,
         adviceConversationContext: context.__advicePanel.adviceConversationContext,
         renderAdvicePanel: context.__advicePanel.renderAdvicePanel,
+        renderAdviceMessage: () => '',
         renderAdviceMessages: () => '',
         renderAdviceFilterControls: () => '',
         renderAdviceModelChip: () => '',
@@ -124,6 +125,36 @@ function loadAdvicePanelHarness() {
         regenerateAdviceFromEditedUser: context.__advicePanel.regenerateAdviceFromEditedUser,
         retryAdviceFrom: context.__advicePanel.retryAdviceFrom
     };
+    return data;
+}
+
+function loadAdviceRenderHarness() {
+    const context = {
+        window: {},
+        document: {
+            querySelector: () => null,
+            createElement: () => ({ innerHTML: '', content: {}, childNodes: [] }),
+            createTreeWalker: () => ({ nextNode: () => false })
+        },
+        NodeFilter: { SHOW_TEXT: 4 },
+        requestAnimationFrame: (fn) => fn(),
+        getComputedStyle: () => ({ overflowY: 'visible' }),
+        advicePanel: {}
+    };
+    context.window = context;
+    context.globalThis = context;
+    vm.createContext(context);
+    const code = fs.readFileSync(new URL('../advice-render.js', import.meta.url), 'utf8');
+    vm.runInContext(`${code}\nthis.__adviceRender = advicePanel;`, context);
+    const data = context.__adviceRender;
+    data.logicalDateKey = () => '2026-05-30';
+    data.parseHistoryDate = (value) => new Date(value || '2026-05-30T00:00:00.000Z');
+    data.escapeHtml = (value) => String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
     return data;
 }
 
@@ -491,6 +522,54 @@ test('advice panel attach exposes v6 message list helper for runtime scrolling',
     const data = loadAdvicePanelHarness();
 
     assert.equal(typeof data._adviceMessageList, 'function');
+});
+
+test('assistant message actions are compact icons without share button', () => {
+    const data = loadAdviceRenderHarness();
+
+    const html = data.renderAdviceMessage({
+        id: 'a1',
+        role: 'assistant',
+        content: 'answer',
+        at: '2026-05-30T00:00:01.000Z',
+        idx: 1
+    });
+
+    assert.match(html, /aria-label="AI 回答操作"/);
+    assert.match(html, /aria-label="复制"/);
+    assert.match(html, /aria-label="重试"/);
+    assert.match(html, /content_copy/);
+    assert.doesNotMatch(html, />分享</);
+    assert.doesNotMatch(html, /shareAdviceMessage/);
+});
+
+test('advice version switcher renders after content instead of header', () => {
+    const data = loadAdviceRenderHarness();
+
+    const html = data.renderAdviceMessage({
+        id: 'a2',
+        role: 'assistant',
+        content: 'new answer',
+        at: '2026-05-30T00:00:02.000Z',
+        idx: 2,
+        replyToId: 'a1',
+        versionIdx: 1,
+        versionGroup: [
+            { id: 'a1', versionIdx: 0 },
+            { id: 'a2', versionIdx: 1 }
+        ]
+    });
+    const headerEnd = html.indexOf('</div>', html.indexOf('advice-bubble-head'));
+    const switcherIndex = html.indexOf('class="advice-version-switcher"');
+    const actionsIndex = html.indexOf('advice-bubble-actions');
+    const deleteIndex = html.indexOf('aria-label="删除当前版本"');
+    const contentIndex = html.indexOf('advice-bubble-content');
+
+    assert.ok(switcherIndex > headerEnd);
+    assert.ok(switcherIndex > contentIndex);
+    assert.ok(switcherIndex > actionsIndex);
+    assert.ok(switcherIndex > deleteIndex);
+    assert.doesNotMatch(html, /delete_sweep/);
 });
 
 test('touch intent marks stream as user-paused when user scrolls away', () => {
