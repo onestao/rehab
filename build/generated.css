@@ -6172,8 +6172,12 @@ body.is-training .fab-pip.active {
     margin: var(--advice-version-switcher-margin, 2px 0 0);
     padding: 3px 5px;
     border-radius: var(--md-sys-shape-full);
-    background: color-mix(in srgb, var(--md-sys-surface-container-highest) 70%, transparent);
+    border: 1px solid var(--glass-border);
+    background: color-mix(in srgb, var(--glass-bg-strong) 86%, transparent);
     color: var(--md-sys-on-surface-variant);
+    box-shadow: var(--glass-shadow-inset), 0 6px 18px color-mix(in srgb, var(--md-sys-on-surface) 7%, transparent);
+    backdrop-filter: var(--glass-blur-sm);
+    -webkit-backdrop-filter: var(--glass-blur-sm);
     flex-shrink: 0;
 }
 .advice-version-switcher .advice-version-btn {
@@ -6187,12 +6191,28 @@ body.is-training .fab-pip.active {
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    position: relative;
+    overflow: hidden;
     -webkit-tap-highlight-color: transparent;
+    transition:
+        transform var(--md-sys-motion-duration-short) var(--md-expressive-spring),
+        background var(--md-sys-motion-duration-short) ease,
+        color var(--md-sys-motion-duration-short) ease;
+}
+.advice-version-switcher .advice-version-btn::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: currentColor;
+    opacity: 0;
+    transition: opacity var(--md-sys-motion-duration-short) ease;
 }
 .advice-version-switcher .advice-version-btn .material-symbols-rounded { font-size: 17px; }
+.advice-version-switcher .advice-version-btn:active { transform: scale(0.9); }
+.advice-version-switcher .advice-version-btn:active::after { opacity: var(--md-state-press); }
 .advice-version-switcher .advice-version-btn.active {
-    background: var(--md-sys-primary-container);
-    color: var(--md-sys-on-primary-container);
+    background: color-mix(in srgb, var(--md-sys-primary-container) 78%, transparent);
+    color: var(--md-sys-primary);
 }
 .advice-version-label {
     font-size: 11px;
@@ -6707,15 +6727,18 @@ body.is-training .fab-pip.active {
     margin-top: 2px;
 }
 .advice-bubble-actions button {
-    border: none;
+    border: 1px solid var(--glass-border);
     border-radius: var(--md-sys-shape-full);
-    background: color-mix(in srgb, var(--md-sys-surface-container) 78%, transparent);
+    background: color-mix(in srgb, var(--glass-bg-strong) 78%, transparent);
     color: var(--md-sys-on-surface-variant);
     font-size: 11px;
     font-weight: 800;
     min-height: 26px;
     padding: 0 10px;
     cursor: pointer;
+    box-shadow: var(--glass-shadow-inset), 0 6px 16px color-mix(in srgb, var(--md-sys-on-surface) 7%, transparent);
+    backdrop-filter: var(--glass-blur-sm);
+    -webkit-backdrop-filter: var(--glass-blur-sm);
 }
 .advice-bubble-actions .advice-action-btn {
     width: 34px;
@@ -6726,20 +6749,38 @@ body.is-training .fab-pip.active {
     align-items: center;
     justify-content: center;
     flex: 0 0 auto;
+    position: relative;
+    overflow: hidden;
     touch-action: manipulation;
     -webkit-tap-highlight-color: transparent;
+    transition:
+        transform var(--md-sys-motion-duration-short) var(--md-expressive-spring),
+        background var(--md-sys-motion-duration-short) ease,
+        color var(--md-sys-motion-duration-short) ease,
+        border-color var(--md-sys-motion-duration-short) ease;
+}
+.advice-bubble-actions .advice-action-btn::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: currentColor;
+    opacity: 0;
+    transition: opacity var(--md-sys-motion-duration-short) ease;
 }
 .advice-bubble-actions .advice-action-btn .material-symbols-rounded { font-size: 18px; }
-.advice-bubble-actions .advice-action-btn:active { transform: scale(0.94); }
+.advice-bubble-actions .advice-action-btn:active { transform: scale(0.9); }
+.advice-bubble-actions .advice-action-btn:active::after { opacity: var(--md-state-press); }
 .advice-bubble-actions .advice-action-danger:active {
-    background: var(--md-sys-error-container);
-    color: var(--md-sys-on-error-container);
+    background: color-mix(in srgb, var(--md-sys-error-container) 72%, var(--glass-bg));
+    border-color: color-mix(in srgb, var(--md-sys-error) 36%, var(--glass-border));
+    color: var(--md-sys-error);
 }
 .advice-bubble-actions .advice-version-switcher {
     margin-left: auto;
 }
 .advice-bubble.user .advice-bubble-actions button {
-    background: color-mix(in srgb, var(--md-sys-on-primary-container) 12%, transparent);
+    background: color-mix(in srgb, var(--md-sys-on-primary-container) 14%, transparent);
+    border-color: color-mix(in srgb, var(--md-sys-on-primary-container) 16%, transparent);
     color: var(--md-sys-on-primary-container);
 }
 .advice-routine-actions {
