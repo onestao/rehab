@@ -14,6 +14,7 @@ const advicePanel = {
             MODEL_ICONS: this.MODEL_ICONS,
             sendAiAdvice: this.sendAiAdvice,
             cancelAiAdvice: this.cancelAiAdvice,
+            stopActiveAdviceReply: this.stopActiveAdviceReply,
             bindAdviceRequestLifecycle: this.bindAdviceRequestLifecycle,
             requestAdviceWakeLock: this.requestAdviceWakeLock,
             releaseAdviceWakeLock: this.releaseAdviceWakeLock,
@@ -1176,9 +1177,44 @@ const advicePanel = {
         } catch {
             try { this._adviceAbortController?.abort?.(); } catch {}
         }
-        this.flushAdviceStreamRender?.();
+        this.stopActiveAdviceReply?.('user');
         this.updateAdviceSendState?.();
         window.haptics?.light?.();
+        return true;
+    },
+
+    stopActiveAdviceReply(reason = 'user') {
+        const pendingId = this._activeAdvicePendingId;
+        if (!pendingId) return false;
+        const idx = this.db.health.aiAdviceChat.findIndex(msg => msg.id === pendingId);
+        const previous = idx >= 0 ? this.db.health.aiAdviceChat[idx] : null;
+        if (!previous || previous.stopped) return false;
+        const renderer = this._streamRenderers?.[pendingId] || this._activeStreamRenderer;
+        const rendererState = renderer?.getState?.() || null;
+        const partial = String(rendererState?.shown || previous.content || '').trim();
+        try { renderer?.destroy?.(); } catch {}
+        if (this._streamRenderers) delete this._streamRenderers[pendingId];
+        this._activeStreamRenderer = null;
+        this.db.health.aiAdviceChat[idx] = {
+            ...previous,
+            content: partial || '已停止生成。',
+            pending: false,
+            stopped: true,
+            stoppedAt: new Date().toISOString(),
+            stopReason: reason,
+            error: false,
+            errorInfo: {
+                ...(this._adviceRequestMeta || {}),
+                type: reason === 'user' ? 'user_cancelled' : 'aborted',
+                message: reason === 'user' ? '用户主动停止生成' : '请求已中断'
+            },
+            updatedAt: Date.now()
+        };
+        this._adviceSending = false;
+        this.setAdviceStreamUiState?.('idle');
+        this.releaseAdviceWakeLock?.();
+        this.save();
+        this.rerenderAdvicePanel?.({ refreshMessages: true });
         return true;
     },
 
@@ -1766,6 +1802,7 @@ const advicePanel = {
         );
         const now = new Date().toISOString();
         const pendingId = this.generateRecordId('advice-pending');
+        this._activeAdvicePendingId = pendingId;
         const replyToId = options?.replyToId || '';
         const baseVersionIdx = Number(options?.versionIdx || 0);
         this._adviceSending = true;
@@ -1836,8 +1873,10 @@ const advicePanel = {
             /** @type {{ in: number, out: number }|null} */
             let lastUsage = null;
             const onToken = (delta, accumulated, meta) => {
+                    if (controller.signal.aborted || this._activeAdvicePendingId !== pendingId) return;
                     const idx = this.db.health.aiAdviceChat.findIndex(msg => msg.id === pendingId);
                     if (idx < 0) return;
+                    if (this.db.health.aiAdviceChat[idx].stopped) return;
                     this.db.health.aiAdviceChat[idx].content = accumulated;
                     if (this.db.health.aiAdviceChat[idx].pending && accumulated) this.db.health.aiAdviceChat[idx].pending = false;
                     if (meta?.usage) {
@@ -1904,6 +1943,7 @@ const advicePanel = {
                 }
             }
             const idx = this.db.health.aiAdviceChat.findIndex(msg => msg.id === pendingId);
+            if (idx >= 0 && this.db.health.aiAdviceChat[idx]?.stopped) return;
             if (idx >= 0) this.db.health.aiAdviceChat[idx] = {
                 ...this.db.health.aiAdviceChat[idx],
                 role: 'assistant',
@@ -1939,6 +1979,7 @@ const advicePanel = {
         } catch (e) {
             const idx = this.db.health.aiAdviceChat.findIndex(msg => msg.id === pendingId);
             if (this._adviceCancelledByUser || e?.code === 'AI_CANCELLED' || e?.name === 'AbortError') {
+                if (idx >= 0 && this.db.health.aiAdviceChat[idx]?.stopped) return;
                 const previous = idx >= 0 ? this.db.health.aiAdviceChat[idx] : null;
                 const partial = String(previous?.content || '').trim();
                 const stopped = {
@@ -1999,6 +2040,7 @@ const advicePanel = {
         } finally {
             this._adviceSending = false;
             this._activeStreamRenderer = null;
+            this._activeAdvicePendingId = '';
             this._adviceAbortController = null;
             this._adviceRequestMeta = null;
             this.releaseAdviceWakeLock?.();

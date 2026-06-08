@@ -196,9 +196,16 @@
         updateAdviceSendState() {
             const send = document.getElementById('adviceSendBtn');
             if (!send) return;
+            const icon = send.querySelector('.material-symbols-rounded');
             const prompt = String(document.getElementById('advicePrompt')?.value || '').trim();
             const hasUsableAttachment = getAttachmentList(this).some(att => att.status !== 'failed' && (att.kind === 'image' || att.readable));
-            send.disabled = !!this._adviceSending || (!prompt && !hasUsableAttachment);
+            const sending = !!this._adviceSending;
+            send.disabled = sending ? false : (!prompt && !hasUsableAttachment);
+            send.classList.toggle('is-stopping', sending);
+            send.setAttribute('aria-label', sending ? '停止生成' : '发送问题');
+            send.title = sending ? '停止生成' : '发送问题';
+            send.setAttribute('onclick', sending ? 'data.cancelAiAdvice()' : 'data.sendAiAdvice()');
+            if (icon) icon.textContent = sending ? 'stop' : 'send';
         },
 
         async handleAdviceSelectedFiles(fileList, pickerKind = 'file') {

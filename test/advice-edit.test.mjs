@@ -68,6 +68,7 @@ function loadAdvicePanelHarness() {
         buildAdviceMessages(prompt) { return [{ role: 'user', content: prompt }]; },
         save() {},
         render() {},
+        rerenderAdvicePanel() {},
         clearAdviceDraft() {},
         setAdviceStreamUiState() {},
         scrollAdviceToLatest() {},
@@ -106,6 +107,7 @@ function loadAdvicePanelHarness() {
         escapeHtml,
         sendAiAdvice: context.__advicePanel.sendAiAdvice,
         cancelAiAdvice: context.__advicePanel.cancelAiAdvice,
+        stopActiveAdviceReply: context.__advicePanel.stopActiveAdviceReply,
         updateAdviceSendState: context.__advicePanel.updateAdviceSendState,
         requestAdviceWakeLock: context.__advicePanel.requestAdviceWakeLock,
         releaseAdviceWakeLock: context.__advicePanel.releaseAdviceWakeLock,
@@ -483,13 +485,26 @@ test('touch intent marks stream as user-paused when user scrolls away', () => {
     assert.equal(data._adviceUserScrollPaused, true);
 });
 
-test('cancelAiAdvice stops active request and preserves partial assistant reply', async () => {
+test('cancelAiAdvice immediately freezes UI and preserves partial assistant reply', async () => {
     const data = loadAdvicePanelHarness();
     data.db.health.aiAdviceChat = [];
+    const button = {
+        disabled: true,
+        classList: { toggle(name, enabled) { this[name] = enabled; } },
+        attrs: {},
+        setAttribute(name, value) { this.attrs[name] = value; },
+        querySelector: () => ({ textContent: '' })
+    };
+    data.__context.document.getElementById = (id) => {
+        if (id === 'advicePrompt') return { value: '' };
+        if (id !== 'adviceSendBtn') return null;
+        return button;
+    };
     data.__context.ai.callStream = async (_messages, _maxTokens, onToken, opts) => {
         onToken('partial', 'partial answer');
         await new Promise((resolve, reject) => {
             opts.signal.addEventListener('abort', () => {
+                onToken(' late', 'partial answer late');
                 reject(Object.assign(new Error('AI_CANCELLED'), { code: 'AI_CANCELLED' }));
             }, { once: true });
         });
@@ -500,6 +515,8 @@ test('cancelAiAdvice stops active request and preserves partial assistant reply'
     const sendPromise = data.sendAiAdvice('stop this');
     assert.equal(data._adviceSending, true);
     assert.equal(data.cancelAiAdvice(), true);
+    assert.equal(data._adviceSending, false);
+    assert.equal(button.attrs.onclick, 'data.sendAiAdvice()');
     await sendPromise;
 
     const stopped = data.db.health.aiAdviceChat.find(msg => msg.role === 'assistant');
@@ -509,4 +526,35 @@ test('cancelAiAdvice stops active request and preserves partial assistant reply'
     assert.equal(stopped.errorInfo.type, 'user_cancelled');
     assert.equal(data._adviceSending, false);
     assert.ok(saveCount >= 1);
+});
+
+test('attachment updateAdviceSendState keeps stop button while advice is sending', () => {
+    const data = loadAdvicePanelHarness();
+    const button = {
+        disabled: true,
+        classList: { toggle(name, enabled) { this[name] = enabled; } },
+        attrs: {},
+        title: '',
+        setAttribute(name, value) { this.attrs[name] = value; },
+        querySelector: () => ({ textContent: '' })
+    };
+    data.__context.document.getElementById = (id) => {
+        if (id === 'adviceSendBtn') return button;
+        if (id === 'advicePrompt') return { value: '' };
+        return null;
+    };
+    data.__context.window.advicePanel = data.__context.__advicePanel;
+    data.__context.window.data = data;
+    data.__context.window.renderSafe = { escapeHtml: data.escapeHtml };
+    const code = fs.readFileSync(new URL('../advice-attachments.js', import.meta.url), 'utf8');
+    vm.runInContext(code, data.__context);
+    Object.assign(data, data.__context.window.adviceAttachments);
+
+    data._adviceSending = true;
+    data.updateAdviceSendState();
+
+    assert.equal(button.disabled, false);
+    assert.equal(button.classList['is-stopping'], true);
+    assert.equal(button.attrs.onclick, 'data.cancelAiAdvice()');
+    assert.equal(button.attrs['aria-label'], '停止生成');
 });

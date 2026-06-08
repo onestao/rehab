@@ -642,7 +642,9 @@ Object.assign(ai, {
     // ---------- 通用 SSE 读取 ----------
     async _readSSE(res, onChunk, extract, extractUsage = null, signal = null) {
         if (!res.body) {
+            signal?.throwIfAborted?.();
             const text = await res.text();
+            signal?.throwIfAborted?.();
             try {
                 const d = JSON.parse(text);
                 const t = extract(d);
@@ -651,6 +653,11 @@ Object.assign(ai, {
             } catch { return ''; }
         }
          const reader = res.body.getReader();
+         const cancelReader = () => {
+             try { reader.cancel(signal?.reason).catch?.(() => {}); } catch {}
+         };
+         if (signal?.aborted) cancelReader();
+         else signal?.addEventListener?.('abort', cancelReader, { once: true });
          const decoder = new TextDecoder('utf-8');
          let buffer = '', full = '';
          let lastUsage = null;
@@ -676,14 +683,19 @@ Object.assign(ai, {
                  } catch {}
              }
          };
-        while (true) {
-            signal?.throwIfAborted?.();
-            const { value, done } = await reader.read();
-            if (done) break;
-            buffer += decoder.decode(value, { stream: true });
-            const events = buffer.split(/\r?\n\r?\n/);
-            buffer = events.pop() || '';
-            for (const event of events) flush(event);
+        try {
+            while (true) {
+                signal?.throwIfAborted?.();
+                const { value, done } = await reader.read();
+                signal?.throwIfAborted?.();
+                if (done) break;
+                buffer += decoder.decode(value, { stream: true });
+                const events = buffer.split(/\r?\n\r?\n/);
+                buffer = events.pop() || '';
+                for (const event of events) flush(event);
+            }
+        } finally {
+            signal?.removeEventListener?.('abort', cancelReader);
         }
          if (buffer) flush(buffer);
          if (lastUsage && (lastUsage.in || lastUsage.out)) {
