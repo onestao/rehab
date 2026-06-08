@@ -128,6 +128,8 @@ function backupPreviewText(label, dbObj, meta = {}) {
 
 const backup = {
     async buildArchive() {
+        const started = Date.now();
+        window.errorBus?.event?.('backup', 'build:start');
         if (typeof data.flush === 'function') await data.flush();
         if (!data.db || typeof data.db !== 'object') {
             throw new Error('数据为空，无法构建归档');
@@ -161,10 +163,19 @@ const backup = {
         const blob = await gzipBlob(jsonStr);
         const ts = new Date().toISOString().replace(/[:\-\.]/g, '').slice(0, 19);
         const filename = `rehab-${ts}-${checksum.slice(0, 8)}.json.gz`;
+        window.errorBus?.event?.('backup', 'build:success', {
+            elapsedMs: Date.now() - started,
+            blobBytes: blob.size || 0,
+            jsonBytes: jsonStr.length,
+            checksumPrefix: checksum.slice(0, 8),
+            itemCounts: payload.itemCounts
+        });
         return { blob, filename, checksum, payload };
     },
 
     async snapshotToRing(blob, filename, source) {
+        const started = Date.now();
+        window.errorBus?.event?.('backup', 'ring:start', { source, blobBytes: blob?.size || 0 });
         const MAX_RING_COUNT = 10;
         const MAX_RING_BYTES = 50 * 1024 * 1024;
         const CRITICAL_SOURCES = new Set(['pre-pull', 'pre-import']);
@@ -261,11 +272,17 @@ const backup = {
                         db.close();
                     };
 
-                    doPrune().then(resolve).catch((err) => { db.close(); resolve(); });
+                    doPrune().then(() => {
+                        window.errorBus?.event?.('backup', 'ring:success', { source, elapsedMs: Date.now() - started, blobBytes: blob?.size || 0 });
+                        resolve();
+                    }).catch((err) => {
+                        window.errorBus?.event?.('backup', 'ring:pruneFailed', { source, elapsedMs: Date.now() - started, error: err });
+                        db.close(); resolve();
+                    });
                 };
-                tx.onerror = () => { db.close(); reject(tx.error); };
+                tx.onerror = () => { window.errorBus?.event?.('backup', 'ring:failed', { source, elapsedMs: Date.now() - started, error: tx.error }); db.close(); reject(tx.error); };
             };
-            req.onerror = () => reject(req.error);
+            req.onerror = () => { window.errorBus?.event?.('backup', 'ring:failed', { source, elapsedMs: Date.now() - started, error: req.error }); reject(req.error); };
         });
     },
 
@@ -350,6 +367,8 @@ const backup = {
     },
 
     async exportData() {
+        const started = Date.now();
+        window.errorBus?.event?.('backup', 'export:start');
         try {
             const { blob, filename } = await this.buildArchive();
             await this.snapshotToRing(blob, filename, 'manual');
@@ -361,7 +380,9 @@ const backup = {
             a.click();
             a.remove();
             setTimeout(() => URL.revokeObjectURL(url), 1000);
+            window.errorBus?.event?.('backup', 'export:success', { elapsedMs: Date.now() - started, blobBytes: blob.size || 0 });
         } catch (e) {
+            window.errorBus?.event?.('backup', 'export:failed', { elapsedMs: Date.now() - started, error: e });
             alert('导出备份失败: ' + e.message);
         }
     },
@@ -410,6 +431,8 @@ const backup = {
     async importFile(event) {
         const file = event?.target?.files?.[0];
         if (!file) return;
+        const started = Date.now();
+        window.errorBus?.event?.('backup', 'import:start', { fileBytes: file.size || 0, fileType: file.type || '' });
         try {
             await this.buildArchive().then(({ blob, filename }) =>
                 this.snapshotToRing(blob, filename, 'pre-import')
@@ -469,8 +492,10 @@ const backup = {
             if (typeof ai !== 'undefined') await ai.init({ saveData: true, renderData: false });
             if (typeof syncStatus !== 'undefined') syncStatus.render();
             data.render();
+            window.errorBus?.event?.('backup', 'import:success', { elapsedMs: Date.now() - started, fileBytes: file.size || 0, itemCounts: backupCounts(nextDb) });
             alert('备份导入成功');
         } catch (e) {
+            window.errorBus?.event?.('backup', 'import:failed', { elapsedMs: Date.now() - started, fileBytes: file.size || 0, error: e });
             alert('备份导入失败: ' + e.message);
         } finally {
             if (event?.target) event.target.value = '';

@@ -41,6 +41,8 @@
         },
 
         async init() {
+            const started = Date.now();
+            window.errorBus?.event?.('storage', 'init:start');
             if (window.storageMigrate && typeof window.storageMigrate.createAdapter === 'function') {
                 const migrationResult = await window.storageMigrate.createAdapter({
                     dbKey: this.DB_KEY,
@@ -51,6 +53,11 @@
                 });
                 this._storage = migrationResult.adapter;
                 this._storageMode = migrationResult.mode;
+                window.errorBus?.event?.('storage', 'adapter:resolved', {
+                    mode: migrationResult.mode,
+                    migrationOk: !!migrationResult.migration?.ok,
+                    migrationReason: migrationResult.migration?.reason || ''
+                });
                 if (migrationResult.migration && !migrationResult.migration.ok && migrationResult.migration.reason) {
                     if (window.toast) toast.show(`迁移失败，继续使用本地存储：${migrationResult.migration.reason}`, 'error');
                 }
@@ -76,6 +83,14 @@
             this.render();
             this.restoreActionDraft();
             if (window.cardio) cardio.initUI();
+            window.errorBus?.event?.('storage', 'init:success', {
+                mode: this._storageMode,
+                elapsedMs: Date.now() - started,
+                hasDb: !!localDb,
+                hasCfg: !!localCfg,
+                schemaVersion: Number(this.db?.schemaVersion || 0),
+                counts: this.storageDebugCounts?.()
+            });
 
             setTimeout(() => {
                 if (window.sync) {
@@ -92,6 +107,20 @@
                 const el = document.getElementById(id);
                 if (el && draft[key] != null) el.value = draft[key];
             });
+        },
+
+        storageDebugCounts() {
+            const health = this.db?.health || {};
+            return {
+                actions: this.db?.actions?.length || 0,
+                routines: this.db?.routines?.length || 0,
+                history: this.db?.history?.length || 0,
+                dailyPlans: this.db?.dailyPlans?.length || 0,
+                food: health.foodLogs?.length || 0,
+                exercise: health.exerciseLogs?.length || 0,
+                weight: health.weights?.length || 0,
+                advice: health.aiAdviceChat?.length || 0
+            };
         },
 
         _initHistoryApi() {
@@ -208,6 +237,7 @@
                 if (!old) continue;
                 this.db = old;
                 this.flushSync();
+                window.errorBus?.event?.('storage', 'legacy:migrated', { key, counts: this.storageDebugCounts?.() });
                 break;
             }
         },
@@ -273,6 +303,7 @@
                 storage.flushSync(this.DB_KEY, this.db);
                 if (this.cfg) storage.flushSync(this.CFG_KEY, this.cfg);
             } catch (e) {
+                window.errorBus?.event?.('storage', 'flushSync:failed', { mode: this._storageMode, error: e });
                 if (window.toast) toast.show(`本地快照写入失败：${toast.sanitize(e)}`, 'error');
                 else console.error('flushSync failed', e);
             }
@@ -280,6 +311,7 @@
 
         async flush() {
             if (!this._dbDirty && !this._pendingPersistPromise) return;
+            const started = Date.now();
             clearTimeout(this._persistTimer);
             this._persistTimer = null;
             this.ensurePersistPromise();
@@ -287,12 +319,14 @@
                 if (this._dbDirty) {
                     await Promise.resolve(this.resolveStorageAdapter().write(this.DB_KEY, this.db));
                     this._dbDirty = false;
+                    window.errorBus?.event?.('storage', 'flush:success', { mode: this._storageMode, elapsedMs: Date.now() - started, counts: this.storageDebugCounts?.() });
                     if (window.sync && typeof sync.scheduleAutoPush === 'function') {
                         try { sync.scheduleAutoPush(); } catch {}
                     }
                 }
                 this._resolvePersist?.();
             } catch (e) {
+                window.errorBus?.event?.('storage', 'flush:failed', { mode: this._storageMode, elapsedMs: Date.now() - started, error: e });
                 this._rejectPersist?.(e);
                 throw e;
             } finally {

@@ -316,6 +316,7 @@
             const localAdapter = createLocalAdapter();
             const hasIdb = typeof indexedDB !== 'undefined' && window.storageIdb;
             if (!hasIdb) {
+                window.errorBus?.event?.('storage.migration', 'idb:unavailable');
                 return {
                     adapter: localAdapter,
                     mode: 'localStorage',
@@ -325,9 +326,15 @@
 
             let migration;
             try {
+                window.errorBus?.event?.('storage.migration', 'start', { targetVersion: Number(options.targetVersion || 2) });
                 migration = await this.migrateLocalToIdb(options, localAdapter);
+                window.errorBus?.event?.('storage.migration', migration.ok ? 'success' : 'failed', {
+                    targetVersion: Number(options.targetVersion || 2),
+                    reason: migration.reason || ''
+                });
             } catch (e) {
                 const reason = e && e.message ? e.message : '迁移流程异常';
+                window.errorBus?.event?.('storage.migration', 'exception', { targetVersion: Number(options.targetVersion || 2), error: e });
                 localStorage.setItem(options.migrationFailedKey, reason);
                 localStorage.removeItem(options.storageVersionKey);
                 try { await window.storageIdb.destroy(); } catch (_) {}
@@ -348,6 +355,7 @@
             const currentVersion = Number(localStorage.getItem(storageVersionKey) || 0);
 
             if (currentVersion >= targetVersion) {
+                window.errorBus?.event?.('storage.migration', 'skip', { currentVersion, targetVersion });
                 return { ok: true, reason: '' };
             }
 
@@ -360,6 +368,11 @@
                 await window.storageIdb.open();
                 if (sourceDb != null) {
                     const split = splitLargeCollections(sourceDb);
+                    window.errorBus?.event?.('storage.migration', 'split', {
+                        historyCount: split.history.length,
+                        adviceCount: split.advice.length,
+                        schemaVersion: Number(sourceDb.schemaVersion || 0)
+                    });
                     const keys = largeKeys(dbKey);
                     if (sourceDbRaw != null && !localStorage.getItem(dbKey + ':legacy-full')) {
                         localStorage.setItem(dbKey + ':legacy-full', sourceDbRaw);

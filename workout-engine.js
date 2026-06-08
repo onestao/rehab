@@ -74,9 +74,21 @@ const workoutEngine = {
 
     transition(phase, patch = {}) {
         if (!this.state) return;
+        const previousPhase = this.state.phase || '';
         Object.assign(this.state, patch, { phase });
         this.syncPanelLabels(phase);
         if (window.workoutState) workoutState.markActive();
+        if (previousPhase !== phase) {
+            window.errorBus?.event?.('workout.engine', 'phase', {
+                from: previousPhase,
+                to: phase,
+                actionIndex: this.state.actionIndex,
+                setIndex: this.state.setIndex,
+                repIndex: this.state.repIndex,
+                sideIndex: this.state.sideIndex,
+                hasPhaseLeft: Number.isFinite(this.state.phaseLeft)
+            });
+        }
         try {
             window.dispatchEvent(new CustomEvent('workout:state', {
                 detail: {
@@ -143,6 +155,7 @@ const workoutEngine = {
     skipCurrentPhase() {
         const target = this.skipTarget();
         if (!target) return false;
+        window.errorBus?.event?.('workout.engine', 'skipTarget', { from: this.state?.phase || '', to: target.phase || '' });
         this.skipOverride = {
             phase: target.phase,
             patch: {
@@ -159,6 +172,7 @@ const workoutEngine = {
     async start() {
         this.state = this.createInitialState();
         const firstAction = this.currentActions()[0] || null;
+        window.errorBus?.event?.('workout.engine', 'start', { actionCount: this.currentActions().length, hasFirstAction: !!firstAction });
         if (firstAction) {
             this.state.activeAction = JSON.parse(JSON.stringify(firstAction));
             this.syncPanelLabels('intro');
@@ -187,6 +201,7 @@ const workoutEngine = {
 
     async stepAction(action) {
         if ((action.sets|0) < 1 || ((action.reps|0) <= 0 && (action.work|0) <= 0)) {
+            window.errorBus?.event?.('workout.engine', 'invalidActionSkipped', { actionIndex: this.state?.actionIndex || 0, sets: action?.sets || 0, reps: action?.reps || 0, work: action?.work || 0 });
             window.toast?.show?.(`「${action.name || '未命名'}」参数不完整（组数/次数/时长为0），已跳过`, 'error');
             this.transition('completed');
             return;

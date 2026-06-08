@@ -69,12 +69,22 @@ function loadAdvicePanelHarness() {
         save() {},
         render() {},
         rerenderAdvicePanel() {},
+        softDeleteById(items, id) {
+            const item = (items || []).find(entry => entry?.id === id);
+            if (!item) return false;
+            item.deleted = true;
+            item.updatedAt = Date.now();
+            return true;
+        },
         clearAdviceDraft() {},
         setAdviceStreamUiState() {},
         scrollAdviceToLatest() {},
         pruneAdviceVersionGroup: context.__advicePanel.pruneAdviceVersionGroup,
+        isEmptyAdviceAssistantMessage: context.__advicePanel.isEmptyAdviceAssistantMessage,
+        pruneEmptyAdviceAssistantMessages: context.__advicePanel.pruneEmptyAdviceAssistantMessages,
         getAdviceVersionGroup: context.__advicePanel.getAdviceVersionGroup,
         _isVersionActive: context.__advicePanel._isVersionActive,
+        findAdviceMessage: context.__advicePanel.findAdviceMessage,
         findAssistantReplyForUser: context.__advicePanel.findAssistantReplyForUser,
         adviceRangeStart: context.__advicePanel.adviceRangeStart,
         visibleAdviceMessages: context.__advicePanel.visibleAdviceMessages,
@@ -111,7 +121,8 @@ function loadAdvicePanelHarness() {
         updateAdviceSendState: context.__advicePanel.updateAdviceSendState,
         requestAdviceWakeLock: context.__advicePanel.requestAdviceWakeLock,
         releaseAdviceWakeLock: context.__advicePanel.releaseAdviceWakeLock,
-        regenerateAdviceFromEditedUser: context.__advicePanel.regenerateAdviceFromEditedUser
+        regenerateAdviceFromEditedUser: context.__advicePanel.regenerateAdviceFromEditedUser,
+        retryAdviceFrom: context.__advicePanel.retryAdviceFrom
     };
     return data;
 }
@@ -379,6 +390,34 @@ test('advice conversation context excludes inactive overwritten answer versions'
     const context = data.adviceConversationContext();
 
     assert.equal(JSON.stringify(context.map(msg => msg.content)), JSON.stringify(['old question', 'active answer']));
+});
+
+test('retrying an active answer makes the new answer active and removes empty versions', async () => {
+    const data = loadAdvicePanelHarness();
+    data.db.health.aiAdviceChat.push({
+        id: 'a-empty',
+        role: 'assistant',
+        content: '   ',
+        at: '2026-05-30T00:00:02.000Z',
+        deleted: false,
+        updatedAt: 2,
+        replyToId: 'a1',
+        versionIdx: 1,
+        versionActive: false
+    });
+
+    await data.retryAdviceFrom(1, 'a1');
+
+    const oldAnswer = data.db.health.aiAdviceChat.find(msg => msg.id === 'a1');
+    const emptyAnswer = data.db.health.aiAdviceChat.find(msg => msg.id === 'a-empty');
+    const newAnswer = data.db.health.aiAdviceChat.find(msg => msg.id === 'advice-pending-new');
+
+    assert.equal(oldAnswer.versionActive, false);
+    assert.equal(emptyAnswer.deleted, true);
+    assert.equal(newAnswer.content, 'new answer');
+    assert.equal(newAnswer.replyToId, 'a1');
+    assert.equal(newAnswer.versionActive, true);
+    assert.equal(newAnswer.versionIdx, 1);
 });
 
 test('advice message window renders recent history by default and can expand', () => {

@@ -21,6 +21,8 @@ const advicePanel = {
             requestAiAdvice: this.requestAiAdvice,
             findAdviceMessage: this.findAdviceMessage,
             pruneAdviceVersionGroup: this.pruneAdviceVersionGroup,
+            isEmptyAdviceAssistantMessage: this.isEmptyAdviceAssistantMessage,
+            pruneEmptyAdviceAssistantMessages: this.pruneEmptyAdviceAssistantMessages,
             deleteAiAdviceMessage: this.deleteAiAdviceMessage,
             copyAdviceMessage: this.copyAdviceMessage,
             retryAdviceFrom: this.retryAdviceFrom,
@@ -489,7 +491,7 @@ const advicePanel = {
             bar.style.cssText = 'position:sticky;top:-10px;margin:-10px -10px 8px;padding:8px;background:#111;border-bottom:1px solid #333;display:flex;flex-wrap:wrap;gap:6px;align-items:center';
             const status = document.createElement('span');
             status.style.cssText = 'flex:1;min-width:120px;color:#0f0';
-            status.textContent = '共 ' + records.length + ' 条';
+            status.textContent = '共 ' + records.length + ' 条 · 仅会话级元数据，已脱敏';
             const mkBtn = (label, bg, fn) => {
                 const b = document.createElement('button');
                 b.textContent = label;
@@ -515,6 +517,10 @@ const advicePanel = {
                 }
             };
             bar.appendChild(status);
+            const note = document.createElement('div');
+            note.style.cssText = 'width:100%;color:#9f9;font-size:11px;opacity:.85';
+            note.textContent = '导出内容不进入业务数据/同步/备份；默认只含状态、耗时、数量、错误类型等元数据。';
+            bar.appendChild(note);
             bar.appendChild(mkBtn('文本', '#08f', () => {
                 copy(records.map((r, i) => '#' + i + ' ' + new Date(r.t).toLocaleTimeString() + ' [' + r.level + '] ' + r.scope + '\nmsg: ' + r.message + (r.meta ? '\nmeta: ' + (typeof r.meta === 'string' ? r.meta : JSON.stringify(r.meta)) : '')).join('\n\n'), '已复制 (' + records.length + ')');
             }));
@@ -1821,6 +1827,17 @@ const advicePanel = {
             pageHidden: false,
             cancelledByUser: false
         };
+        const requestStarted = Date.now();
+        window.errorBus?.event?.('advice.request', 'start', {
+            provider,
+            model,
+            hasImageAttachment,
+            attachmentCount: attachments.length,
+            messageCount: this.db.health.aiAdviceChat.length,
+            contextMode: options?.contextMode || this.adviceContextMode || 'auto',
+            retry: !!options?.skipUserMessage,
+            temporaryModel: isOverride
+        });
         this.requestAdviceWakeLock?.();
         this.updateAdviceSendState?.();
         let userMessageId = '';
@@ -1867,6 +1884,14 @@ const advicePanel = {
             const baseMessages = this.buildAdviceMessages(effectivePrompt, model, { contextMode });
             const messages = this.applyAdviceAttachmentsToMessages?.(baseMessages, attachments) || baseMessages;
             requestMessages = messages;
+            window.errorBus?.event?.('advice.request', 'prepared', {
+                provider,
+                model,
+                contextMode,
+                requestMessageCount: messages.length,
+                hasImageAttachment,
+                attachmentCount: attachments.length
+            });
             let full = '';
             let _lastRender = 0;
             let _pendingFrame = 0;
@@ -1944,6 +1969,12 @@ const advicePanel = {
             }
             const idx = this.db.health.aiAdviceChat.findIndex(msg => msg.id === pendingId);
             if (idx >= 0 && this.db.health.aiAdviceChat[idx]?.stopped) return;
+            if (!String(full || '').trim()) {
+                if (idx >= 0) this.softDeleteById(this.db.health.aiAdviceChat, pendingId);
+                window.toast?.show?.('AI 返回为空，已删除空回复，请重试或切换模型。', 'error');
+                this.save();
+                return;
+            }
             if (idx >= 0) this.db.health.aiAdviceChat[idx] = {
                 ...this.db.health.aiAdviceChat[idx],
                 role: 'assistant',
@@ -1956,6 +1987,17 @@ const advicePanel = {
                 deleted: false,
                 updatedAt: Date.now()
             };
+            window.errorBus?.event?.('advice.request', 'success', {
+                provider,
+                model,
+                elapsedMs: Date.now() - requestStarted,
+                outputChars: String(full || '').length,
+                usageIn: lastUsage?.in,
+                usageOut: lastUsage?.out,
+                hasImageAttachment,
+                wasBackgrounded: !!this._adviceRequestMeta?.wasBackgrounded,
+                pageHidden: !!this._adviceRequestMeta?.pageHidden
+            });
             this.save();
             requestAnimationFrame(() => {
                 const bubble = document.querySelector(`[data-advice-id="${pendingId}"]`);
@@ -2011,6 +2053,15 @@ const advicePanel = {
                 };
                 if (idx >= 0) this.db.health.aiAdviceChat[idx] = stopped;
                 else this.db.health.aiAdviceChat.push(stopped);
+                window.errorBus?.event?.('advice.request', 'cancelled', {
+                    provider,
+                    model,
+                    elapsedMs: Date.now() - requestStarted,
+                    stopReason: stopped.stopReason,
+                    partialChars: partial.length,
+                    wasBackgrounded: !!this._adviceRequestMeta?.wasBackgrounded,
+                    pageHidden: !!this._adviceRequestMeta?.pageHidden
+                });
                 this.save();
                 requestAnimationFrame(() => {
                     const bubble = document.querySelector(`[data-advice-id="${pendingId}"]`);
@@ -2031,6 +2082,17 @@ const advicePanel = {
             const failed = { id: pendingId, role: 'assistant', content: failure.content, at: new Date().toISOString(), model, provider, temporaryModel: isOverride, error: true, errorInfo: { ...(failure.info || {}), ...(this._adviceRequestMeta || {}) }, retryPrompt: prompt, deleted: false, updatedAt: Date.now(), replyToId, versionIdx: baseVersionIdx, versionActive: options?.versionActive !== false, versionPinned: !!options?.versionPinned };
             if (idx >= 0) this.db.health.aiAdviceChat[idx] = failed;
             else this.db.health.aiAdviceChat.push(failed);
+            window.errorBus?.event?.('advice.request', 'failed', {
+                provider,
+                model,
+                elapsedMs: Date.now() - requestStarted,
+                type: failure.info?.type || e?.code || e?.name || 'unknown',
+                status: failure.info?.status || e?.status || 0,
+                requestMessageCount: requestMessages.length,
+                hasImageAttachment,
+                wasBackgrounded: !!this._adviceRequestMeta?.wasBackgrounded,
+                pageHidden: !!this._adviceRequestMeta?.pageHidden
+            });
             this.save();
             requestAnimationFrame(() => {
                 if (!this._adviceUserScrollPaused && this._adviceFollowStream) {
@@ -2164,6 +2226,26 @@ const advicePanel = {
         return idx >= 0 && idx < messages.length ? messages[idx] : null;
     },
 
+    isEmptyAdviceAssistantMessage(msg) {
+        if (!msg || msg.role !== 'assistant') return false;
+        if (msg.pending || msg.error || msg.stopped) return false;
+        return !String(msg.content || '').trim();
+    },
+
+    pruneEmptyAdviceAssistantMessages(rootId = '') {
+        const list = this.db.health?.aiAdviceChat || [];
+        const now = Date.now();
+        let removed = 0;
+        list.forEach(msg => {
+            if (!this.isEmptyAdviceAssistantMessage(msg)) return;
+            if (rootId && (msg.replyToId || msg.id) !== rootId) return;
+            msg.deleted = true;
+            msg.updatedAt = now;
+            removed += 1;
+        });
+        return removed;
+    },
+
     deleteAiAdviceMessage(idx, id = '') {
         const target = this.findAdviceMessage(idx, id);
         const targetId = target?.id;
@@ -2217,20 +2299,20 @@ const advicePanel = {
                 this.softDeleteById(this.db.health.aiAdviceChat, msg.id);
                 this.db.aiTrash.push({ id: msg.id, deletedAt: Date.now(), payload: { ...msg } });
                 this.save();
-                this.sendAiAdvice(prompt, { skipUserMessage: true, contextMode });
-                return;
+                return this.sendAiAdvice(prompt, { skipUserMessage: true, contextMode });
             }
             const rootId = msg.replyToId || msg.id;
+            this.pruneEmptyAdviceAssistantMessages(rootId);
             const siblings = this.getAdviceVersionGroup(rootId);
             const nextIdx = siblings.length;
-            const nextActive = !siblings.length || !siblings.some(s => s.versionActive);
+            const nextActive = true;
             siblings.forEach(s => {
-                if (s.versionActive && nextActive) {
+                if (s.versionActive) {
                     s.versionActive = false;
                     s.updatedAt = Date.now();
                 }
             });
-            this.sendAiAdvice(prompt, {
+            const result = this.sendAiAdvice(prompt, {
                 replyToId: rootId,
                 versionIdx: nextIdx,
                 skipUserMessage: true,
@@ -2238,9 +2320,9 @@ const advicePanel = {
                 contextMode
             });
             this.pruneAdviceVersionGroup(rootId, 10);
-            return;
+            return result;
         }
-        this.sendAiAdvice(prompt, { contextMode });
+        return this.sendAiAdvice(prompt, { contextMode });
     },
 
     regenerateAdvice() {

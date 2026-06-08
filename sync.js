@@ -70,6 +70,16 @@ const sync = {
     __pushTimer: null,
     __pushDebounceMs: 8000,
 
+    debugEvent(type, meta = {}) {
+        try {
+            window.errorBus?.event?.('sync', type, {
+                mode: data?.cfg?.mode || 'none',
+                pendingQueue: Number(data?.db?.syncMeta?.pendingQueue?.length || 0),
+                ...meta
+            });
+        } catch {}
+    },
+
     scheduleAutoPush(opts = {}) {
         if (data.cfg.mode === 'none') return;
         const ms = Number(opts.debounceMs || this.__pushDebounceMs);
@@ -676,6 +686,8 @@ const sync = {
     },
 
     async fullBackup(options = {}) {
+        const started = Date.now();
+        this.debugEvent('fullBackup:start', { quiet: !!options.quiet });
         await data.flush();
         this.setStatus('syncing', options.quiet ? '正在重建快照' : '正在上传全量快照');
         const snapshotTs = Date.now();
@@ -699,9 +711,12 @@ const sync = {
         this.saveSyncMeta();
         await this.processRetryQueue();
         this.setStatus('cloud', options.quiet ? '快照重建完成' : '全量备份完成');
+        this.debugEvent('fullBackup:success', { quiet: !!options.quiet, elapsedMs: Date.now() - started });
     },
 
     async pushChanges(options = {}) {
+        const started = Date.now();
+        this.debugEvent('push:start', { quiet: !!options.quiet, rethrow: !!options.rethrow });
         try {
             await data.flush();
             this.setStatus('syncing', '正在上传增量变更');
@@ -717,9 +732,11 @@ const sync = {
                     const result = await this.processRetryQueue();
                     const remaining = Number(result?.remaining ?? this.getSyncMeta().pendingQueue?.length ?? 0);
                     this.setStatus(remaining > 0 ? 'error' : 'cloud', remaining > 0 ? `无新增变更，仍有 ${remaining} 个待重试上传` : '失败队列已上传，没有新的增量变更');
+                    this.debugEvent('push:retryQueue', { attempted: Number(result?.attempted || 0), remaining, elapsedMs: Date.now() - started });
                     return;
                 }
                 this.setStatus('cloud', '没有待上传的增量变更');
+                this.debugEvent('push:noop', { elapsedMs: Date.now() - started });
                 return;
             }
 
@@ -774,14 +791,23 @@ const sync = {
             }
 
             this.setStatus('cloud', `增量上传完成（${changedEntities.length} 个实体）`);
+            this.debugEvent('push:success', {
+                changedEntityCount: changedEntities.length,
+                changedEntities,
+                elapsedMs: Date.now() - started,
+                manifestWindows: this.manifestIncrementalCount(remoteManifest)
+            });
         } catch (e) {
             this.setStatus('error', `增量上传失败: ${e.message}`);
+            this.debugEvent('push:failed', { elapsedMs: Date.now() - started, error: e });
             if (!options.quiet) alert(`增量上传失败: ${e.message}`);
             if (options.rethrow) throw e;
         }
     },
 
     async pullChanges() {
+        const started = Date.now();
+        this.debugEvent('pull:start');
         try {
             await data.flush();
             this.setStatus('syncing', '正在拉取远端变更');
@@ -845,8 +871,10 @@ const sync = {
                 await this.fullBackup({ quiet: true });
             }
             this.setStatus('cloud', '拉取完成');
+            this.debugEvent('pull:success', { appliedSources, elapsedMs: Date.now() - started });
         } catch (e) {
             this.setStatus('error', `拉取失败: ${e.message}`);
+            this.debugEvent('pull:failed', { elapsedMs: Date.now() - started, error: e });
             alert(`拉取失败: ${e.message}`);
         }
     },
@@ -883,8 +911,11 @@ const sync = {
             if (!url) return;
         }
         try {
+            this.debugEvent('autoBackup:start', { reason });
             await this.pushChanges({ quiet: true, rethrow: true });
+            this.debugEvent('autoBackup:success', { reason });
         } catch (e) {
+            this.debugEvent('autoBackup:failed', { reason, error: e });
             console.warn('Auto incremental backup failed', reason, e);
         }
     },

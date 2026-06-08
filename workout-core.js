@@ -69,6 +69,7 @@ Object.assign(workout, {
             if (!nextPaused) window.speechSynthesis.resume();
         }
         if (nextPaused) (window.workoutVoice?.cancel?.() ?? window.speechSynthesis.cancel());
+        window.errorBus?.event?.('workout', nextPaused ? 'pause' : 'resume', { mode: this.mode, phase: window.workoutEngine?.state?.phase || '', phaseLeft: this._phaseLeft });
         document.getElementById('playIcon').innerText = nextPaused ? 'play_arrow' : 'pause';
         if ('mediaSession' in navigator) navigator.mediaSession.playbackState = nextPaused ? 'paused' : 'playing';
         this.syncPipVideoElement(!nextPaused);
@@ -156,7 +157,9 @@ Object.assign(workout, {
         }
         if (this.mode === 'cardio') return cardio.toggle();
         if (!this.isPlaying) {
-            if ((data._planActions ? data._planActions() : data.activeRecords(data.db.actions || []).filter(a => !a.libOnly)).length === 0) return;
+            const plannedActions = data._planActions ? data._planActions() : data.activeRecords(data.db.actions || []).filter(a => !a.libOnly);
+            if (plannedActions.length === 0) return;
+            window.errorBus?.event?.('workout', 'start', { mode: this.mode, actionCount: plannedActions.length });
             window.workoutReadiness?.notifyBeforeStart?.();
             window.workoutVoice?.unlockAudio?.();
             this.isPlaying = true; this.isPaused = false; this.totalSec = 0;
@@ -241,6 +244,7 @@ Object.assign(workout, {
     skip() {
         if (!this.isPlaying) return;
         window.haptics?.medium?.();
+        window.errorBus?.event?.('workout', 'skip', { mode: this.mode, phase: window.workoutEngine?.state?.phase || '', phaseLeft: this._phaseLeft });
         if (this.mode === 'strength' && window.workoutEngine?.skipCurrentPhase()) {
             document.getElementById('statusText').innerText = 'SKIP';
             document.getElementById('subText').innerText = '已跳过当前阶段';
@@ -272,6 +276,7 @@ Object.assign(workout, {
         if (this.mode === 'cardio') return cardio.stop();
         window.haptics?.medium?.();
         if(confirm("停止并保存记录？")) {
+            window.errorBus?.event?.('workout', 'stop:confirmed', { mode: this.mode, duration: this.totalSec, phase: window.workoutEngine?.state?.phase || '' });
             this.isPlaying = false;
             if (this._countResolve) { this._countResolve(); this._countResolve = null; }
             this._manualStopRequested = true;
@@ -281,6 +286,7 @@ Object.assign(workout, {
     finish() {
         const duration = this.totalSec;
         const manualStop = !!this._manualStopRequested;
+        window.errorBus?.event?.('workout', 'finish:start', { mode: this.mode, duration, manualStop });
         this._manualStopRequested = false;
         this.isPlaying = false;
         this.isPaused = false;
@@ -304,6 +310,7 @@ Object.assign(workout, {
         const bar = document.getElementById('globalTrainingBar');
         if (bar) { bar.classList.add('hidden'); bar.querySelector('span').style.width = '0%'; }
         if (duration < 20) {
+            window.errorBus?.event?.('workout', 'finish:tooShort', { duration, manualStop });
             if (window.data?.activeRun) {
                 const ctx = window.data.activeRun;
                 if (ctx.previousPlan && window.data?._replacePlanActions) window.data._replacePlanActions(ctx.previousPlan);
@@ -334,6 +341,7 @@ Object.assign(workout, {
         } else {
             data.db.history.unshift(historyRecord);
         }
+        window.errorBus?.event?.('workout', 'finish:recorded', { duration, manualStop, actionCount: historyRecord.actions.length, actualSetCount: historyRecord.actualSets.length });
         window.data?.handlePlanWorkoutFinished?.(historyRecord);
         data.db.actualSetsBuffer = [];
         data.saveAndBackup();

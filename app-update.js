@@ -8,14 +8,20 @@ const appUpdate = {
 
     async registerServiceWorker() {
         if (!('serviceWorker' in navigator)) return;
+        const started = Date.now();
+        window.errorBus?.event?.('appUpdate', 'register:start', { swUrl: this.swUrl, version: this.version });
         try {
             this.registration = await navigator.serviceWorker.register(this.swUrl, { updateViaCache: 'none' });
             this.bindRegistration(this.registration);
             await this.registration.update?.();
             navigator.serviceWorker.addEventListener('controllerchange', () => {
+                window.errorBus?.event?.('appUpdate', 'controllerchange');
                 window.location.reload();
             }, { once: true });
-        } catch {}
+            window.errorBus?.event?.('appUpdate', 'register:success', { elapsedMs: Date.now() - started, hasWaiting: !!this.registration?.waiting });
+        } catch (e) {
+            window.errorBus?.event?.('appUpdate', 'register:failed', { elapsedMs: Date.now() - started, error: e });
+        }
     },
 
     bindRegistration(registration) {
@@ -25,6 +31,7 @@ const appUpdate = {
         if (registration._appUpdateBound) return;
         registration._appUpdateBound = true;
         registration.addEventListener('updatefound', () => {
+            window.errorBus?.event?.('appUpdate', 'updatefound');
             const worker = registration.installing;
             if (!worker) return;
             this.bindWorker(worker);
@@ -35,6 +42,7 @@ const appUpdate = {
         if (!worker || worker._appUpdateBound) return;
         worker._appUpdateBound = true;
         worker.addEventListener('statechange', () => {
+            window.errorBus?.event?.('appUpdate', 'worker:state', { state: worker.state, hasController: !!navigator.serviceWorker.controller });
             if (worker.state === 'installed' && navigator.serviceWorker.controller) {
                 this.show(worker);
             }
@@ -43,16 +51,23 @@ const appUpdate = {
 
     show(worker) {
         this.waitingWorker = worker;
+        window.errorBus?.event?.('appUpdate', 'waiting:show', { state: worker?.state || '' });
         document.getElementById('appUpdateBanner')?.classList.remove('hidden');
     },
 
     apply() {
         const worker = this.waitingWorker || this.registration?.waiting;
         if (worker) {
-            try { worker.postMessage({ type: 'SKIP_WAITING' }); } catch {}
+            try {
+                window.errorBus?.event?.('appUpdate', 'apply:skipWaiting', { state: worker.state || '' });
+                worker.postMessage({ type: 'SKIP_WAITING' });
+            } catch (e) {
+                window.errorBus?.event?.('appUpdate', 'apply:failed', { error: e });
+            }
             // controllerchange handler will reload once the new SW activates.
             return;
         }
+        window.errorBus?.event?.('appUpdate', 'apply:reloadFallback');
         window.location.reload();
     },
 
@@ -62,11 +77,14 @@ const appUpdate = {
 
     async checkNow() {
         if (!('serviceWorker' in navigator)) {
+            window.errorBus?.event?.('appUpdate', 'check:unsupported');
             this.notify('当前浏览器不支持离线更新', 'error');
             return { ok: false, reason: 'unsupported' };
         }
         if (this.checking) return { ok: false, reason: 'checking' };
 
+        const started = Date.now();
+        window.errorBus?.event?.('appUpdate', 'check:start', { version: this.version });
         this.checking = true;
         this.updateProfileButton(true);
         this.notify('正在检测更新...');
@@ -80,12 +98,15 @@ const appUpdate = {
             if (worker) {
                 this.show(worker);
                 this.notify('发现新版本，点击“立即更新”完成刷新', 'success');
+                window.errorBus?.event?.('appUpdate', 'check:updateFound', { elapsedMs: Date.now() - started, workerState: worker.state || '' });
                 return { ok: true, updateFound: true };
             }
 
             this.notify('已是最新版本', 'success');
+            window.errorBus?.event?.('appUpdate', 'check:current', { elapsedMs: Date.now() - started });
             return { ok: true, updateFound: false };
         } catch (e) {
+            window.errorBus?.event?.('appUpdate', 'check:failed', { elapsedMs: Date.now() - started, error: e });
             this.notify('检测更新失败：' + (e?.message || '请稍后重试'), 'error');
             return { ok: false, reason: 'failed', error: e };
         } finally {

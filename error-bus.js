@@ -49,6 +49,46 @@
         }
     }
 
+    function sanitizeUrl(value) {
+        try {
+            const url = new URL(String(value || ''), location.href);
+            return url.origin + url.pathname;
+        } catch {
+            return String(value || '').split('?')[0].slice(0, 160);
+        }
+    }
+
+    function sanitizeMeta(value, depth = 0) {
+        if (value == null) return value;
+        if (depth > 3) return '[MaxDepth]';
+        if (value instanceof Error) {
+            return { name: value.name || 'Error', message: String(value.message || '').slice(0, 240) };
+        }
+        const type = typeof value;
+        if (type === 'boolean' || type === 'number') return Number.isFinite(value) ? value : String(value);
+        if (type === 'string') return value.length > 240 ? value.slice(0, 240) + '...' : value;
+        if (type !== 'object') return String(value);
+        if (Array.isArray(value)) {
+            return {
+                length: value.length,
+                sample: value.slice(0, 5).map(item => sanitizeMeta(item, depth + 1))
+            };
+        }
+        const out = {};
+        const deny = /(^|_)(api[-_]?key|key|secret|token|pass|password|authorization|credential|prompt|content|body|response|text|payload|db|cfg|headers?)($|_)/i;
+        Object.keys(value).slice(0, 40).forEach(key => {
+            const raw = value[key];
+            if (deny.test(key)) {
+                out[key] = '[redacted]';
+            } else if (/url|endpoint/i.test(key)) {
+                out[key] = sanitizeUrl(raw);
+            } else {
+                out[key] = sanitizeMeta(raw, depth + 1);
+            }
+        });
+        return out;
+    }
+
     function pushDebug(level, scope, args, extra) {
         if (!debugMode) return;
         try {
@@ -99,7 +139,7 @@
             const started = Date.now();
             const input = /** @type {any} */ (args[0]);
             const init = /** @type {any} */ (args[1]);
-            const url = (input && typeof input === 'object' && input.url) || (typeof input === 'string' ? input : '') || '';
+            const url = sanitizeUrl((input && typeof input === 'object' && input.url) || (typeof input === 'string' ? input : '') || '');
             const method = (init && init.method) || (input && typeof input === 'object' && input.method) || 'GET';
             return originalFetch(...args).then(res => {
                 pushDebug('info', 'fetch', [`${method} ${url} → ${res.status} (${Date.now() - started}ms)`]);
@@ -246,15 +286,15 @@
                 const item = {
                     scope: scope || 'unknown',
                     message: friendlyMessage(error),
-                    meta: meta || null,
+                    meta: meta ? sanitizeMeta(meta) : null,
                     at: new Date().toISOString(),
                     stack: error.stack || ''
                 };
                 queue.push(item);
                 while (queue.length > MAX_EVENTS) queue.shift();
-                if (consolePatched && originalConsole) originalConsole.error(`[${item.scope}]`, error, meta || '');
-                else console.error(`[${item.scope}]`, error, meta || '');
-                pushDebug('error', item.scope, [item.message, meta]);
+                if (consolePatched && originalConsole) originalConsole.error(`[${item.scope}]`, error, item.meta || '');
+                else console.error(`[${item.scope}]`, error, item.meta || '');
+                pushDebug('error', item.scope, [item.message, item.meta]);
                 safeToast(item.message);
                 return item;
             } catch (secondary) {
@@ -268,11 +308,17 @@
             const item = {
                 scope: scope || 'log',
                 message: typeof payload === 'string' ? payload : safeStringify(payload),
-                meta: meta || (typeof payload === 'object' ? payload : null),
+                meta: sanitizeMeta(meta || (typeof payload === 'object' ? payload : null)),
                 at: new Date().toISOString()
             };
             pushDebug('log', item.scope, [item.message], item.meta);
             return item;
+        },
+        event(scope, type, meta) {
+            if (!debugMode) return null;
+            const safeMeta = sanitizeMeta(meta || {});
+            pushDebug('info', scope || 'event', [String(type || 'event')], safeMeta);
+            return { scope: scope || 'event', type: String(type || 'event'), meta: safeMeta, at: new Date().toISOString() };
         },
         list() {
             return queue.slice();
