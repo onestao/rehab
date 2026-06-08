@@ -6584,6 +6584,12 @@ body.is-training .fab-pip.active {
     border: 1px solid color-mix(in srgb, var(--md-sys-outline-variant) 72%, transparent);
 }
 .advice-bubble.pending { opacity: 0.86; }
+.advice-bubble.stopped {
+    border-color: color-mix(in srgb, var(--md-sys-tertiary) 24%, var(--md-sys-outline-variant));
+    background: linear-gradient(135deg,
+        color-mix(in srgb, var(--md-sys-tertiary-container) 28%, var(--md-sys-surface-container-lowest)),
+        var(--md-sys-surface-container-lowest));
+}
 .advice-bubble.error {
     background: linear-gradient(135deg,
         color-mix(in srgb, var(--md-sys-error-container) 86%, var(--glass-bg-strong)),
@@ -6597,6 +6603,15 @@ body.is-training .fab-pip.active {
 .advice-bubble-head { display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; min-width: 0; }
 .advice-bubble b { flex: 1 1 0; min-width: 0; overflow: hidden; font-size: 11px; color: var(--md-sys-on-surface-variant); display: flex; align-items: center; gap: 6px; }
 .advice-bubble b small { font-size: 10px; font-weight: 600; color: var(--md-sys-on-surface-variant); opacity: 0.8; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.advice-stopped-badge {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    padding: 1px 6px;
+    background: color-mix(in srgb, var(--md-sys-tertiary-container) 78%, transparent);
+    color: var(--md-sys-on-tertiary-container);
+    font-weight: 900;
+}
 .advice-bubble.user b,
 .advice-bubble.user b small,
 .advice-bubble.user .advice-bubble-content,
@@ -6974,6 +6989,19 @@ body.is-training .fab-pip.active {
     padding-bottom: 4px; -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
 }
+.advice-stopped-notice {
+    margin-top: 8px;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    border-radius: 999px;
+    padding: 5px 9px;
+    background: color-mix(in srgb, var(--md-sys-tertiary-container) 58%, transparent);
+    color: var(--md-sys-on-tertiary-container);
+    font-size: 11px;
+    font-weight: 800;
+}
+.advice-stopped-notice .material-symbols-rounded { font-size: 15px; }
 .advice-error-recovery {
     display: grid;
     gap: 8px;
@@ -6999,6 +7027,57 @@ body.is-training .fab-pip.active {
     font-size: 17px;
     color: var(--md-sys-error);
     font-variation-settings: 'FILL' 1;
+}
+.advice-error-details {
+    border-radius: 14px;
+    border: 1px solid color-mix(in srgb, var(--md-sys-error) 16%, var(--glass-border));
+    background: color-mix(in srgb, var(--glass-bg) 76%, transparent);
+    overflow: hidden;
+}
+.advice-error-details summary {
+    min-height: 34px;
+    padding: 0 10px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--md-sys-on-error-container);
+    font-size: 11px;
+    font-weight: 900;
+    cursor: pointer;
+}
+.advice-error-details summary .material-symbols-rounded { font-size: 15px; }
+.advice-error-detail-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 6px;
+    padding: 0 10px 10px;
+}
+.advice-error-detail-grid div {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+}
+.advice-error-detail-grid strong {
+    color: color-mix(in srgb, var(--md-sys-on-error-container) 72%, transparent);
+    font-size: 10px;
+}
+.advice-error-detail-grid span {
+    color: var(--md-sys-on-error-container);
+    font-size: 11px;
+    font-weight: 800;
+    overflow-wrap: anywhere;
+}
+.advice-error-details pre {
+    margin: 0 10px 10px;
+    max-height: 180px;
+    overflow: auto;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    border-radius: 10px;
+    padding: 8px;
+    background: color-mix(in srgb, var(--md-sys-error-container) 54%, var(--md-sys-surface));
+    color: var(--md-sys-on-error-container);
+    font-size: 10px;
 }
 .advice-error-actions {
     display: flex;
@@ -9685,8 +9764,10 @@ body.is-training .fab-pip.active {
 .ai-input textarea { flex: 1 1 auto; min-width: 0; border: none; background: transparent; font-size: 13px; color: var(--md-sys-on-surface); outline: none; resize: none; min-height: 24px; max-height: 160px; font-family: inherit; overflow-wrap: anywhere; overscroll-behavior: contain; touch-action: pan-y; -webkit-overflow-scrolling: touch; }
 .ai-input textarea::placeholder { color: var(--md-sys-on-surface-variant); }
 .ai-send { width: 36px; height: 36px; border-radius: 50%; border: none; background: var(--md-sys-primary); color: var(--md-sys-on-primary); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: var(--md-sys-elevation-1); transition: transform 0.2s var(--md-sys-motion-spring); flex: none; }
+.ai-send.is-stopping { background: var(--md-sys-error); color: var(--md-sys-on-error); animation: ai-stop-pulse 1.2s ease-in-out infinite; }
 .ai-send:active { transform: scale(0.92); }
 .ai-send .material-symbols-rounded { font-size: 18px; }
+@keyframes ai-stop-pulse { 0%, 100% { box-shadow: var(--md-sys-elevation-1); } 50% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--md-sys-error) 18%, transparent); } }
 .advice-attach-actions { display: inline-flex; flex: none; }
 .advice-attach-btn { width: 36px; height: 36px; border: none; border-radius: 50%; background: color-mix(in srgb, var(--md-sys-secondary-container) 64%, transparent); color: var(--md-sys-on-secondary-container); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; position: relative; overflow: hidden; transition: transform 0.18s var(--md-sys-motion-spring), background 0.18s ease; box-shadow: var(--md-sys-elevation-1); }
 .advice-attach-btn::after { content: ''; position: absolute; inset: 0; background: currentColor; opacity: 0; transition: opacity 0.18s ease; }

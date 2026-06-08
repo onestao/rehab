@@ -13,6 +13,10 @@ const advicePanel = {
             PAGE_SCROLL_KEY: this.PAGE_SCROLL_KEY,
             MODEL_ICONS: this.MODEL_ICONS,
             sendAiAdvice: this.sendAiAdvice,
+            cancelAiAdvice: this.cancelAiAdvice,
+            bindAdviceRequestLifecycle: this.bindAdviceRequestLifecycle,
+            requestAdviceWakeLock: this.requestAdviceWakeLock,
+            releaseAdviceWakeLock: this.releaseAdviceWakeLock,
             requestAiAdvice: this.requestAiAdvice,
             findAdviceMessage: this.findAdviceMessage,
             pruneAdviceVersionGroup: this.pruneAdviceVersionGroup,
@@ -47,6 +51,7 @@ const advicePanel = {
             isMobileAdviceInput: this.isMobileAdviceInput,
             onAdvicePromptInput: this.onAdvicePromptInput,
             onAdvicePromptKeydown: this.onAdvicePromptKeydown,
+            updateAdviceSendState: this.updateAdviceSendState,
             setAdviceModel: this.setAdviceModel,
             providerKeyForModel: this.providerKeyForModel,
             providerIcon: this.providerIcon,
@@ -172,6 +177,49 @@ const advicePanel = {
             const retry = document.getElementById('aiRetryMode');
             if (retry) retry.value = this.db?.aiRetryMode || 'versioned';
         });
+        target.bindAdviceRequestLifecycle?.();
+    },
+
+    bindAdviceRequestLifecycle() {
+        if (this._adviceRequestLifecycleBound) return;
+        this._adviceRequestLifecycleBound = true;
+        document.addEventListener?.('visibilitychange', () => {
+            if (!this._adviceSending || !this._adviceRequestMeta) return;
+            if (document.hidden) {
+                this._adviceRequestMeta.wasBackgrounded = true;
+                this._adviceRequestMeta.hiddenAt = this._adviceRequestMeta.hiddenAt || new Date().toISOString();
+                this._adviceRequestMeta.visibilityState = document.visibilityState || 'hidden';
+            } else {
+                this._adviceRequestMeta.visibleAgainAt = new Date().toISOString();
+                this._adviceRequestMeta.visibilityState = document.visibilityState || 'visible';
+            }
+        });
+        window.addEventListener?.('pagehide', () => {
+            if (!this._adviceSending || !this._adviceRequestMeta) return;
+            this._adviceRequestMeta.pageHidden = true;
+            this._adviceRequestMeta.pageHiddenAt = new Date().toISOString();
+        });
+    },
+
+    async requestAdviceWakeLock() {
+        try {
+            if (!navigator.wakeLock?.request) return null;
+            const sentinel = await navigator.wakeLock.request('screen');
+            sentinel?.addEventListener?.('release', () => {
+                if (this._adviceWakeLock === sentinel) this._adviceWakeLock = null;
+            }, { once: true });
+            this._adviceWakeLock = sentinel;
+            return sentinel;
+        } catch (e) {
+            try { window.errorBus?.report?.('advice.wakelock', e); } catch {}
+            return null;
+        }
+    },
+
+    releaseAdviceWakeLock() {
+        const lock = this._adviceWakeLock;
+        this._adviceWakeLock = null;
+        try { lock?.release?.(); } catch {}
     },
 
     listenThemeChanges() {
@@ -1098,6 +1146,42 @@ const advicePanel = {
         }
     },
 
+    updateAdviceSendState() {
+        const send = document.getElementById('adviceSendBtn');
+        const input = document.getElementById('advicePrompt');
+        if (!send) return;
+        const icon = send.querySelector('.material-symbols-rounded');
+        const hasAttachment = (this._adviceAttachments || []).some(att => att && att.status !== 'failed' && (att.kind === 'image' || att.readable));
+        const sending = !!this._adviceSending;
+        send.disabled = sending ? false : !(String(input?.value || '').trim() || hasAttachment);
+        send.classList.toggle('is-stopping', sending);
+        send.setAttribute('aria-label', sending ? '停止生成' : '发送问题');
+        send.title = sending ? '停止生成' : '发送问题';
+        send.setAttribute('onclick', sending ? 'data.cancelAiAdvice()' : 'data.sendAiAdvice()');
+        if (icon) icon.textContent = sending ? 'stop' : 'send';
+    },
+
+    cancelAiAdvice() {
+        if (!this._adviceSending) return false;
+        this._adviceCancelledByUser = true;
+        if (this._adviceRequestMeta) {
+            this._adviceRequestMeta.cancelledByUser = true;
+            this._adviceRequestMeta.cancelledAt = new Date().toISOString();
+        }
+        try {
+            const reason = typeof DOMException === 'function'
+                ? new DOMException('User stopped AI advice generation', 'AbortError')
+                : undefined;
+            this._adviceAbortController?.abort?.(reason);
+        } catch {
+            try { this._adviceAbortController?.abort?.(); } catch {}
+        }
+        this.flushAdviceStreamRender?.();
+        this.updateAdviceSendState?.();
+        window.haptics?.light?.();
+        return true;
+    },
+
     onAdvicePromptKeydown(e) {
         if (e.isComposing) return;
         if (this.isMobileAdviceInput()) return;
@@ -1685,6 +1769,23 @@ const advicePanel = {
         const replyToId = options?.replyToId || '';
         const baseVersionIdx = Number(options?.versionIdx || 0);
         this._adviceSending = true;
+        this._adviceCancelledByUser = false;
+        const AbortCtor = window.AbortController || globalThis.AbortController;
+        if (typeof AbortCtor !== 'function') throw new Error('当前浏览器不支持取消 AI 请求');
+        const controller = new AbortCtor();
+        this._adviceAbortController = controller;
+        this._adviceRequestMeta = {
+            startedAt: now,
+            provider,
+            model,
+            visibilityState: document.visibilityState || 'visible',
+            displayMode: window.matchMedia?.('(display-mode: standalone)')?.matches ? 'standalone' : 'browser',
+            wasBackgrounded: !!document.hidden,
+            pageHidden: false,
+            cancelledByUser: false
+        };
+        this.requestAdviceWakeLock?.();
+        this.updateAdviceSendState?.();
         let userMessageId = '';
         if (!options?.skipUserMessage) {
             const userMessage = { id: this.generateRecordId('advice-user'), role: 'user', content: effectivePrompt, attachments: this.adviceAttachmentMetadata?.(attachments) || [], at: now, updatedAt: Date.now(), deleted: false };
@@ -1782,6 +1883,7 @@ const advicePanel = {
             };
             full = hasImageAttachment
                 ? await ai.callAdviceWithAttachments(messages, attachments, 2400, {
+                    signal: controller.signal,
                     timeoutMs: 45000,
                     onProgress: ({ stage, message }) => {
                         const idx = this.db.health.aiAdviceChat.findIndex(msg => msg.id === pendingId);
@@ -1792,7 +1894,7 @@ const advicePanel = {
                         this.rerenderAdvicePanel?.();
                     }
                 })
-                : await ai.callStream(messages, 2400, onToken);
+                : await ai.callStream(messages, 2400, onToken, { signal: controller.signal });
             if (hasImageAttachment) {
                 const idx = this.db.health.aiAdviceChat.findIndex(msg => msg.id === pendingId);
                 if (idx >= 0) {
@@ -1836,8 +1938,56 @@ const advicePanel = {
             });
         } catch (e) {
             const idx = this.db.health.aiAdviceChat.findIndex(msg => msg.id === pendingId);
+            if (this._adviceCancelledByUser || e?.code === 'AI_CANCELLED' || e?.name === 'AbortError') {
+                const previous = idx >= 0 ? this.db.health.aiAdviceChat[idx] : null;
+                const partial = String(previous?.content || '').trim();
+                const stopped = {
+                    ...(previous || {}),
+                    id: pendingId,
+                    role: 'assistant',
+                    content: partial || '已停止生成。',
+                    at: previous?.at || new Date().toISOString(),
+                    model,
+                    provider,
+                    temporaryModel: isOverride,
+                    pending: false,
+                    stopped: true,
+                    stoppedAt: new Date().toISOString(),
+                    stopReason: this._adviceCancelledByUser ? 'user' : 'aborted',
+                    error: false,
+                    errorInfo: {
+                        ...(this._adviceRequestMeta || {}),
+                        type: this._adviceCancelledByUser ? 'user_cancelled' : 'aborted',
+                        message: this._adviceCancelledByUser ? '用户主动停止生成' : '请求已中断'
+                    },
+                    retryPrompt: prompt,
+                    deleted: false,
+                    updatedAt: Date.now(),
+                    replyToId,
+                    versionIdx: baseVersionIdx,
+                    versionActive: options?.versionActive !== false,
+                    versionPinned: !!options?.versionPinned
+                };
+                if (idx >= 0) this.db.health.aiAdviceChat[idx] = stopped;
+                else this.db.health.aiAdviceChat.push(stopped);
+                this.save();
+                requestAnimationFrame(() => {
+                    const bubble = document.querySelector(`[data-advice-id="${pendingId}"]`);
+                    const contentEl = bubble?.querySelector?.('.advice-bubble-content');
+                    if (contentEl && contentEl._renderer) {
+                        try { contentEl._renderer.flushAll(); } catch {}
+                        try { contentEl._renderer.destroy(); } catch {}
+                        contentEl._renderer = null;
+                        delete this._streamRenderers[pendingId];
+                    }
+                    if (!this._adviceUserScrollPaused && this._adviceFollowStream) {
+                        this.scrollAdviceToLatest(true);
+                    }
+                });
+                return;
+            }
             const failure = this.classifyAdviceFailure?.(e, requestMessages || [], model) || { content: `分析失败：${window.toast ? toast.sanitize(e) : e.message}`, info: {} };
-            const failed = { id: pendingId, role: 'assistant', content: failure.content, at: new Date().toISOString(), model, provider, temporaryModel: isOverride, error: true, errorInfo: failure.info, retryPrompt: prompt, deleted: false, updatedAt: Date.now(), replyToId, versionIdx: baseVersionIdx, versionActive: options?.versionActive !== false, versionPinned: !!options?.versionPinned };
+            const failed = { id: pendingId, role: 'assistant', content: failure.content, at: new Date().toISOString(), model, provider, temporaryModel: isOverride, error: true, errorInfo: { ...(failure.info || {}), ...(this._adviceRequestMeta || {}) }, retryPrompt: prompt, deleted: false, updatedAt: Date.now(), replyToId, versionIdx: baseVersionIdx, versionActive: options?.versionActive !== false, versionPinned: !!options?.versionPinned };
             if (idx >= 0) this.db.health.aiAdviceChat[idx] = failed;
             else this.db.health.aiAdviceChat.push(failed);
             this.save();
@@ -1849,9 +1999,11 @@ const advicePanel = {
         } finally {
             this._adviceSending = false;
             this._activeStreamRenderer = null;
+            this._adviceAbortController = null;
+            this._adviceRequestMeta = null;
+            this.releaseAdviceWakeLock?.();
             this.setAdviceStreamUiState('idle');
-            const send = document.getElementById('adviceSendBtn');
-            if (send) send.disabled = true;
+            this.updateAdviceSendState?.();
         }
     },
 
@@ -2264,6 +2416,8 @@ const advicePanel = {
         const insightHeader = this.renderInsightHeader?.(insightCtx) || '';
         const insightBaseline = this.renderInsightBaseline?.(insightCtx) || '';
         const expandedClass = this._aiInsightExpanded ? ' expanded' : '';
+        const isSendingAdvice = !!this._adviceSending;
+        const canSend = String(rawDraft || '').trim() || ((this._adviceAttachments || []).some(att => att && att.status !== 'failed' && (att.kind === 'image' || att.readable)));
 
         return `<div class="advice-v6-page ${this._adviceSuppressCardAnimation ? 'advice-no-enter' : ''}">
             <div class="ai-insight${expandedClass}">
@@ -2292,7 +2446,7 @@ const advicePanel = {
                     ${this.renderAdviceModelChip()}
                     ${this.renderAdviceAttachmentControls?.() || ''}
                     <textarea id="advicePrompt" class="advice-composer-input" rows="1" placeholder="问 AI 关于训练 / 饮食..." oninput="data.onAdvicePromptInput(this)" onkeydown="data.onAdvicePromptKeydown(event)">${draft}</textarea>
-                    <button id="adviceSendBtn" class="ai-send" onclick="data.sendAiAdvice()" type="button" ${(String(rawDraft || '').trim() || ((this._adviceAttachments || []).some(att => att && att.status !== 'failed' && (att.kind === 'image' || att.readable)))) ? '' : 'disabled'} aria-label="发送问题"><span class="material-symbols-rounded">send</span></button>
+                    <button id="adviceSendBtn" class="ai-send ${isSendingAdvice ? 'is-stopping' : ''}" onclick="${isSendingAdvice ? 'data.cancelAiAdvice()' : 'data.sendAiAdvice()'}" type="button" ${isSendingAdvice || canSend ? '' : 'disabled'} aria-label="${isSendingAdvice ? '停止生成' : '发送问题'}" title="${isSendingAdvice ? '停止生成' : '发送问题'}"><span class="material-symbols-rounded">${isSendingAdvice ? 'stop' : 'send'}</span></button>
                 </div>
             </div>
         </div>`;

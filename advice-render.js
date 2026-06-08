@@ -468,6 +468,7 @@ Object.assign(advicePanel, {
         const cost = typeof msg.costUsd === 'number' && msg.costUsd > 0
             ? ` · $${highlightKeyword(msg.costUsd.toFixed(4), currentKeyword)}`
             : '';
+        const stoppedBadge = msg.stopped ? ' · <span class="advice-stopped-badge">已停止</span>' : '';
         const rawContent = String(msg.content || '');
         const isLongAssistant = msg.role === 'assistant'
             && !latest
@@ -503,7 +504,7 @@ Object.assign(advicePanel, {
                 return `<span class="advice-message-attachment ${att.kind === 'image' && att.thumb ? 'has-thumb' : ''}" title="${escapeHtml(att.name || '附件')}">${preview}${highlightKeyword(att.name || '附件', currentKeyword)}<small>${highlightKeyword(meta, currentKeyword)}</small></span>`;
             }).join('')}</div>`
             : '';
-        const state = msg.pending ? ' pending' : msg.error ? ' error' : '';
+        const state = msg.pending ? ' pending' : msg.error ? ' error' : msg.stopped ? ' stopped' : '';
         const versionGroup = Array.isArray(msg.versionGroup) ? msg.versionGroup : null;
         let versionSwitcher = '';
         if (versionGroup && versionGroup.length > 1) {
@@ -527,6 +528,7 @@ Object.assign(advicePanel, {
             </div>`
             : '';
         const errorRecovery = msg.error ? (this.renderAdviceErrorRecovery?.(msg) || '') : '';
+        const stoppedNotice = msg.stopped ? '<div class="advice-stopped-notice"><span class="material-symbols-rounded">stop</span>已停止生成，已保留上方部分回复。</div>' : '';
         const actions = msg.role === 'assistant'
             ? `<div class="advice-bubble-actions">
                 <button onclick="data.copyAdviceMessage(${msg.idx}, this.closest('.advice-bubble')?.dataset.adviceId || '')" type="button">复制</button>
@@ -542,12 +544,13 @@ Object.assign(advicePanel, {
             </div>`;
         return `<div class="advice-bubble ${msg.role}${state}" ${safeId ? `data-advice-id="${safeId}"` : ''} ${latest ? 'data-advice-latest="true"' : ''}>
             <div class="advice-bubble-head">
-                <b>${label}<small>${time}${model}${usage}${cost}</small></b>
+                <b>${label}<small>${time}${model}${usage}${cost}${stoppedBadge}</small></b>
                 ${versionSwitcher}
                 ${msg.pending ? '<span class="advice-typing-dot"></span>' : ''}
             </div>
             ${attachments}
             <div class="advice-bubble-content">${msg.pending ? '<div class="skeleton-line skeleton" style="width:80%"></div><div class="skeleton-line skeleton" style="width:60%"></div><div class="skeleton-line skeleton" style="width:90%"></div>' : content}</div>
+            ${stoppedNotice}
             ${errorRecovery}
             ${longMessageToggle}
             ${routineActions}

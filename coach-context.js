@@ -179,14 +179,35 @@ Object.assign(advicePanel, {
     },
 
     classifyAdviceFailure(error, messages = [], model = '') {
-        const raw = String(error?.message || error || ''), lower = raw.toLowerCase(), status = Number(raw.match(/AI 请求失败:\s*(\d{3})/)?.[1] || 0);
+        const raw = String(error?.message || error || ''), lower = raw.toLowerCase(), status = Number(error?.status || raw.match(/AI 请求失败:\s*(\d{3})/)?.[1] || 0);
+        const code = String(error?.code || '');
+        const body = String(error?.body || '').slice(0, 800);
+        const type = code === 'AI_TIMEOUT' ? 'timeout'
+            : code === 'NETWORK_ERROR' || /failed to fetch|network|load failed/i.test(raw) ? 'network'
+                : status === 429 ? 'rate_limit'
+                    : status === 401 || status === 403 ? 'auth'
+                        : status === 404 ? 'endpoint'
+                            : status >= 500 ? 'upstream'
+                                : status >= 400 ? 'request'
+                                    : code || 'unknown';
         const contextFail = status === 413 || status === 414 || /context_length|maximum context|token limit|too many tokens|prompt too long|context.*exceed/.test(lower);
         const upstreamFail = [502, 503, 504].includes(status) || /server_error|upstream|bad gateway|gateway|timeout|upsy/.test(lower);
-        const info = { possibleContextOverflow: contextFail || (upstreamFail && messages.reduce((n, m) => n + String(m?.content || '').length, 0) > Math.min(12000, /web|browser|网页|proxy|中转|local|ollama|7b|8b|14b/i.test(String(model || '')) ? 8000 : 12000)) };
+        const info = {
+            type,
+            status,
+            code,
+            message: raw.slice(0, 500),
+            body,
+            requestChars: messages.reduce((n, m) => n + String(m?.content || '').length, 0),
+            possibleContextOverflow: contextFail || (upstreamFail && messages.reduce((n, m) => n + String(m?.content || '').length, 0) > Math.min(12000, /web|browser|网页|proxy|中转|local|ollama|7b|8b|14b/i.test(String(model || '')) ? 8000 : 12000)),
+            failedAt: new Date().toISOString()
+        };
         const content = contextFail ? '当前上下文超过模型限制，建议使用轻量上下文或仅提问重试。'
             : upstreamFail ? (info.possibleContextOverflow ? 'AI 服务返回上游错误，当前上下文较长，可能超过网页转 API 通道能力。' : 'AI 服务暂时不可用，可能是供应商或代理异常。')
                 : status === 429 ? 'AI 请求被限流或额度不足，请稍后重试。'
                     : status === 401 || status === 403 ? 'AI 鉴权失败，请检查 API Key。'
+                        : status === 404 ? 'AI 接口路径或模型不存在，请检查 Base URL 和模型名称。'
+                            : type === 'network' ? '网络连接异常或后台切换导致请求中断，请回到前台后重试。'
                         : 'AI 请求失败，请重试或切换模型。';
         return { content, info };
     },
@@ -194,8 +215,23 @@ Object.assign(advicePanel, {
     renderAdviceErrorRecovery(msg = {}) {
         if (!msg?.error) return '';
         const safeId = this.escapeHtml?.(msg.id || '') || '';
+        const safe = this.escapeHtml?.bind(this) || ((value) => String(value ?? ''));
+        const info = msg.errorInfo || {};
         const hint = msg.errorInfo?.possibleContextOverflow ? '当前模型通道可能不适合长上下文，建议先用轻量上下文重试。' : '如果仍失败，请稍后重试或切换模型。';
-        return `<div class="advice-error-recovery"><div class="advice-error-hint"><span class="material-symbols-rounded">tips_and_updates</span>${this.escapeHtml?.(hint) || hint}</div><div class="advice-error-actions"><button type="button" onclick="data.retryAdviceFrom(0, '${safeId}', 'light')"><span class="material-symbols-rounded">compress</span>轻量重试</button><button type="button" onclick="data.retryAdviceFrom(0, '${safeId}', 'none')"><span class="material-symbols-rounded">short_text</span>仅提问</button><button type="button" onclick="data.openAdviceModelPicker?.()"><span class="material-symbols-rounded">tune</span>切换模型</button></div></div>`;
+        const rows = [
+            ['错误分类', info.type || 'unknown'],
+            ['HTTP 状态', info.status || '无'],
+            ['提供商', msg.provider || info.provider || '未知'],
+            ['模型', msg.model || info.model || '未知'],
+            ['请求时间', info.startedAt || msg.at || '未知'],
+            ['失败时间', info.failedAt || '未知'],
+            ['前后台状态', `${info.visibilityState || 'unknown'}${info.wasBackgrounded ? '，曾切到后台' : ''}${info.pageHidden ? '，触发 pagehide' : ''}`],
+            ['请求长度', info.requestChars ? `${info.requestChars} 字符` : '未知']
+        ];
+        const detailRows = rows.map(([k, v]) => `<div><strong>${safe(k)}</strong><span>${safe(v)}</span></div>`).join('');
+        const raw = info.body || info.message || '';
+        const details = `<details class="advice-error-details"><summary><span class="material-symbols-rounded">bug_report</span>查看失败详情</summary><div class="advice-error-detail-grid">${detailRows}</div>${raw ? `<pre>${safe(raw)}</pre>` : ''}</details>`;
+        return `<div class="advice-error-recovery"><div class="advice-error-hint"><span class="material-symbols-rounded">tips_and_updates</span>${safe(hint)}</div>${details}<div class="advice-error-actions"><button type="button" onclick="data.retryAdviceFrom(0, '${safeId}', 'light')"><span class="material-symbols-rounded">compress</span>轻量重试</button><button type="button" onclick="data.retryAdviceFrom(0, '${safeId}', 'none')"><span class="material-symbols-rounded">short_text</span>仅提问</button><button type="button" onclick="data.openAdviceModelPicker?.()"><span class="material-symbols-rounded">tune</span>切换模型</button></div></div>`;
     },
 
     async requestAiAdvice(prompt, model) {

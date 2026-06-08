@@ -123,3 +123,38 @@ test('renderAdviceMessage keeps latest or searched long assistant replies comple
     assert.match(searchHtml, /TAIL/);
     assert.doesNotMatch(searchHtml, /展开完整回复/);
 });
+
+test('renderAdviceMessage marks stopped assistant replies without error state', () => {
+    const panel = loadAdvicePanel();
+
+    const html = panel.renderAdviceMessage({ id: 'stop-1', role: 'assistant', content: 'partial answer', stopped: true, at: '2026-05-30T00:00:00.000Z' }, true, '');
+
+    assert.match(html, /advice-bubble assistant stopped/);
+    assert.match(html, /已停止生成/);
+    assert.match(html, /partial answer/);
+    assert.doesNotMatch(html, /advice-error-recovery/);
+});
+
+test('renderAdviceMessage renders escaped safe failure details', () => {
+    const panel = loadAdvicePanel();
+    panel.renderAdviceErrorRecovery = function renderAdviceErrorRecovery(msg) {
+        const safe = this.escapeHtml.bind(this);
+        const info = msg.errorInfo || {};
+        return `<details class="advice-error-details"><summary>查看失败详情</summary><pre>${safe(info.body || info.message || '')}</pre></details>`;
+    };
+
+    const html = panel.renderAdviceMessage({
+        id: 'err-1',
+        role: 'assistant',
+        content: 'AI 请求失败',
+        error: true,
+        at: '2026-05-30T00:00:00.000Z',
+        provider: 'openai',
+        model: 'gpt-test',
+        errorInfo: { type: 'auth', status: 401, body: '<script>secret</script>' }
+    }, true, '');
+
+    assert.match(html, /advice-error-details/);
+    assert.match(html, /&lt;script&gt;secret&lt;\/script&gt;/);
+    assert.doesNotMatch(html, /<script>secret<\/script>/);
+});

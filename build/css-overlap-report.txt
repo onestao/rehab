@@ -270,20 +270,20 @@ mark.ai-hit
 0%
   files: 16-history-hero-calendar.css, 50-v6-ui.css, 54-v6-ai.css, 58-skeleton.css, 41-m3e-effects.css
     transform: scale(1) | translate(0, 0) scale(1) | scale(1) rotate(-3deg) | scaleX(0.35) (16-history-hero-calendar.css / 50-v6-ui.css / 50-v6-ui.css / 50-v6-ui.css / 50-v6-ui.css / 41-m3e-effects.css)
-    box-shadow: inset 0 1px 0 rgba(255,255,255,0.72), inset 0 -1px 2px rgba(0,29,54,0.06), 0 10px 28px color-mix(in srgb, var(--md-sys-primary) 16%, transparent) | 0 6px 18px color-mix(in srgb, var(--md-sys-primary) 35%, transparent) | 0 0 0 4px color-mix(in srgb, var(--md-sys-primary) 18%, transparent) (50-v6-ui.css / 50-v6-ui.css / 50-v6-ui.css / 50-v6-ui.css)
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.72), inset 0 -1px 2px rgba(0,29,54,0.06), 0 10px 28px color-mix(in srgb, var(--md-sys-primary) 16%, transparent) | 0 6px 18px color-mix(in srgb, var(--md-sys-primary) 35%, transparent) | 0 0 0 4px color-mix(in srgb, var(--md-sys-primary) 18%, transparent) | var(--md-sys-elevation-1) (50-v6-ui.css / 50-v6-ui.css / 50-v6-ui.css / 50-v6-ui.css / 54-v6-ai.css)
     opacity: 0.55 | 0.3 | .35 (50-v6-ui.css / 50-v6-ui.css / 54-v6-ai.css)
 
 100%
   files: 16-history-hero-calendar.css, 50-v6-ui.css, 54-v6-ai.css, 58-skeleton.css, 41-m3e-effects.css
     transform: scale(1) | translate(0, 0) scale(1) | scale(1) rotate(-3deg) | scaleX(0.35) (16-history-hero-calendar.css / 50-v6-ui.css / 50-v6-ui.css / 50-v6-ui.css / 50-v6-ui.css / 41-m3e-effects.css)
-    box-shadow: inset 0 1px 0 rgba(255,255,255,0.72), inset 0 -1px 2px rgba(0,29,54,0.06), 0 10px 28px color-mix(in srgb, var(--md-sys-primary) 16%, transparent) | 0 6px 18px color-mix(in srgb, var(--md-sys-primary) 35%, transparent) | 0 0 0 4px color-mix(in srgb, var(--md-sys-primary) 18%, transparent) (50-v6-ui.css / 50-v6-ui.css / 50-v6-ui.css / 50-v6-ui.css)
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.72), inset 0 -1px 2px rgba(0,29,54,0.06), 0 10px 28px color-mix(in srgb, var(--md-sys-primary) 16%, transparent) | 0 6px 18px color-mix(in srgb, var(--md-sys-primary) 35%, transparent) | 0 0 0 4px color-mix(in srgb, var(--md-sys-primary) 18%, transparent) | var(--md-sys-elevation-1) (50-v6-ui.css / 50-v6-ui.css / 50-v6-ui.css / 50-v6-ui.css / 54-v6-ai.css)
     opacity: 0.55 | 0.3 | .35 (50-v6-ui.css / 50-v6-ui.css / 54-v6-ai.css)
 
 50%
   files: 16-history-hero-calendar.css, 50-v6-ui.css, 54-v6-ai.css
     transform: scale(1.03) | translate(8px, -12px) scale(1.08) | scale(1.15) rotate(3deg) | scaleX(0.85) | scale(1.05) (16-history-hero-calendar.css / 50-v6-ui.css / 50-v6-ui.css / 50-v6-ui.css / 50-v6-ui.css)
     filter: saturate(1.15) drop-shadow(0 6px 18px var(--md-sys-primary-container)) | saturate(1.12) drop-shadow(0 6px 16px color-mix(in srgb, var(--md-sys-primary) 18%, transparent)) (16-history-hero-calendar.css / 50-v6-ui.css)
-    box-shadow: inset 0 1px 0 rgba(255,255,255,0.86), inset 0 -1px 2px rgba(0,29,54,0.05), 0 14px 34px color-mix(in srgb, var(--md-sys-primary) 24%, transparent) | 0 8px 28px color-mix(in srgb, var(--md-sys-primary) 55%, transparent) | 0 0 0 9px color-mix(in srgb, var(--md-sys-primary) 6%, transparent) | 0 8px 24px color-mix(in srgb, var(--md-sys-primary) 55%, transparent) (50-v6-ui.css / 50-v6-ui.css / 50-v6-ui.css / 50-v6-ui.css)
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.86), inset 0 -1px 2px rgba(0,29,54,0.05), 0 14px 34px color-mix(in srgb, var(--md-sys-primary) 24%, transparent) | 0 8px 28px color-mix(in srgb, var(--md-sys-primary) 55%, transparent) | 0 0 0 9px color-mix(in srgb, var(--md-sys-primary) 6%, transparent) | 0 8px 24px color-mix(in srgb, var(--md-sys-primary) 55%, transparent) | 0 0 0 6px color-mix(in srgb, var(--md-sys-error) 18%, transparent) (50-v6-ui.css / 50-v6-ui.css / 50-v6-ui.css / 50-v6-ui.css / 54-v6-ai.css)
     opacity: 0.95 | 1 (50-v6-ui.css / 54-v6-ai.css)
 
 .record-tabs

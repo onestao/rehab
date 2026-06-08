@@ -160,8 +160,10 @@
 .ai-input textarea { flex: 1 1 auto; min-width: 0; border: none; background: transparent; font-size: 13px; color: var(--md-sys-on-surface); outline: none; resize: none; min-height: 24px; max-height: 160px; font-family: inherit; overflow-wrap: anywhere; overscroll-behavior: contain; touch-action: pan-y; -webkit-overflow-scrolling: touch; }
 .ai-input textarea::placeholder { color: var(--md-sys-on-surface-variant); }
 .ai-send { width: 36px; height: 36px; border-radius: 50%; border: none; background: var(--md-sys-primary); color: var(--md-sys-on-primary); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: var(--md-sys-elevation-1); transition: transform 0.2s var(--md-sys-motion-spring); flex: none; }
+.ai-send.is-stopping { background: var(--md-sys-error); color: var(--md-sys-on-error); animation: ai-stop-pulse 1.2s ease-in-out infinite; }
 .ai-send:active { transform: scale(0.92); }
 .ai-send .material-symbols-rounded { font-size: 18px; }
+@keyframes ai-stop-pulse { 0%, 100% { box-shadow: var(--md-sys-elevation-1); } 50% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--md-sys-error) 18%, transparent); } }
 .advice-attach-actions { display: inline-flex; flex: none; }
 .advice-attach-btn { width: 36px; height: 36px; border: none; border-radius: 50%; background: color-mix(in srgb, var(--md-sys-secondary-container) 64%, transparent); color: var(--md-sys-on-secondary-container); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; position: relative; overflow: hidden; transition: transform 0.18s var(--md-sys-motion-spring), background 0.18s ease; box-shadow: var(--md-sys-elevation-1); }
 .advice-attach-btn::after { content: ''; position: absolute; inset: 0; background: currentColor; opacity: 0; transition: opacity 0.18s ease; }

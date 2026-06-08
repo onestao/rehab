@@ -296,16 +296,25 @@ Object.assign(ai, {
         return await this.callVisionTextImage(promptText, images[0].file, maxTokens, systemText, opts);
     },
 
-    async callStream(messages, maxTokens = 2000, onToken = () => {}) {
+    async callStream(messages, maxTokens = 2000, onToken = () => {}, opts = {}) {
         const effective = this.getEffectiveConfig ? this.getEffectiveConfig() : { ...this.cfg, profileId: this.cfg.activeProfileId, apiKey: this.apiKeyFor(this.cfg.activeProfileId) };
         if (!effective.enabled) throw new Error('请先在设置中配置 AI 接口');
         const key = effective.apiKey;
         if (!key) throw new Error('请先在当前 AI 配置中填写 API Key');
         const provider = effective.provider || 'openai';
-        if (provider === 'claude')           return this._callClaude(messages, maxTokens, key, true, onToken, effective);
-        if (provider === 'openai-responses') return this._callOpenAIResponses(messages, maxTokens, key, true, onToken, effective);
-        if (provider === 'gemini')           return this._callGemini(messages, maxTokens, key, true, onToken, effective);
-        return this._callOpenAIChat(messages, maxTokens, key, true, onToken, effective);
+        try {
+            opts.signal?.throwIfAborted?.();
+            if (provider === 'claude')           return await this._callClaude(messages, maxTokens, key, true, onToken, effective, opts.signal);
+            if (provider === 'openai-responses') return await this._callOpenAIResponses(messages, maxTokens, key, true, onToken, effective, opts.signal);
+            if (provider === 'gemini')           return await this._callGemini(messages, maxTokens, key, true, onToken, effective, opts.signal);
+            return await this._callOpenAIChat(messages, maxTokens, key, true, onToken, effective, opts.signal);
+        } catch (e) {
+            if (e?.name === 'AbortError' || opts.signal?.aborted) {
+                throw this._makeAiError('AI_CANCELLED', { code: 'AI_CANCELLED', cause: e });
+            }
+            if (e instanceof TypeError) throw this._makeAiError(e.message || 'NETWORK_ERROR', { code: 'NETWORK_ERROR', cause: e });
+            throw e;
+        }
     },
 
     async _callOpenAIChatVision(promptText, img, maxTokens, key, effective, systemText = '', signal = null) {
@@ -447,18 +456,19 @@ Object.assign(ai, {
     },
 
     // ---------- OpenAI Chat Completions ----------
-    async _callOpenAIChat(messages, maxTokens, key, stream, onChunk, effective = this.getEffectiveConfig?.() || this.cfg) {
+    async _callOpenAIChat(messages, maxTokens, key, stream, onChunk, effective = this.getEffectiveConfig?.() || this.cfg, signal = null) {
         const url = `${effective.baseUrl}/chat/completions`;
         const body = { model: effective.model, messages, temperature: 0.3, max_tokens: maxTokens };
         if (stream) body.stream = true;
         const res = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
-            body: JSON.stringify(body)
+            body: JSON.stringify(body),
+            signal
         });
         if (!res.ok) {
             const txt = await res.text().catch(() => '');
-            throw new Error(`AI 请求失败: ${res.status} ${txt.slice(0, 120)}`);
+            throw this._makeHttpAiError(res.status, txt);
         }
         if (!stream) {
             const raw = await res.text();
@@ -482,13 +492,14 @@ Object.assign(ai, {
             }
         }
          return this._readSSE(res, onChunk,
-             (json) => json.choices?.[0]?.delta?.content ?? json.choices?.[0]?.message?.content ?? '',
-             (json) => (json.usage ? { in: Number(json.usage.prompt_tokens || 0), out: Number(json.usage.completion_tokens || 0) } : null)
-         );
+              (json) => json.choices?.[0]?.delta?.content ?? json.choices?.[0]?.message?.content ?? '',
+              (json) => (json.usage ? { in: Number(json.usage.prompt_tokens || 0), out: Number(json.usage.completion_tokens || 0) } : null),
+              signal
+          );
     },
 
     // ---------- OpenAI Responses API（最新 /v1/responses） ----------
-    async _callOpenAIResponses(messages, maxTokens, key, stream, onChunk, effective = this.getEffectiveConfig?.() || this.cfg) {
+    async _callOpenAIResponses(messages, maxTokens, key, stream, onChunk, effective = this.getEffectiveConfig?.() || this.cfg, signal = null) {
         const url = `${effective.baseUrl}/responses`;
         const sys = messages.filter(m => m.role === 'system').map(m => m.content).join('\n');
         const input = messages.filter(m => m.role !== 'system').map(m => ({
@@ -507,11 +518,12 @@ Object.assign(ai, {
         const res = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
-            body: JSON.stringify(body)
+            body: JSON.stringify(body),
+            signal
         });
         if (!res.ok) {
             const txt = await res.text().catch(() => '');
-            throw new Error(`AI 请求失败: ${res.status} ${txt.slice(0, 120)}`);
+            throw this._makeHttpAiError(res.status, txt);
         }
         if (!stream) {
             const d = await res.json();
@@ -524,20 +536,20 @@ Object.assign(ai, {
             }
             return txt;
         }
-         return this._readSSE(res, onChunk, (json) => {
-             if (json.type === 'response.output_text.delta') return json.delta || '';
-             return '';
-         }, (json) => {
+          return this._readSSE(res, onChunk, (json) => {
+              if (json.type === 'response.output_text.delta') return json.delta || '';
+              return '';
+          }, (json) => {
              if (json.type === 'response.completed' && json.response?.usage) {
                  const u = json.response.usage;
                  return { in: Number(u.input_tokens || 0), out: Number(u.output_tokens || 0) };
              }
-             return null;
-         });
+              return null;
+          }, signal);
     },
 
     // ---------- Anthropic Claude Messages API ----------
-    async _callClaude(messages, maxTokens, key, stream, onChunk, effective = this.getEffectiveConfig?.() || this.cfg) {
+    async _callClaude(messages, maxTokens, key, stream, onChunk, effective = this.getEffectiveConfig?.() || this.cfg, signal = null) {
         const url = `${effective.baseUrl}/messages`;
         const sys = messages.filter(m => m.role === 'system').map(m => m.content).join('\n');
         const msgs = messages.filter(m => m.role !== 'system').map(m => ({
@@ -561,31 +573,32 @@ Object.assign(ai, {
                 'anthropic-version': '2023-06-01',
                 'anthropic-dangerous-direct-browser-access': 'true'
             },
-            body: JSON.stringify(body)
+            body: JSON.stringify(body),
+            signal
         });
         if (!res.ok) {
             const txt = await res.text().catch(() => '');
-            throw new Error(`AI 请求失败: ${res.status} ${txt.slice(0, 120)}`);
+            throw this._makeHttpAiError(res.status, txt);
         }
         if (!stream) {
             const d = await res.json();
             return (d.content || []).filter(c => c.type === 'text').map(c => c.text).join('');
         }
-         return this._readSSE(res, onChunk, (json) => {
-             if (json.type === 'content_block_delta' && json.delta?.type === 'text_delta') {
-                 return json.delta.text || '';
-             }
+          return this._readSSE(res, onChunk, (json) => {
+              if (json.type === 'content_block_delta' && json.delta?.type === 'text_delta') {
+                  return json.delta.text || '';
+              }
              return '';
          }, (json) => {
              if (json.type === 'message_delta' && json.usage) {
                  return { in: Number(json.usage.input_tokens || 0), out: Number(json.usage.output_tokens || 0) };
              }
-             return null;
-         });
+              return null;
+          }, signal);
     },
 
     // ---------- Gemini ----------
-    async _callGemini(messages, maxTokens, key, stream, onChunk, effective = this.getEffectiveConfig?.() || this.cfg) {
+    async _callGemini(messages, maxTokens, key, stream, onChunk, effective = this.getEffectiveConfig?.() || this.cfg, signal = null) {
         const sys = messages.filter(m => m.role === 'system').map(m => m.content).join('\n');
         const contents = messages.filter(m => m.role !== 'system').map(m => ({
             role: m.role === 'assistant' ? 'model' : 'user',
@@ -601,31 +614,33 @@ Object.assign(ai, {
         const res = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body)
+            body: JSON.stringify(body),
+            signal
         });
         if (!res.ok) {
             const txt = await res.text().catch(() => '');
-            throw new Error(`AI 请求失败: ${res.status} ${txt.slice(0, 120)}`);
+            throw this._makeHttpAiError(res.status, txt);
         }
         if (!stream) {
             const d = await res.json();
             return d.candidates?.[0]?.content?.parts?.map(p => p.text).join('') || '';
         }
-         return this._readSSE(res, onChunk,
-             (json) => json.candidates?.[0]?.content?.parts?.map(p => p.text).join('') || '',
-             (json) => {
+          return this._readSSE(res, onChunk,
+              (json) => json.candidates?.[0]?.content?.parts?.map(p => p.text).join('') || '',
+              (json) => {
                  const meta = json.usageMetadata || null;
                  if (!meta) return null;
                  return {
                      in: Number(meta.promptTokenCount || 0),
                      out: Number(meta.candidatesTokenCount || meta.totalTokenCount || 0)
                  };
-             }
-         );
+              },
+              signal
+          );
     },
 
     // ---------- 通用 SSE 读取 ----------
-    async _readSSE(res, onChunk, extract, extractUsage = null) {
+    async _readSSE(res, onChunk, extract, extractUsage = null, signal = null) {
         if (!res.body) {
             const text = await res.text();
             try {
@@ -662,6 +677,7 @@ Object.assign(ai, {
              }
          };
         while (true) {
+            signal?.throwIfAborted?.();
             const { value, done } = await reader.read();
             if (done) break;
             buffer += decoder.decode(value, { stream: true });

@@ -18,6 +18,8 @@ function loadAdvicePanelHarness() {
         setTimeout: () => 0,
         clearTimeout: () => {},
         navigator: { maxTouchPoints: 0 },
+        AbortController,
+        DOMException,
         performance: { now: () => 0 },
         ai: {
             cfg: { enabled: true, model: 'test-model', provider: 'test-provider' },
@@ -31,6 +33,8 @@ function loadAdvicePanelHarness() {
     };
     context.window = {
         matchMedia: () => ({ matches: false, addEventListener: () => {} }),
+        addEventListener: () => {},
+        AbortController,
         adviceStreamRenderer: null,
         haptics: { light: () => {} }
     };
@@ -101,6 +105,10 @@ function loadAdvicePanelHarness() {
         buildPlanAnalytics: () => ({}),
         escapeHtml,
         sendAiAdvice: context.__advicePanel.sendAiAdvice,
+        cancelAiAdvice: context.__advicePanel.cancelAiAdvice,
+        updateAdviceSendState: context.__advicePanel.updateAdviceSendState,
+        requestAdviceWakeLock: context.__advicePanel.requestAdviceWakeLock,
+        releaseAdviceWakeLock: context.__advicePanel.releaseAdviceWakeLock,
         regenerateAdviceFromEditedUser: context.__advicePanel.regenerateAdviceFromEditedUser
     };
     return data;
@@ -473,4 +481,32 @@ test('touch intent marks stream as user-paused when user scrolls away', () => {
 
     assert.equal(data._adviceStreamUi, 'paused');
     assert.equal(data._adviceUserScrollPaused, true);
+});
+
+test('cancelAiAdvice stops active request and preserves partial assistant reply', async () => {
+    const data = loadAdvicePanelHarness();
+    data.db.health.aiAdviceChat = [];
+    data.__context.ai.callStream = async (_messages, _maxTokens, onToken, opts) => {
+        onToken('partial', 'partial answer');
+        await new Promise((resolve, reject) => {
+            opts.signal.addEventListener('abort', () => {
+                reject(Object.assign(new Error('AI_CANCELLED'), { code: 'AI_CANCELLED' }));
+            }, { once: true });
+        });
+    };
+    let saveCount = 0;
+    data.save = () => { saveCount += 1; };
+
+    const sendPromise = data.sendAiAdvice('stop this');
+    assert.equal(data._adviceSending, true);
+    assert.equal(data.cancelAiAdvice(), true);
+    await sendPromise;
+
+    const stopped = data.db.health.aiAdviceChat.find(msg => msg.role === 'assistant');
+    assert.equal(stopped.stopped, true);
+    assert.equal(stopped.error, false);
+    assert.equal(stopped.content, 'partial answer');
+    assert.equal(stopped.errorInfo.type, 'user_cancelled');
+    assert.equal(data._adviceSending, false);
+    assert.ok(saveCount >= 1);
 });
