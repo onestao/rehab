@@ -93,6 +93,8 @@
                 goalType,
                 pace,
                 dailyCal: p.dailyCal,
+                currentWeight: plan?.meta?.currentWeight,
+                targetWeight: plan?.meta?.targetWeight,
                 calorieDelta: isGain ? p.calorieDelta : undefined,
                 deficit: isGain ? undefined : p.deficit,
                 weeklyChange: isGain ? p.weeklyChange : undefined,
@@ -113,6 +115,66 @@
 
         renderWeightLossPlanCard() {
             return this.renderWeightLossPanel();
+        },
+
+        renderGoalSafetyPanel() {
+            if (!window.cutRehabDashboardPure?.buildCutRehabDashboardState) return '';
+            const state = window.cutRehabDashboardPure.buildCutRehabDashboardState(this.db, {
+                date: this.logicalDateKey?.() || new Date().toISOString().slice(0, 10)
+            });
+            const goal = this.db.health?.dietGoal || null;
+            const goalType = goal?.goalType || this.db.health?.goalType || 'loss';
+            const isGain = goalType === 'gain';
+            const esc = this.escapeHtml?.bind(this) || (value => String(value ?? ''));
+            const risk = state.rehab.level;
+            const riskLabel = state.rehab.levelMeta?.label || '未评估';
+            const paceLabel = goal ? (isGain
+                ? (goal.pace === 'conservative' ? '精益' : goal.pace === 'moderate' ? '稳定' : '进取')
+                : (goal.pace === 'fast' ? '快速' : goal.pace === 'moderate' ? '中等' : '慢速')) : '未选择';
+            const summary = risk === 'red'
+                ? `${isGain ? '增肌训练' : '减重训练'}先降为康复维护和低冲击，营养目标保留但不要靠加量硬推。`
+                : risk === 'yellow'
+                    ? `${isGain ? '力量训练' : '有氧与力量'}不加量，避开高冲击，把疼痛反馈作为是否推进的开关。`
+                    : `${isGain ? '增肌' : '减重'}方案可执行，但仍按疼痛和疲劳反馈校准训练量。`;
+            const proteinText = state.goal.targetProtein
+                ? `${state.diet.protein}/${state.goal.targetProtein}g`
+                : `${state.diet.protein}/--g`;
+            const planText = state.today.tasksTotal
+                ? `${state.today.tasksDone}/${state.today.tasksTotal}`
+                : '--';
+            const actionChips = state.actions.map(text => `<span>${esc(text)}</span>`).join('');
+            return `<section class="goal-safety-panel">
+                <div class="weightloss-section-head">
+                    <span class="cardio-kicker">目标执行安全线</span>
+                    <h3>康复约束</h3>
+                    <small>${esc(paceLabel)}${goal ? (isGain ? '增肌' : '减重') : '目标'} · 安全档 ${esc(state.paceMeta?.label || '--')} · ${esc(state.decision.headline || '')}</small>
+                </div>
+                <div class="goal-safety-card" data-goal-safety-level="${esc(risk)}">
+                    <div class="goal-safety-status">
+                        <span class="material-symbols-rounded">health_and_safety</span>
+                        <div><b>${esc(riskLabel)}约束</b><small>${esc(summary)}</small></div>
+                    </div>
+                    <div class="goal-safety-metrics">
+                        <span><b>${esc(String(state.rehab.maxPain))}/10</b><small>疼痛</small></span>
+                        <span><b>${esc(planText)}</b><small>今日任务</small></span>
+                        <span><b>${esc(proteinText)}</b><small>蛋白</small></span>
+                    </div>
+                    <div class="goal-safety-actions">${actionChips}</div>
+                    <div class="goal-safety-buttons">
+                        <button class="md-btn md-btn-tonal" type="button" data-goal-safety-action="plan">按约束生成计划</button>
+                        <button class="md-btn" type="button" data-goal-safety-action="rehab">复诊问题</button>
+                    </div>
+                </div>
+            </section>`;
+        },
+
+        bindGoalSafetyPanel(root) {
+            root?.querySelector('[data-goal-safety-action="plan"]')?.addEventListener('click', () => {
+                this.openPlanAiSheet?.('today', ['rehab', 'cut']);
+            });
+            root?.querySelector('[data-goal-safety-action="rehab"]')?.addEventListener('click', () => {
+                this.openRehabWeeklySheet?.();
+            });
         },
 
         renderWeightLossPanel() {
@@ -201,6 +263,7 @@
                     </div>` : ''}
                 </div>
             </details>
+            ${this.renderGoalSafetyPanel()}
             ${plan ? `<div class="weightloss-options">
                 ${isGain
                     ? ['conservative', 'moderate', 'aggressive'].map(pace => {

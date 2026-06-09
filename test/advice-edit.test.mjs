@@ -572,14 +572,15 @@ test('advice version switcher renders after content instead of header', () => {
     assert.doesNotMatch(html, /delete_sweep/);
 });
 
-test('touch intent marks stream as user-paused when user scrolls away', () => {
+test('touch intent pauses follow mode without freezing stream renderer', () => {
     const data = loadAdvicePanelHarness();
     data._adviceSending = true;
     data._adviceUserScrollPaused = false;
     data._adviceStreamUi = 'streaming';
     data.setAdviceStreamUiState = (state) => { data._adviceStreamUi = state; };
     data.showAdviceNewMessageButton = () => {};
-    data._activeStreamRenderer = { pause: () => {}, resume: () => {} };
+    let paused = false;
+    data._activeStreamRenderer = { pause: () => { paused = true; }, resume: () => {} };
 
     data._adviceScrollContainer = () => ({
         scrollHeight: 2000,
@@ -599,8 +600,9 @@ test('touch intent marks stream as user-paused when user scrolls away', () => {
     data._adviceUserScrollIntent = true;
     data._handleAdviceStreamScroll({ scrollHeight: 2000, clientHeight: 600, scrollTop: 200 });
 
-    assert.equal(data._adviceStreamUi, 'paused');
+    assert.equal(data._adviceStreamUi, 'streaming');
     assert.equal(data._adviceUserScrollPaused, true);
+    assert.equal(paused, false);
 });
 
 test('cancelAiAdvice immediately freezes UI and preserves partial assistant reply', async () => {

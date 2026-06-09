@@ -402,12 +402,9 @@ const advicePanel = {
 
     pauseStreamForScroll() {
         if (!this._adviceSending) return;
-        const renderer = this._activeStreamRenderer;
-        if (!renderer) return;
         if (this._adviceStreamUi === 'paused' || this._adviceStreamUi === 'user-paused') return;
-        renderer.pause('scroll');
         this._adviceUserScrollPaused = true;
-        this.setAdviceStreamUiState('paused');
+        this.setAdviceStreamUiState('streaming');
         this.showAdviceNewMessageButton();
     },
 
@@ -415,8 +412,7 @@ const advicePanel = {
         if (!this._adviceSending) return;
         if (!this._adviceUserScrollPaused) return;
         const renderer = this._activeStreamRenderer;
-        if (!renderer) return;
-        renderer.resume();
+        if (renderer?.getState?.().mode === 'paused') renderer.resume();
         this._adviceUserScrollPaused = false;
         this.hideAdviceNewMessageButton();
         this.setAdviceStreamUiState('streaming');
