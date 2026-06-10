@@ -158,6 +158,8 @@ test('model picker delegates untrusted model metadata instead of inline JS', () 
         cfg: { provider: 'openai', profiles: [{ id: `profile');globalThis.pwned=1;//`, provider: 'openai', key: 'set' }] },
         models: [{ provider: 'openai', id: `model');globalThis.pwned=1;//`, displayName: 'Model' }],
         getEffectiveConfig() { return { profileId: `profile');globalThis.pwned=1;//`, provider: 'openai', model: 'base' }; },
+        normalizeProvider(provider = '') { return String(provider || '').trim() || 'openai'; },
+        isModelEnabled(model) { return model?.enabled !== false; },
         apiKeyFor() { return 'key'; }
     };
     const { api } = loadWindowModule('advice-panel.js', 'advicePanel', {
@@ -195,6 +197,48 @@ test('model picker delegates untrusted model metadata instead of inline JS', () 
         provider: 'openai',
         model: `model');globalThis.pwned=1;//`
     });
+});
+
+test('model picker aggregates only enabled cached models by provider scope', () => {
+    const ai = {
+        cfg: {
+            provider: 'openai',
+            profiles: [
+                { id: 'p-openai', provider: 'openai' },
+                { id: 'p-claude', provider: 'claude' }
+            ]
+        },
+        models: [
+            { provider: 'openai', id: 'hidden-openai', enabled: false },
+            { provider: 'openai', id: 'enabled-openai', enabled: true },
+            { provider: 'claude', id: 'enabled-claude', enabled: true }
+        ],
+        normalizeProvider(provider = '') { return String(provider || '').trim() || 'openai'; },
+        isModelEnabled(model) { return model?.enabled !== false; },
+        getEffectiveConfig() { return { profileId: 'p-openai', provider: 'openai', model: 'enabled-openai' }; },
+        apiKeyFor(id) { return id ? 'key' : ''; }
+    };
+    const { api } = loadWindowModule('advice-panel.js', 'advicePanel', {
+        ai,
+        document: { querySelector: () => null, getElementById: () => null },
+        localStorage: { getItem: () => null, setItem: () => {} },
+        requestAnimationFrame: () => {}
+    });
+    api.escapeHtml = escapeHtml;
+    api.adviceModelVisual = () => ({ key: 'generic' });
+    api.adviceModelThemeStyle = () => '';
+    api.adviceModelIconHtml = () => '';
+
+    api.adviceModelPickerScope = 'cached';
+    const cachedHtml = api.renderAdviceModelPicker();
+    assert.match(cachedHtml, /enabled-openai/);
+    assert.match(cachedHtml, /enabled-claude/);
+    assert.doesNotMatch(cachedHtml, /hidden-openai/);
+
+    api.adviceModelPickerScope = 'others';
+    const othersHtml = api.renderAdviceModelPicker();
+    assert.doesNotMatch(othersHtml, /enabled-openai/);
+    assert.match(othersHtml, /enabled-claude/);
 });
 
 test('app update version matches current service worker cache version', () => {

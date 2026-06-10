@@ -126,6 +126,8 @@ timeline
 timer
 tips_and_updates
 today
+toggle_off
+toggle_on
 trending_down
 trending_flat
 trending_up

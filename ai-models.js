@@ -30,7 +30,7 @@ Object.assign(ai, {
         const baseUrl = (document.getElementById('aiBaseUrl')?.value || '').trim().replace(/\/+$/, '');
         const profileId = this.cfg.activeProfileId || 'temp';
         const apiKey = (document.getElementById('aiApiKey')?.value || '').trim() || this.apiKeyFor(profileId);
-        const provider = document.getElementById('aiProvider')?.value || 'openai';
+        const provider = this.normalizeProvider(document.getElementById('aiProvider')?.value || this.cfg.provider || 'openai');
         if (!baseUrl) return alert('请先填写 Base URL');
         if (!apiKey) return alert('请先填写 API Key');
         const statusEl = document.getElementById('aiFetchStatus');
@@ -41,10 +41,8 @@ Object.assign(ai, {
             if (provider === 'gemini') models = await this.fetchGeminiModels(baseUrl, apiKey);
             else if (provider === 'claude') models = await this.fetchClaudeModels(baseUrl, apiKey);
             else models = await this.fetchOpenAIModels(baseUrl, apiKey);
-            this.models = models.map(m => ({ ...m, provider }));
-            await this.idbSet(this.MODELS_KEY, JSON.stringify(this.models));
-            try { localStorage.setItem(this.MODELS_KEY, JSON.stringify(this.models)); } catch {}
-            this.persistDataDb(false);
+            this.models = this.mergeModelCache(this.models, models.map(m => ({ ...m, provider })));
+            await this.persistModelCache();
             this.renderModels(this.models, false);
             if (statusEl) statusEl.textContent = `已获取 ${models.length} 个模型`;
         } catch (e) {
@@ -139,43 +137,57 @@ Object.assign(ai, {
             if (!keepHidden) container.classList.remove('hidden');
             return;
         }
-        const currentProvider = document.getElementById('aiProvider')?.value || this.cfg.provider || 'openai';
         const esc = window.renderSafe?.escapeHtml || (v => String(v ?? ''));
-        const filtered = models.filter(m => (m.provider || currentProvider) === currentProvider).map(m => {
-            const verdict = this.analyzeVisionModel(m.id, m.provider || currentProvider);
-            return { ...m, vision: !!(m.vision || verdict.vision), highRes: !!(m.highRes || verdict.highRes), isImageGen: !!(m.isImageGen || verdict.isImageGen) };
+        const grouped = new Map();
+        models.forEach(model => {
+            const provider = this.normalizeProvider(model.provider);
+            if (!grouped.has(provider)) grouped.set(provider, []);
+            grouped.get(provider).push({ ...model, provider });
         });
-        const vision = filtered.filter(m => m.vision && !m.isImageGen);
-        const imageGen = filtered.filter(m => m.isImageGen);
-        const normal = filtered.filter(m => !m.vision && !m.isImageGen);
+        const activeProvider = this.normalizeProvider(this.cfg.provider || 'openai');
+        const providerOrder = [activeProvider, ...Array.from(grouped.keys()).filter(provider => provider !== activeProvider).sort()];
         const badge = (m) => {
             if (m.isImageGen) return '<span class="ai-vision-badge ai-vision-badge-imagegen"><span class="material-symbols-rounded">palette</span>图像生成</span>';
             if (m.vision) return `<span class="ai-vision-badge"><span class="material-symbols-rounded">visibility</span>视觉</span>${m.highRes ? '<span class="ai-vision-badge ai-vision-badge-highres">高分辨率</span>' : ''}`;
-            return '<span class="ai-vision-badge ai-vision-badge-unverified">视觉未验证</span>';
+            return '<span class="ai-vision-badge ai-vision-badge-unverified" title="视觉未验证"><span class="material-symbols-rounded">visibility_off</span></span>';
         };
-        const section = (title, list) => list.length ? `
-            <div class="ai-model-group">
-                <div class="ai-model-group-title">${title}</div>
-                ${list.map(m => `
-                    <button class="ai-model-item ${m.vision ? 'has-vision' : ''} ${m.isImageGen ? 'is-imagegen' : ''}" data-model="${esc(m.id)}" onclick="ai.selectModel(this.dataset.model)">
-                        <span class="ai-model-name">${esc(m.id)}</span>
-                        ${badge(m)}
-                    </button>
-                `).join('')}
-            </div>` : '';
-        container.innerHTML = `${section('可处理图片', vision)}${section('视觉未验证', normal)}${section('图像生成', imageGen)}`;
+        const row = (m, provider) => {
+            const verdict = this.analyzeVisionModel(m.id, m.provider || provider);
+            m = { ...m, vision: !!(m.vision || verdict.vision), highRes: !!(m.highRes || verdict.highRes), isImageGen: !!(m.isImageGen || verdict.isImageGen) };
+            const on = this.isModelEnabled(m);
+            return `<div class="ai-model-item ${m.vision ? 'has-vision' : ''} ${m.isImageGen ? 'is-imagegen' : ''} ${on ? '' : 'is-disabled'}"><button class="ai-model-select" type="button" data-model="${esc(m.id)}" data-provider="${esc(m.provider || provider)}" onclick="ai.selectModel(this.dataset.model,this.dataset.provider)"><span class="ai-model-name">${esc(m.id)}</span>${badge(m)}</button><button class="ai-model-enable-toggle ${on ? 'is-on' : ''}" type="button" aria-pressed="${on}" aria-label="${on ? '隐藏' : '启用'}" data-model="${esc(m.id)}" data-provider="${esc(m.provider || provider)}" onclick="ai.toggleModelEnabled(this.dataset.model,this.dataset.provider)"><span class="material-symbols-rounded">${on ? 'toggle_on' : 'toggle_off'}</span></button></div>`;
+        };
+        const sections = providerOrder.filter(provider => grouped.has(provider)).map(provider => {
+            return `
+                <div class="ai-model-group">
+                    <button class="ai-model-group-title ai-model-provider-toggle ${provider === activeProvider ? 'is-active' : ''}" type="button" data-provider="${esc(provider)}" onclick="ai.setFormProvider(this.dataset.provider)">${esc(this.providerLabel(provider))}</button>
+                    ${grouped.get(provider).map(m => row(m, provider)).join('')}
+                </div>`;
+        });
+        container.innerHTML = sections.join('');
         if (!keepHidden) container.classList.remove('hidden');
         if (!this.visionWhitelist) {
             this.loadVisionWhitelist().then(() => this.renderModels(models, true)).catch(() => {});
         }
     },
 
-    async selectModel(id) {
+    async selectModel(id, provider = '') {
+        const normalizedProvider = this.normalizeProvider(provider || this.cfg.provider || 'openai');
+        const targetProfile = (this.cfg.profiles || []).find(profile => this.normalizeProvider(profile.provider) === normalizedProvider && this.apiKeyFor(profile.id));
+        if (targetProfile && targetProfile.id !== this.cfg.activeProfileId) {
+            await this.selectProfile(targetProfile.id);
+        }
         const input = document.getElementById('aiModel');
         if (input) input.value = id;
+        const providerSelect = document.getElementById('aiProvider');
+        if (providerSelect) providerSelect.value = normalizedProvider;
+        this.cfg.provider = normalizedProvider;
         this.cfg.model = id;
         const idx = this.cfg.profiles.findIndex(p => p.id === this.cfg.activeProfileId);
-        if (idx >= 0) this.cfg.profiles[idx].model = id;
+        if (idx >= 0) {
+            this.cfg.profiles[idx].provider = normalizedProvider;
+            this.cfg.profiles[idx].model = id;
+        }
         await this.persist();
         this.persistDataDb(false);
         const container = document.getElementById('aiModelList');

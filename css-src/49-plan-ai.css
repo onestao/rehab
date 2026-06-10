@@ -5,6 +5,15 @@
 .plan-ai-preview {
     display: grid;
     gap: 12px;
+    min-width: 0;
+    max-width: 100%;
+}
+
+#planAiSheetBody,
+.plan-ai-sheet > *,
+.plan-ai-preview > * {
+    min-width: 0;
+    max-width: 100%;
 }
 
 .plan-ai-status {
@@ -323,6 +332,8 @@
     overflow-x: auto;
     padding-bottom: 2px;
     scrollbar-width: none;
+    min-width: 0;
+    max-width: 100%;
 }
 
 .plan-ai-chip-row::-webkit-scrollbar {
@@ -354,6 +365,8 @@
     border: 1px solid var(--md-sys-outline-variant);
     border-radius: var(--md-sys-shape-xl);
     background: var(--md-sys-surface-container-low);
+    min-width: 0;
+    max-width: 100%;
 }
 
 .plan-ai-preview-plan-head {
@@ -361,6 +374,7 @@
     grid-template-columns: minmax(0, 1fr) 44px;
     gap: 8px;
     align-items: center;
+    min-width: 0;
 }
 
 .plan-ai-preview-item {
@@ -372,6 +386,8 @@
     border: 1px solid color-mix(in srgb, var(--md-sys-outline-variant) 72%, transparent);
     border-radius: var(--md-sys-shape-lg);
     background: var(--md-sys-surface-container-lowest);
+    min-width: 0;
+    max-width: 100%;
 }
 
 .plan-ai-preview-name,
@@ -385,6 +401,12 @@
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
     gap: 8px;
+    min-width: 0;
+}
+
+.plan-ai-preview-spec > .md-field,
+.plan-ai-preview-alt {
+    min-width: 0;
 }
 
 .plan-ai-preview-alt {
@@ -402,6 +424,25 @@
 }
 
 .plan-ai-preview-alt input {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--md-sys-primary);
+}
+
+.plan-ai-preview-confirm {
+    grid-column: 1 / -1;
+    min-width: 0;
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    color: var(--md-sys-on-surface-variant);
+    font-size: 12px;
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+}
+
+.plan-ai-preview-confirm input {
+    flex: none;
     width: 18px;
     height: 18px;
     accent-color: var(--md-sys-primary);
@@ -460,4 +501,16 @@
     background: var(--md-sys-surface-container-low);
     padding: 10px;
     white-space: pre-wrap;
+}
+
+@media (max-width: 480px) {
+    .plan-ai-preview-spec {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 360px) {
+    .plan-ai-preview-spec {
+        grid-template-columns: 1fr;
+    }
 }

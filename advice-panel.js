@@ -1346,10 +1346,6 @@ const advicePanel = {
             toast.show('该提供商未配置 API Key', 'error');
             return;
         }
-        const cached = (ai.models || []).some(m => (m.provider || profile.provider) === provider && m.id === model);
-        if (!cached && ai.fetchModels) {
-            ai.fetchModels().catch(() => {});
-        }
         ai.setOverride?.({ profileId, provider, model });
         this.closeAdviceModelPicker();
         window.haptics?.light?.();
@@ -1361,14 +1357,19 @@ const advicePanel = {
         const effective = ai.getEffectiveConfig?.() || ai.cfg;
         const profiles = ai.cfg.profiles || [];
         const scope = this.adviceModelPickerScope || 'current';
-        const activeProvider = effective.provider || ai.cfg.provider || 'openai';
+        const normalizeProvider = ai.normalizeProvider.bind(ai);
+        const activeProvider = normalizeProvider(effective.provider || ai.cfg.provider || 'openai');
         const profileForProvider = (provider) => {
-            const normalized = provider || 'openai';
-            const active = profiles.find(p => p.id === effective.profileId && (p.provider || 'openai') === normalized && ai.apiKeyFor(p.id));
-            return active || profiles.find(p => (p.provider || 'openai') === normalized && ai.apiKeyFor(p.id)) || null;
+            const normalized = normalizeProvider(provider);
+            const active = profiles.find(p => p.id === effective.profileId && normalizeProvider(p.provider) === normalized && ai.apiKeyFor(p.id));
+            return active || profiles.find(p => normalizeProvider(p.provider) === normalized && ai.apiKeyFor(p.id)) || null;
+        };
+        const cachedModelEnabled = (provider, modelId) => {
+            const cached = (ai.models || []).find(model => normalizeProvider(model.provider) === normalizeProvider(provider) && String(model.id || '') === String(modelId || ''));
+            return !cached || ai.isModelEnabled(cached);
         };
         const rawRows = [];
-        if (effective.model) {
+        if (effective.model && cachedModelEnabled(activeProvider, effective.model)) {
             rawRows.push({
                 profileId: effective.profileId || profileForProvider(activeProvider)?.id || '',
                 provider: activeProvider,
@@ -1379,7 +1380,8 @@ const advicePanel = {
             });
         }
         (ai.models || []).forEach(model => {
-            const provider = model.provider || activeProvider;
+            if (!ai.isModelEnabled(model)) return;
+            const provider = normalizeProvider(model.provider || activeProvider);
             const profile = profileForProvider(provider);
             rawRows.push({
                 profileId: profile?.id || '',
@@ -1392,15 +1394,17 @@ const advicePanel = {
         });
         const rows = rawRows.filter(row => {
             if (!row.model) return false;
+            row.provider = normalizeProvider(row.provider || activeProvider);
             if (scope === 'current') return row.provider === activeProvider;
             if (scope === 'others') return row.provider !== activeProvider;
             return true;
         });
         const deduped = rows.filter((row, index, all) => row.model && all.findIndex(x => x.provider === row.provider && x.model === row.model) === index);
         const restore = `<button class="md-btn md-btn-tonal" onclick="ai.clearOverride?.();data.closeAdviceModelPicker?.();data.rerenderAdvicePanel?.()" type="button">恢复默认</button>`;
+        const selectedProvider = normalizeProvider(effective.provider || activeProvider);
         const emptyText = scope === 'cached'
-            ? '暂无缓存模型，请先在 AI 设置中获取模型'
-            : (scope === 'others' ? '暂无其他提供商缓存模型' : '当前提供商暂无缓存模型');
+            ? '暂无启用模型'
+            : (scope === 'others' ? '暂无其他启用模型' : '当前暂无启用模型');
         return `<div class="model-picker-body">
             <div class="model-picker-tabs" role="tablist" aria-label="模型范围">
                 <button class="model-picker-tab ${scope === 'current' ? 'active' : ''}" onclick="data.setAdviceModelPickerScope('current')" type="button" aria-selected="${scope === 'current'}">当前提供商</button>
@@ -1410,7 +1414,7 @@ const advicePanel = {
             ${deduped.map(row => {
                 const visual = this.adviceModelVisual(row.model);
                 const style = this.adviceModelThemeStyle(visual);
-                return `<button class="model-picker-row advice-model-${visual.key} ${row.model === effective.model && row.provider === effective.provider ? 'is-selected' : ''}" ${style ? `style="${this.escapeHtml(style)}"` : ''} type="button" aria-disabled="${row.disabled}" title="${row.disabled ? '未配置 API Key' : ''}" data-advice-model-action="choose" data-profile-id="${this.escapeHtml(row.profileId)}" data-provider="${this.escapeHtml(row.provider)}" data-model="${this.escapeHtml(row.model)}">
+                return `<button class="model-picker-row advice-model-${visual.key} ${row.model === effective.model && row.provider === selectedProvider ? 'is-selected' : ''}" ${style ? `style="${this.escapeHtml(style)}"` : ''} type="button" aria-disabled="${row.disabled}" title="${row.disabled ? '未配置 API Key' : ''}" data-advice-model-action="choose" data-profile-id="${this.escapeHtml(row.profileId)}" data-provider="${this.escapeHtml(row.provider)}" data-model="${this.escapeHtml(row.model)}">
                     <span class="advice-model-mark">${this.adviceModelIconHtml(visual)}</span>
                     <span class="model-picker-main"><strong>${this.escapeHtml(row.label)}</strong><small>${this.escapeHtml(row.provider)} · ${this.escapeHtml(row.tag)}</small></span>
                     ${row.model === effective.model && row.provider === effective.provider ? '<span class="material-symbols-rounded">check</span>' : ''}

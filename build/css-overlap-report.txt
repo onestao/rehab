@@ -1071,7 +1071,7 @@ mark.ai-hit
 
 .plan-ai-preview-spec
   files: 49-plan.css, 49-plan-ai.css
-    grid-template-columns: repeat(2, minmax(0, 1fr)) | repeat(auto-fit, minmax(96px, 1fr)) (49-plan.css / 49-plan-ai.css)
+    grid-template-columns: repeat(2, minmax(0, 1fr)) | repeat(auto-fit, minmax(96px, 1fr)) | 1fr (49-plan.css / 49-plan-ai.css / 49-plan-ai.css / 49-plan-ai.css)
 
 .hero
   files: 50-v6-ui.css, 51-v6-today.css, 41-m3e-effects.css
@@ -1321,7 +1321,7 @@ mark.ai-hit
   files: 49-plan.css, 49-plan-ai.css
     color: var(--md-sys-on-surface-variant) (49-plan.css / 49-plan-ai.css)
 
-## COMPLEMENTS (same selector, disjoint properties): 103
+## COMPLEMENTS (same selector, disjoint properties): 104
 .bar-leading
   files: 04-layout-appbar.css, 50-v6-ui.css
 
@@ -1506,6 +1506,9 @@ body.is-paused .fab-play
   files: 49-plan.css, 49-plan-ai.css
 
 .plan-weekly-day small
+  files: 49-plan-ai.css
+
+.plan-ai-preview-alt
   files: 49-plan-ai.css
 
 .glass-card
