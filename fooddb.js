@@ -68,7 +68,7 @@ const fooddb = {
     saveCustomFood(food) {
         const list = this.getCustomFoods();
         list.push({ ...food, id: `custom_${Date.now()}`, cat: '自定义' });
-        localStorage.setItem('rehab_food_custom', JSON.stringify(list));
+        try { localStorage.setItem('rehab_food_custom', JSON.stringify(list)); } catch {}
     },
 
     getAll() {

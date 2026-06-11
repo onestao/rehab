@@ -49,7 +49,7 @@ const workoutState = {
             this.clear();
             return;
         }
-        localStorage.setItem(this.KEY, JSON.stringify(this.snapshot()));
+        try { localStorage.setItem(this.KEY, JSON.stringify(this.snapshot())); } catch {}
         workout._lastActiveAt = Date.now();
     },
 

@@ -90,6 +90,28 @@
         return { missing: missing.sort(), extra: extra.sort() };
     }
 
+    /** Wrapper around localStorage.setItem that silently handles QuotaExceededError.
+     *  Delegates eviction to dataStore if available, then retries once. */
+    function safeSet(key, serialized) {
+        try {
+            localStorage.setItem(key, serialized);
+            return true;
+        } catch (e) {
+            const isQuota = e && (e.name === 'QuotaExceededError' || e.code === 22 || /quota/i.test(e.message || ''));
+            if (!isQuota) throw e;
+            try {
+                if (window.dataStore && typeof window.dataStore._evictAiChatForQuota === 'function') {
+                    window.dataStore._evictAiChatForQuota();
+                }
+                localStorage.setItem(key, serialized);
+                return true;
+            } catch (_) {
+                window.errorBus?.report?.('storage.migrate', e, { op: 'setItem', key });
+                return false;
+            }
+        }
+    }
+
     function createLocalAdapter() {
         return {
             mode: 'localStorage',
@@ -97,10 +119,10 @@
                 return safeParse(localStorage.getItem(key), key);
             },
             write(key, value) {
-                localStorage.setItem(key, JSON.stringify(value));
+                safeSet(key, JSON.stringify(value));
             },
             flushSync(key, value) {
-                localStorage.setItem(key, JSON.stringify(value));
+                safeSet(key, JSON.stringify(value));
             },
             remove(key) {
                 localStorage.removeItem(key);
@@ -279,21 +301,21 @@
             async write(key, value) {
                 if (key === dbKey) {
                     const split = splitLargeCollections(value);
-                    localStorage.setItem(key, JSON.stringify(split.meta));
+                    safeSet(key, JSON.stringify(split.meta));
                     await window.storageIdb.set(key, split.meta);
                     await writeHistoryToStore(split.history);
                     await window.storageIdb.set(keys.advice, split.advice);
                     return;
                 }
-                localStorage.setItem(key, JSON.stringify(value));
+                safeSet(key, JSON.stringify(value));
                 await window.storageIdb.set(key, value);
             },
             flushSync(key, value) {
                 if (key === dbKey) {
-                    localStorage.setItem(key, JSON.stringify(splitLargeCollections(value).meta));
+                    safeSet(key, JSON.stringify(splitLargeCollections(value).meta));
                     return;
                 }
-                localStorage.setItem(key, JSON.stringify(value));
+                safeSet(key, JSON.stringify(value));
             },
             async remove(key) {
                 await window.storageIdb.remove(key);
@@ -375,8 +397,8 @@
                     });
                     const keys = largeKeys(dbKey);
                     if (sourceDbRaw != null && !localStorage.getItem(dbKey + ':legacy-full')) {
-                        localStorage.setItem(dbKey + ':legacy-full', sourceDbRaw);
-                        localStorage.setItem(dbKey + ':legacy-full:createdAt', String(Date.now()));
+                        safeSet(dbKey + ':legacy-full', sourceDbRaw);
+                        safeSet(dbKey + ':legacy-full:createdAt', String(Date.now()));
                     }
                     await window.storageIdb.set(dbKey, split.meta);
                     await window.storageIdb.set(keys.history, split.history);
@@ -403,7 +425,7 @@
                     );
                 }
 
-                localStorage.setItem(storageVersionKey, String(targetVersion));
+                try { safeSet(storageVersionKey, String(targetVersion)); } catch {}
                 localStorage.removeItem(migrationFailedKey);
                 return { ok: true, reason: '' };
             } catch (e) {
@@ -411,8 +433,8 @@
                 localStorage.setItem(migrationFailedKey, reason);
                 localStorage.removeItem(storageVersionKey);
                 try { await window.storageIdb.destroy(); } catch (_) {}
-                if (sourceDbRaw != null) localStorage.setItem(dbKey, sourceDbRaw);
-                if (sourceCfgRaw != null) localStorage.setItem(cfgKey, sourceCfgRaw);
+                if (sourceDbRaw != null) try { localStorage.setItem(dbKey, sourceDbRaw); } catch {}
+                if (sourceCfgRaw != null) try { localStorage.setItem(cfgKey, sourceCfgRaw); } catch {}
                 return { ok: false, reason: reason };
             }
         }

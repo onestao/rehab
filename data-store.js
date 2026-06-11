@@ -13,8 +13,47 @@
         _resolvePersist: null,
         _rejectPersist: null,
         _dbDirty: false,
+        _quotaWarned: false,
+
+        /** Try localStorage.setItem; on QuotaExceededError run eviction once and retry.
+         *  Returns true on success, false on permanent failure. */
+        safeLocalStorageSet(key, serialized) {
+            try {
+                localStorage.setItem(key, serialized);
+                return true;
+            } catch (e) {
+                const isQuota = e && (e.name === 'QuotaExceededError' || e.code === 22 || /quota/i.test(e.message || ''));
+                if (!isQuota) throw e;
+                // Evict oldest AI chat messages to free space, then retry once.
+                this._evictAiChatForQuota();
+                try {
+                    localStorage.setItem(key, serialized);
+                    return true;
+                } catch (_) {
+                    window.errorBus?.report?.('storage', e, { op: 'setItem', key });
+                    return false;
+                }
+            }
+        },
+
+        /** Trim aiAdviceChat to the last 100 messages and show a one-time toast. */
+        _evictAiChatForQuota() {
+            try {
+                const chat = this.db?.health?.aiAdviceChat;
+                if (Array.isArray(chat) && chat.length > 100) {
+                    this.db.health.aiAdviceChat = chat.slice(-100);
+                }
+                if (!this._quotaWarned) {
+                    this._quotaWarned = true;
+                    if (window.toast && typeof toast.show === 'function') {
+                        toast.show('存储空间已满，已自动清理部分 AI 对话记录', 'warn');
+                    }
+                }
+            } catch (_) {}
+        },
 
         createLocalStorageAdapter() {
+            const store = this;
             return {
                 mode: 'localStorage',
                 read(key) {
@@ -23,10 +62,10 @@
                     return JSON.parse(raw);
                 },
                 write(key, value) {
-                    localStorage.setItem(key, JSON.stringify(value));
+                    store.safeLocalStorageSet(key, JSON.stringify(value));
                 },
                 flushSync(key, value) {
-                    localStorage.setItem(key, JSON.stringify(value));
+                    store.safeLocalStorageSet(key, JSON.stringify(value));
                 },
                 remove(key) {
                     localStorage.removeItem(key);
