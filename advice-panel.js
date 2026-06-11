@@ -1446,6 +1446,7 @@ const advicePanel = {
     clearAdviceSearch() {
         this.adviceSearchQuery = '';
         this.adviceSearchOpen = false;
+        this._adviceSearchRequestId = Number(this._adviceSearchRequestId || 0) + 1;
         this.resetAdviceRenderWindow?.();
         this.captureAdviceDraft();
         this.captureAdviceScroll();
@@ -1458,22 +1459,43 @@ const advicePanel = {
         if (!list) return;
 
         const query = String(this.adviceSearchQuery || '').trim();
+        const requestId = Number(this._adviceSearchRequestId || 0) + 1;
+        const searchLimit = 20;
+        this._adviceSearchRequestId = requestId;
         let messages = [];
 
         if (query) {
-            const results = await window.dataStore.advice.search(query, 100);
-            messages = results.reverse();
+            if (query.length < 2) {
+                list.innerHTML = '<div class="empty-state advice-empty"><span class="material-symbols-rounded">keyboard</span><p>输入至少 2 个字符后搜索历史记录</p></div>';
+                if (summary) summary.textContent = '历史聊天不会预加载；输入至少 2 个字符后按需搜索';
+                return;
+            }
+            if (summary) summary.textContent = `正在按需搜索历史记录“${query}”...`;
+            list.innerHTML = '<div class="empty-state advice-empty"><span class="material-symbols-rounded">manage_search</span><p>正在搜索冷历史记录</p></div>';
+            let results = [];
+            try {
+                results = await window.dataStore.advice.search(query, searchLimit);
+            } catch (e) {
+                if (requestId !== this._adviceSearchRequestId || query !== String(this.adviceSearchQuery || '').trim()) return;
+                console.error('Failed to search advice history', e);
+                list.innerHTML = '<div class="empty-state advice-empty"><span class="material-symbols-rounded">error</span><p>历史搜索失败，请稍后重试</p></div>';
+                if (summary) summary.textContent = '历史搜索失败';
+                return;
+            }
+            if (requestId !== this._adviceSearchRequestId || query !== String(this.adviceSearchQuery || '').trim()) return;
+            messages = (Array.isArray(results) ? results : []).reverse();
         } else {
             messages = this.activeRecords(this.db.health.aiAdviceChat || []);
         }
 
         const visibleMessages = this.visibleAdviceMessages(messages, !!query);
-        const total = await window.dataStore.advice.count();
+        const total = query ? visibleMessages.length : await window.dataStore.advice.count();
+        if (requestId !== this._adviceSearchRequestId || query !== String(this.adviceSearchQuery || '').trim()) return;
         const windowed = this.visibleAdviceWindowMessages(visibleMessages, total);
         list.innerHTML = this.renderAdviceMessages(windowed.messages, windowed.hiddenCount);
         if (summary) {
-            if (!total) summary.textContent = '像聊天一样提问，AI 会结合你的记录分析';
-            else if (query) summary.textContent = `搜索“${query}”：${visibleMessages.length} 条匹配记录`;
+            if (query) summary.textContent = `搜索“${query}”：${visibleMessages.length} 条匹配记录${visibleMessages.length >= searchLimit ? `（显示前 ${searchLimit} 条）` : ''}`;
+            else if (!total) summary.textContent = '像聊天一样提问，AI 会结合你的记录分析';
             else {
                 const rangeLabel = { today: '今日', week: '最近7天', month: '最近30天', all: '全部' }[this.adviceRange || 'today'] || '今日';
                 summary.textContent = `${rangeLabel}显示 ${Math.floor(visibleMessages.length / 2)} / 共 ${Math.floor(total / 2)} 轮建议`;

@@ -102,6 +102,7 @@ function loadAdvicePanelHarness() {
         applyAdviceTopChromeOffset: () => {},
         pauseStreamForScroll: context.__advicePanel.pauseStreamForScroll,
         adviceConversationContext: context.__advicePanel.adviceConversationContext,
+        refreshAdviceSearchResults: context.__advicePanel.refreshAdviceSearchResults,
         renderAdvicePanel: context.__advicePanel.renderAdvicePanel,
         renderAdviceMessage: () => '',
         renderAdviceMessages: () => '',
@@ -486,6 +487,102 @@ test('advice message window does not hide search matches', () => {
 
     assert.equal(windowed.messages.length, 120);
     assert.equal(windowed.hiddenCount, 0);
+});
+
+test('advice history search requires two characters before cold scan', async () => {
+    const data = loadAdvicePanelHarness();
+    const list = { innerHTML: '' };
+    const summary = { textContent: '' };
+    let searchCalls = 0;
+    data.__context.document = {
+        getElementById(id) { return id === 'adviceMessageSummary' ? summary : null; },
+        querySelector() { return null; }
+    };
+    data._adviceMessageList = () => list;
+    data.adviceSearchQuery = 'a';
+    data.__context.window.dataStore = data.__context.dataStore = {
+        advice: {
+            async search() { searchCalls++; return []; },
+            async count() { return 0; }
+        }
+    };
+
+    await data.refreshAdviceSearchResults();
+
+    assert.equal(searchCalls, 0);
+    assert.match(list.innerHTML, /输入至少 2 个字符/);
+    assert.match(summary.textContent, /不会预加载/);
+});
+
+test('advice history search cold scans only a small result window', async () => {
+    const data = loadAdvicePanelHarness();
+    const list = { innerHTML: '' };
+    const summary = { textContent: '' };
+    const calls = [];
+    data.__context.document = {
+        getElementById(id) { return id === 'adviceMessageSummary' ? summary : null; },
+        querySelector() { return null; }
+    };
+    data._adviceMessageList = () => list;
+    data.renderAdviceMessages = (messages) => `rendered:${messages.map(m => m.id).join(',')}`;
+    data.adviceSearchQuery = 'knee';
+    data.__context.window.dataStore = data.__context.dataStore = {
+        advice: {
+            async search(keyword, limit) {
+                calls.push({ keyword, limit });
+                return Array.from({ length: limit }, (_, idx) => ({
+                    id: `m${idx}`,
+                    role: idx % 2 ? 'assistant' : 'user',
+                    content: `knee ${idx}`,
+                    at: '2026-05-30T00:00:00.000Z',
+                    deleted: false
+                }));
+            },
+            async count() { throw new Error('search should not count full history'); }
+        }
+    };
+
+    await data.refreshAdviceSearchResults();
+
+    assert.deepEqual(calls, [{ keyword: 'knee', limit: 20 }]);
+    assert.match(list.innerHTML, /^rendered:/);
+    assert.match(summary.textContent, /显示前 20 条/);
+});
+
+test('advice history search ignores stale cold results after query changes', async () => {
+    const data = loadAdvicePanelHarness();
+    const list = { innerHTML: '' };
+    const summary = { textContent: '' };
+    /** @type {() => void} */
+    let releaseOldSearch = () => { throw new Error('old search was not started'); };
+    data.__context.document = {
+        getElementById(id) { return id === 'adviceMessageSummary' ? summary : null; },
+        querySelector() { return null; }
+    };
+    data._adviceMessageList = () => list;
+    data.renderAdviceMessages = (messages) => `rendered:${messages.map(m => m.id).join(',')}`;
+    data.__context.window.dataStore = data.__context.dataStore = {
+        advice: {
+            search(keyword) {
+                if (keyword === 'old') {
+                    return new Promise(resolve => { releaseOldSearch = () => resolve(/** @type {any[]} */ ([{ id: 'old-result', role: 'user', content: 'old', at: '2026-05-30T00:00:00.000Z' }])); });
+                }
+                return Promise.resolve([{ id: 'new-result', role: 'user', content: 'new', at: '2026-05-30T00:00:00.000Z' }]);
+            },
+            async count() { return 0; }
+        }
+    };
+
+    data.adviceSearchQuery = 'old';
+    const oldSearch = data.refreshAdviceSearchResults();
+    data.adviceSearchQuery = 'new';
+    await data.refreshAdviceSearchResults();
+    releaseOldSearch();
+    await oldSearch;
+
+    assert.equal(list.innerHTML, 'rendered:new-result');
+    assert.match(summary.textContent, /new/);
+    assert.doesNotMatch(summary.textContent, /old/);
 });
 
 test('v6 advice panel does not reuse legacy nested chat scroll class', () => {

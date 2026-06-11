@@ -53,6 +53,7 @@ const ASSETS = [
     'plan-store.js?v=259',
     'plan-feedback.js?v=259',
     'plan-cooldown.js?v=259',
+    'plan-auto-adjust.js?v=259',
     'plan-weekly.js?v=259',
     'plan-equipment.js?v=259',
     'plan-ai-pure.js?v=259',

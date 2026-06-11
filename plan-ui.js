@@ -634,7 +634,10 @@
             this._planSaveRoutineManualStop = !!historyRecord.manualStop;
             this.activeRun = null;
             if (!isCooldown) this.openPlanFeedback?.(planId, ctx.taskId);
-            else if (!queueFollowup) this.maybePromptSavePlanRoutine?.({ manualStop: !!historyRecord.manualStop });
+            else if (!queueFollowup) {
+                this.maybePromptSavePlanRoutine?.({ manualStop: !!historyRecord.manualStop });
+                this.maybeAutoAdjustNextDayAfterFeedback?.(planId);
+            }
             if (queueFollowup) {
                 const nextPlan = this.getTodayDailyPlans?.()?.find((item) => item.pendingCooldowns?.length);
                 const next = nextPlan?.pendingCooldowns?.[0];
@@ -642,6 +645,7 @@
                     setTimeout(() => this.runQueuedCooldown?.(nextPlan.id, next), 500);
                 } else if (isCooldown) {
                     this.maybePromptSavePlanRoutine?.({ manualStop: !!historyRecord.manualStop });
+                    this.maybeAutoAdjustNextDayAfterFeedback?.(planId);
                 }
             }
         },

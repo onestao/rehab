@@ -746,11 +746,11 @@
     </div>
     <script>
         const PAGE_DEPS = {
-            workout: ['voice-engine','voice-cache','voice-webspeech-adapter','voice-legado-adapter','workout-voice','workout-readiness','strength-form','weekly-plan','action-history','plan-chains','plan-progression','plan-store','plan-feedback','plan-cooldown','plan-weekly','plan-equipment','plan-ui','workout-system','workout-pip','workout-core','workout-cardio-pure','workout-cardio','workout-engine','workout-state','swipe-actions','routine-plan','routine-library','workout-wakelock','workout-media-session','ai-store','ai-profile','ai-api'],
+            workout: ['voice-engine','voice-cache','voice-webspeech-adapter','voice-legado-adapter','workout-voice','workout-readiness','strength-form','weekly-plan','action-history','plan-chains','plan-progression','plan-store','plan-feedback','plan-cooldown','plan-auto-adjust','plan-weekly','plan-equipment','plan-ui','workout-system','workout-pip','workout-core','workout-cardio-pure','workout-cardio','workout-engine','workout-state','swipe-actions','routine-plan','routine-library','workout-wakelock','workout-media-session','ai-store','ai-profile','ai-api'],
             'ai-coach': ['ai-store','ai-profile','ai-model-cache','ai-models','ai-api','ai-pricing','ai-templates','advice-template-manager','advice-rules','plan-analytics','advice-panel','coach-context','advice-attachments','advice-render','advice-prompt','advice-stream-renderer','routine-library','plan-chains','plan-progression','plan-store','plan-ai-pure','plan-ai'],
             profile: ['voice-engine','voice-cache','voice-webspeech-adapter','voice-legado-adapter','workout-voice','credential-fields','weekly-plan','backup','sync-ui','sync-adapters','sync','routine-library','goal-plan','weekly-summary','plan-chains','plan-progression','plan-store','plan-equipment','plan-ui','ai-store','ai-profile','ai-model-cache','ai-models'],
             records: ['history-view','weekly-summary','health-diet','health-weight','health-profile','health-exercise','goal-plan','routine-library','food-log','pr-tracker','volume-heatmap','action-history','report-metrics-pure','report-panel','plan-chains','plan-progression','plan-store','plan-weekly','plan-ui','ai-store','ai-profile','ai-model-cache','ai-models','ai-api'],
-            today: ['health-diet','health-weight','health-exercise','food-log','history-view','weekly-summary','report-metrics-pure','report-panel','routine-library','plan-chains','plan-progression','plan-store','plan-feedback','plan-cooldown','plan-weekly','plan-equipment','plan-ui','ai-store','ai-profile','ai-model-cache','ai-models','ai-api']
+            today: ['health-diet','health-weight','health-exercise','food-log','history-view','weekly-summary','report-metrics-pure','report-panel','routine-library','plan-chains','plan-progression','plan-store','plan-feedback','plan-cooldown','plan-auto-adjust','plan-weekly','plan-equipment','plan-ui','ai-store','ai-profile','ai-model-cache','ai-models','ai-api']
         };
         const _loaded = new Set(['render-safe','nav-stack','data-utils-pure','data-records','data-schema','data-utils','storage/idb','storage/migrate','data-store','data-ui-state','data-views','data','voice-engine','voice-cache','voice-webspeech-adapter','voice-legado-adapter','workout-voice','workout-readiness','strength-form','weekly-plan','action-history','sync-pure','sync-status','credential-fields','sheet-drag','haptics','app-update','pwa-support']);
         const _loadingPromises = new Map();
@@ -782,6 +782,7 @@
             'plan-store': ['plan-chains','plan-progression'],
             'plan-feedback': ['plan-store'],
             'plan-cooldown': ['plan-store','plan-feedback'],
+            'plan-auto-adjust': ['plan-store','plan-feedback','plan-cooldown','ai-api'],
             'plan-weekly': ['plan-store'],
             'plan-equipment': ['plan-store'],
             'plan-ai': ['plan-store','ai-api','plan-ai-pure'],

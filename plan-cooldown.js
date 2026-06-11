@@ -19,6 +19,7 @@
             const refs = Array.isArray(task.cooldownRefs) ? task.cooldownRefs : [];
             if (!refs.length) {
                 this.maybePromptSavePlanRoutine?.();
+                this.maybeAutoAdjustNextDayAfterFeedback?.(planId);
                 return;
             }
             const cooldownId = refs[0];
@@ -29,6 +30,7 @@
                 this.queueCooldown?.(planId, cooldownId);
                 this.renderTodayPage?.();
                 this.maybePromptSavePlanRoutine?.();
+                this.maybeAutoAdjustNextDayAfterFeedback?.(planId);
                 return;
             }
             if (prefs.cooldownMode === 'paired') {
@@ -64,6 +66,7 @@
                     clearInterval(root._planTimer);
                     this.queueCooldown?.(planId, taskId);
                     this.renderTodayPage?.();
+                    this.maybeAutoAdjustNextDayAfterFeedback?.(planId);
                     removePrompt(root);
                 }
             }, 200);
@@ -73,11 +76,13 @@
                     if (act === 'queue') {
                         this.queueCooldown?.(planId, taskId);
                         this.renderTodayPage?.();
+                        this.maybeAutoAdjustNextDayAfterFeedback?.(planId);
                     } else if (act === 'now') {
                         this.dequeueCooldown?.(planId, taskId, { save: false });
                         this.runPlanTask?.(planId, taskId, { asCooldown: true });
                     } else {
                         this.maybePromptSavePlanRoutine?.();
+                        this.maybeAutoAdjustNextDayAfterFeedback?.(planId);
                     }
                     removePrompt(root);
                 });
