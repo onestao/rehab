@@ -241,6 +241,49 @@
             } catch (_) {}
         }
 
+        async function readAdviceFromStore() {
+            if (!window.adviceCollections) return null;
+            try {
+                const count = await window.adviceCollections.count();
+                if (count > 0) {
+                    return await window.adviceCollections.getAll();
+                }
+            } catch (_) {}
+            return null;
+        }
+
+        async function lazyMigrateAdviceToStore(adviceArray) {
+            if (!window.adviceCollections || !Array.isArray(adviceArray) || !adviceArray.length) return;
+            try {
+                const existing = await window.adviceCollections.count();
+                if (existing > 0) return;
+                await window.adviceCollections.putMany(adviceArray);
+                // Clean up old KV blob after successful migration
+                await window.storageIdb.remove(keys.advice);
+            } catch (_) {}
+        }
+
+        async function readAdviceHybrid() {
+            const storeAdvice = await readAdviceFromStore();
+            if (storeAdvice && storeAdvice.length > 0) return storeAdvice;
+            const kvAdvice = await window.storageIdb.get(keys.advice);
+            if (Array.isArray(kvAdvice) && kvAdvice.length > 0) {
+                await lazyMigrateAdviceToStore(kvAdvice);
+                return kvAdvice;
+            }
+            return null;
+        }
+
+        async function writeAdviceToStore(adviceArray) {
+            if (!window.adviceCollections || !Array.isArray(adviceArray)) return;
+            try {
+                await window.adviceCollections.clear();
+                if (adviceArray.length > 0) {
+                    await window.adviceCollections.putMany(adviceArray);
+                }
+            } catch (_) {}
+        }
+
         return {
             mode: 'idb',
             async read(key) {
@@ -249,7 +292,8 @@
                 if (key === dbKey && idbValue) {
                     const storeOrKvHistory = await readHistoryHybrid();
                     const idbHistory = storeOrKvHistory || await window.storageIdb.get(keys.history);
-                    const idbAdvice = await window.storageIdb.get(keys.advice);
+                    const storeOrKvAdvice = await readAdviceHybrid();
+                    const idbAdvice = storeOrKvAdvice || await window.storageIdb.get(keys.advice);
                     const legacyFull = readLegacyFullSnapshot();
                     const hydrated = recoverLargeCollections(idbValue, {
                         idbHistory,
@@ -273,7 +317,7 @@
                         const split = splitLargeCollections(recoveredLocal);
                         await window.storageIdb.set(key, split.meta);
                         await writeHistoryToStore(split.history);
-                        await window.storageIdb.set(keys.advice, split.advice);
+                        await writeAdviceToStore(split.advice);
                         return recoveredLocal;
                     }
                     return hydrated;
@@ -290,7 +334,7 @@
                         const split = splitLargeCollections(value);
                         await window.storageIdb.set(key, split.meta);
                         await writeHistoryToStore(split.history);
-                        await window.storageIdb.set(keys.advice, split.advice);
+                        await writeAdviceToStore(split.advice);
                     } else {
                         await window.storageIdb.set(key, value);
                     }
@@ -304,7 +348,7 @@
                     safeSet(key, JSON.stringify(split.meta));
                     await window.storageIdb.set(key, split.meta);
                     await writeHistoryToStore(split.history);
-                    await window.storageIdb.set(keys.advice, split.advice);
+                    await writeAdviceToStore(split.advice);
                     return;
                 }
                 safeSet(key, JSON.stringify(value));
@@ -322,6 +366,9 @@
                 if (key === dbKey) {
                     if (window.storageCollections) {
                         try { await window.storageCollections.clear(); } catch (_) {}
+                    }
+                    if (window.adviceCollections) {
+                        try { await window.adviceCollections.clear(); } catch (_) {}
                     }
                     await window.storageIdb.remove(keys.history);
                     await window.storageIdb.remove(keys.advice);

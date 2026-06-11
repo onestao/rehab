@@ -396,12 +396,27 @@ const sync = {
                         db.aiCipher = (value || [])[0] || null;
                     }
                 };
+
             default:
                 return null;
         }
     },
 
-    mergeEntityRecords(entity, remoteRecords) {
+    async mergeEntityRecords(entity, remoteRecords) {
+        if (entity === 'aiAdviceChat' && window.adviceCollections) {
+            const localRecords = await window.adviceCollections.getAll();
+            const merged = this.mergeRecordLists(localRecords, remoteRecords || []);
+            await window.adviceCollections.putMany(merged);
+            
+            const sliced = merged.length > 50 ? merged.slice(-50) : merged;
+            data.db.health = data.db.health || {};
+            data.db.health.aiAdviceChat = sliced;
+            if (window.dataStore && window.dataStore.advice) {
+                window.dataStore.advice.workingSet = sliced;
+            }
+            return true;
+        }
+
         const ref = this.getEntityRef(data.db, entity);
         if (!ref) return false;
         if (entity === 'aiCipher') {
@@ -521,19 +536,44 @@ const sync = {
         }
 
         const localBefore = JSON.parse(JSON.stringify(data.db));
+        if (window.adviceCollections) {
+            localBefore.health = localBefore.health || {};
+            localBefore.health.aiAdviceChat = await window.adviceCollections.getAll();
+        }
+
         data.db = remoteDb || {};
         data.normalizeDb();
         if (!data.db.aiCipher && localBefore.aiCipher) data.db.aiCipher = localBefore.aiCipher;
         if (!data.db.encryptedAi && localBefore.encryptedAi) data.db.encryptedAi = localBefore.encryptedAi;
         if (data.db.aiCipher?.payload && !data.db.encryptedAi) data.db.encryptedAi = data.db.aiCipher.payload;
+        
         const entities = Object.keys(this.remoteEntityMap());
-        entities.forEach(entity => {
+        const remoteEntities = this.remoteEntityMapFromDb(data.db);
+        
+        for (let i = 0; i < entities.length; i++) {
+            const entity = entities[i];
             const localRef = this.getEntityRef(localBefore, entity);
             const remoteRef = this.getEntityRef(data.db, entity);
-            if (!localRef || !remoteRef) return;
+            if (!localRef || !remoteRef) continue;
+            
+            if (entity === 'aiAdviceChat' && window.adviceCollections) {
+                const localRecords = localBefore.health.aiAdviceChat || [];
+                const remoteRecords = remoteEntities[entity] || [];
+                const merged = this.mergeRecordLists(localRecords, remoteRecords);
+                await window.adviceCollections.putMany(merged);
+                
+                const sliced = merged.length > 50 ? merged.slice(-50) : merged;
+                data.db.health = data.db.health || {};
+                data.db.health.aiAdviceChat = sliced;
+                if (window.dataStore && window.dataStore.advice) {
+                    window.dataStore.advice.workingSet = sliced;
+                }
+                continue;
+            }
+
             if (entity === 'healthProfile') remoteRef.set(this.mergeHealthProfileLists(localRef.get(), remoteRef.get()));
             else remoteRef.set(this.mergeRecordLists(localRef.get(), remoteRef.get()));
-        });
+        }
         data.normalizeDb();
     },
 
@@ -671,13 +711,26 @@ const sync = {
         return { attempted: batch.length, remaining: meta.pendingQueue.length };
     },
 
-    diffChangesSince(ts) {
+    async diffChangesSince(ts) {
         const changes = {};
         const entities = this.remoteEntityMap();
+        if (window.adviceCollections) {
+            entities.aiAdviceChat = await window.adviceCollections.getAll();
+        }
         Object.keys(entities).forEach(entity => {
             changes[entity] = (entities[entity] || []).filter(item => Number(item.updatedAt || 0) > Number(ts || 0));
         });
         return changes;
+    },
+
+    cleanupLegacyFull() {
+        try {
+            if (localStorage.getItem('rehab_pro_db:legacy-full')) {
+                localStorage.removeItem('rehab_pro_db:legacy-full');
+                localStorage.removeItem('rehab_pro_db:legacy-full:createdAt');
+                console.log('Legacy full backup cleaned after successful cloud sync.');
+            }
+        } catch (_) {}
     },
 
     manifestIncrementalCount(manifest) {
@@ -692,6 +745,9 @@ const sync = {
         this.setStatus('syncing', options.quiet ? '正在重建快照' : '正在上传全量快照');
         const snapshotTs = Date.now();
         const snapshotDb = this.remoteSnapshotDb(data.db);
+        if (snapshotDb.health && window.adviceCollections) {
+            snapshotDb.health.aiAdviceChat = await window.adviceCollections.getAll();
+        }
         const snapshotBody = JSON.stringify(snapshotDb);
         const snapshotHash = await this.sha256(snapshotBody);
         await this.withRetry(() => this.writeJson(this.REMOTE_SNAPSHOT, snapshotDb, this.REMOTE_SNAPSHOT));
@@ -710,6 +766,7 @@ const sync = {
         meta.lastIncrementalTs = snapshotTs;
         this.saveSyncMeta();
         await this.processRetryQueue();
+        this.cleanupLegacyFull();
         this.setStatus('cloud', options.quiet ? '快照重建完成' : '全量备份完成');
         this.debugEvent('fullBackup:success', { quiet: !!options.quiet, elapsedMs: Date.now() - started });
     },
@@ -723,7 +780,7 @@ const sync = {
             const remoteManifest = this.ensureManifestShape((await this.fetchJson(this.REMOTE_MANIFEST, true)).data);
             const localMeta = this.getSyncMeta();
             const sinceTs = Math.max(Number(localMeta.lastIncrementalTs || 0), Number(remoteManifest.lastIncrementalTs || 0));
-            const changes = this.diffChangesSince(sinceTs);
+            const changes = await this.diffChangesSince(sinceTs);
             const changedEntities = Object.keys(changes).filter(entity => (changes[entity] || []).length > 0);
             if (!changedEntities.length) {
                 const pending = Number(localMeta.pendingQueue?.length || 0);
@@ -790,6 +847,7 @@ const sync = {
                 console.warn('daily archive failed', e);
             }
 
+            this.cleanupLegacyFull();
             this.setStatus('cloud', `增量上传完成（${changedEntities.length} 个实体）`);
             this.debugEvent('push:success', {
                 changedEntityCount: changedEntities.length,
@@ -870,6 +928,7 @@ const sync = {
             if (data.cfg.mode === 's3' && appliedSources > 0) {
                 await this.fullBackup({ quiet: true });
             }
+            this.cleanupLegacyFull();
             this.setStatus('cloud', '拉取完成');
             this.debugEvent('pull:success', { appliedSources, elapsedMs: Date.now() - started });
         } catch (e) {

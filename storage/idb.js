@@ -3,7 +3,8 @@
     const DB_NAME = 'rehab_pro_storage';
     const STORE_NAME = 'kv';
     const HISTORY_STORE_NAME = 'history';
-    const DB_VERSION = 3;
+    const AI_MESSAGES_STORE_NAME = 'ai_messages';
+    const DB_VERSION = 4;
 
     const migrations = {
         1: async function (db) {
@@ -15,6 +16,13 @@
                 var store = db.createObjectStore(HISTORY_STORE_NAME, { keyPath: 'id' });
                 store.createIndex('byUpdatedAt', 'updatedAt', { unique: false });
                 store.createIndex('byDateKey', 'dayKey', { unique: false });
+            }
+        },
+        4: async function (db) {
+            if (!db.objectStoreNames.contains(AI_MESSAGES_STORE_NAME)) {
+                var store = db.createObjectStore(AI_MESSAGES_STORE_NAME, { keyPath: 'id' });
+                store.createIndex('byUpdatedAt', 'updatedAt', { unique: false });
+                store.createIndex('byRole', 'role', { unique: false });
             }
         }
     };
@@ -38,6 +46,7 @@
         DB_NAME: DB_NAME,
         STORE_NAME: STORE_NAME,
         HISTORY_STORE_NAME: HISTORY_STORE_NAME,
+        AI_MESSAGES_STORE_NAME: AI_MESSAGES_STORE_NAME,
         DB_VERSION: DB_VERSION,
         migrations: migrations,
         _openPromise: null,

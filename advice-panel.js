@@ -1437,7 +1437,10 @@ const advicePanel = {
         this.adviceSearchQuery = el?.value || '';
         this.resetAdviceRenderWindow?.();
         this.captureAdviceDraft();
-        this.refreshAdviceSearchResults();
+        if (this._adviceSearchTimer) clearTimeout(this._adviceSearchTimer);
+        this._adviceSearchTimer = setTimeout(() => {
+            this.refreshAdviceSearchResults();
+        }, 300);
     },
 
     clearAdviceSearch() {
@@ -1449,15 +1452,33 @@ const advicePanel = {
         this.rerenderAdvicePanel({ expandChrome: true });
     },
 
-    refreshAdviceSearchResults() {
+    async refreshAdviceSearchResults() {
         const list = this._adviceMessageList?.();
         const summary = document.getElementById('adviceMessageSummary');
         if (!list) return;
-        const messages = this.activeRecords(this.db.health.aiAdviceChat || []);
-        const visibleMessages = this.visibleAdviceMessages(messages);
-        const windowed = this.visibleAdviceWindowMessages(visibleMessages);
+
+        const query = String(this.adviceSearchQuery || '').trim();
+        let messages = [];
+
+        if (query) {
+            const results = await window.dataStore.advice.search(query, 100);
+            messages = results.reverse();
+        } else {
+            messages = this.activeRecords(this.db.health.aiAdviceChat || []);
+        }
+
+        const visibleMessages = this.visibleAdviceMessages(messages, !!query);
+        const total = await window.dataStore.advice.count();
+        const windowed = this.visibleAdviceWindowMessages(visibleMessages, total);
         list.innerHTML = this.renderAdviceMessages(windowed.messages, windowed.hiddenCount);
-        if (summary) summary.textContent = this.adviceMessageSummary(messages, visibleMessages);
+        if (summary) {
+            if (!total) summary.textContent = '像聊天一样提问，AI 会结合你的记录分析';
+            else if (query) summary.textContent = `搜索“${query}”：${visibleMessages.length} 条匹配记录`;
+            else {
+                const rangeLabel = { today: '今日', week: '最近7天', month: '最近30天', all: '全部' }[this.adviceRange || 'today'] || '今日';
+                summary.textContent = `${rangeLabel}显示 ${Math.floor(visibleMessages.length / 2)} / 共 ${Math.floor(total / 2)} 轮建议`;
+            }
+        }
     },
 
     setAdviceRange(range) {
@@ -1492,7 +1513,6 @@ const advicePanel = {
         this.captureAdviceScroll();
         this.rerenderAdvicePanel({ expandChrome: this.adviceContextOpen, refreshMessages: false });
     },
-
     toggleAdviceV6Insights() {
         this.adviceV6InsightsOpen = !this.adviceV6InsightsOpen;
         this.captureAdviceDraft();
@@ -1529,7 +1549,7 @@ const advicePanel = {
         });
     },
 
-    visibleAdviceMessages(messages = []) {
+    visibleAdviceMessages(messages = [], isSearch = false) {
         const groups = new Map();
         messages.forEach(msg => {
             if (!msg) return;
@@ -1552,41 +1572,52 @@ const advicePanel = {
             const versionGroup = group.length > 1 ? group : null;
             return { ...msg, idx, versionGroup };
         });
+        if (isSearch) return withIndex;
         const start = this.adviceRangeStart();
-        const ranged = start ? withIndex.filter(msg => this.parseHistoryDate(msg.at) >= start) : withIndex;
-        const query = String(this.adviceSearchQuery || '').trim().toLowerCase();
-        if (!query) return ranged;
-        const matched = new Set();
-        ranged.forEach((msg, localIdx) => {
-            const date = this.logicalDateKey(this.parseHistoryDate(msg.at));
-            const haystack = `${msg.content || ''} ${msg.model || ''} ${msg.role || ''} ${date}`.toLowerCase();
-            if (!haystack.includes(query)) return;
-            matched.add(localIdx);
-            if (msg.role === 'assistant' && localIdx > 0) matched.add(localIdx - 1);
-            if (msg.role === 'user' && localIdx + 1 < ranged.length) matched.add(localIdx + 1);
-        });
-        return ranged.filter((_, localIdx) => matched.has(localIdx));
+        return start ? withIndex.filter(msg => this.parseHistoryDate(msg.at) >= start) : withIndex;
     },
 
     resetAdviceRenderWindow() {
         this._adviceRenderLimit = 80;
     },
 
-    visibleAdviceWindowMessages(messages = []) {
+    visibleAdviceWindowMessages(messages = [], totalCount = null) {
         const limit = Math.max(20, Number(this._adviceRenderLimit || 80));
-        if (this.adviceSearchQuery || messages.length <= limit) {
-            return { messages, hiddenCount: 0, totalCount: messages.length };
+        const total = totalCount !== null ? totalCount : messages.length;
+        if (this.adviceSearchQuery) {
+            return { messages, hiddenCount: 0, totalCount: total };
         }
+        const rendered = messages.slice(-limit);
         return {
-            messages: messages.slice(-limit),
-            hiddenCount: Math.max(0, messages.length - limit),
-            totalCount: messages.length
+            messages: rendered,
+            hiddenCount: Math.max(0, total - rendered.length),
+            totalCount: total
         };
     },
 
-    expandAdviceRenderWindow(step = 80) {
+    async expandAdviceRenderWindow(step = 80) {
         const current = Math.max(20, Number(this._adviceRenderLimit || 80));
-        this._adviceRenderLimit = current + Math.max(20, Number(step) || 80);
+        const nextLimit = current + Math.max(20, Number(step) || 80);
+        this._adviceRenderLimit = nextLimit;
+
+        if (!this.adviceSearchQuery && window.dataStore?.advice && typeof window.dataStore.advice.getPage === 'function') {
+            const memoryCount = (this.db.health.aiAdviceChat || []).length;
+            if (nextLimit > memoryCount) {
+                if (this._adviceSending) {
+                    window.toast?.show?.('AI 正在回复中，请稍后加载更多', 'info');
+                    return;
+                }
+                try {
+                    const records = await window.dataStore.advice.getPage(0, nextLimit);
+                    records.reverse();
+                    this.db.health.aiAdviceChat = records;
+                    window.dataStore.advice.workingSet = records;
+                } catch (e) {
+                    console.error('Failed to load older advice', e);
+                }
+            }
+        }
+
         this.captureAdviceDraft?.();
         this.rerenderAdvicePanel?.();
     },

@@ -116,6 +116,14 @@
             if (localCfg) this.cfg = localCfg;
             this.normalizeDb();
             this._initHistoryApi();
+            this._initAdviceApi();
+            try {
+                const recentAdvice = await this.advice.getRecent(50);
+                if (recentAdvice && recentAdvice.length > 0) {
+                    this.db.health.aiAdviceChat = recentAdvice.reverse();
+                    this.advice.workingSet = this.db.health.aiAdviceChat;
+                }
+            } catch (e) { console.error('Load recent advice failed', e); }
             this.bindFlushHooks();
             if (window.sync && typeof sync.initUI === 'function') sync.initUI();
             if (typeof ai !== 'undefined') await ai.init({ saveData: true, renderData: false });
@@ -223,6 +231,104 @@
                         });
                     }
                     return Promise.resolve((self.db.history || []).length);
+                }
+            };
+        },
+
+        _initAdviceApi() {
+            const self = this;
+            if (self.db.health && Array.isArray(self.db.health.aiAdviceChat) && self.db.health.aiAdviceChat.length > 50) {
+                self.db.health.aiAdviceChat = self.db.health.aiAdviceChat.slice(-50);
+                self._dbDirty = true;
+            }
+            this.advice = {
+                workingSet: self.db.health.aiAdviceChat || [],
+                append(record) {
+                    if (!record || typeof record !== 'object') return;
+                    if (!record.id) record.id = self.generateRecordId('advice');
+                    if (!record.updatedAt) record.updatedAt = Date.now();
+                    if (typeof record.deleted !== 'boolean') record.deleted = false;
+                    self.advice.workingSet.push(record);
+                    self.db.health.aiAdviceChat = self.advice.workingSet;
+                    if (window.adviceCollections) {
+                        window.adviceCollections.append(record).catch(function (e) {
+                            console.warn('advice.append store write failed', e);
+                        });
+                    }
+                },
+                update(record) {
+                    if (!record || !record.id) return;
+                    const idx = self.advice.workingSet.findIndex(function (r) { return r && r.id === record.id; });
+                    if (idx >= 0) self.advice.workingSet[idx] = record;
+                    self.db.health.aiAdviceChat = self.advice.workingSet;
+                    if (window.adviceCollections) {
+                        window.adviceCollections.update(record).catch(function (e) {
+                            console.warn('advice.update store write failed', e);
+                        });
+                    }
+                },
+                deleteById(id) {
+                    const record = self.advice.workingSet.find(function (r) { return r && r.id === id; });
+                    if (!record || record.deleted) return false;
+                    record.deleted = true;
+                    record.updatedAt = Date.now();
+                    if (window.adviceCollections) {
+                        window.adviceCollections.update(record).catch(function (e) {
+                            console.warn('advice.deleteById store write failed', e);
+                        });
+                    }
+                    return true;
+                },
+                getRecent(limit) {
+                    limit = typeof limit === 'number' ? limit : 50;
+                    if (window.adviceCollections) {
+                        return window.adviceCollections.getPage(0, limit).catch(function () {
+                            return self.advice.workingSet.slice(-limit).reverse();
+                        });
+                    }
+                    return Promise.resolve(self.advice.workingSet.slice(-limit).reverse());
+                },
+                getPage(offset, limit) {
+                    if (window.adviceCollections) {
+                        return window.adviceCollections.getPage(offset, limit);
+                    }
+                    return Promise.resolve([]);
+                },
+                getById(id) {
+                    const local = self.advice.workingSet.find(function(r) { return r && r.id === id; });
+                    if (local) return Promise.resolve(local);
+                    if (window.adviceCollections) {
+                        return window.adviceCollections.getById(id);
+                    }
+                    return Promise.resolve(null);
+                },
+                getAll() {
+                    if (window.adviceCollections) {
+                        return window.adviceCollections.getAll().catch(function () {
+                            return self.advice.workingSet || [];
+                        });
+                    }
+                    return Promise.resolve(self.advice.workingSet || []);
+                },
+                count() {
+                    if (window.adviceCollections) {
+                        return window.adviceCollections.count().catch(function () {
+                            return (self.advice.workingSet || []).length;
+                        });
+                    }
+                    return Promise.resolve((self.advice.workingSet || []).length);
+                },
+                search(keyword, limit) {
+                    if (window.adviceCollections) {
+                        return window.adviceCollections.search(keyword, limit);
+                    }
+                    return Promise.resolve([]);
+                },
+                flush() {
+                    if (!window.adviceCollections || !self.advice.workingSet || !self.advice.workingSet.length) return Promise.resolve();
+                    return window.adviceCollections.putMany(self.advice.workingSet).catch(function (e) {
+                        console.warn('advice.flush store write failed', e);
+                    });
                 }
             };
         },
@@ -362,6 +468,9 @@
                     if (window.sync && typeof sync.scheduleAutoPush === 'function') {
                         try { sync.scheduleAutoPush(); } catch {}
                     }
+                }
+                if (this.advice && typeof this.advice.flush === 'function') {
+                    await this.advice.flush();
                 }
                 this._resolvePersist?.();
             } catch (e) {
