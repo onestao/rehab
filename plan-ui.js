@@ -404,7 +404,7 @@
                     </span>
                 </button>
                 <div class="plan-task-actions">
-                    <button class="md-icon-btn" type="button" onclick="event.stopPropagation();data.openPlanTaskEdit('${planId}','${task.id}')" aria-label="编辑参数"><span class="material-symbols-rounded">tune</span></button>
+                    <button class="md-icon-btn" type="button" onclick="event.stopPropagation();data.openPlanTaskEdit('${planId}','${task.id}')" aria-label="编辑动作"><span class="material-symbols-rounded">edit</span></button>
                     <button class="md-icon-btn" type="button" onclick="event.stopPropagation();data.markPlanTaskDone('${planId}','${task.id}')" aria-label="手动完成"><span class="material-symbols-rounded">done</span></button>
                     <button class="md-icon-btn" type="button" onclick="event.stopPropagation();data.openPlanTaskMenu('${planId}','${task.id}')" aria-label="更多"><span class="material-symbols-rounded">more_vert</span></button>
                 </div>
@@ -444,17 +444,21 @@
             const { task } = this.findTask?.(planId, taskId) || {};
             if (!task) return;
             const current = task.spec || {};
+            const category = task.category || 'main';
             this._openModal?.({
-                title: '调整任务参数',
-                icon: 'tune',
+                title: '编辑计划动作',
+                icon: 'edit',
                 bodyHtml: `
                     <div class="md-grid modal-grid" style="gap:10px">
+                        <div class="md-field span-full"><input id="planEditName" type="text" placeholder=" " value="${this.escapeHtml(task.name || '')}"><label>动作名称</label></div>
+                        <div class="md-field"><select id="planEditCategory"><option value="warmup" ${category === 'warmup' ? 'selected' : ''}>热身</option><option value="main" ${category === 'main' ? 'selected' : ''}>主训练</option><option value="cooldown" ${category === 'cooldown' ? 'selected' : ''}>拉伸/放松</option></select><label>阶段</label></div>
                         <div class="md-field"><input id="planEditSets" type="number" placeholder=" " value="${Number(current.sets || 1)}"><label>组数</label></div>
                         <div class="md-field"><input id="planEditReps" type="number" placeholder=" " value="${Number(current.reps || 0)}"><label>次数</label></div>
                         <div class="md-field"><input id="planEditWork" type="number" placeholder=" " value="${Number(current.work || 0)}"><label>时长（秒）</label></div>
                         <div class="md-field"><input id="planEditRest" type="number" placeholder=" " value="${Number(current.actionRest || 0)}"><label>组间休息</label></div>
                         <div class="md-field"><input id="planEditRepRest" type="number" min="0" placeholder=" " value="${Number(current.repRest || 0)}"><label>次/侧间休息（秒）</label></div>
                         <label class="plan-edit-alt"><input id="planEditIsAlt" type="checkbox" ${current.isAlt ? 'checked' : ''}><span>双侧交替（左右换边）</span></label>
+                        <div class="md-field span-full"><input id="planEditReason" type="text" placeholder=" " value="${this.escapeHtml(task.aiReasoning || '')}"><label>修改理由/备注（可选）</label></div>
                     </div>`,
                 actionsHtml: `
                     <button class="md-btn" type="button" data-modal-close>取消</button>
@@ -466,6 +470,10 @@
         savePlanTaskEdit(planId, taskId) {
             const { plan, task } = this.findTask?.(planId, taskId) || {};
             if (!plan || !task) return;
+            const name = String(document.getElementById('planEditName')?.value || '').trim();
+            const category = String(document.getElementById('planEditCategory')?.value || task.category || 'main');
+            task.name = name || task.name || '未命名任务';
+            task.category = ['warmup', 'main', 'cooldown'].includes(category) ? category : 'main';
             task.spec = {
                 ...task.spec,
                 sets: Math.max(1, Number(document.getElementById('planEditSets')?.value || task.spec.sets || 1)),
@@ -475,11 +483,12 @@
                 repRest: Math.max(0, Number(document.getElementById('planEditRepRest')?.value || task.spec.repRest || 0)),
                 isAlt: !!document.getElementById('planEditIsAlt')?.checked
             };
+            task.aiReasoning = String(document.getElementById('planEditReason')?.value || '').trim();
             task.invalidSpec = (task.spec.reps <= 0 && task.spec.work <= 0);
             const prefs = this.ensurePlanPrefs?.() || {};
             if (prefs.askOnEdit === 'lock_default') task.userOverride = true;
             if (prefs.askOnEdit === 'pass_default') task.userOverride = false;
-            this.touchRecord(task, ['spec', 'userOverride']);
+            this.touchRecord(task, ['name', 'category', 'spec', 'aiReasoning', 'userOverride']);
             this.touchRecord(plan, ['items']);
             this.save();
             this._closeActiveModal?.();
@@ -501,6 +510,7 @@
                 title: this.escapeHtml(task.name || '任务'),
                 icon: 'more_vert',
                 bodyHtml: `<div class="weekly-plan-picker">
+                    <button class="model-picker-row" type="button" onclick="data.openPlanTaskEdit('${planId}','${taskId}')"><span class="material-symbols-rounded">edit</span><span class="model-picker-main"><strong>编辑动作</strong><small>临时修改名称、阶段和训练参数</small></span></button>
                     <button class="model-picker-row" type="button" onclick="data.movePlanTaskTo('${planId}','${taskId}','${this.logicalDateKey?.() || this.dateKey(new Date())}')"><span class="material-symbols-rounded">today</span><span class="model-picker-main"><strong>移到今天</strong><small>回到当前日期执行</small></span></button>
                     <button class="model-picker-row" type="button" onclick="data.movePlanTaskTo('${planId}','${taskId}','${tomorrowKey}')"><span class="material-symbols-rounded">event</span><span class="model-picker-main"><strong>移到明天</strong><small>延后一天执行</small></span></button>
                     <button class="model-picker-row" type="button" onclick="data.togglePlanTaskLock('${planId}','${taskId}')"><span class="material-symbols-rounded">${task.userOverride ? 'lock_open' : 'lock'}</span><span class="model-picker-main"><strong>${task.userOverride ? '取消锁定' : '锁定任务'}</strong><small>锁定后 AI 不覆盖</small></span></button>

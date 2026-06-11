@@ -60,6 +60,7 @@ help
 history
 info
 inventory_2
+keyboard
 keyboard_arrow_down
 keyboard_arrow_left
 keyboard_arrow_right
@@ -70,6 +71,7 @@ linear_scale
 local_fire_department
 lock
 lock_open
+manage_search
 mic
 mic_off
 monitor_heart
