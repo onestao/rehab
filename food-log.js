@@ -13,6 +13,7 @@ const foodLog = {
             todayCalories: this.todayCalories,
             todayMacros: this.todayMacros,
             applyFoodItem: this.applyFoodItem,
+            normalizeAiFoodItems: this.normalizeAiFoodItems,
             normalizeFoodAlias: this.normalizeFoodAlias,
             foodLogNutritionPer100g: this.foodLogNutritionPer100g,
             buildFoodAliasLookup: this.buildFoodAliasLookup,
@@ -528,6 +529,72 @@ const foodLog = {
         return `<span class="food-source-tag">${this._foodSource}</span>`;
     },
 
+    normalizeAiFoodItems(items = []) {
+        const normKey = value => String(value || '').trim().toLowerCase().replace(/[\s_\-./()（）\[\]【】]/g, '');
+        const val = (sources, aliases = []) => {
+            const keys = new Set(aliases.map(normKey));
+            for (const source of sources || []) {
+                if (!source || typeof source !== 'object' || Array.isArray(source)) continue;
+                for (const key of Object.keys(source)) {
+                    const v = source[key];
+                    if (keys.has(normKey(key)) && v !== undefined && v !== null && v !== '') return v;
+                }
+            }
+            return undefined;
+        };
+        const num = (value, field = '') => {
+            if (value === undefined || value === null || value === '') return 0;
+            if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+            if (typeof value === 'object') {
+                const nestedVal = val([value], ['value', 'amount', '数量', '数值']);
+                const nestedUnit = val([value], ['unit', '单位']);
+                return num(nestedUnit ? `${nestedVal} ${nestedUnit}` : nestedVal, field);
+            }
+            const text = String(value).replace(/,/g, '').trim();
+            const match = text.match(/-?\d+(?:\.\d+)?/);
+            const n = match ? Number(match[0]) : 0;
+            if (!Number.isFinite(n)) return 0;
+            return field === 'cal' && /\bkj\b|千焦/i.test(text) ? Number((n / 4.184).toFixed(1)) : n;
+        };
+        const str = value => {
+            if (value === undefined || value === null || typeof value === 'object') return '';
+            return String(value).trim();
+        };
+        const list = value => Array.isArray(value) ? value.map(v => String(v || '').trim()).filter(Boolean) : (str(value) ? str(value).split(/[、,，;；]/).map(v => v.trim()).filter(Boolean) : []);
+        return (Array.isArray(items) ? items : []).map(item => {
+            if (!item || typeof item !== 'object' || Array.isArray(item)) return { name: String(item || '').trim(), grams: 0, cal: 0, pro: 0, carb: 0, fat: 0 };
+            const sources = [item, ...['nutrition', 'nutrients', 'macros', 'macro', '营养', '营养素', '营养信息', '估算', 'estimate'].map(key => val([item], [key])).filter(v => v && typeof v === 'object' && !Array.isArray(v))];
+            const per100Sources = sources.map(source => val([source], ['per100g', 'per100', 'per_100g', 'nutritionPer100g', '每100g', '每100克'])).filter(v => v && typeof v === 'object' && !Array.isArray(v));
+            const get = aliases => val(sources, aliases);
+            const per100 = aliases => val(per100Sources, aliases);
+            const grams = num(get(['grams', 'g', 'weight', 'weightG', 'amountG', '重量', '克数', '克', '份量', '食用量']), 'grams');
+            const total = (aliases, field) => {
+                const direct = num(get(aliases), field);
+                if (direct || !grams) return direct;
+                const base = num(per100(aliases), field);
+                return base ? Number((base * grams / 100).toFixed(field === 'cal' ? 0 : 1)) : 0;
+            };
+            return {
+                ...item,
+                name: str(get(['name', 'food', 'foodName', 'dish', '食物', '食物名', '名称', '名字'])) || str(item.name),
+                grams,
+                cal: total(['cal', 'kcal', 'calories', 'energy', '热量', '卡路里', '千卡', '能量'], 'cal'),
+                pro: total(['pro', 'protein', 'proteinG', '蛋白', '蛋白质'], 'pro'),
+                carb: total(['carb', 'carbs', 'carbohydrate', 'carbohydrateG', '碳水', '碳水化合物'], 'carb'),
+                fat: total(['fat', 'totalFat', 'fatG', '脂肪'], 'fat'),
+                fiber: total(['fiber', 'dietaryFiber', '膳食纤维', '纤维'], 'fiber'),
+                sugar: total(['sugar', '糖', '糖分'], 'sugar'),
+                sodium: total(['sodium', 'sodiumMg', '钠'], 'sodium'),
+                saturatedFat: total(['saturatedFat', 'satFat', '饱和脂肪'], 'saturatedFat'),
+                ingredients: list(get(['ingredients', 'ingredient', '主要配料', '配料', '食材'])),
+                cooking: str(get(['cooking', 'cookingMethod', '烹饪方式', '做法'])),
+                source: str(get(['source', 'basis', '估算依据', '来源'])) || 'ai-food-parse',
+                confidence: num(get(['confidence', 'score', '置信度']), 'confidence') || '',
+                note: str(get(['note', 'remark', '备注', '健康性备注']))
+            };
+        }).filter(item => item.name || item.grams || item.cal || item.pro || item.carb || item.fat);
+    },
+
     async aiParseFood() {
         const textarea = document.getElementById('foodAiText');
         const manualInput = document.getElementById('foodName');
@@ -543,7 +610,7 @@ const foodLog = {
         const statusEl = document.getElementById('foodAiStatus');
         if (statusEl) statusEl.textContent = 'AI 分析中...';
         try {
-            const items = await ai.parseFood(text);
+            const items = this.normalizeAiFoodItems(await ai.parseFood(text));
             if (!items.length) throw new Error('未识别到食物');
             this._aiFoodResults = items;
             this._aiFoodAdded = new Set();

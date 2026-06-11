@@ -229,7 +229,7 @@
             window.haptics?.light?.();
             window.toast?.show?.('正在识别照片…', 'info');
             try {
-                const items = await window.ai.parseFoodFromImage(file, {
+                const rawItems = await window.ai.parseFoodFromImage(file, {
                     signal: controller.signal,
                     timeoutMs: isHeic ? 45000 : 30000,
                     onProgress: ({ stage }) => {
@@ -239,6 +239,7 @@
                         else if (stage === 'parse') this.setDietPhotoStatus('parse', '正在解析识别结果…');
                     }
                 });
+                const items = typeof this.normalizeAiFoodItems === 'function' ? this.normalizeAiFoodItems(rawItems) : rawItems;
                 if (!items || !items.length) throw new Error('未识别到食物');
                 this._aiFoodResults = items;
                 this._aiFoodAdded = new Set();
