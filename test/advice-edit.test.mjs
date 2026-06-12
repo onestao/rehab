@@ -89,6 +89,7 @@ function loadAdvicePanelHarness() {
         adviceRangeStart: context.__advicePanel.adviceRangeStart,
         visibleAdviceMessages: context.__advicePanel.visibleAdviceMessages,
         visibleAdviceWindowMessages: context.__advicePanel.visibleAdviceWindowMessages,
+        countAdviceMessages: context.__advicePanel.countAdviceMessages,
         resetAdviceRenderWindow: context.__advicePanel.resetAdviceRenderWindow,
         expandAdviceRenderWindow: context.__advicePanel.expandAdviceRenderWindow,
         _adviceMessageList: context.__advicePanel._adviceMessageList,
@@ -126,6 +127,8 @@ function loadAdvicePanelHarness() {
         regenerateAdviceFromEditedUser: context.__advicePanel.regenerateAdviceFromEditedUser,
         retryAdviceFrom: context.__advicePanel.retryAdviceFrom
     };
+    data.deleteAiAdviceMessage = context.__advicePanel.deleteAiAdviceMessage;
+    data.preserveAdviceScroll = (fn) => fn();
     return data;
 }
 
@@ -583,6 +586,37 @@ test('advice history search ignores stale cold results after query changes', asy
     assert.equal(list.innerHTML, 'rendered:new-result');
     assert.match(summary.textContent, /new/);
     assert.doesNotMatch(summary.textContent, /old/);
+});
+
+test('deleting an advice message refreshes without dataStore advice count API', async () => {
+    const data = loadAdvicePanelHarness();
+    const list = { innerHTML: '' };
+    const summary = { textContent: '' };
+    data.__context.document = {
+        getElementById(id) { return id === 'adviceMessageSummary' ? summary : null; },
+        querySelector() { return null; }
+    };
+    data.__context.window.dataStore = data.__context.dataStore = {};
+    data._adviceMessageList = () => list;
+    data.renderAdviceMessages = (messages) => `rendered:${messages.map(m => m.id).join(',')}`;
+    data.adviceRange = 'all';
+    data.adviceSearchQuery = '';
+    data.deleteWithUndo = function deleteWithUndo(items, id, options) {
+        this.softDeleteById(items, id);
+        options.save.call(this);
+        options.render.call(this);
+        return true;
+    };
+    let saved = false;
+    data.saveAndBackup = () => { saved = true; };
+
+    data.deleteAiAdviceMessage(0, 'u1');
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    assert.equal(saved, true);
+    assert.equal(data.db.health.aiAdviceChat[0].deleted, true);
+    assert.equal(list.innerHTML, 'rendered:a1');
+    assert.match(summary.textContent, /共 0 轮建议/);
 });
 
 test('v6 advice panel does not reuse legacy nested chat scroll class', () => {

@@ -104,6 +104,7 @@ const advicePanel = {
             filterByAdviceRange: this.filterByAdviceRange,
             visibleAdviceMessages: this.visibleAdviceMessages,
             visibleAdviceWindowMessages: this.visibleAdviceWindowMessages,
+            countAdviceMessages: this.countAdviceMessages,
             resetAdviceRenderWindow: this.resetAdviceRenderWindow,
             expandAdviceRenderWindow: this.expandAdviceRenderWindow,
             adviceMessageSummary: this.adviceMessageSummary,
@@ -1489,7 +1490,7 @@ const advicePanel = {
         }
 
         const visibleMessages = this.visibleAdviceMessages(messages, !!query);
-        const total = query ? visibleMessages.length : await window.dataStore.advice.count();
+        const total = query ? visibleMessages.length : await this.countAdviceMessages();
         if (requestId !== this._adviceSearchRequestId || query !== String(this.adviceSearchQuery || '').trim()) return;
         const windowed = this.visibleAdviceWindowMessages(visibleMessages, total);
         list.innerHTML = this.renderAdviceMessages(windowed.messages, windowed.hiddenCount);
@@ -1615,6 +1616,18 @@ const advicePanel = {
             hiddenCount: Math.max(0, total - rendered.length),
             totalCount: total
         };
+    },
+
+    async countAdviceMessages() {
+        const fallback = () => this.activeRecords(this.db?.health?.aiAdviceChat || []).length;
+        const store = window.dataStore?.advice;
+        if (!store || typeof store.count !== 'function') return fallback();
+        try {
+            const count = Number(await store.count());
+            return Number.isFinite(count) ? count : fallback();
+        } catch {
+            return fallback();
+        }
     },
 
     async expandAdviceRenderWindow(step = 80) {
