@@ -56,6 +56,9 @@ const advicePanel = {
             onAdvicePromptKeydown: this.onAdvicePromptKeydown,
             updateAdviceSendState: this.updateAdviceSendState,
             setAdviceModel: this.setAdviceModel,
+            adviceModelStarKey: this.adviceModelStarKey,
+            isAdviceModelStarred: this.isAdviceModelStarred,
+            toggleAdviceModelStar: this.toggleAdviceModelStar,
             providerKeyForModel: this.providerKeyForModel,
             providerIcon: this.providerIcon,
             modelShortName: this.modelShortName,
@@ -271,6 +274,12 @@ const advicePanel = {
             if (typeof parsed.model === 'string' && parsed.model.trim()) {
                 this.adviceModel = parsed.model;
             }
+            if (Array.isArray(parsed.starredModels)) {
+                this.adviceStarredModels = parsed.starredModels
+                    .map(item => String(item || '').trim())
+                    .filter(Boolean)
+                    .slice(0, 100);
+            }
             if (typeof parsed.templateId === 'string') {
                 this.db.aiTemplateActiveId = parsed.templateId;
             }
@@ -295,6 +304,7 @@ const advicePanel = {
                 },
                 contextMode: ['auto', 'light', 'none'].includes(this.adviceContextMode) ? this.adviceContextMode : 'auto',
                 model: this.adviceModel || '__current__',
+                starredModels: Array.isArray(this.adviceStarredModels) ? this.adviceStarredModels.slice(0, 100) : [],
                 templateId: this.db.aiTemplateActiveId || '',
                 retryMode: this.db.aiRetryMode || 'versioned'
             };
@@ -1253,6 +1263,35 @@ const advicePanel = {
         this.rerenderAdvicePanel?.();
     },
 
+    adviceModelStarKey(provider = '', model = '') {
+        const normalizedProvider = ai.normalizeProvider ? ai.normalizeProvider(provider || 'openai') : String(provider || 'openai').trim();
+        return `${normalizedProvider || 'openai'}::${String(model || '').trim()}`;
+    },
+
+    isAdviceModelStarred(provider = '', model = '') {
+        if (!model) return false;
+        const starred = new Set(Array.isArray(this.adviceStarredModels) ? this.adviceStarredModels : []);
+        return starred.has(this.adviceModelStarKey(provider, model));
+    },
+
+    toggleAdviceModelStar(provider = '', model = '') {
+        if (!model) return false;
+        const key = this.adviceModelStarKey(provider, model);
+        const starred = new Set(Array.isArray(this.adviceStarredModels) ? this.adviceStarredModels : []);
+        const next = !starred.has(key);
+        if (next) starred.add(key);
+        else starred.delete(key);
+        this.adviceStarredModels = Array.from(starred).slice(0, 100);
+        this.saveAdviceSettings();
+        const content = document.getElementById('aiModelPickerContent');
+        if (content) {
+            content.innerHTML = this.renderAdviceModelPicker();
+            this.bindAdviceModelPickerActions(content);
+        }
+        window.haptics?.light?.();
+        return next;
+    },
+
     providerKeyForModel(provider = '', model = '') {
         const modelText = String(model || '').toLowerCase();
         if (/grok|x-ai|\bxai\b/.test(modelText)) return 'grok';
@@ -1330,8 +1369,19 @@ const advicePanel = {
         if (!root || root.dataset.adviceModelPickerActionsBound === '1') return;
         root.dataset.adviceModelPickerActionsBound = '1';
         root.addEventListener('click', (event) => {
+            const star = event.target?.closest?.('[data-advice-model-action="star"]');
+            if (star && root.contains(star)) {
+                event.preventDefault();
+                event.stopPropagation?.();
+                this.toggleAdviceModelStar(
+                    star.getAttribute('data-provider') || '',
+                    star.getAttribute('data-model') || ''
+                );
+                return;
+            }
             const row = event.target?.closest?.('[data-advice-model-action="choose"]');
             if (!row || !root.contains(row)) return;
+            if (row.getAttribute('aria-disabled') === 'true') return;
             event.preventDefault();
             this.chooseAdviceModel(
                 row.getAttribute('data-profile-id') || '',
@@ -1400,7 +1450,10 @@ const advicePanel = {
             if (scope === 'others') return row.provider !== activeProvider;
             return true;
         });
-        const deduped = rows.filter((row, index, all) => row.model && all.findIndex(x => x.provider === row.provider && x.model === row.model) === index);
+        const deduped = rows
+            .filter((row, index, all) => row.model && all.findIndex(x => x.provider === row.provider && x.model === row.model) === index)
+            .map((row, index) => ({ ...row, starred: this.isAdviceModelStarred(row.provider, row.model), order: index }))
+            .sort((a, b) => Number(b.starred) - Number(a.starred) || a.order - b.order);
         const restore = `<button class="md-btn md-btn-tonal" onclick="ai.clearOverride?.();data.closeAdviceModelPicker?.();data.rerenderAdvicePanel?.()" type="button">恢复默认</button>`;
         const selectedProvider = normalizeProvider(effective.provider || activeProvider);
         const emptyText = scope === 'cached'
@@ -1415,11 +1468,13 @@ const advicePanel = {
             ${deduped.map(row => {
                 const visual = this.adviceModelVisual(row.model);
                 const style = this.adviceModelThemeStyle(visual);
-                return `<button class="model-picker-row advice-model-${visual.key} ${row.model === effective.model && row.provider === selectedProvider ? 'is-selected' : ''}" ${style ? `style="${this.escapeHtml(style)}"` : ''} type="button" aria-disabled="${row.disabled}" title="${row.disabled ? '未配置 API Key' : ''}" data-advice-model-action="choose" data-profile-id="${this.escapeHtml(row.profileId)}" data-provider="${this.escapeHtml(row.provider)}" data-model="${this.escapeHtml(row.model)}">
+                const starLabel = row.starred ? '取消星标' : '加星标';
+                return `<div class="model-picker-row advice-model-${visual.key} ${row.model === effective.model && row.provider === selectedProvider ? 'is-selected' : ''} ${row.starred ? 'is-starred' : ''}" ${style ? `style="${this.escapeHtml(style)}"` : ''} role="button" tabindex="0" aria-disabled="${row.disabled}" title="${row.disabled ? '未配置 API Key' : ''}" data-advice-model-action="choose" data-profile-id="${this.escapeHtml(row.profileId)}" data-provider="${this.escapeHtml(row.provider)}" data-model="${this.escapeHtml(row.model)}">
                     <span class="advice-model-mark">${this.adviceModelIconHtml(visual)}</span>
                     <span class="model-picker-main"><strong>${this.escapeHtml(row.label)}</strong><small>${this.escapeHtml(row.provider)} · ${this.escapeHtml(row.tag)}</small></span>
+                    <button class="model-picker-star ${row.starred ? 'active' : ''}" type="button" aria-label="${starLabel}：${this.escapeHtml(row.label)}" title="${starLabel}" data-advice-model-action="star" data-provider="${this.escapeHtml(row.provider)}" data-model="${this.escapeHtml(row.model)}"><span class="material-symbols-rounded">${row.starred ? 'star' : 'star_border'}</span></button>
                     ${row.model === effective.model && row.provider === effective.provider ? '<span class="material-symbols-rounded">check</span>' : ''}
-                </button>`;
+                </div>`;
             }).join('') || `<div class="ai-model-empty">${this.escapeHtml(emptyText)}</div>`}
             ${restore}
         </div>`;

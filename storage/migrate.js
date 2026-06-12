@@ -232,11 +232,15 @@
         }
 
         async function writeHistoryToStore(historyArray) {
-            if (!window.storageCollections || !Array.isArray(historyArray)) return;
+            if (!Array.isArray(historyArray)) return;
             try {
-                await window.storageCollections.clear();
-                if (historyArray.length > 0) {
-                    await window.storageCollections.putMany(historyArray);
+                if (window.storageCollections) {
+                    await window.storageCollections.clear();
+                    if (historyArray.length > 0) {
+                        await window.storageCollections.putMany(historyArray);
+                    }
+                } else if (keys?.history) {
+                    await window.storageIdb.set(keys.history, historyArray);
                 }
             } catch (_) {}
         }
@@ -275,11 +279,15 @@
         }
 
         async function writeAdviceToStore(adviceArray) {
-            if (!window.adviceCollections || !Array.isArray(adviceArray)) return;
+            if (!Array.isArray(adviceArray)) return;
             try {
-                await window.adviceCollections.clear();
-                if (adviceArray.length > 0) {
-                    await window.adviceCollections.putMany(adviceArray);
+                if (window.adviceCollections) {
+                    await window.adviceCollections.clear();
+                    if (adviceArray.length > 0) {
+                        await window.adviceCollections.putMany(adviceArray);
+                    }
+                } else if (keys?.advice) {
+                    await window.storageIdb.set(keys.advice, adviceArray);
                 }
             } catch (_) {}
         }

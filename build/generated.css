@@ -7553,9 +7553,12 @@ body.is-training .fab-pip.active {
     color: var(--md-sys-on-secondary-container);
 }
 
+.model-picker-row.is-starred {
+    border-color: color-mix(in srgb, var(--md-sys-tertiary) 42%, var(--md-sys-outline-variant));
+}
+
 .model-picker-row[aria-disabled="true"] {
     opacity: .48;
-    pointer-events: none;
 }
 
 .model-picker-main {
@@ -7570,6 +7573,28 @@ body.is-training .fab-pip.active {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+.model-picker-star {
+    width: 36px;
+    height: 36px;
+    border: 0;
+    border-radius: var(--md-sys-shape-full);
+    background: transparent;
+    color: var(--md-sys-on-surface-variant);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+}
+
+.model-picker-star:hover {
+    background: color-mix(in srgb, currentColor 10%, transparent);
+}
+
+.model-picker-star.active {
+    color: var(--md-sys-tertiary);
+    background: var(--md-sys-tertiary-container);
 }
 
 .advice-temp-model {

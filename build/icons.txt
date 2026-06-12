@@ -118,6 +118,8 @@ skip_previous
 speed
 sports
 sports_gymnastics
+star
+star_border
 stop
 summarize
 swap_horiz

@@ -35,7 +35,9 @@ function fakeRoot() {
 
 function fakeEvent(attrs) {
     const target = {
-        closest() {
+        closest(selector = '') {
+            const expected = String(selector).match(/\[([^=\]]+)="([^"]+)"\]/);
+            if (expected && attrs[expected[1]] !== expected[2]) return null;
             return {
                 getAttribute(name) { return attrs[name] ?? ''; }
             };
@@ -239,6 +241,72 @@ test('model picker aggregates only enabled cached models by provider scope', () 
     const othersHtml = api.renderAdviceModelPicker();
     assert.doesNotMatch(othersHtml, /enabled-openai/);
     assert.match(othersHtml, /enabled-claude/);
+});
+
+test('model picker stars models and sorts starred rows first', () => {
+    const stored = {};
+    const ai = {
+        cfg: {
+            provider: 'openai',
+            profiles: [
+                { id: 'p-openai', provider: 'openai' },
+                { id: 'p-claude', provider: 'claude' }
+            ]
+        },
+        models: [
+            { provider: 'openai', id: 'openai-model', enabled: true },
+            { provider: 'claude', id: 'claude-model', enabled: true }
+        ],
+        normalizeProvider(provider = '') { return String(provider || '').trim() || 'openai'; },
+        isModelEnabled(model) { return model?.enabled !== false; },
+        getEffectiveConfig() { return { profileId: 'p-openai', provider: 'openai', model: 'openai-model' }; },
+        apiKeyFor(id) { return id ? 'key' : ''; }
+    };
+    const { api } = loadWindowModule('advice-panel.js', 'advicePanel', {
+        ai,
+        document: { querySelector: () => null, getElementById: () => null },
+        localStorage: { getItem: () => null, setItem: (key, value) => { stored[key] = value; } },
+        requestAnimationFrame: () => {},
+        window: { haptics: { light() {} } }
+    });
+    api.db = { aiTemplateActiveId: '', aiRetryMode: 'versioned' };
+    api.escapeHtml = escapeHtml;
+    api.adviceModelVisual = () => ({ key: 'generic' });
+    api.adviceModelThemeStyle = () => '';
+    api.adviceModelIconHtml = () => '';
+    api.adviceModelPickerScope = 'cached';
+    api.adviceStarredModels = ['claude::claude-model'];
+
+    const html = api.renderAdviceModelPicker();
+    assert.ok(html.indexOf('claude-model') < html.indexOf('openai-model'));
+    assert.match(html, /data-advice-model-action="star"/);
+    assert.match(html, /star/);
+
+    api.adviceStarredModels = [];
+    api.toggleAdviceModelStar('openai', 'openai-model');
+    assert.equal(api.adviceStarredModels.includes('openai::openai-model'), true);
+    assert.equal(stored.rehab_advice_settings.includes('openai::openai-model'), true);
+
+    const root = fakeRoot();
+    let starred = null;
+    let chosen = null;
+    api.toggleAdviceModelStar = (provider, model) => { starred = { provider, model }; };
+    api.chooseAdviceModel = (profileId, provider, model) => { chosen = { profileId, provider, model }; };
+    api.bindAdviceModelPickerActions(root);
+    const listener = root.listener;
+    assert.ok(listener);
+
+    const event = fakeEvent({
+        'data-advice-model-action': 'star',
+        'data-provider': 'openai',
+        'data-model': 'openai-model'
+    });
+    listener(event);
+
+    assert.deepEqual(starred, { provider: 'openai', model: 'openai-model' });
+    assert.equal(chosen, null);
+    assert.equal(event.prevented, true);
+    assert.equal(event.stopped, true);
 });
 
 test('app update version matches current service worker cache version', () => {

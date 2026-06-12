@@ -26,6 +26,7 @@ module.exports = [
       'data-records.js',
       'data-schema.js',
       'storage/idb-collections.js',
+      'storage/idb-advice-collections.js',
       'credential-fields.js',
       'sheet-drag.js'
     ],
