@@ -428,7 +428,7 @@ Object.assign(advicePanel, {
                 : '<div class="empty-state advice-empty"><span class="material-symbols-rounded">forum</span><p>还没有 AI 建议，选择下方快捷问题开始</p></div>';
         }
         const olderNotice = hiddenCount > 0
-            ? `<div class="advice-history-window"><button type="button" onclick="data.expandAdviceRenderWindow?.()"><span class="material-symbols-rounded">expand_less</span> 加载更早 ${hiddenCount} 条对话</button></div>`
+            ? `<div class="advice-history-window"><button type="button" onclick="data.expandAdviceRenderWindow?.()"><span class="material-symbols-rounded">expand_less</span> 加载更早 ${hiddenCount} 条消息</button><button type="button" onclick="data.toggleAdviceSearch?.()"><span class="material-symbols-rounded">manage_search</span> 搜索归档</button></div>`
             : '';
         const groups = messages.reduce((acc, msg, idx) => {
             const date = this.logicalDateKey(this.parseHistoryDate(msg.at));

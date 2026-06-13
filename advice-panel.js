@@ -76,6 +76,9 @@ const advicePanel = {
             toggleAdviceSearch: this.toggleAdviceSearch,
             onAdviceSearchInput: this.onAdviceSearchInput,
             clearAdviceSearch: this.clearAdviceSearch,
+            toggleAdviceHistorySearchScope: this.toggleAdviceHistorySearchScope,
+            adviceSearchTimestamp: this.adviceSearchTimestamp,
+            adviceRecordMatchesSearch: this.adviceRecordMatchesSearch,
             getAdviceTemplates: this.getAdviceTemplates,
             getActiveAdviceTemplate: this.getActiveAdviceTemplate,
             selectAdviceTemplate: this.selectAdviceTemplate,
@@ -98,6 +101,9 @@ const advicePanel = {
             scrollAdviceToLatest: this.scrollAdviceToLatest,
             scheduleAdviceStreamScroll: this.scheduleAdviceStreamScroll,
             refreshAdviceSearchResults: this.refreshAdviceSearchResults,
+            searchAdviceWorkingSet: this.searchAdviceWorkingSet,
+            mergeAdviceSearchResults: this.mergeAdviceSearchResults,
+            loadAdviceWindowFromColdStore: this.loadAdviceWindowFromColdStore,
             refreshAdviceModelPicker: this.refreshAdviceModelPicker,
             refreshAdviceModelChip: this.refreshAdviceModelChip,
             renderAdviceModelChip: this.renderAdviceModelChip,
@@ -254,9 +260,11 @@ const advicePanel = {
             const parsed = JSON.parse(raw);
             if (!parsed || typeof parsed !== 'object') return;
 
-            const allowedRanges = new Set(['today', 'week', 'month', 'all']);
+            const allowedRanges = new Set(['today', 'week', 'month']);
             if (typeof parsed.range === 'string' && allowedRanges.has(parsed.range)) {
                 this.adviceRange = parsed.range;
+            } else if (parsed.range === 'all') {
+                this.adviceRange = 'today';
             }
 
             if (parsed.contexts && typeof parsed.contexts === 'object') {
@@ -294,8 +302,9 @@ const advicePanel = {
     saveAdviceSettings() {
         try {
             const contexts = { diet: true, training: true, weight: true, goal: true, ...(this.adviceContexts || {}) };
+            const persistentRange = ['today', 'week', 'month'].includes(this.adviceRange) ? this.adviceRange : 'today';
             const payload = {
-                range: this.adviceRange || 'today',
+                range: persistentRange,
                 contexts: {
                     diet: !!contexts.diet,
                     training: !!contexts.training,
@@ -1073,6 +1082,7 @@ const advicePanel = {
         const chromeInner = document.querySelector('.advice-top-chrome-inner');
         if (!list || !chromeInner) {
             this.renderAiCoachPage?.() || this.renderRoutines?.();
+            requestAnimationFrame(() => this.refreshAdviceSearchResults?.());
             return;
         }
         const previousTop = list.scrollTop || 0;
@@ -1487,6 +1497,9 @@ const advicePanel = {
         this.captureAdviceDraft();
         this.captureAdviceScroll();
         this.rerenderAdvicePanel({ expandChrome: true, focusSearch: this.adviceSearchOpen });
+        if (shouldOpen && (this.adviceRange || 'today') === 'all') {
+            requestAnimationFrame(() => this.refreshAdviceSearchResults?.());
+        }
     },
 
     onAdviceSearchInput(el) {
@@ -1507,6 +1520,87 @@ const advicePanel = {
         this.captureAdviceDraft();
         this.captureAdviceScroll();
         this.rerenderAdvicePanel({ expandChrome: true });
+    },
+
+    toggleAdviceHistorySearchScope(checked = false) {
+        const nextRange = checked ? 'all' : 'today';
+        if (this.adviceRange === nextRange) return;
+        this.adviceRange = nextRange;
+        this.resetAdviceRenderWindow?.();
+        this.captureAdviceDraft?.();
+        this.captureAdviceScroll?.();
+        this.rerenderAdvicePanel?.({ expandChrome: true, focusSearch: true });
+    },
+
+    adviceSearchTimestamp(record) {
+        const updatedAt = Number(record?.updatedAt || 0);
+        if (Number.isFinite(updatedAt) && updatedAt > 0) return updatedAt;
+        const at = new Date(record?.at || record?.date || 0).getTime();
+        return Number.isFinite(at) ? at : 0;
+    },
+
+    adviceRecordMatchesSearch(record, query = '') {
+        const term = String(query || '').trim().toLowerCase();
+        if (!term || !record || record.deleted) return false;
+        const dateText = record.at ? this.logicalDateKey?.(this.parseHistoryDate(record.at)) : '';
+        return [
+            record.content,
+            record.model,
+            record.provider,
+            record.role,
+            record.id,
+            record.at,
+            dateText
+        ].some(value => String(value || '').toLowerCase().includes(term));
+    },
+
+    searchAdviceWorkingSet(query = '', limit = 20) {
+        const max = Math.max(1, Number(limit) || 20);
+        const records = this.activeRecords(this.db?.health?.aiAdviceChat || []);
+        const matchesSearch = this.adviceRecordMatchesSearch || advicePanel.adviceRecordMatchesSearch;
+        const timestamp = this.adviceSearchTimestamp || advicePanel.adviceSearchTimestamp;
+        return records
+            .filter(record => matchesSearch.call(this, record, query))
+            .sort((a, b) => timestamp.call(this, b) - timestamp.call(this, a))
+            .slice(0, max);
+    },
+
+    mergeAdviceSearchResults(primary = [], secondary = [], limit = 20) {
+        const max = Math.max(1, Number(limit) || 20);
+        const byId = new Map();
+        const timestamp = this.adviceSearchTimestamp || advicePanel.adviceSearchTimestamp;
+        [...(primary || []), ...(secondary || [])].forEach(record => {
+            if (!record || record.deleted) return;
+            const key = record.id || `${record.role || ''}:${record.at || ''}:${record.content || ''}`;
+            if (!byId.has(key)) byId.set(key, record);
+        });
+        return Array.from(byId.values())
+            .sort((a, b) => timestamp.call(this, b) - timestamp.call(this, a))
+            .slice(0, max);
+    },
+
+    async loadAdviceWindowFromColdStore(limit = this._adviceRenderLimit || 80) {
+        const store = this.advice || window.dataStore?.advice;
+        const max = Math.max(50, Number(limit) || 80);
+        const fallback = () => this.activeRecords(this.db?.health?.aiAdviceChat || []);
+        if (!store || typeof store.getPage !== 'function') return fallback();
+        if (this._adviceSending) return fallback();
+        const memoryCount = (this.db?.health?.aiAdviceChat || []).length;
+        let total = memoryCount;
+        try {
+            if (typeof store.count === 'function') total = Math.max(memoryCount, Number(await store.count()) || 0);
+        } catch {
+            total = memoryCount;
+        }
+        const target = Math.min(Math.max(max, memoryCount), total || max);
+        if (target <= memoryCount) return fallback();
+        const records = await store.getPage(0, target);
+        const chronological = (Array.isArray(records) ? records : []).reverse();
+        if (chronological.length) {
+            this.db.health.aiAdviceChat = chronological;
+            store.workingSet = chronological;
+        }
+        return fallback();
     },
 
     async refreshAdviceSearchResults() {
@@ -1530,18 +1624,35 @@ const advicePanel = {
             list.innerHTML = '<div class="empty-state advice-empty"><span class="material-symbols-rounded">manage_search</span><p>正在搜索冷历史记录</p></div>';
             let results = [];
             try {
-                results = await window.dataStore.advice.search(query, searchLimit);
+                const searchWorkingSet = this.searchAdviceWorkingSet || advicePanel.searchAdviceWorkingSet;
+                const mergeResults = this.mergeAdviceSearchResults || advicePanel.mergeAdviceSearchResults;
+                const coldResults = await window.dataStore.advice.search(query, searchLimit);
+                const workingSetResults = searchWorkingSet.call(this, query, searchLimit);
+                results = mergeResults.call(this, coldResults, workingSetResults, searchLimit);
             } catch (e) {
-                if (requestId !== this._adviceSearchRequestId || query !== String(this.adviceSearchQuery || '').trim()) return;
-                console.error('Failed to search advice history', e);
-                list.innerHTML = '<div class="empty-state advice-empty"><span class="material-symbols-rounded">error</span><p>历史搜索失败，请稍后重试</p></div>';
-                if (summary) summary.textContent = '历史搜索失败';
-                return;
+                const searchWorkingSet = this.searchAdviceWorkingSet || advicePanel.searchAdviceWorkingSet;
+                results = searchWorkingSet.call(this, query, searchLimit);
+                if (!results.length) {
+                    if (requestId !== this._adviceSearchRequestId || query !== String(this.adviceSearchQuery || '').trim()) return;
+                    console.error('Failed to search advice history', e);
+                    list.innerHTML = '<div class="empty-state advice-empty"><span class="material-symbols-rounded">error</span><p>历史搜索失败，请稍后重试</p></div>';
+                    if (summary) summary.textContent = '历史搜索失败';
+                    return;
+                }
             }
             if (requestId !== this._adviceSearchRequestId || query !== String(this.adviceSearchQuery || '').trim()) return;
             messages = (Array.isArray(results) ? results : []).reverse();
         } else {
-            messages = this.activeRecords(this.db.health.aiAdviceChat || []);
+            if ((this.adviceRange || 'today') === 'all') {
+                try {
+                    messages = await this.loadAdviceWindowFromColdStore(this._adviceRenderLimit || 80);
+                } catch (e) {
+                    console.error('Failed to load advice history window', e);
+                    messages = this.activeRecords(this.db.health.aiAdviceChat || []);
+                }
+            } else {
+                messages = this.activeRecords(this.db.health.aiAdviceChat || []);
+            }
         }
 
         const visibleMessages = this.visibleAdviceMessages(messages, !!query);
@@ -1698,10 +1809,7 @@ const advicePanel = {
                     return;
                 }
                 try {
-                    const records = await window.dataStore.advice.getPage(0, nextLimit);
-                    records.reverse();
-                    this.db.health.aiAdviceChat = records;
-                    window.dataStore.advice.workingSet = records;
+                    await this.loadAdviceWindowFromColdStore(nextLimit);
                 } catch (e) {
                     console.error('Failed to load older advice', e);
                 }
@@ -2580,10 +2688,17 @@ const advicePanel = {
                     <button class="advice-search-toggle ${searchOpen ? 'active' : ''}" onclick="data.toggleAdviceSearch()" type="button" aria-label="搜索聊天记录"><span class="material-symbols-rounded">search</span></button>
                 </div>
             </div>
-            ${searchOpen ? `<div class="advice-search-row">
-                <span class="material-symbols-rounded">search</span>
-                <input id="adviceSearchInput" value="${searchQuery}" oninput="data.onAdviceSearchInput(this)" placeholder="搜索聊天记录、日期或模型" autocomplete="off">
-                ${rawSearchQuery ? '<button onclick="data.clearAdviceSearch()" type="button" aria-label="清空搜索"><span class="material-symbols-rounded">close</span></button>' : ''}
+            ${searchOpen ? `<div class="advice-search-panel">
+                <div class="advice-search-row">
+                    <span class="material-symbols-rounded">search</span>
+                    <input id="adviceSearchInput" value="${searchQuery}" oninput="data.onAdviceSearchInput(this)" placeholder="搜索聊天记录、日期或模型" autocomplete="off">
+                    ${rawSearchQuery ? '<button onclick="data.clearAdviceSearch()" type="button" aria-label="清空搜索"><span class="material-symbols-rounded">close</span></button>' : ''}
+                </div>
+                <label class="advice-history-scope">
+                    <input type="checkbox" ${range === 'all' ? 'checked' : ''} onchange="data.toggleAdviceHistorySearchScope(this.checked)">
+                    <span class="material-symbols-rounded">history</span>
+                    <span>包含全部历史</span>
+                </label>
             </div>` : ''}
             ${ctxOpen ? `<div class="advice-context-popover">
                 <div class="advice-context-popover-head">

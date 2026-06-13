@@ -6487,6 +6487,7 @@ body.is-training .fab-pip.active {
     color: var(--md-sys-on-secondary-container);
 }
 .advice-search-toggle .material-symbols-rounded { font-size: 18px; }
+.advice-search-panel { display: grid; gap: 8px; }
 .advice-search-row {
     min-height: 38px;
     display: grid;
@@ -6521,6 +6522,23 @@ body.is-training .fab-pip.active {
     justify-content: center;
     cursor: pointer;
 }
+.advice-history-scope {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    width: fit-content;
+    min-height: 32px;
+    padding: 0 10px;
+    border-radius: var(--md-sys-shape-full);
+    background: var(--md-sys-surface-container-low);
+    color: var(--md-sys-on-surface-variant);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+}
+.advice-history-scope input { accent-color: var(--md-sys-primary); }
+.advice-history-scope .material-symbols-rounded { font-size: 16px; color: var(--md-sys-primary); }
 .advice-quick-prompts {
     display: flex;
     gap: 6px;
@@ -10089,7 +10107,7 @@ body.is-training .fab-pip.active {
 
 .ai-msg-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
 .advice-v6-chat-list { overflow: visible; min-height: 0; touch-action: pan-y; }
-.advice-history-window { display: flex; justify-content: center; padding: 2px 0 6px; }
+.advice-history-window { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; padding: 2px 0 6px; }
 .advice-history-window button { display: inline-flex; align-items: center; gap: 4px; min-height: 36px; padding: 6px 14px; border: 1px solid var(--glass-border); border-radius: 999px; background: var(--glass-bg-strong); color: var(--md-sys-on-surface-variant); font-size: 11px; font-weight: 600; cursor: pointer; box-shadow: var(--glass-shadow-inset); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); transition: transform .16s var(--md-sys-motion-spring), background .2s ease, color .2s ease; }
 .advice-history-window button:active { transform: scale(.96); background: var(--md-sys-primary-container); color: var(--md-sys-on-primary-container); }
 .advice-history-window .material-symbols-rounded { font-size: 16px; }
