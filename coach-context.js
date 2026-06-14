@@ -94,7 +94,7 @@ Object.assign(advicePanel, {
             }).join('\n');
             const formatWeights = list => list.map(w => `- ${w.date}｜${w.weight.toFixed(2)} kg`).join('\n');
             const formatRehabWeekly = list => list.map(week => {
-                const actions = (week.actions || []).map(a => `${a.name || '未命名'}（${a.status || 'continued'}${a.painLevel ? `，疼痛${a.painLevel}/10` : ''}${a.needsReview ? '，需确认' : ''}${a.coachNote ? '，' + a.coachNote : ''}）`).join('；');
+                const actions = (week.actions || []).map(a => `${a.name || '未命名'}[${a.actionId || '?'}]（${a.status || 'continued'}${a.painLevel ? `，疼痛${a.painLevel}/10` : ''}${a.needsReview ? '，需确认' : ''}${a.progressesFrom ? '，进阶自:' + a.progressesFrom : ''}${a.coachNote ? '，' + a.coachNote : ''}）`).join('；');
                 const extras = [];
                 if (week.visitDate) extras.push(`就诊:${week.visitDate}`);
                 if (week.homework) extras.push(`作业:${week.homework}`);

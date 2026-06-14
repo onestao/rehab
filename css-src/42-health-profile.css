@@ -577,6 +577,11 @@
 .baseline-item strong { display: block; font-size: 13px; }
 .baseline-item small { display: block; color: var(--md-sys-on-surface-variant); font-size: 11px; line-height: 15px; }
 .rehab-week-date-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.rehab-week-date-grid .md-field,
+.rehab-week-date-grid input[type="date"] { min-width: 0; }
+@media (max-width: 480px) {
+    .rehab-week-date-grid { grid-template-columns: 1fr; }
+}
 .rehab-prescription-field textarea { min-height: 118px; }
 .rehab-week-chips { display: flex; gap: 6px; overflow-x: auto; padding: 8px 0 2px; }
 .rehab-week-chips .md-chip { flex: 0 0 auto; }

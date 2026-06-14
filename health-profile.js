@@ -60,6 +60,26 @@
         return `exam-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
     }
 
+    function generateRehabActionId() {
+        return `ra-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    }
+
+    function rehabSpecSummary(spec) {
+        if (!spec) return '-';
+        const mode = String(spec.mode || 'reps');
+        if (mode.includes('hold')) return `${spec.sets || '?'}组×${spec.work || '?'}秒`;
+        return `${spec.sets || '?'}组×${spec.reps || '?'}次${mode.includes('alt') ? '/侧' : ''}`;
+    }
+
+    function rehabActionNameMatch(nameA, nameB) {
+        const a = String(nameA || '').trim();
+        const b = String(nameB || '').trim();
+        if (!a || !b) return 'none';
+        if (a === b) return 'exact';
+        if (a.includes(b) || b.includes(a)) return 'partial';
+        return 'none';
+    }
+
     function extractJsonObject(raw = '') {
         const text = String(raw || '').trim();
         try { return JSON.parse(text); } catch {}
@@ -81,7 +101,144 @@
             return this.dateKey ? this.dateKey(d) : d.toISOString().slice(0, 10);
         },
 
+        migrateRehabActionIds() {
+            if (!this.db?.health?.rehabWeekly?.length) return;
+            if (this.db.health._rehabMigrationV >= 1) return;
+            let changed = false;
+            (this.db.health.rehabWeekly || []).forEach(week => {
+                (week.actions || []).forEach((action, idx, arr) => {
+                    if (!action.actionId) {
+                        action.actionId = generateRehabActionId();
+                        changed = true;
+                    }
+                    if (typeof action.progressesFrom === 'number') {
+                        const target = arr[action.progressesFrom];
+                        action.progressesFrom = target?.actionId || undefined;
+                        changed = true;
+                    }
+                });
+            });
+            this.db.health._rehabMigrationV = 1;
+            if (changed) {
+                this.saveAndBackup?.() || this.save?.();
+            }
+        },
+
+        buildRetroactiveLinks() {
+            const weeks = this.latestRehabWeekly?.(Number.MAX_SAFE_INTEGER) || [];
+            if (weeks.length < 2) return { autoLinked: [], candidates: [], stats: { auto: 0, candidate: 0 } };
+            const chronological = weeks.slice().reverse();
+            const knownActions = new Map();
+            const autoLinked = [];
+            const candidates = [];
+            chronological.forEach((week, wIdx) => {
+                (week.actions || []).forEach(action => {
+                    const id = action.actionId;
+                    if (!id) return;
+                    if (action.progressesFrom) { knownActions.set(id, action); return; }
+                    let bestMatch = null;
+                    let bestConfidence = 'none';
+                    for (const [prevId, prevAction] of knownActions) {
+                        if (prevId === id) continue;
+                        const nameMatch = rehabActionNameMatch(action.name, prevAction.name);
+                        if (nameMatch === 'none') continue;
+                        const sameBodyPart = !action.bodyPart || !prevAction.bodyPart || action.bodyPart === prevAction.bodyPart;
+                        if (!sameBodyPart) continue;
+                        if (nameMatch === 'exact') { bestMatch = prevAction; bestConfidence = 'high'; break; }
+                        if (nameMatch === 'partial' && bestConfidence !== 'high') { bestMatch = prevAction; bestConfidence = 'medium'; }
+                    }
+                    if (bestMatch && bestConfidence === 'high') {
+                        autoLinked.push({ actionId: id, name: action.name, bodyPart: action.bodyPart, weekStart: week.weekStart, fromId: bestMatch.actionId, fromName: bestMatch.name, confidence: 'high' });
+                        action.progressesFrom = bestMatch.actionId;
+                    } else if (bestMatch && bestConfidence === 'medium') {
+                        candidates.push({ actionId: id, name: action.name, bodyPart: action.bodyPart, weekStart: week.weekStart, fromId: bestMatch.actionId, fromName: bestMatch.name, confidence: 'medium' });
+                    }
+                    knownActions.set(id, action);
+                });
+            });
+            return { autoLinked, candidates, stats: { auto: autoLinked.length, candidate: candidates.length } };
+        },
+
+        renderRetroactiveLinkBanner() {
+            if ((this.db.health?._rehabMigrationV || 0) >= 2) return '';
+            const weeks = this.latestRehabWeekly?.(Number.MAX_SAFE_INTEGER) || [];
+            if (weeks.length < 2) return '';
+            const hasUnlinked = weeks.some(w => (w.actions || []).some(a => a.actionId && !a.progressesFrom));
+            if (!hasUnlinked) return '';
+            return `<div class="rehab-retroactive-banner">
+                <span class="material-symbols-rounded">link</span>
+                <div><strong>发现历史动作可能存在跨周关联</strong><small>精确匹配将自动建链，近似匹配需您确认</small></div>
+                <button class="md-btn md-btn-tonal" type="button" onclick="data.runRetroactiveLink()">批量处理</button>
+                <button class="md-icon-btn" type="button" onclick="this.closest('.rehab-retroactive-banner').remove()" title="稍后再说"><span class="material-symbols-rounded">close</span></button>
+            </div>`;
+        },
+
+        runRetroactiveLink() {
+            const result = this.buildRetroactiveLinks();
+            if (!result.autoLinked.length && !result.candidates.length) {
+                window.toast?.show?.('没有发现需要关联的历史动作', 'info');
+                this.db.health._rehabMigrationV = 2;
+                this.save?.();
+                return;
+            }
+            const autoSection = result.autoLinked.length ? `<div class="retroactive-section">
+                <h4><span class="material-symbols-rounded">check_circle</span> 自动关联（名称+部位精确匹配）— ${result.autoLinked.length} 条</h4>
+                <div class="retroactive-list">${result.autoLinked.map(l =>
+                    `<div class="retroactive-item is-auto"><span>${esc(this, l.fromName)}</span><span class="material-symbols-rounded">arrow_forward</span><span>${esc(this, l.name)}</span><small>${esc(this, l.weekStart || '')}</small></div>`
+                ).join('')}</div>
+            </div>` : '';
+            const candidateSection = result.candidates.length ? `<div class="retroactive-section">
+                <h4><span class="material-symbols-rounded">help</span> 需确认（名称相似但不完全一致）— ${result.candidates.length} 条</h4>
+                <div class="retroactive-list">${result.candidates.map((c, i) =>
+                    `<div class="retroactive-item is-candidate" data-candidate-index="${i}">
+                        <div><span>${esc(this, c.fromName)}</span><span class="material-symbols-rounded">arrow_forward</span><span>${esc(this, c.name)}</span><small>${esc(this, c.weekStart || '')}</small></div>
+                        <div class="retroactive-actions">
+                            <button class="md-btn md-btn-tonal" type="button" onclick="data.acceptRetroactiveCandidate(${i})"><span class="material-symbols-rounded">check</span> 是同一动作</button>
+                            <button class="md-btn md-btn-tonal" type="button" onclick="this.closest('.retroactive-item').remove()"><span class="material-symbols-rounded">close</span> 不是</button>
+                        </div>
+                    </div>`
+                ).join('')}</div>
+            </div>` : '';
+            this._retroactiveCandidates = result.candidates;
+            this._confirmModal?.({
+                title: '历史动作关联回溯',
+                icon: 'link',
+                message: `精确匹配 ${result.autoLinked.length} 条（已自动关联），近似匹配 ${result.candidates.length} 条（需确认）`,
+                html: `${autoSection}${candidateSection}`,
+                okText: result.candidates.length ? '全部接受并完成' : '完成回溯',
+                cancelText: '稍后再说',
+                onOk: () => {
+                    (this._retroactiveCandidates || []).forEach(c => {
+                        const weeks = this.db.health?.rehabWeekly || [];
+                        for (const week of weeks) {
+                            const action = (week.actions || []).find(a => a.actionId === c.actionId);
+                            if (action) { action.progressesFrom = c.fromId; break; }
+                        }
+                    });
+                    this.db.health._rehabMigrationV = 2;
+                    this.saveAndBackup?.() || this.save?.();
+                    this._retroactiveCandidates = null;
+                    window.toast?.show?.('历史动作关联已完成', 'success');
+                    this.renderHistory?.();
+                }
+            });
+        },
+
+        acceptRetroactiveCandidate(index) {
+            const c = this._retroactiveCandidates?.[index];
+            if (!c) return;
+            const weeks = this.db.health?.rehabWeekly || [];
+            for (const week of weeks) {
+                const action = (week.actions || []).find(a => a.actionId === c.actionId);
+                if (action) { action.progressesFrom = c.fromId; break; }
+            }
+            const el = document.querySelector(`[data-candidate-index="${index}"]`);
+            if (el) { el.classList.add('is-accepted'); el.querySelector('.retroactive-actions').innerHTML = '<span class="material-symbols-rounded">check_circle</span> 已关联'; }
+            this.save?.();
+        },
+
         latestRehabWeekly(limit = 3) {
+            this.migrateRehabActionIds();
             return (this.activeRecords?.(this.db.health?.rehabWeekly || []) || [])
                 .slice()
                 .sort((a, b) => String(b.weekStart || '').localeCompare(String(a.weekStart || '')) || Number(b.updatedAt || 0) - Number(a.updatedAt || 0))
@@ -133,7 +290,9 @@
                     <button class="md-btn md-btn-tonal profile-edit-btn" onclick="data.openRehabWeeklySheet('${esc(this, week.weekStart || '')}')" type="button"><span class="material-symbols-rounded">edit</span> 编辑</button>
                 </div>`;
             }).join('');
+            const retroactiveBanner = this.renderRetroactiveLinkBanner?.() || '';
             return `<div class="md-card rehab-week-card">
+                ${retroactiveBanner}
                 <div class="rehab-week-glass-summary">
                     <div class="rehab-week-stat"><strong>${actions.length || 0}</strong><small>动作</small></div>
                     <div class="rehab-week-stat"><strong>${newCount}</strong><small>新增</small></div>
@@ -602,13 +761,72 @@
                     painLevel: Number(action.painLevel || 0),
                     coachNote: action.coachNote || '',
                     confidence: Number(action.confidence || 0),
-                    progressesFrom: action.progressesFrom !== undefined ? action.progressesFrom : null
+                    progressesFrom: action.progressesFrom !== undefined && action.progressesFrom !== null ? String(action.progressesFrom) : null
                 }))
             }));
         },
 
+        buildRehabActionFingerprint(lookbackWeeks = 6, safetyThreshold = 4) {
+            const weeks = this.latestRehabWeekly?.(lookbackWeeks) || [];
+            if (!weeks.length) return '';
+            const actionMap = new Map();
+            weeks.forEach((week, weekIndex) => {
+                const weekLabel = `W${weekIndex + 1}`;
+                const isSafetyOnly = weekIndex >= safetyThreshold;
+                (week.actions || []).forEach(action => {
+                    const id = action.actionId || '';
+                    if (!id) return;
+                    if (!actionMap.has(id)) {
+                        actionMap.set(id, {
+                            actionId: id,
+                            name: action.name || '',
+                            bodyPart: action.bodyPart || '',
+                            latestStatus: normalizeRehabStatus(action.status),
+                            weekLabels: [],
+                            latestSpec: action.spec,
+                            maxPain: 0,
+                            note: '',
+                            conditionId: action.conditionId || '',
+                            isSafetyOnly
+                        });
+                    }
+                    const entry = actionMap.get(id);
+                    entry.weekLabels.push(weekLabel);
+                    entry.maxPain = Math.max(entry.maxPain, Number(action.painLevel || 0));
+                    if (!entry.note && action.coachNote) entry.note = String(action.coachNote).slice(0, 40);
+                    if (weekIndex === 0) {
+                        entry.latestStatus = normalizeRehabStatus(action.status);
+                        entry.latestSpec = action.spec;
+                        entry.name = action.name || entry.name;
+                        entry.bodyPart = action.bodyPart || entry.bodyPart;
+                        entry.conditionId = action.conditionId || entry.conditionId;
+                    }
+                });
+            });
+            if (!actionMap.size) return '';
+            const rows = [];
+            rows.push('ID｜动作名｜部位｜状态｜出现周｜规格｜疼痛｜备注');
+            const sorted = [...actionMap.values()].sort((a, b) => {
+                const statusOrder = { continued: 0, progressed: 0, new: 1, watch: 2, dropped: 3 };
+                return (statusOrder[a.latestStatus] ?? 4) - (statusOrder[b.latestStatus] ?? 4);
+            });
+            for (const entry of sorted) {
+                const statusLabel = entry.latestStatus + (entry.isSafetyOnly ? '(仅安全参考)' : '');
+                rows.push([
+                    entry.actionId,
+                    entry.name,
+                    entry.bodyPart || '-',
+                    statusLabel,
+                    entry.weekLabels.join(','),
+                    rehabSpecSummary(entry.latestSpec),
+                    entry.maxPain ? `${entry.maxPain}/10` : '0',
+                    entry.note || ''
+                ].join('｜'));
+            }
+            return '【历史动作指纹表】\n' + rows.join('\n');
+        },
+
         buildRehabWeeklyPrompt(text = '', weekStart = '', visitDate = '') {
-            const recent = this.recentRehabWeeklyContext?.(3) || [];
             const p = this.db?.health?.profile || {};
             const tpl = window.dataAiTemplates;
             const prefResult = tpl?.buildPromptMessages('rehab_weekly_parse', {}, this.db) || {};
@@ -634,7 +852,7 @@
             const confidenceThreshold = prefs.lowConfidenceThreshold || 80;
             return [
                 prefSys || '你是康复训练处方结构化助手。用户只能提供康复师的自然语言描述，你需要把它解析为本周康复处方。\n必须只返回严格 JSON，不要 Markdown，不要解释。',
-                'JSON 结构：{"weekStart":"YYYY-MM-DD","visitDate":"YYYY-MM-DD","therapistAssessment":"...","homework":"...","actions":[{"name":"标准化动作名","rawDescription":"用户原话片段","bodyPart":"膝|踝|髋|腰背|肩|肘腕|颈|全身|其他","conditionId":"健康档案病症ID或空字符串","conditionLabel":"对应病症名称或空字符串","status":"new|continued|progressed|dropped|watch","confidence":0-100,"spec":{"sets":number,"reps":number,"work":number,"mode":"reps|hold|alt-reps|alt-hold","actionRest":number}|null,"painLevel":0-10,"coachNote":"...","needsReview":true|false,"progressesFrom":number|null}]}',
+                'JSON 结构：{"weekStart":"YYYY-MM-DD","visitDate":"YYYY-MM-DD","therapistAssessment":"...","homework":"...","actions":[{"name":"标准化动作名","rawDescription":"用户原话片段","bodyPart":"膝|踝|髋|腰背|肩|肘腕|颈|全身|其他","conditionId":"健康档案病症ID或空字符串","conditionLabel":"对应病症名称或空字符串","status":"new|continued|progressed|dropped|watch","confidence":0-100,"spec":{"sets":number,"reps":number,"work":number,"mode":"reps|hold|alt-reps|alt-hold","actionRest":number}|null,"painLevel":0-10,"coachNote":"...","needsReview":true|false,"progressesFrom":"历史动作指纹表中的actionId"|null}]}',
                 '规则：',
                 '- name 要尽量归一化为可执行动作名；如果不确定，在 name 中保留候选，如"弹力带髋外展 / 蚌式开合"。',
                 '- bodyPart 表示该动作或诊断主要影响部位；能判断时必须填写膝/踝/髋/腰背/肩/肘腕/颈/全身/其他之一。',
@@ -643,12 +861,15 @@
                 `- 低置信动作 confidence < ${confidenceThreshold} 或疼痛 >= ${painThreshold} 必须 needsReview=true。`,
                 '- dropped 动作 spec 可以为 null。',
                 '- 不要编造用户没提到的动作。',
-                '- progressesFrom 表示该动作是从哪个动作进阶/变化而来的（填写原始 actions 数组的索引），如果没有则为 null。',
+                '- progressesFrom 表示该动作是从【历史动作指纹表】中哪个动作进阶/变化而来的（填写该动作的 ID，如 "ra-xxx-xxx"），如果不是进阶则为 null。',
+                '- 如果本周动作与指纹表中某动作名称相同或为其进阶版本（如加量/改强度/换变体），填写对应 ID 并设 status 为 continued 或 progressed。',
+                '- 不要为指纹表中未提及的动作编造 progressesFrom。',
                 '- 如果用户健康档案中有训练禁忌或损伤，coachNote 中必须提醒注意事项；避免推荐会加重伤情的动作。',
                 profileBlock ? `\n【用户健康档案】\n${profileBlock}` : '',
                 `本周开始：${weekStart || '未知'}`,
                 `复诊日期：${visitDate || '未知'}`,
-                `最近3周处方：${JSON.stringify(recent)}`,
+                this.buildRehabActionFingerprint(6, 4) || '暂无历史处方',
+                prefs.includeLastRawText ? `上周原始描述（仅供参考）：${String((this.latestRehabWeekly?.(1)?.[0]?.rawText) || '').slice(0, 300)}` : '',
                 `用户本周描述：${text}`
             ].filter(Boolean).join('\n');
         },
@@ -662,6 +883,7 @@
                 const confidence = Math.max(0, Math.min(100, Math.round(Number(action.confidence || 0)) || 75));
                 const bodyPart = String(action.bodyPart || inferBodyPart(`${name} ${action.rawDescription || action.raw || ''} ${action.coachNote || ''}`) || '').slice(0, 20);
                 return {
+                    actionId: String(action.actionId || '').trim() || generateRehabActionId(),
                     name,
                     rawDescription: String(action.rawDescription || action.raw || '').slice(0, 220),
                     ...(bodyPart ? { bodyPart } : {}),
@@ -673,7 +895,7 @@
                     painLevel,
                     coachNote: String(action.coachNote || '').slice(0, 240),
                     needsReview: !!action.needsReview || confidence < 80 || painLevel >= 4,
-                    progressesFrom: action.progressesFrom !== undefined && action.progressesFrom !== null ? Number(action.progressesFrom) : undefined
+                    progressesFrom: action.progressesFrom !== undefined && action.progressesFrom !== null ? String(action.progressesFrom) : undefined
                 };
             }).filter(Boolean);
             return {
@@ -707,6 +929,35 @@
                 const parsed = extractJsonObject(result);
                 if (!parsed) throw new Error('AI 返回不是有效 JSON');
                 const draft = this.normalizeRehabWeeklyPayload(parsed, { weekStart, visitDate, rawText });
+                // Auto-mark previously active actions as dropped if not mentioned this week
+                const prevWeek = this.latestRehabWeekly?.(1)?.[0];
+                if (prevWeek?.actions?.length) {
+                    const mentionedIds = new Set(draft.actions.map(a => a.progressesFrom).filter(Boolean));
+                    const mentionedNames = new Set(draft.actions.map(a => (a.name || '').trim().toLowerCase()));
+                    (prevWeek.actions || []).forEach(prevAction => {
+                        if (normalizeRehabStatus(prevAction.status) === 'dropped') return;
+                        const prevId = prevAction.actionId || '';
+                        const prevName = (prevAction.name || '').trim().toLowerCase();
+                        const alreadyReferenced = (prevId && mentionedIds.has(prevId)) || mentionedNames.has(prevName) || draft.actions.some(a => a.actionId === prevId);
+                        if (!alreadyReferenced && prevId) {
+                            draft.actions.push({
+                                actionId: prevAction.actionId,
+                                name: prevAction.name || '未命名',
+                                rawDescription: '',
+                                bodyPart: prevAction.bodyPart || '',
+                                conditionId: prevAction.conditionId || '',
+                                conditionLabel: prevAction.conditionLabel || '',
+                                status: 'dropped',
+                                confidence: 50,
+                                spec: null,
+                                painLevel: 0,
+                                coachNote: '本周未提及，疑似暂停',
+                                needsReview: true,
+                                progressesFrom: undefined
+                            });
+                        }
+                    });
+                }
                 if (!draft.actions.length) throw new Error('AI 未解析出可用动作');
                 this._rehabWeeklyDraft = draft;
                 this.renderRehabWeeklyDraft();
@@ -752,11 +1003,20 @@
 
         renderRehabActionReview(action, index, allActions) {
             const status = normalizeRehabStatus(action.status);
-            const otherActions = (allActions || []).filter((_, i) => i !== index);
-            const progressesFromOptions = otherActions.map((a, i) => {
-                const origIndex = (allActions || []).indexOf(a);
-                return `<option value="${origIndex}" ${action.progressesFrom === origIndex ? 'selected' : ''}>${esc(this, a.name)}</option>`;
-            }).join('');
+            const otherCurrentActions = (allActions || []).filter((_, i) => i !== index);
+            const historyActions = (this.latestRehabWeekly?.(3) || []).flatMap((week, wIdx) =>
+                (week.actions || []).filter(ha => ha.actionId && !otherCurrentActions.some(ca => ca.actionId === ha.actionId) && ha.actionId !== action.actionId)
+                    .map(ha => ({ actionId: ha.actionId, name: ha.name || '未命名', weekLabel: `W${wIdx + 1}` }))
+            );
+            const seen = new Set();
+            const dedupedHistory = historyActions.filter(h => { if (seen.has(h.actionId)) return false; seen.add(h.actionId); return true; });
+            const currentOptions = otherCurrentActions.filter(a => a.actionId).map(a =>
+                `<option value="${esc(this, a.actionId)}" ${action.progressesFrom === a.actionId ? 'selected' : ''}>${esc(this, a.name)}(本周)</option>`
+            ).join('');
+            const historyOptions = dedupedHistory.map(h =>
+                `<option value="${esc(this, h.actionId)}" ${action.progressesFrom === h.actionId ? 'selected' : ''}>${esc(this, h.name)}(${h.weekLabel})</option>`
+            ).join('');
+            const progressesFromOptions = currentOptions + (historyOptions ? `<option disabled>──历史──</option>${historyOptions}` : '');
             return `<div class="rehab-action-review" data-rehab-action-index="${index}">
                 <div class="rehab-action-review-head">
                     <div><strong>${esc(this, action.name)}</strong><small>${esc(this, action.rawDescription || action.coachNote || '')}</small></div>
@@ -801,7 +1061,7 @@
                 action.needsReview = action.needsReview || action.painLevel >= 4 || Number(action.confidence || 100) < 80;
                 if (action.status === 'dropped') action.spec = null;
                 const pf = row.querySelector('[data-field="progressesFrom"]')?.value;
-                action.progressesFrom = pf !== undefined && pf !== '' ? Number(pf) : undefined;
+                action.progressesFrom = pf !== undefined && pf !== '' ? String(pf) : undefined;
             });
             return draft;
         },

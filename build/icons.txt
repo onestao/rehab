@@ -2,6 +2,7 @@ accessibility_new
 add
 add_circle
 arrow_back
+arrow_forward
 assignment
 auto_awesome
 backup
@@ -68,6 +69,7 @@ keyboard_arrow_up
 library_books
 light_mode
 linear_scale
+link
 local_fire_department
 lock
 lock_open

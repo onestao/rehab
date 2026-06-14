@@ -302,6 +302,7 @@
                 therapistAssessment: week.therapistAssessment || '',
                 homework: week.homework || '',
                 actions: (week.actions || []).map((action) => ({
+                    actionId: action.actionId || '',
                     name: action.name || '',
                     status: action.status || 'continued',
                     rawDescription: action.rawDescription || '',
@@ -310,7 +311,8 @@
                     painLevel: Number(action.painLevel || 0),
                     confidence: Number(action.confidence || 0),
                     needsReview: !!action.needsReview,
-                    coachNote: action.coachNote || ''
+                    coachNote: action.coachNote || '',
+                    progressesFrom: action.progressesFrom || null
                 }))
             }));
     }

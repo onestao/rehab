@@ -315,6 +315,10 @@
                     { value: 'strict', label: '严格' },
                     { value: 'moderate', label: '适中' }
                 ]},
+                { key: 'includeLastRawText', label: '附带上周原文', type: 'chips', options: [
+                    { value: false, label: '不附带' },
+                    { value: true, label: '附带（fallback）' }
+                ]},
                 { key: 'customNote', label: '自定义补充', type: 'textarea' }
             ]
         },
