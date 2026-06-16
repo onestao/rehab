@@ -15,7 +15,7 @@ const STATUS_ICON_RE = /:\s*\[\s*["']([a-z][a-z0-9_]*)["']\s*,/g;
 const ICON_TEXT_ASSIGN_RE = /(?:innerText|textContent)\s*=\s*[^;\n]*(?:\?\s*)?["']([a-z][a-z0-9_]*)["'](?:\s*:\s*["']([a-z][a-z0-9_]*)["'])?/g;
 const SPORT_RETURN_RE = /return\s+["']([a-z][a-z0-9_]*)["']/g;
 const CONTEXT_RADIUS = 200;
-const SKIP_DIRS = new Set(['.git', 'build', 'scripts']);
+const SKIP_DIRS = new Set(['.git', 'build', 'scripts', 'node_modules', '.gemini']);
 
 function shouldSkipFile(fullPath) {
     const rel = path.relative(root, fullPath).replace(/\\/g, '/');

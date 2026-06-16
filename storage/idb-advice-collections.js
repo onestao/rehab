@@ -40,6 +40,40 @@
             });
         },
 
+        getAllIds: function () {
+            return window.storageIdb.open().then(function (db) {
+                return new Promise(function (resolve, reject) {
+                    var tx = db.transaction(STORE_NAME, 'readonly');
+                    var store = tx.objectStore(STORE_NAME);
+                    // Open cursor on 'byUpdatedAt' to maintain chronological order
+                    var request = store.index('byUpdatedAt').openCursor(null, 'next');
+                    var ids = [];
+                    request.onsuccess = function () {
+                        var cursor = request.result;
+                        if (!cursor) {
+                            txDone(tx).then(function () { resolve(ids); }, function () { resolve(ids); });
+                            return;
+                        }
+                        ids.push(cursor.value.id);
+                        cursor.continue();
+                    };
+                    request.onerror = function () { reject(request.error || new Error('IDB cursor failed')); };
+                });
+            });
+        },
+
+        getByIds: function (ids) {
+            if (!Array.isArray(ids) || !ids.length) return Promise.resolve([]);
+            return window.storageIdb.open().then(function (db) {
+                var tx = db.transaction(STORE_NAME, 'readonly');
+                var store = tx.objectStore(STORE_NAME);
+                var promises = ids.map(function (id) { return requestToPromise(store.get(id)); });
+                return Promise.all(promises).then(function (results) {
+                    return txDone(tx).then(function () { return results; });
+                });
+            });
+        },
+
         getSince: function (ts) {
             return window.storageIdb.open().then(function (db) {
                 var tx = db.transaction(STORE_NAME, 'readonly');

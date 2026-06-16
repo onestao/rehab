@@ -134,7 +134,23 @@ const backup = {
         if (!data.db || typeof data.db !== 'object') {
             throw new Error('数据为空，无法构建归档');
         }
-        const dbStr = JSON.stringify(data.db);
+        let dbToExport = data.db;
+        if (window.adviceCollections) {
+            try {
+                const allAdvice = await window.adviceCollections.getAll();
+                if (allAdvice && allAdvice.length > 0) {
+                    dbToExport = Object.assign({}, data.db, {
+                        health: Object.assign({}, data.db.health || {}, {
+                            aiAdviceChat: allAdvice
+                        })
+                    });
+                }
+            } catch (err) {
+                console.warn('[backup] failed to get full advice for export', err);
+            }
+        }
+
+        const dbStr = JSON.stringify(dbToExport);
         const sizeMB = dbStr.length / (1024 * 1024);
         if (sizeMB > 8) console.warn('[backup] db over 8MB, consider purge');
         const checksum = await sha256Hex(dbStr);
@@ -145,19 +161,19 @@ const backup = {
         const payload = {
             app: '训练助手',
             exportedAt: new Date().toISOString(),
-            schemaVersion: data.db.schemaVersion || data.SCHEMA_VERSION || 1,
+            schemaVersion: dbToExport.schemaVersion || data.SCHEMA_VERSION || 1,
             itemCounts: {
-                actions: data.db.actions?.length || 0,
-                routines: data.db.routines?.length || 0,
-                history: data.db.history?.length || 0,
-                dailyPlans: data.db.dailyPlans?.length || 0,
-                food: data.db.health?.foodLogs?.length || 0,
-                exercise: data.db.health?.exerciseLogs?.length || 0,
-                weight: data.db.health?.weights?.length || 0,
-                advice: data.db.health?.aiAdviceChat?.length || 0
+                actions: dbToExport.actions?.length || 0,
+                routines: dbToExport.routines?.length || 0,
+                history: dbToExport.history?.length || 0,
+                dailyPlans: dbToExport.dailyPlans?.length || 0,
+                food: dbToExport.health?.foodLogs?.length || 0,
+                exercise: dbToExport.health?.exerciseLogs?.length || 0,
+                weight: dbToExport.health?.weights?.length || 0,
+                advice: dbToExport.health?.aiAdviceChat?.length || 0
             },
             checksum,
-            db: data.db
+            db: dbToExport
         };
         const jsonStr = JSON.stringify(payload);
         const blob = await gzipBlob(jsonStr);
@@ -351,7 +367,20 @@ const backup = {
                             throw new Error('快照数据格式无效');
                         }
                         data.db = nextDb;
+                        if (window.storageMigrate?.migrateAdviceToVersioned) {
+                            data.db = window.storageMigrate.migrateAdviceToVersioned(data.db);
+                        }
+                        if (window.adviceCollections && Array.isArray(data.db.health?.aiAdviceChat)) {
+                            await window.adviceCollections.clear();
+                            await window.adviceCollections.putMany(data.db.health.aiAdviceChat);
+                            if (data.db.health.aiAdviceChat.length > 50) {
+                                data.db.health.aiAdviceChat = data.db.health.aiAdviceChat.slice(-50);
+                            }
+                        }
                         data.normalizeDb();
+                        if (typeof data._initAdviceApi === 'function') {
+                            await data._initAdviceApi();
+                        }
                         data.save({ render: false });
                         await data.flush();
                         data.render();
@@ -486,7 +515,17 @@ const backup = {
             if (window.storageMigrate?.migrateAdviceToVersioned) {
                 data.db = window.storageMigrate.migrateAdviceToVersioned(data.db);
             }
+            if (window.adviceCollections && Array.isArray(data.db.health?.aiAdviceChat)) {
+                await window.adviceCollections.clear();
+                await window.adviceCollections.putMany(data.db.health.aiAdviceChat);
+                if (data.db.health.aiAdviceChat.length > 50) {
+                    data.db.health.aiAdviceChat = data.db.health.aiAdviceChat.slice(-50);
+                }
+            }
             data.normalizeDb();
+            if (typeof data._initAdviceApi === 'function') {
+                await data._initAdviceApi();
+            }
             data.save({ render: false });
             await data.flush();
             if (typeof ai !== 'undefined') await ai.init({ saveData: true, renderData: false });

@@ -111,11 +111,6 @@ const advicePanel = {
             autoResizeAdvicePrompt: this.autoResizeAdvicePrompt,
             adviceRangeStart: this.adviceRangeStart,
             filterByAdviceRange: this.filterByAdviceRange,
-            visibleAdviceMessages: this.visibleAdviceMessages,
-            visibleAdviceWindowMessages: this.visibleAdviceWindowMessages,
-            countAdviceMessages: this.countAdviceMessages,
-            resetAdviceRenderWindow: this.resetAdviceRenderWindow,
-            expandAdviceRenderWindow: this.expandAdviceRenderWindow,
             adviceMessageSummary: this.adviceMessageSummary,
             iconFallbackSrcs: this.iconFallbackSrcs,
             adviceModelIconHtml: this.adviceModelIconHtml,
@@ -1532,147 +1527,157 @@ const advicePanel = {
         this.rerenderAdvicePanel?.({ expandChrome: true, focusSearch: true });
     },
 
-    adviceSearchTimestamp(record) {
-        const updatedAt = Number(record?.updatedAt || 0);
-        if (Number.isFinite(updatedAt) && updatedAt > 0) return updatedAt;
-        const at = new Date(record?.at || record?.date || 0).getTime();
-        return Number.isFinite(at) ? at : 0;
-    },
-
-    adviceRecordMatchesSearch(record, query = '') {
-        const term = String(query || '').trim().toLowerCase();
-        if (!term || !record || record.deleted) return false;
-        const dateText = record.at ? this.logicalDateKey?.(this.parseHistoryDate(record.at)) : '';
-        return [
-            record.content,
-            record.model,
-            record.provider,
-            record.role,
-            record.id,
-            record.at,
-            dateText
-        ].some(value => String(value || '').toLowerCase().includes(term));
-    },
-
-    searchAdviceWorkingSet(query = '', limit = 20) {
-        const max = Math.max(1, Number(limit) || 20);
-        const records = this.activeRecords(this.db?.health?.aiAdviceChat || []);
-        const matchesSearch = this.adviceRecordMatchesSearch || advicePanel.adviceRecordMatchesSearch;
-        const timestamp = this.adviceSearchTimestamp || advicePanel.adviceSearchTimestamp;
-        return records
-            .filter(record => matchesSearch.call(this, record, query))
-            .sort((a, b) => timestamp.call(this, b) - timestamp.call(this, a))
-            .slice(0, max);
-    },
-
-    mergeAdviceSearchResults(primary = [], secondary = [], limit = 20) {
-        const max = Math.max(1, Number(limit) || 20);
-        const byId = new Map();
-        const timestamp = this.adviceSearchTimestamp || advicePanel.adviceSearchTimestamp;
-        [...(primary || []), ...(secondary || [])].forEach(record => {
-            if (!record || record.deleted) return;
-            const key = record.id || `${record.role || ''}:${record.at || ''}:${record.content || ''}`;
-            if (!byId.has(key)) byId.set(key, record);
-        });
-        return Array.from(byId.values())
-            .sort((a, b) => timestamp.call(this, b) - timestamp.call(this, a))
-            .slice(0, max);
-    },
-
-    async loadAdviceWindowFromColdStore(limit = this._adviceRenderLimit || 80) {
-        const store = this.advice || window.dataStore?.advice;
-        const max = Math.max(50, Number(limit) || 80);
-        const fallback = () => this.activeRecords(this.db?.health?.aiAdviceChat || []);
-        if (!store || typeof store.getPage !== 'function') return fallback();
-        if (this._adviceSending) return fallback();
-        const memoryCount = (this.db?.health?.aiAdviceChat || []).length;
-        let total = memoryCount;
-        try {
-            if (typeof store.count === 'function') total = Math.max(memoryCount, Number(await store.count()) || 0);
-        } catch {
-            total = memoryCount;
-        }
-        const target = Math.min(Math.max(max, memoryCount), total || max);
-        if (target <= memoryCount) return fallback();
-        const records = await store.getPage(0, target);
-        const chronological = (Array.isArray(records) ? records : []).reverse();
-        if (chronological.length) {
-            this.db.health.aiAdviceChat = chronological;
-            store.workingSet = chronological;
-        }
-        return fallback();
-    },
 
     async refreshAdviceSearchResults() {
         const list = this._adviceMessageList?.();
-        const summary = document.getElementById('adviceMessageSummary');
+        const summary = document.getElementById('adviceSearchSummary') || document.getElementById('adviceMessageSummary');
         if (!list) return;
 
         const query = String(this.adviceSearchQuery || '').trim();
         const requestId = Number(this._adviceSearchRequestId || 0) + 1;
-        const searchLimit = 20;
         this._adviceSearchRequestId = requestId;
-        let messages = [];
+
+        if (!window.dataStore?.advice?.getItem) {
+            console.error('[Advice Virtualizer] dataStore.advice not initialized');
+            return;
+        }
+
+        // Initialize Virtualizer
+        if (!this._virtualizer || this._virtualizer.options.getScrollElement() !== list) {
+            if (typeof window.VirtualCore === 'undefined' || !window.VirtualCore.Virtualizer) {
+                console.error('[Advice Virtualizer] VirtualCore not loaded');
+                return;
+            }
+            this._virtualizer = new window.VirtualCore.Virtualizer({
+                count: window.dataStore.advice.activeIdsRef.length,
+                getScrollElement: () => list,
+                estimateSize: () => 120, // default height
+                overscan: 5,
+                onChange: (instance) => {
+                    this._renderVirtualSlice(list, instance);
+                }
+            });
+
+            // Listen to segment load events for re-render
+            window.addEventListener('aiAdvice:segmentLoaded', () => {
+                if (this._virtualizer) this._virtualizer.measure();
+            });
+        }
 
         if (query) {
             if (query.length < 2) {
                 list.innerHTML = '<div class="empty-state advice-empty"><span class="material-symbols-rounded">keyboard</span><p>输入至少 2 个字符后搜索历史记录</p></div>';
                 if (summary) summary.textContent = '历史聊天不会预加载；输入至少 2 个字符后按需搜索';
+                window.dataStore.advice.setSearchResults([]);
+                window.dataStore.advice.setMode('search');
                 return;
             }
             if (summary) summary.textContent = `正在按需搜索历史记录“${query}”...`;
-            list.innerHTML = '<div class="empty-state advice-empty"><span class="material-symbols-rounded">manage_search</span><p>正在搜索冷历史记录</p></div>';
-            let results = [];
-            try {
-                const searchWorkingSet = this.searchAdviceWorkingSet || advicePanel.searchAdviceWorkingSet;
-                const mergeResults = this.mergeAdviceSearchResults || advicePanel.mergeAdviceSearchResults;
-                const coldResults = await window.dataStore.advice.search(query, searchLimit);
-                const workingSetResults = searchWorkingSet.call(this, query, searchLimit);
-                results = mergeResults.call(this, coldResults, workingSetResults, searchLimit);
-            } catch (e) {
-                const searchWorkingSet = this.searchAdviceWorkingSet || advicePanel.searchAdviceWorkingSet;
-                results = searchWorkingSet.call(this, query, searchLimit);
-                if (!results.length) {
-                    if (requestId !== this._adviceSearchRequestId || query !== String(this.adviceSearchQuery || '').trim()) return;
-                    console.error('Failed to search advice history', e);
-                    list.innerHTML = '<div class="empty-state advice-empty"><span class="material-symbols-rounded">error</span><p>历史搜索失败，请稍后重试</p></div>';
-                    if (summary) summary.textContent = '历史搜索失败';
-                    return;
-                }
+            
+            // Send query to worker
+            if (!this._adviceSearchWorker) {
+                this._initSearchWorker();
             }
-            if (requestId !== this._adviceSearchRequestId || query !== String(this.adviceSearchQuery || '').trim()) return;
-            messages = (Array.isArray(results) ? results : []).reverse();
-        } else {
-            if ((this.adviceRange || 'today') === 'all') {
-                try {
-                    messages = await this.loadAdviceWindowFromColdStore(this._adviceRenderLimit || 80);
-                } catch (e) {
-                    console.error('Failed to load advice history window', e);
-                    messages = this.activeRecords(this.db.health.aiAdviceChat || []);
-                }
-            } else {
-                messages = this.activeRecords(this.db.health.aiAdviceChat || []);
-            }
-        }
 
-        const visibleMessages = this.visibleAdviceMessages(messages, !!query);
-        const total = query ? visibleMessages.length : await this.countAdviceMessages();
-        if (requestId !== this._adviceSearchRequestId || query !== String(this.adviceSearchQuery || '').trim()) return;
-        const windowed = this.visibleAdviceWindowMessages(visibleMessages, total);
-        list.innerHTML = this.renderAdviceMessages(windowed.messages, windowed.hiddenCount);
-        if (summary) {
-            if (query) summary.textContent = `搜索“${query}”：${visibleMessages.length} 条匹配记录${visibleMessages.length >= searchLimit ? `（显示前 ${searchLimit} 条）` : ''}`;
-            else if (!total) summary.textContent = '像聊天一样提问，AI 会结合你的记录分析';
-            else {
-                const rangeLabel = { today: '今日', week: '最近7天', month: '最近30天', all: '全部' }[this.adviceRange || 'today'] || '今日';
-                summary.textContent = `${rangeLabel}显示 ${Math.floor(visibleMessages.length / 2)} / 共 ${Math.floor(total / 2)} 轮建议`;
+            this._adviceSearchWorker.postMessage({ type: 'SEARCH', payload: { query, limit: 100 } });
+            
+            // Render is deferred to SEARCH_RESULT message handler
+        } else {
+            window.dataStore.advice.setMode('timeline');
+            this._updateVirtualizerCount();
+            
+            const total = window.dataStore.advice.activeIdsRef.length;
+            if (summary) {
+                if (!total) summary.textContent = '像聊天一样提问，AI 会结合你的记录分析';
+                else summary.textContent = `全部显示：${total} 轮建议 (虚拟化)`;
             }
         }
     },
 
+    _initSearchWorker() {
+        this._adviceSearchWorker = new Worker('advice-search.worker.js');
+        this._adviceSearchWorker.onmessage = (e) => {
+            const { type, payload } = e.data;
+            if (type === 'SEARCH_RESULT') {
+                if (String(this.adviceSearchQuery || '').trim() !== payload.query) return;
+                
+                // Assuming payload.results returns array of IDs
+                window.dataStore.advice.setSearchResults(payload.results);
+                window.dataStore.advice.setMode('search');
+                this._updateVirtualizerCount();
+                
+                const summary = document.getElementById('adviceSearchSummary') || document.getElementById('adviceMessageSummary');
+                if (summary) summary.textContent = `搜索“${payload.query}”：${payload.results.length} 条匹配记录`;
+            }
+        };
+        this._adviceSearchWorker.postMessage({ type: 'INIT', payload: {} });
+    },
+
+    _updateVirtualizerCount() {
+        if (this._virtualizer) {
+            this._virtualizer.setOptions({
+                ...this._virtualizer.options,
+                count: window.dataStore.advice.activeIdsRef.length
+            });
+            this._renderVirtualSlice(this._virtualizer.options.getScrollElement(), this._virtualizer);
+        }
+    },
+
+    _renderVirtualSlice(listEl, instance) {
+        const virtualItems = instance.getVirtualItems();
+        const totalHeight = instance.getTotalSize();
+        const renderVersion = window.dataStore.advice.version;
+        const currentKeyword = String(this.adviceSearchQuery || '').trim();
+        
+        let html = `<div style="height: ${totalHeight}px; width: 100%; position: relative;">`;
+        let prevDate = null;
+        
+        if (virtualItems.length > 0) {
+            const firstIdx = virtualItems[0].index;
+            if (firstIdx > 0) {
+                const prevRecord = window.dataStore.advice.getItem(firstIdx - 1, renderVersion);
+                if (prevRecord && !prevRecord.skeleton && prevRecord.at) {
+                    prevDate = this.logicalDateKey(this.parseHistoryDate(prevRecord.at));
+                }
+            }
+        }
+
+        virtualItems.forEach(item => {
+            const index = item.index;
+            const record = window.dataStore.advice.getItem(index, renderVersion);
+            
+            html += `<div data-index="${index}" class="virtual-advice-row" style="position: absolute; top: 0; left: 0; width: 100%; transform: translateY(${item.start}px);">`;
+            
+            if (record && record.skeleton) {
+                html += `<div class="advice-bubble skeleton" style="height: 100px; margin: 12px; background: rgba(128,128,128,0.1); border-radius: 12px;"></div>`;
+            } else if (record) {
+                const recordDate = this.logicalDateKey(this.parseHistoryDate(record.at));
+                if (recordDate !== prevDate) {
+                    html += `<div class="advice-virtual-date-header" style="padding: 12px 16px; font-weight: bold; color: var(--md-sys-primary); text-align: center; font-size: 14px;">${this.escapeHtml(recordDate)}</div>`;
+                    prevDate = recordDate;
+                }
+                const isLatest = index === window.dataStore.advice.activeIdsRef.length - 1;
+                html += this.renderAdviceMessage ? this.renderAdviceMessage(record, isLatest, currentKeyword) : '';
+            }
+            
+            html += `</div>`;
+        });
+        html += `</div>`;
+        
+        listEl.innerHTML = html;
+        
+        // Measure real element height
+        requestAnimationFrame(() => {
+            const rows = listEl.querySelectorAll('.virtual-advice-row');
+            rows.forEach(row => {
+                const rect = row.getBoundingClientRect();
+                instance.measureElement(row);
+            });
+        });
+    },
+
     setAdviceRange(range) {
         this.adviceRange = range || 'today';
-        this.resetAdviceRenderWindow?.();
         this.saveAdviceSettings();
         this.captureAdviceDraft();
         this.captureAdviceScroll();
@@ -1721,6 +1726,32 @@ const advicePanel = {
         input.focus();
     },
 
+    adviceConversationContext(limit = 12) {
+        if (limit <= 0) return [];
+        const store = window.dataStore?.advice;
+        const timelineIds = store?._timelineIds || [];
+        const recordsById = new Map();
+        (this.db.health.aiAdviceChat || []).forEach(r => recordsById.set(r.id, r));
+        const messages = timelineIds.map(id => recordsById.get(id)).filter(Boolean);
+        
+        const today = this.logicalDateKey();
+        const todayMessages = messages.filter(msg => this.logicalDateKey(this.parseHistoryDate(msg.at)) === today);
+        const recentMessages = messages.slice(-limit);
+        const merged = [];
+        [...todayMessages, ...recentMessages].forEach(msg => {
+            if (!msg?.content || msg.pending || msg.error) return;
+            if (merged.includes(msg)) return;
+            merged.push(msg);
+        });
+        const trimmed = merged.length && merged[merged.length - 1].role === 'user'
+            ? merged.slice(0, -1)
+            : merged;
+        return trimmed.slice(-Math.max(limit, todayMessages.length)).map(msg => ({
+            role: msg.role === 'assistant' ? 'assistant' : 'user',
+            content: msg.content
+        }));
+    },
+
     adviceRangeStart(range = this.adviceRange || 'today') {
         const start = this.logicalDayStart();
         if (range === 'week') start.setDate(start.getDate() - 6);
@@ -1736,119 +1767,6 @@ const advicePanel = {
             const date = getDate(item);
             return date && date >= start;
         });
-    },
-
-    visibleAdviceMessages(messages = [], isSearch = false) {
-        const groups = new Map();
-        messages.forEach(msg => {
-            if (!msg) return;
-            if (msg.role !== 'assistant') return;
-            const root = msg.replyToId || msg.id;
-            if (!groups.has(root)) groups.set(root, []);
-            groups.get(root).push(msg);
-        });
-        const filtered = messages.filter(msg => {
-            if (!msg) return false;
-            if (msg.role !== 'assistant') return true;
-            const root = msg.replyToId || msg.id;
-            const group = groups.get(root) || [];
-            if (group.length <= 1) return true;
-            return this._isVersionActive(msg, group);
-        });
-        const withIndex = filtered.map((msg, idx) => {
-            const root = msg.role === 'assistant' ? (msg.replyToId || msg.id) : '';
-            const group = root ? (groups.get(root) || []) : [];
-            const versionGroup = group.length > 1 ? group : null;
-            return { ...msg, idx, versionGroup };
-        });
-        if (isSearch) return withIndex;
-        const start = this.adviceRangeStart();
-        return start ? withIndex.filter(msg => this.parseHistoryDate(msg.at) >= start) : withIndex;
-    },
-
-    resetAdviceRenderWindow() {
-        this._adviceRenderLimit = 80;
-    },
-
-    visibleAdviceWindowMessages(messages = [], totalCount = null) {
-        const limit = Math.max(20, Number(this._adviceRenderLimit || 80));
-        const total = totalCount !== null ? totalCount : messages.length;
-        if (this.adviceSearchQuery) {
-            return { messages, hiddenCount: 0, totalCount: total };
-        }
-        const rendered = messages.slice(-limit);
-        return {
-            messages: rendered,
-            hiddenCount: Math.max(0, total - rendered.length),
-            totalCount: total
-        };
-    },
-
-    async countAdviceMessages() {
-        const fallback = () => this.activeRecords(this.db?.health?.aiAdviceChat || []).length;
-        const store = window.dataStore?.advice;
-        if (!store || typeof store.count !== 'function') return fallback();
-        try {
-            const count = Number(await store.count());
-            return Number.isFinite(count) ? count : fallback();
-        } catch {
-            return fallback();
-        }
-    },
-
-    async expandAdviceRenderWindow(step = 80) {
-        const current = Math.max(20, Number(this._adviceRenderLimit || 80));
-        const nextLimit = current + Math.max(20, Number(step) || 80);
-        this._adviceRenderLimit = nextLimit;
-
-        if (!this.adviceSearchQuery && window.dataStore?.advice && typeof window.dataStore.advice.getPage === 'function') {
-            const memoryCount = (this.db.health.aiAdviceChat || []).length;
-            if (nextLimit > memoryCount) {
-                if (this._adviceSending) {
-                    window.toast?.show?.('AI 正在回复中，请稍后加载更多', 'info');
-                    return;
-                }
-                try {
-                    await this.loadAdviceWindowFromColdStore(nextLimit);
-                } catch (e) {
-                    console.error('Failed to load older advice', e);
-                }
-            }
-        }
-
-        this.captureAdviceDraft?.();
-        this.rerenderAdvicePanel?.();
-    },
-
-    adviceMessageSummary(messages, visibleMessages) {
-        const rangeLabel = { today: '今日', week: '最近7天', month: '最近30天', all: '全部' }[this.adviceRange || 'today'] || '今日';
-        const query = String(this.adviceSearchQuery || '').trim();
-        if (!messages.length) return '像聊天一样提问，AI 会结合你的记录分析';
-        if (query) return `搜索“${query}”：${visibleMessages.length} 条匹配记录`;
-        return `${rangeLabel}显示 ${Math.floor(visibleMessages.length / 2)} / 共 ${Math.floor(messages.length / 2)} 轮建议`;
-    },
-
-    adviceConversationContext(limit = 12) {
-        if (limit <= 0) return [];
-        const messages = this.visibleAdviceMessages(this.activeRecords(this.db.health.aiAdviceChat || []));
-        const today = this.logicalDateKey();
-        const todayMessages = messages.filter(msg => this.logicalDateKey(this.parseHistoryDate(msg.at)) === today);
-        const recentMessages = messages.slice(-limit);
-        const merged = [];
-        [...todayMessages, ...recentMessages].forEach(msg => {
-            if (!msg?.content || msg.pending || msg.error) return;
-            if (merged.includes(msg)) return;
-            merged.push(msg);
-        });
-        // Drop the trailing user message — sendAiAdvice will append the same prompt as the
-        // final {role:'user'} entry, so keeping it here would duplicate the question.
-        const trimmed = merged.length && merged[merged.length - 1].role === 'user'
-            ? merged.slice(0, -1)
-            : merged;
-        return trimmed.slice(-Math.max(limit, todayMessages.length)).map(msg => ({
-            role: msg.role === 'assistant' ? 'assistant' : 'user',
-            content: msg.content
-        }));
     },
 
     preserveAdviceScroll(fn) {
@@ -2719,9 +2637,6 @@ const advicePanel = {
     },
 
     renderAdvicePanel() {
-        const messages = this.activeRecords(this.db.health.aiAdviceChat || []);
-        const visibleMessages = this.visibleAdviceMessages(messages);
-        const windowedMessages = this.visibleAdviceWindowMessages(visibleMessages);
         const rawDraft = this.restoreAdviceDraft();
         const draft = this.escapeHtml(rawDraft);
         const goalType = this.db.health.dietGoal?.goalType || this.db.health.goalType || 'loss';
@@ -2764,7 +2679,8 @@ const advicePanel = {
             </div>
             <div class="advice-v6-filter-bar">${this.renderAdviceFilterControls()}</div>
             <div class="sect-head"><span class="t">对话</span><button class="a" onclick="data.clearAdviceChat?.()" type="button">清空</button></div>
-            <div class="ai-msg-list advice-v6-chat-list">${this.renderAdviceMessages(windowedMessages.messages, windowedMessages.hiddenCount)}</div>
+            <div id="adviceMessageSummary" style="font-size: 12px; color: var(--md-sys-on-surface-variant); padding: 0 16px;"></div>
+            <div class="ai-msg-list advice-v6-chat-list" style="flex: 1; overflow-y: auto; overflow-x: hidden;"></div>
             <div class="advice-scroll-rail" aria-label="对话快速跳转">
                 <button class="advice-rail-btn" onclick="data.scrollAdviceToTop()" type="button" aria-label="跳到最顶端" title="跳到最顶端"><span class="material-symbols-rounded">vertical_align_top</span></button>
                 <button class="advice-rail-btn" onclick="data.scrollAdviceToPrevBubble()" type="button" aria-label="上一段对话" title="上一段对话"><span class="material-symbols-rounded">expand_less</span></button>
