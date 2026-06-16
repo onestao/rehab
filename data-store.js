@@ -116,8 +116,14 @@
             if (localCfg) this.cfg = localCfg;
             this.normalizeDb();
             this._initHistoryApi();
-            await this._initAdviceApi();
-            // recentAdvice loading logic is now handled internally by advice query planner.
+            this._initAdviceApi();
+            try {
+                const recentAdvice = await this.advice.getRecent(50);
+                if (recentAdvice && recentAdvice.length > 0) {
+                    this.db.health.aiAdviceChat = recentAdvice.reverse();
+                    this.advice.workingSet = this.db.health.aiAdviceChat;
+                }
+            } catch (e) { console.error('Load recent advice failed', e); }
             this.bindFlushHooks();
             if (window.sync && typeof sync.initUI === 'function') sync.initUI();
             if (typeof ai !== 'undefined') await ai.init({ saveData: true, renderData: false });
@@ -229,338 +235,100 @@
             };
         },
 
-        async _initAdviceApi() {
+        _initAdviceApi() {
             const self = this;
-            
-            // Clean legacy sync working set
             if (self.db.health && Array.isArray(self.db.health.aiAdviceChat) && self.db.health.aiAdviceChat.length > 50) {
                 self.db.health.aiAdviceChat = self.db.health.aiAdviceChat.slice(-50);
                 self._dbDirty = true;
             }
-
-            const SEGMENT_SIZE = 100;
-            const MAX_SEGMENTS = 8;
-            
-            let allTimelineIds = [];
-            if (window.adviceCollections && typeof window.adviceCollections.getAllIds === 'function') {
-                allTimelineIds = await window.adviceCollections.getAllIds();
-            } else if (self.db.health.aiAdviceChat) {
-                allTimelineIds = self.db.health.aiAdviceChat.map(function(r) { return r.id; });
-            }
-
             this.advice = {
-                mode: 'timeline', // 'timeline' | 'search'
-                version: 1,
-                activeIdsRef: [].concat(allTimelineIds),
-                
-                // State variables for Query Planner & LRU
-                _filteredIds: [],
-                _timelineIds: allTimelineIds,
-                _lruCache: new Map(), // segmentId -> Map(id -> record)
-                _fetchingSegments: new Set(),
-                
-                // Emergency state machine: NORMAL, DEGRADED, RECOVERY
-                _telemetryState: 'NORMAL',
-                _consecutiveMisses: 0,
-                _lastEmergencySync: 0,
-                _lastIndexRequested: 0,
-                _lastTimeRequested: Date.now(),
-                _adaptiveLagBudget: 1,
-
-                // -----------------------------------------
-                // View Model / PURE Resolver
-                // -----------------------------------------
-                
-                /**
-                 * Pure sync resolver for Virtual List.
-                 * NEVER performs IO. Returns skeleton if segment is missed.
-                 * Checks renderVersion for lag budget.
-                 */
-                getItem(index, renderVersion) {
-                    const lag = this.version - renderVersion;
-                    const isHardMismatch = lag < 0; // Negative lag means renderVersion is from future? Shouldn't happen unless restarted
-                    
-                    // Adaptive Lag Budget Check
-                    if (isHardMismatch || lag > this._adaptiveLagBudget) {
-                        return { skeleton: true, id: 'skel-stale-' + index, _stale: true };
-                    }
-                    
-                    const id = this.activeIdsRef[index];
-                    if (!id) return null;
-
-                    const segmentId = Math.floor(index / SEGMENT_SIZE);
-                    const segmentData = this._lruCache.get(segmentId);
-                    
-                    // Trigger Query Planner async (fire and forget I/O)
-                    this._queryPlanner(index, segmentId);
-
-                    if (segmentData && segmentData.has(id)) {
-                        this._consecutiveMisses = 0; // reset
-                        return segmentData.get(id);
-                    }
-                    
-                    // SKELETON MISS
-                    this._recordSkeletonHit();
-                    return { skeleton: true, id: 'skel-' + id };
-                },
-
-                // -----------------------------------------
-                // Query Planning & Adaptive Strategies
-                // -----------------------------------------
-
-                _queryPlanner(index, currentSegmentId) {
-                    // 1. Calculate Velocity & Update Lag Budget
-                    const now = Date.now();
-                    const deltaT = now - this._lastTimeRequested;
-                    if (deltaT > 0 && deltaT < 1000) {
-                        const deltaIdx = Math.abs(index - this._lastIndexRequested);
-                        const velocity = deltaIdx / deltaT; // items per ms
-                        
-                        // Dual-rate Smoothing (Hysteresis)
-                        if (velocity > 0.05) {
-                            // Fast path: rapid adaptation to avoid lag
-                            this._adaptiveLagBudget = Math.min(3, this._adaptiveLagBudget + 0.5);
-                        } else {
-                            // Slow path: gradual decay to maintain stability
-                            this._adaptiveLagBudget = Math.max(1, this._adaptiveLagBudget - 0.05);
-                        }
-                    } else if (deltaT >= 1000) {
-                        this._adaptiveLagBudget = 1; // reset when idle
-                    }
-                    this._lastIndexRequested = index;
-                    this._lastTimeRequested = now;
-
-                    // 2. Prefetch Logic ( +2 ahead/behind )
-                    this._prefetchSegment(currentSegmentId);
-                    
-                    // Determine scroll direction (heuristic based on near edges of segment)
-                    const offsetInSegment = index % SEGMENT_SIZE;
-                    if (offsetInSegment > (SEGMENT_SIZE * 0.7)) {
-                        this._prefetchSegment(currentSegmentId + 1);
-                        this._prefetchSegment(currentSegmentId + 2);
-                    } else if (offsetInSegment < (SEGMENT_SIZE * 0.3)) {
-                        this._prefetchSegment(currentSegmentId - 1);
-                        this._prefetchSegment(currentSegmentId - 2);
-                    } else {
-                        // In middle, prefetch both adjacents
-                        this._prefetchSegment(currentSegmentId + 1);
-                        this._prefetchSegment(currentSegmentId - 1);
-                    }
-                },
-
-                _recordSkeletonHit() {
-                    this._consecutiveMisses++;
-                    if (this._consecutiveMisses > 10 && this._telemetryState === 'NORMAL') {
-                        const now = Date.now();
-                        // Cooldown check (prevent IO storm)
-                        if (now - this._lastEmergencySync > 2000) {
-                            this._telemetryState = 'DEGRADED';
-                            this._lastEmergencySync = now;
-                            this._triggerEmergencyPrefetch();
-                        }
-                    }
-                },
-
-                _triggerEmergencyPrefetch() {
-                    console.warn('[AI Query Planner] Emergency Prefetch Triggered!');
-                    const currentSegmentId = Math.floor(this._lastIndexRequested / SEGMENT_SIZE);
-                    this._prefetchSegment(currentSegmentId, true);
-                    this._prefetchSegment(currentSegmentId + 1, true);
-                    this._prefetchSegment(currentSegmentId - 1, true);
-                    this._telemetryState = 'RECOVERY';
-                    setTimeout(() => {
-                        this._telemetryState = 'NORMAL';
-                        this._consecutiveMisses = 0;
-                    }, 1000);
-                },
-
-                _prefetchSegment(segmentId, force = false) {
-                    if (segmentId < 0) return;
-                    
-                    // Ensure bounds
-                    const maxSegId = Math.floor(this.activeIdsRef.length / SEGMENT_SIZE);
-                    if (segmentId > maxSegId) return;
-
-                    if (!force && this._lruCache.has(segmentId)) {
-                        // Refresh LRU order (delete and re-add)
-                        const val = this._lruCache.get(segmentId);
-                        this._lruCache.delete(segmentId);
-                        this._lruCache.set(segmentId, val);
-                        return;
-                    }
-
-                    if (this._fetchingSegments.has(segmentId)) return;
-                    this._fetchingSegments.add(segmentId);
-
-                    // Resolve IDs for this segment from activeIdsRef
-                    const startIdx = segmentId * SEGMENT_SIZE;
-                    const idsToFetch = this.activeIdsRef.slice(startIdx, startIdx + SEGMENT_SIZE);
-
-                    if (idsToFetch.length === 0) {
-                        this._fetchingSegments.delete(segmentId);
-                        return;
-                    }
-
-                    if (!window.adviceCollections) {
-                        this._fetchingSegments.delete(segmentId);
-                        return;
-                    }
-
-                    // Perform IO
-                    window.adviceCollections.getByIds(idsToFetch).then(results => {
-                        const segmentMap = new Map();
-                        results.forEach(record => {
-                            if (record && record.id) segmentMap.set(record.id, record);
-                        });
-
-                        // Enforce LRU bounds
-                        if (this._lruCache.size >= MAX_SEGMENTS) {
-                            const oldestKey = this._lruCache.keys().next().value;
-                            this._lruCache.delete(oldestKey);
-                        }
-
-                        this._lruCache.set(segmentId, segmentMap);
-                        this._fetchingSegments.delete(segmentId);
-                        
-                        // Notify UI to re-render if it was missing these items
-                        window.dispatchEvent(new CustomEvent('aiAdvice:segmentLoaded', { detail: { segmentId } }));
-                    }).catch(err => {
-                        console.error('[AI Query Planner] Segment fetch failed:', err);
-                        this._fetchingSegments.delete(segmentId);
-                    });
-                },
-
-                // -----------------------------------------
-                // State Mutations (Immutable Snapshots)
-                // -----------------------------------------
-
-                setMode(mode) {
-                    if (this.mode === mode) return;
-                    this.mode = mode;
-                    this.version++;
-                    this.activeIdsRef = [].concat(mode === 'search' ? this._filteredIds : this._timelineIds);
-                },
-
-                setSearchResults(filteredIds) {
-                    this._filteredIds = filteredIds;
-                    if (this.mode === 'search') {
-                        this.version++;
-                        this.activeIdsRef = [].concat(this._filteredIds);
-                    }
-                },
-
+                workingSet: self.db.health.aiAdviceChat || [],
                 append(record) {
                     if (!record || typeof record !== 'object') return;
                     if (!record.id) record.id = self.generateRecordId('advice');
                     if (!record.updatedAt) record.updatedAt = Date.now();
                     if (typeof record.deleted !== 'boolean') record.deleted = false;
-                    
-                    // Update Timeline
-                    this._timelineIds.push(record.id);
-                    
-                    // Inject into currently active LRU segment if applicable (last segment)
-                    const segmentId = Math.floor((this._timelineIds.length - 1) / SEGMENT_SIZE);
-                    if (!this._lruCache.has(segmentId)) {
-                        this._lruCache.set(segmentId, new Map());
-                    }
-                    this._lruCache.get(segmentId).set(record.id, record);
-
-                    // Trigger IDB Save
+                    self.advice.workingSet.push(record);
+                    self.db.health.aiAdviceChat = self.advice.workingSet;
                     if (window.adviceCollections) {
-                        window.adviceCollections.append(record).catch(e => console.warn('advice.append fail', e));
-                    }
-                    
-                    // Snapshot Immutability Update
-                    if (this.mode === 'timeline') {
-                        this.version++;
-                        this.activeIdsRef = [].concat(this._timelineIds);
-                    }
-                    
-                    // Keep workingSet updated for sync layer compatibility
-                    self.db.health.aiAdviceChat.push(record);
-                    if (self.db.health.aiAdviceChat.length > 50) {
-                        self.db.health.aiAdviceChat = self.db.health.aiAdviceChat.slice(-50);
-                    }
-                    self._dbDirty = true;
-                },
-
-                update(record) {
-                    if (!record || !record.id) return;
-                    
-                    // Update LRU if present
-                    for (let segmentMap of this._lruCache.values()) {
-                        if (segmentMap.has(record.id)) {
-                            segmentMap.set(record.id, record);
-                            break;
-                        }
-                    }
-                    
-                    // Trigger IDB Save
-                    if (window.adviceCollections) {
-                        window.adviceCollections.update(record).catch(e => console.warn('advice.update fail', e));
-                    }
-                    
-                    // Update workingSet
-                    const idx = self.db.health.aiAdviceChat.findIndex(r => r && r.id === record.id);
-                    if (idx >= 0) {
-                        self.db.health.aiAdviceChat[idx] = record;
-                        self._dbDirty = true;
-                    }
-
-                    // Snapshot version bump to trigger re-render
-                    this.version++;
-                },
-
-                deleteById(id) {
-                    // Remove from timeline array
-                    this._timelineIds = this._timelineIds.filter(tid => tid !== id);
-                    if (this.mode === 'timeline') {
-                        this.activeIdsRef = [].concat(this._timelineIds);
-                    } else {
-                        this._filteredIds = this._filteredIds.filter(tid => tid !== id);
-                        this.activeIdsRef = [].concat(this._filteredIds);
-                    }
-                    
-                    // Remove from LRU
-                    for (let segmentMap of this._lruCache.values()) {
-                        if (segmentMap.has(id)) {
-                            segmentMap.delete(id);
-                            break;
-                        }
-                    }
-
-                    if (window.adviceCollections) {
-                        // We need a deleteById in adviceCollections! Let's just use update with deleted flag.
-                        window.adviceCollections.getById(id).then(r => {
-                            if (r) {
-                                r.deleted = true;
-                                r.updatedAt = Date.now();
-                                window.adviceCollections.update(r);
-                            }
+                        window.adviceCollections.append(record).catch(function (e) {
+                            console.warn('advice.append store write failed', e);
                         });
                     }
-                    
-                    const idx = self.db.health.aiAdviceChat.findIndex(r => r && r.id === id);
-                    if (idx >= 0) {
-                        self.db.health.aiAdviceChat.splice(idx, 1);
-                        self._dbDirty = true;
+                },
+                update(record) {
+                    if (!record || !record.id) return;
+                    const idx = self.advice.workingSet.findIndex(function (r) { return r && r.id === record.id; });
+                    if (idx >= 0) self.advice.workingSet[idx] = record;
+                    self.db.health.aiAdviceChat = self.advice.workingSet;
+                    if (window.adviceCollections) {
+                        window.adviceCollections.update(record).catch(function (e) {
+                            console.warn('advice.update store write failed', e);
+                        });
                     }
-
-                    this.version++;
+                },
+                deleteById(id) {
+                    const record = self.advice.workingSet.find(function (r) { return r && r.id === id; });
+                    if (!record || record.deleted) return false;
+                    record.deleted = true;
+                    record.updatedAt = Date.now();
+                    if (window.adviceCollections) {
+                        window.adviceCollections.update(record).catch(function (e) {
+                            console.warn('advice.deleteById store write failed', e);
+                        });
+                    }
                     return true;
                 },
-
-                // Compatibility stubs for sync.js and old code
                 getRecent(limit) {
-                    limit = limit || 50;
-                    const recentIds = this._timelineIds.slice(-limit);
-                    return window.adviceCollections ? window.adviceCollections.getByIds(recentIds) : Promise.resolve([]);
+                    limit = typeof limit === 'number' ? limit : 50;
+                    if (window.adviceCollections) {
+                        return window.adviceCollections.getPage(0, limit).catch(function () {
+                            return self.advice.workingSet.slice(-limit).reverse();
+                        });
+                    }
+                    return Promise.resolve(self.advice.workingSet.slice(-limit).reverse());
+                },
+                getPage(offset, limit) {
+                    if (window.adviceCollections) {
+                        return window.adviceCollections.getPage(offset, limit);
+                    }
+                    return Promise.resolve([]);
+                },
+                getById(id) {
+                    const local = self.advice.workingSet.find(function(r) { return r && r.id === id; });
+                    if (local) return Promise.resolve(local);
+                    if (window.adviceCollections) {
+                        return window.adviceCollections.getById(id);
+                    }
+                    return Promise.resolve(null);
                 },
                 getAll() {
-                    return window.adviceCollections ? window.adviceCollections.getAll() : Promise.resolve([]);
+                    if (window.adviceCollections) {
+                        return window.adviceCollections.getAll().catch(function () {
+                            return self.advice.workingSet || [];
+                        });
+                    }
+                    return Promise.resolve(self.advice.workingSet || []);
+                },
+                count() {
+                    if (window.adviceCollections) {
+                        return window.adviceCollections.count().catch(function () {
+                            return (self.advice.workingSet || []).length;
+                        });
+                    }
+                    return Promise.resolve((self.advice.workingSet || []).length);
+                },
+                search(keyword, limit) {
+                    if (window.adviceCollections) {
+                        return window.adviceCollections.search(keyword, limit);
+                    }
+                    return Promise.resolve([]);
                 },
                 flush() {
-                    return Promise.resolve(); // Handled individually now
+                    if (!window.adviceCollections || !self.advice.workingSet || !self.advice.workingSet.length) return Promise.resolve();
+                    return window.adviceCollections.putMany(self.advice.workingSet).catch(function (e) {
+                        console.warn('advice.flush store write failed', e);
+                    });
                 }
             };
         },

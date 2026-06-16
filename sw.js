@@ -1,5 +1,5 @@
 // @ts-nocheck
-const CACHE = 'training-assistant-v272';
+const CACHE = 'training-assistant-v273';
 const CACHE_VERSION = CACHE.replace(/^training-assistant-v/, '');
 const ASSETS = [
     'index.html',
