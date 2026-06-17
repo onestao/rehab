@@ -10106,7 +10106,55 @@ body.is-training .fab-pip.active {
 .ai-insight-action:active { transform: scale(.96); }
 
 .ai-msg-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
-.advice-v6-chat-list { overflow: visible; min-height: 0; touch-action: pan-y; }
+.advice-v6-chat-list {
+    position: relative;
+    min-height: 0;
+    max-height: none;
+    overflow: visible;
+    padding: 2px 4px 12px;
+}
+.advice-v6-chat-list[data-advice-virtual-active="true"] {
+    display: block;
+    min-height: 320px;
+    max-height: min(68vh, 720px);
+    overflow-y: auto;
+    overflow-x: hidden;
+    touch-action: pan-y;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    contain: layout paint;
+    scrollbar-gutter: stable;
+}
+.advice-virtual-inner {
+    position: relative;
+    width: 100%;
+    min-height: 100%;
+}
+.advice-virtual-row {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 0 2px;
+    will-change: transform;
+}
+.advice-virtual-row .advice-bubble { margin-top: 0; margin-bottom: 0; }
+.advice-virtual-skeleton {
+    min-height: 74px;
+    gap: 8px;
+    opacity: .82;
+}
+.advice-virtual-skeleton.is-stale { opacity: .62; }
+.advice-virtual-shimmer {
+    height: 12px;
+    width: 78%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, var(--md-sys-surface-container), var(--md-sys-surface-container-low), var(--md-sys-surface-container));
+    background-size: 200% 100%;
+    animation: ai-shimmer 1.4s linear infinite;
+}
+.advice-virtual-shimmer.short { width: 46%; }
 .advice-history-window { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; padding: 2px 0 6px; }
 .advice-history-window button { display: inline-flex; align-items: center; gap: 4px; min-height: 36px; padding: 6px 14px; border: 1px solid var(--glass-border); border-radius: 999px; background: var(--glass-bg-strong); color: var(--md-sys-on-surface-variant); font-size: 11px; font-weight: 600; cursor: pointer; box-shadow: var(--glass-shadow-inset); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); transition: transform .16s var(--md-sys-motion-spring), background .2s ease, color .2s ease; }
 .advice-history-window button:active { transform: scale(.96); background: var(--md-sys-primary-container); color: var(--md-sys-on-primary-container); }

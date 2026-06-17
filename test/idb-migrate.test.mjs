@@ -75,7 +75,7 @@ function loadStorageMigrate() {
     };
     vm.createContext(sandbox);
     vm.runInContext(code, sandbox);
-    return { localStorage, storageIdb, storageMigrate: sandbox.window.storageMigrate };
+    return { appWindow: sandbox.window, localStorage, storageIdb, storageMigrate: sandbox.window.storageMigrate };
 }
 
 test('local to idb migration validates split collection storage without extra fields', async () => {
@@ -133,4 +133,53 @@ test('idb adapter persists advice chat when advice collection store is unavailab
     assert.deepEqual(await storageIdb.get('rehab.db:advice'), next.health.aiAdviceChat);
     assert.deepEqual((await storageIdb.get('rehab.db')).health.aiAdviceChat, []);
     assert.deepEqual(clone(await result.adapter.read('rehab.db')), next);
+});
+
+test('idb adapter merges working-set advice into collection store without clearing cold history', async () => {
+    const { appWindow, localStorage, storageMigrate } = loadStorageMigrate();
+    const initial = {
+        schemaVersion: 3,
+        actions: [],
+        history: [],
+        health: { aiAdviceChat: [] }
+    };
+    localStorage.setItem('rehab.db', JSON.stringify(initial));
+
+    const result = await storageMigrate.createAdapter({
+        dbKey: 'rehab.db',
+        cfgKey: 'rehab.cfg',
+        storageVersionKey: 'storageVersion',
+        migrationFailedKey: 'migration.failed',
+        targetVersion: 4
+    });
+    const byId = new Map([
+        ['cold-old', { id: 'cold-old', role: 'assistant', content: 'old cold record', updatedAt: 1, deleted: false }]
+    ]);
+    let clearCount = 0;
+    appWindow.adviceCollections = {
+        async clear() {
+            clearCount++;
+            byId.clear();
+        },
+        async putMany(records) {
+            records.forEach(record => byId.set(record.id, clone(record)));
+        },
+        async count() {
+            return byId.size;
+        },
+        async getAll() {
+            return Array.from(byId.values()).map(clone);
+        }
+    };
+    const next = {
+        ...initial,
+        health: {
+            aiAdviceChat: [{ id: 'recent-new', role: 'user', content: 'recent', updatedAt: 10, deleted: false }]
+        }
+    };
+
+    await result.adapter.write('rehab.db', next);
+
+    assert.equal(clearCount, 0);
+    assert.deepEqual(Array.from(byId.keys()).sort(), ['cold-old', 'recent-new']);
 });

@@ -111,6 +111,7 @@
                     this.updateAdviceSendState?.();
                 });
                 requestAnimationFrame(() => {
+                    this.refreshAdviceSearchResults?.();
                     this.bindAdviceScrollListener?.();
                     this.restoreAdviceScroll?.();
                     requestAnimationFrame(() => this.syncAdviceTopChromeToScroll?.());

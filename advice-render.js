@@ -457,8 +457,11 @@ Object.assign(advicePanel, {
 
     renderAdviceMessage(msg, latest = false, currentKeyword = '') {
         const label = highlightKeyword(msg.role === 'user' ? '我' : 'AI', currentKeyword);
+        const parsedAt = this.parseHistoryDate(msg.at);
+        const timeText = parsedAt.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+        const dateMeta = msg.showDateMeta ? `${this.logicalDateKey(parsedAt)} ` : '';
         const time = highlightKeyword(
-            this.parseHistoryDate(msg.at).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
+            `${dateMeta}${timeText}`,
             currentKeyword
         );
         const model = msg.model ? ` · ${highlightKeyword(msg.model, currentKeyword)}${msg.temporaryModel ? ' · <span class="advice-temp-model">临时模型</span>' : ''}` : '';

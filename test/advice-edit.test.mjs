@@ -66,6 +66,8 @@ function loadAdvicePanelHarness() {
         logicalDayStart() { return new Date('2026-05-30T00:00:00.000Z'); },
         logicalDateKey(date = new Date('2026-05-30T00:00:00.000Z')) { return new Date(date).toISOString().slice(0, 10); },
         buildAdviceMessages(prompt) { return [{ role: 'user', content: prompt }]; },
+        SCROLL_KEY: context.__advicePanel.SCROLL_KEY,
+        PAGE_SCROLL_KEY: context.__advicePanel.PAGE_SCROLL_KEY,
         save() {},
         render() {},
         rerenderAdvicePanel() {},
@@ -88,11 +90,25 @@ function loadAdvicePanelHarness() {
         findAssistantReplyForUser: context.__advicePanel.findAssistantReplyForUser,
         adviceRangeStart: context.__advicePanel.adviceRangeStart,
         visibleAdviceMessages: context.__advicePanel.visibleAdviceMessages,
-        visibleAdviceWindowMessages: context.__advicePanel.visibleAdviceWindowMessages,
+        prepareAdviceVirtualState: context.__advicePanel.prepareAdviceVirtualState,
+        mountAdviceVirtualList: context.__advicePanel.mountAdviceVirtualList,
+        setAdviceVirtualEmpty: context.__advicePanel.setAdviceVirtualEmpty,
+        renderAdviceVirtualShell: context.__advicePanel.renderAdviceVirtualShell,
+        renderAdviceVirtualSkeleton: context.__advicePanel.renderAdviceVirtualSkeleton,
+        resolveAdviceRecordsByIds: context.__advicePanel.resolveAdviceRecordsByIds,
+        findAdviceMessageIndexById: context.__advicePanel.findAdviceMessageIndexById,
         countAdviceMessages: context.__advicePanel.countAdviceMessages,
         resetAdviceRenderWindow: context.__advicePanel.resetAdviceRenderWindow,
         expandAdviceRenderWindow: context.__advicePanel.expandAdviceRenderWindow,
+        adviceSavedScrollTop: context.__advicePanel.adviceSavedScrollTop,
+        adviceSavedPageScrollOffset: context.__advicePanel.adviceSavedPageScrollOffset,
+        restoreAdviceScroll: context.__advicePanel.restoreAdviceScroll,
+        resetAdviceScrollOnEntry: context.__advicePanel.resetAdviceScrollOnEntry,
         _adviceMessageList: context.__advicePanel._adviceMessageList,
+        _adviceScrollContainer: context.__advicePanel._adviceScrollContainer,
+        _adviceCurrentScrollY: context.__advicePanel._adviceCurrentScrollY,
+        _adviceMaxScrollY: context.__advicePanel._adviceMaxScrollY,
+        _adviceSetScrollY: context.__advicePanel._adviceSetScrollY,
         bindAdviceScrollListener: context.__advicePanel.bindAdviceScrollListener,
         _handleAdviceStreamScroll: context.__advicePanel._handleAdviceStreamScroll,
         isAdvicePageActive: () => true,
@@ -407,7 +423,7 @@ test('editing a user advice prompt inserts a new active answer version after the
     assert.equal(data.db.health.aiAdviceChat[2].versionActive, false);
 });
 
-test.skip('advice conversation context excludes inactive overwritten answer versions', () => {
+test('advice conversation context excludes inactive overwritten answer versions', () => {
     const data = loadAdvicePanelHarness();
     data.db.health.aiAdviceChat[1].versionActive = false;
     data.db.health.aiAdviceChat.splice(1, 0, {
@@ -455,7 +471,7 @@ test('retrying an active answer makes the new answer active and removes empty ve
     assert.equal(newAnswer.versionIdx, 1);
 });
 
-test.skip('advice message window renders recent history by default and can expand', () => {
+test('advice virtual state keeps all visible ids without window slicing', () => {
     const data = loadAdvicePanelHarness();
     const messages = Array.from({ length: 120 }, (_, idx) => ({
         id: `m${idx}`,
@@ -466,33 +482,150 @@ test.skip('advice message window renders recent history by default and can expan
         updatedAt: idx
     }));
 
-    data.resetAdviceRenderWindow();
-    const first = data.visibleAdviceWindowMessages(messages);
+    data.advice = {
+        mode: 'recent',
+        version: 0,
+        activeIdsRef: [],
+        setActiveRecords(records, mode) {
+            this.mode = mode;
+            this.version += 1;
+            this.activeIdsRef = records.map(record => record.id);
+            return { mode: this.mode, version: this.version, activeIdsRef: this.activeIdsRef };
+        }
+    };
+    const first = data.prepareAdviceVirtualState(messages, 'today', { mount: false });
 
-    assert.equal(first.messages.length, 80);
-    assert.equal(first.hiddenCount, 40);
-    assert.equal(first.messages[0].id, 'm40');
+    assert.equal(first.activeIdsRef.length, 120);
+    assert.equal(first.activeIdsRef[0], 'm0');
+    assert.equal(first.activeIdsRef.at(-1), 'm119');
 
-    data.rerenderAdvicePanel = () => {};
-    data.expandAdviceRenderWindow();
-    const expanded = data.visibleAdviceWindowMessages(messages);
+    const firstRef = first.activeIdsRef;
+    const next = data.prepareAdviceVirtualState(messages.slice(0, 2), 'search', { mount: false });
 
-    assert.equal(expanded.messages.length, 120);
-    assert.equal(expanded.hiddenCount, 0);
+    assert.notEqual(next.activeIdsRef, firstRef);
+    assert.deepEqual(next.activeIdsRef, ['m0', 'm1']);
 });
 
-test.skip('advice message window does not hide search matches', () => {
+test('advice virtual search snapshot does not hide early matches', () => {
     const data = loadAdvicePanelHarness();
     data.adviceSearchQuery = 'early';
     const messages = Array.from({ length: 120 }, (_, idx) => ({ id: `m${idx}`, content: idx === 0 ? 'early match' : 'other' }));
 
-    const windowed = data.visibleAdviceWindowMessages(messages);
+    data.advice = {
+        mode: 'search',
+        version: 0,
+        activeIdsRef: [],
+        setActiveRecords(records, mode) {
+            this.mode = mode;
+            this.version += 1;
+            this.activeIdsRef = records.map(record => record.id);
+            return { mode: this.mode, version: this.version, activeIdsRef: this.activeIdsRef };
+        }
+    };
+    const snapshot = data.prepareAdviceVirtualState(messages, 'search', { mount: false });
 
-    assert.equal(windowed.messages.length, 120);
-    assert.equal(windowed.hiddenCount, 0);
+    assert.equal(snapshot.activeIdsRef.length, 120);
+    assert.equal(snapshot.activeIdsRef[0], 'm0');
 });
 
-test.skip('advice history search requires two characters before cold scan', async () => {
+test('advice panel keeps short ranges in the normal chat flow', () => {
+    const data = loadAdvicePanelHarness();
+    let virtualCalls = 0;
+    let groupedMessages = [];
+    data.__context.window.adviceVirtualList = { mountVirtualList: () => { virtualCalls += 1; } };
+    data.advice = {
+        mode: 'today',
+        activeIdsRef: ['u1', 'a1'],
+        getItem() { return null; }
+    };
+    data._adviceVirtualFallbackRecords = [
+        { id: 'u1', role: 'user', content: 'question', deleted: false },
+        { id: 'a1', role: 'assistant', content: 'answer', deleted: false }
+    ];
+    data.renderAdviceMessage = () => { throw new Error('short ranges should render date groups'); };
+    data.renderAdviceMessages = (messages) => {
+        groupedMessages = messages;
+        return `<section class="advice-date-group">${messages.map(msg => msg.content).join('|')}</section>`;
+    };
+    const list = { dataset: {}, innerHTML: '' };
+
+    const controller = data.mountAdviceVirtualList(list);
+
+    assert.equal(controller, null);
+    assert.equal(virtualCalls, 0);
+    assert.match(list.innerHTML, /advice-date-group/);
+    assert.deepEqual(groupedMessages.map(msg => msg.idx), [0, 1]);
+    assert.equal(list.dataset.adviceVirtualActive, undefined);
+});
+
+test('advice virtual rows include full date metadata when rendered without groups', () => {
+    const data = loadAdvicePanelHarness();
+    let virtualOptions = /** @type {any} */ (null);
+    data.__context.window.adviceVirtualList = {
+        mountVirtualList: (_list, options) => {
+            virtualOptions = options;
+            return { destroy() {} };
+        }
+    };
+    data.advice = {
+        mode: 'all',
+        activeIdsRef: Array.from({ length: 181 }, (_, idx) => `m${idx}`),
+        getItem() { return null; }
+    };
+    data._adviceVirtualFallbackRecords = Array.from({ length: 181 }, (_, idx) => ({
+        id: `m${idx}`,
+        role: idx % 2 ? 'assistant' : 'user',
+        content: `message ${idx}`,
+        at: '2026-05-30T00:00:00.000Z'
+    }));
+    data.renderAdviceMessage = (msg) => msg.showDateMeta ? '<div>date meta</div>' : '<div>missing date</div>';
+    data.renderAdviceMessages = () => '<div class="empty-state"></div>';
+    const list = { dataset: {}, innerHTML: '' };
+
+    const controller = data.mountAdviceVirtualList(list);
+    const options = virtualOptions;
+    assert.ok(options);
+    const html = options.renderItem({ id: 'm180', role: 'assistant', content: 'answer', at: '2026-05-30T00:00:00.000Z' }, 180, false, '');
+
+    assert.ok(controller);
+    assert.match(html, /date meta/);
+    assert.equal(list.dataset.adviceVirtualActive, 'true');
+});
+
+test('rerenderAdvicePanel refreshes range controls as well as messages', () => {
+    const data = loadAdvicePanelHarness();
+    data.rerenderAdvicePanel = data.__context.__advicePanel.rerenderAdvicePanel;
+    data.renderAdviceTopChromeInner = () => '<div>top</div>';
+    data.renderAdviceFilterControls = () => '<button class="advice-pill active">7天</button>';
+    data.refreshAdviceModelChip = () => {};
+    data.autoResizeAdvicePrompt = () => {};
+    data.bindAdviceAttachmentControls = () => {};
+    data.updateAdviceSendState = () => {};
+    data.holdAdviceTopChrome = () => {};
+    let refreshed = false;
+    data.refreshAdviceSearchResults = () => { refreshed = true; };
+
+    const list = { scrollTop: 0, scrollHeight: 200, clientHeight: 100 };
+    const chromeInner = { innerHTML: '' };
+    const filterBar = { innerHTML: '' };
+    data._adviceMessageList = () => list;
+    data.__context.document = {
+        getElementById: () => null,
+        querySelector(selector) {
+            if (selector === '.advice-top-chrome-inner') return chromeInner;
+            if (selector === '.advice-v6-filter-bar') return filterBar;
+            return null;
+        }
+    };
+
+    data.rerenderAdvicePanel();
+
+    assert.equal(chromeInner.innerHTML, '<div>top</div>');
+    assert.equal(filterBar.innerHTML, '<button class="advice-pill active">7天</button>');
+    assert.equal(refreshed, true);
+});
+
+test('advice history search requires two characters before cold scan', async () => {
     const data = loadAdvicePanelHarness();
     const list = { innerHTML: '' };
     const summary = { textContent: '' };
@@ -517,7 +650,7 @@ test.skip('advice history search requires two characters before cold scan', asyn
     assert.match(summary.textContent, /不会预加载/);
 });
 
-test.skip('advice history search cold scans only a small result window', async () => {
+test('advice history search cold scans only a small result window', async () => {
     const data = loadAdvicePanelHarness();
     const list = { innerHTML: '' };
     const summary = { textContent: '' };
@@ -527,7 +660,8 @@ test.skip('advice history search cold scans only a small result window', async (
         querySelector() { return null; }
     };
     data._adviceMessageList = () => list;
-    data.renderAdviceMessages = (messages) => `rendered:${messages.map(m => m.id).join(',')}`;
+    data.renderAdviceMessages = () => '';
+    data.renderAdviceMessage = (msg) => `rendered:${msg.id};`;
     data.adviceSearchQuery = 'knee';
     data.__context.window.dataStore = data.__context.dataStore = {
         advice: {
@@ -552,7 +686,7 @@ test.skip('advice history search cold scans only a small result window', async (
     assert.match(summary.textContent, /显示前 20 条/);
 });
 
-test.skip('advice history search ignores stale cold results after query changes', async () => {
+test('advice history search ignores stale cold results after query changes', async () => {
     const data = loadAdvicePanelHarness();
     const list = { innerHTML: '' };
     const summary = { textContent: '' };
@@ -563,7 +697,8 @@ test.skip('advice history search ignores stale cold results after query changes'
         querySelector() { return null; }
     };
     data._adviceMessageList = () => list;
-    data.renderAdviceMessages = (messages) => `rendered:${messages.map(m => m.id).join(',')}`;
+    data.renderAdviceMessages = () => '';
+    data.renderAdviceMessage = (msg) => `rendered:${msg.id};`;
     data.__context.window.dataStore = data.__context.dataStore = {
         advice: {
             search(keyword) {
@@ -583,12 +718,12 @@ test.skip('advice history search ignores stale cold results after query changes'
     releaseOldSearch();
     await oldSearch;
 
-    assert.equal(list.innerHTML, 'rendered:new-result');
+    assert.equal(list.innerHTML, 'rendered:new-result;');
     assert.match(summary.textContent, /new/);
     assert.doesNotMatch(summary.textContent, /old/);
 });
 
-test.skip('deleting an advice message refreshes without dataStore advice count API', async () => {
+test('deleting an advice message refreshes without dataStore advice count API', async () => {
     const data = loadAdvicePanelHarness();
     const list = { innerHTML: '' };
     const summary = { textContent: '' };
@@ -598,7 +733,8 @@ test.skip('deleting an advice message refreshes without dataStore advice count A
     };
     data.__context.window.dataStore = data.__context.dataStore = {};
     data._adviceMessageList = () => list;
-    data.renderAdviceMessages = (messages) => `rendered:${messages.map(m => m.id).join(',')}`;
+    data.renderAdviceMessages = () => '';
+    data.renderAdviceMessage = (msg) => `rendered:${msg.id};`;
     data.adviceRange = 'all';
     data.adviceSearchQuery = '';
     data.deleteWithUndo = function deleteWithUndo(items, id, options) {
@@ -615,7 +751,7 @@ test.skip('deleting an advice message refreshes without dataStore advice count A
 
     assert.equal(saved, true);
     assert.equal(data.db.health.aiAdviceChat[0].deleted, true);
-    assert.equal(list.innerHTML, 'rendered:a1');
+    assert.equal(list.innerHTML, 'rendered:a1;');
     assert.match(summary.textContent, /共 0 轮建议/);
 });
 
@@ -655,6 +791,45 @@ test('advice panel attach exposes v6 message list helper for runtime scrolling',
     assert.equal(typeof data._adviceMessageList, 'function');
 });
 
+test('advice entry restore resets stale scroll instead of restoring middle position', () => {
+    const data = loadAdvicePanelHarness();
+    const removed = [];
+    const scrollCalls = [];
+    const list = { scrollTop: 48, closest: () => ({}) };
+    const scroller = { scrollTop: 56, scrollHeight: 900, clientHeight: 360 };
+    let topChromeOffset = null;
+    let syncs = 0;
+
+    data.__context.sessionStorage = {
+        getItem(key) { return key === data.SCROLL_KEY ? '56' : '24'; },
+        setItem() {},
+        removeItem(key) { removed.push(key); }
+    };
+    data._adviceMessageList = () => list;
+    data._adviceScrollContainer = () => scroller;
+    data._adviceSetScrollY = (target, y, smooth) => {
+        scrollCalls.push({ target, y, smooth });
+        target.scrollTop = y;
+    };
+    data.applyAdviceTopChromeOffset = (_list, offset) => { topChromeOffset = offset; };
+    data.syncAdviceTopChromeToScroll = () => { syncs += 1; };
+    data._adviceResetOnNextRender = true;
+    data._adviceScrollTop = 56;
+    data._advicePageScrollOffset = 24;
+
+    data.restoreAdviceScroll();
+
+    assert.equal(data._adviceResetOnNextRender, false);
+    assert.equal(data._adviceScrollTop, 0);
+    assert.equal(data._advicePageScrollOffset, 0);
+    assert.equal(scroller.scrollTop, 0);
+    assert.equal(list.scrollTop, 0);
+    assert.equal(topChromeOffset, 0);
+    assert.equal(syncs, 1);
+    assert.deepEqual(scrollCalls.map(call => [call.y, call.smooth]), [[0, false]]);
+    assert.deepEqual(removed.sort(), [data.PAGE_SCROLL_KEY, data.SCROLL_KEY].sort());
+});
+
 test('assistant message actions are compact icons without share button', () => {
     const data = loadAdviceRenderHarness();
 
@@ -672,6 +847,22 @@ test('assistant message actions are compact icons without share button', () => {
     assert.match(html, /content_copy/);
     assert.doesNotMatch(html, />分享</);
     assert.doesNotMatch(html, /shareAdviceMessage/);
+});
+
+test('ungrouped advice bubbles can show the full message date', () => {
+    const data = loadAdviceRenderHarness();
+
+    const html = data.renderAdviceMessage({
+        id: 'u-date',
+        role: 'user',
+        content: 'question from another day',
+        at: '2026-05-30T08:05:00.000Z',
+        idx: 0,
+        showDateMeta: true
+    });
+
+    assert.match(html, /2026-05-30/);
+    assert.match(html, /question from another day/);
 });
 
 test('advice version switcher renders after content instead of header', () => {

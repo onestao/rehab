@@ -40,6 +40,7 @@
             this.routineView = next;
             this.syncRoutineSubpageNav?.(next);
             this.renderRoutines();
+            window.appRoute?.syncFromState?.();
         },
 
         syncRoutineSubpageNav(view) {
@@ -492,10 +493,12 @@
             const deck = document.getElementById('healthSwipeDeck');
             if (!deck) {
                 this.renderRecordsPage();
+                window.appRoute?.syncFromState?.();
                 return;
             }
             deck.scrollLeft = index * deck.clientWidth;
             if (view === 'diet') requestAnimationFrame(() => this.autoResizeDietInput?.());
+            window.appRoute?.syncFromState?.();
         },
 
         syncHealthSubtabNav(view) {
@@ -539,6 +542,7 @@
                 this.syncHealthSubtabNav(nextView);
                 this.updateHealthTabActive();
                 if (nextView === 'diet') requestAnimationFrame(() => this.autoResizeDietInput?.());
+                window.appRoute?.syncFromState?.();
             }, 80);
         },
 

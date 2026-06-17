@@ -278,11 +278,11 @@
             return null;
         }
 
-        async function writeAdviceToStore(adviceArray) {
+        async function writeAdviceToStore(adviceArray, options = {}) {
             if (!Array.isArray(adviceArray)) return;
             try {
                 if (window.adviceCollections) {
-                    await window.adviceCollections.clear();
+                    if (options.replace) await window.adviceCollections.clear();
                     if (adviceArray.length > 0) {
                         await window.adviceCollections.putMany(adviceArray);
                     }
@@ -325,7 +325,7 @@
                         const split = splitLargeCollections(recoveredLocal);
                         await window.storageIdb.set(key, split.meta);
                         await writeHistoryToStore(split.history);
-                        await writeAdviceToStore(split.advice);
+                        await writeAdviceToStore(split.advice, { replace: true });
                         return recoveredLocal;
                     }
                     return hydrated;
@@ -342,7 +342,7 @@
                         const split = splitLargeCollections(value);
                         await window.storageIdb.set(key, split.meta);
                         await writeHistoryToStore(split.history);
-                        await writeAdviceToStore(split.advice);
+                        await writeAdviceToStore(split.advice, { replace: true });
                     } else {
                         await window.storageIdb.set(key, value);
                     }

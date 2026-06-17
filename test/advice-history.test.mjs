@@ -33,7 +33,7 @@ function buildHost(records = []) {
     return host;
 }
 
-test.skip('searchAdviceWorkingSet finds archived-memory messages by content, date, and model', () => {
+test('searchAdviceWorkingSet finds archived-memory messages by content, date, and model', () => {
     const host = buildHost([
         { id: 'old', role: 'assistant', content: '膝盖疼痛建议', model: 'deepseek', at: '2026-06-01T08:00:00.000Z', updatedAt: 100 },
         { id: 'new', role: 'user', content: '今天吃了鸡胸肉', model: 'gpt', at: '2026-06-12T08:00:00.000Z', updatedAt: 300 },
@@ -45,7 +45,7 @@ test.skip('searchAdviceWorkingSet finds archived-memory messages by content, dat
     assert.deepEqual(host.searchAdviceWorkingSet('deepseek', 10).map(item => item.id), ['old']);
 });
 
-test.skip('mergeAdviceSearchResults deduplicates cold and working-set results newest first', () => {
+test('mergeAdviceSearchResults deduplicates cold and working-set results newest first', () => {
     const host = buildHost();
     const cold = [
         { id: 'a', content: 'same', updatedAt: 100 },
@@ -61,7 +61,7 @@ test.skip('mergeAdviceSearchResults deduplicates cold and working-set results ne
     assert.equal(JSON.stringify(merged.map(item => item.id)), JSON.stringify(['c', 'b', 'a']));
 });
 
-test.skip('loadAdviceWindowFromColdStore expands the in-memory working set from IndexedDB page results', async () => {
+test('loadAdviceWindowFromColdStore returns a cold-history view without replacing working set', async () => {
     const host = buildHost([
         { id: 'm-58', content: 'recent 58', updatedAt: 58 },
         { id: 'm-59', content: 'recent 59', updatedAt: 59 },
@@ -80,7 +80,9 @@ test.skip('loadAdviceWindowFromColdStore expands the in-memory working set from 
     const loaded = await host.loadAdviceWindowFromColdStore(60);
 
     assert.equal(loaded.length, 60);
-    assert.equal(host.db.health.aiAdviceChat[0].id, 'm-0');
+    assert.equal(loaded[0].id, 'm-0');
+    assert.equal(loaded.at(-1).id, 'm-59');
+    assert.equal(host.db.health.aiAdviceChat[0].id, 'm-58');
     assert.equal(host.db.health.aiAdviceChat.at(-1).id, 'm-59');
 });
 
@@ -138,6 +140,69 @@ test('toggleAdviceHistorySearchScope maps the checkbox to the all-history range'
     host.toggleAdviceHistorySearchScope(false);
 
     assert.equal(host.adviceRange, 'today');
+});
+
+test('reattaching the advice panel preserves all-history session scope', () => {
+    const host = buildHost();
+    host.__context.localStorage = {
+        getItem() { return JSON.stringify({ range: 'today' }); },
+        setItem() {}
+    };
+    host.adviceRange = 'all';
+
+    host.__context.__advicePanel.attach(host);
+
+    assert.equal(host.adviceRange, 'all');
+});
+
+test('all-history checkbox survives the v6 full-page fallback render', () => {
+    const host = buildHost();
+    host.__context.localStorage = {
+        getItem() { return JSON.stringify({ range: 'today' }); },
+        setItem() {}
+    };
+    host.__context.document.querySelector = () => null;
+    host._adviceMessageList = () => null;
+    host.renderAiCoachPage = () => {
+        host.__context.__advicePanel.attach(host);
+        return true;
+    };
+    host.resetAdviceRenderWindow = () => { host._adviceRenderLimit = 80; };
+    host.captureAdviceDraft = () => {};
+    host.captureAdviceScroll = () => {};
+
+    host.toggleAdviceHistorySearchScope(true);
+
+    assert.equal(host.adviceRange, 'all');
+});
+
+test('refreshAdviceSearchResults does not show cold-history hidden count outside all range', async () => {
+    const host = buildHost([
+        { id: 'today-u', role: 'user', content: 'today question', at: '2026-06-12T08:00:00.000Z' },
+        { id: 'today-a', role: 'assistant', content: 'today answer', at: '2026-06-12T08:01:00.000Z' },
+    ]);
+    const list = { innerHTML: '', scrollTop: 0, scrollHeight: 0, clientHeight: 0 };
+    const summary = { textContent: '' };
+    let hiddenCount = -1;
+    host._adviceMessageList = () => list;
+    host.__context.document.getElementById = () => summary;
+    host.logicalDayStart = () => new Date('2026-06-12T00:00:00.000Z');
+    host.countAdviceMessages = async () => 500;
+    let renderedIds = [];
+    host.renderAdviceMessages = (messages, hidden) => {
+        hiddenCount = hidden;
+        renderedIds = messages.map(msg => msg.id);
+        return `hidden:${hidden}`;
+    };
+    host.renderAdviceMessage = (msg) => `row:${msg.id};`;
+    host.adviceRange = 'today';
+    host.adviceSearchQuery = '';
+
+    await host.refreshAdviceSearchResults();
+
+    assert.equal(hiddenCount, 0);
+    assert.deepEqual(renderedIds, ['today-u', 'today-a']);
+    assert.equal(list.innerHTML, 'hidden:0');
 });
 
 test('all-history search scope is not persisted across startup', () => {

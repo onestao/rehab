@@ -22,6 +22,11 @@
         return message || '发生未知错误';
     }
 
+    function isIgnorableBrowserError(err) {
+        const message = String(err?.message || err || '');
+        return /ResizeObserver loop (?:limit exceeded|completed with undelivered notifications)|Observer loop completed with undelivered notifications/i.test(message);
+    }
+
     function safeToast(message) {
         try {
             if (window.toast && typeof toast.show === 'function') toast.show(message, 'error');
@@ -283,6 +288,7 @@
         report(scope, err, meta) {
             try {
                 const error = normalizeError(err);
+                if (isIgnorableBrowserError(error)) return null;
                 const item = {
                     scope: scope || 'unknown',
                     message: friendlyMessage(error),
@@ -356,6 +362,10 @@
     if (typeof window !== 'undefined') {
         window.errorBus = errorBus;
         window.addEventListener('error', function (event) {
+            if (isIgnorableBrowserError(event.error || event.message)) {
+                event.preventDefault?.();
+                return;
+            }
             errorBus.report('global', event.error || event.message || '脚本错误', {
                 filename: event.filename,
                 lineno: event.lineno,
@@ -363,6 +373,7 @@
             });
         });
         window.addEventListener('unhandledrejection', function (event) {
+            if (isIgnorableBrowserError(event.reason)) return;
             errorBus.report('global', event.reason || '未处理的 Promise 拒绝');
         });
 

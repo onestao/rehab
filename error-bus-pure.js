@@ -13,11 +13,18 @@ export function mapFriendlyMessage(err) {
     return message || '发生未知错误';
 }
 
+/** @param {Error|unknown} err */
+export function isIgnorableBrowserError(err) {
+    const message = String(err instanceof Error ? err.message : err || '');
+    return /ResizeObserver loop (?:limit exceeded|completed with undelivered notifications)|Observer loop completed with undelivered notifications/i.test(message);
+}
+
 export function createErrorBus(max = 100) {
     const queue = [];
     return {
         report(scope, err, meta) {
             const error = normalizeError(err);
+            if (isIgnorableBrowserError(error)) return null;
             const item = {
                 scope: scope || 'unknown',
                 message: mapFriendlyMessage(error),

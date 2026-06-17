@@ -37,6 +37,7 @@ const advicePanel = {
             isAdvicePageActive: this.isAdvicePageActive,
             captureAdviceScroll: this.captureAdviceScroll,
             restoreAdviceScroll: this.restoreAdviceScroll,
+            resetAdviceScrollOnEntry: this.resetAdviceScrollOnEntry,
             bindAdviceScrollListener: this.bindAdviceScrollListener,
             syncAdviceTopChromeToScroll: this.syncAdviceTopChromeToScroll,
             measureAdviceTopChrome: this.measureAdviceTopChrome,
@@ -112,7 +113,12 @@ const advicePanel = {
             adviceRangeStart: this.adviceRangeStart,
             filterByAdviceRange: this.filterByAdviceRange,
             visibleAdviceMessages: this.visibleAdviceMessages,
-            visibleAdviceWindowMessages: this.visibleAdviceWindowMessages,
+            prepareAdviceVirtualState: this.prepareAdviceVirtualState,
+            mountAdviceVirtualList: this.mountAdviceVirtualList,
+            setAdviceVirtualEmpty: this.setAdviceVirtualEmpty,
+            renderAdviceVirtualShell: this.renderAdviceVirtualShell,
+            renderAdviceVirtualSkeleton: this.renderAdviceVirtualSkeleton,
+            resolveAdviceRecordsByIds: this.resolveAdviceRecordsByIds,
             countAdviceMessages: this.countAdviceMessages,
             resetAdviceRenderWindow: this.resetAdviceRenderWindow,
             expandAdviceRenderWindow: this.expandAdviceRenderWindow,
@@ -183,7 +189,9 @@ const advicePanel = {
         Object.assign(target, window.adviceTemplateManager || {});
         Object.assign(target, window.adviceAttachments || {});
 
+        const volatileAdviceRange = target.adviceRange === 'all' ? 'all' : '';
         target.loadAdviceSettings?.();
+        if (volatileAdviceRange) target.adviceRange = volatileAdviceRange;
         this.listenThemeChanges();
         requestAnimationFrame(() => {
             const retry = document.getElementById('aiRetryMode');
@@ -925,6 +933,11 @@ const advicePanel = {
         const list = this._adviceMessageList?.();
         if (!list) return;
         if (!this.isAdvicePageActive(list)) return;
+        if (this._adviceResetOnNextRender) {
+            this._adviceResetOnNextRender = false;
+            this.resetAdviceScrollOnEntry?.();
+            return;
+        }
         const savedTop = this.adviceSavedScrollTop();
         if (Number.isFinite(savedTop)) {
             const scroller = this._adviceScrollContainer();
@@ -937,6 +950,29 @@ const advicePanel = {
         const cardTop = card.getBoundingClientRect().top + window.scrollY;
         const maxWindowTop = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
         window.scrollTo({ top: Math.min(cardTop + savedPageOffset, maxWindowTop), behavior: 'auto' });
+    },
+
+    resetAdviceScrollOnEntry() {
+        const list = this._adviceMessageList?.();
+        if (list && !this.isAdvicePageActive(list)) return;
+        this._adviceResetOnNextRender = false;
+        this._adviceScrollTop = 0;
+        this._advicePageScrollOffset = 0;
+        try { sessionStorage.removeItem(this.SCROLL_KEY); } catch {}
+        try { sessionStorage.removeItem(this.PAGE_SCROLL_KEY); } catch {}
+
+        const scroller = this._adviceScrollContainer?.();
+        const documentScroller = document.scrollingElement || document.documentElement || document.body;
+        if (scroller) this._adviceSetScrollY?.(scroller, 0, false);
+        if (documentScroller && documentScroller !== scroller) this._adviceSetScrollY?.(documentScroller, 0, false);
+
+        this._adviceTopChromeOffset = 0;
+        this._adviceTopChromeLastScrollTop = 0;
+        if (list) {
+            if (typeof list.scrollTop === 'number') list.scrollTop = 0;
+            this.applyAdviceTopChromeOffset?.(list, 0);
+            this.syncAdviceTopChromeToScroll?.(list);
+        }
     },
 
     syncAdviceTopChromeToScroll(list = this._adviceMessageList?.()) {
@@ -1087,6 +1123,8 @@ const advicePanel = {
         }
         const previousTop = list.scrollTop || 0;
         chromeInner.innerHTML = this.renderAdviceTopChromeInner();
+        const filterBar = document.querySelector('.advice-v6-filter-bar');
+        if (filterBar) filterBar.innerHTML = this.renderAdviceFilterControls();
         this.refreshAdviceModelChip?.();
         if (refreshMessages) {
             this.refreshAdviceSearchResults();
@@ -1530,6 +1568,7 @@ const advicePanel = {
         this.captureAdviceDraft?.();
         this.captureAdviceScroll?.();
         this.rerenderAdvicePanel?.({ expandChrome: true, focusSearch: true });
+        window.appRoute?.syncFromState?.();
     },
 
     adviceSearchTimestamp(record) {
@@ -1596,11 +1635,9 @@ const advicePanel = {
         if (target <= memoryCount) return fallback();
         const records = await store.getPage(0, target);
         const chronological = (Array.isArray(records) ? records : []).reverse();
-        if (chronological.length) {
-            this.db.health.aiAdviceChat = chronological;
-            store.workingSet = chronological;
-        }
-        return fallback();
+        return chronological.length
+            ? this.activeRecords(store._mergeChronological ? store._mergeChronological(fallback(), chronological) : chronological)
+            : fallback();
     },
 
     async refreshAdviceSearchResults() {
@@ -1611,22 +1648,31 @@ const advicePanel = {
         const query = String(this.adviceSearchQuery || '').trim();
         const requestId = Number(this._adviceSearchRequestId || 0) + 1;
         const searchLimit = 20;
+        const store = window.dataStore?.advice || this.advice;
         this._adviceSearchRequestId = requestId;
         let messages = [];
+        let visibleMessages = [];
+        let total = 0;
 
         if (query) {
             if (query.length < 2) {
-                list.innerHTML = '<div class="empty-state advice-empty"><span class="material-symbols-rounded">keyboard</span><p>输入至少 2 个字符后搜索历史记录</p></div>';
+                this.setAdviceVirtualEmpty('<div class="empty-state advice-empty"><span class="material-symbols-rounded">keyboard</span><p>输入至少 2 个字符后搜索历史记录</p></div>', 'search-short', list);
                 if (summary) summary.textContent = '历史聊天不会预加载；输入至少 2 个字符后按需搜索';
                 return;
             }
             if (summary) summary.textContent = `正在按需搜索历史记录“${query}”...`;
-            list.innerHTML = '<div class="empty-state advice-empty"><span class="material-symbols-rounded">manage_search</span><p>正在搜索冷历史记录</p></div>';
+            this.setAdviceVirtualEmpty('<div class="empty-state advice-empty"><span class="material-symbols-rounded">manage_search</span><p>正在搜索冷历史记录</p></div>', 'search-loading', list);
             let results = [];
             try {
                 const searchWorkingSet = this.searchAdviceWorkingSet || advicePanel.searchAdviceWorkingSet;
                 const mergeResults = this.mergeAdviceSearchResults || advicePanel.mergeAdviceSearchResults;
-                const coldResults = await window.dataStore.advice.search(query, searchLimit);
+                let coldResults = [];
+                if (store?.searchIds) {
+                    const ids = await store.searchIds(query, searchLimit);
+                    coldResults = await this.resolveAdviceRecordsByIds(ids);
+                } else if (store?.search) {
+                    coldResults = await store.search(query, searchLimit);
+                }
                 const workingSetResults = searchWorkingSet.call(this, query, searchLimit);
                 results = mergeResults.call(this, coldResults, workingSetResults, searchLimit);
             } catch (e) {
@@ -1635,37 +1681,55 @@ const advicePanel = {
                 if (!results.length) {
                     if (requestId !== this._adviceSearchRequestId || query !== String(this.adviceSearchQuery || '').trim()) return;
                     console.error('Failed to search advice history', e);
-                    list.innerHTML = '<div class="empty-state advice-empty"><span class="material-symbols-rounded">error</span><p>历史搜索失败，请稍后重试</p></div>';
+                    this.setAdviceVirtualEmpty('<div class="empty-state advice-empty"><span class="material-symbols-rounded">error</span><p>历史搜索失败，请稍后重试</p></div>', 'search-error', list);
                     if (summary) summary.textContent = '历史搜索失败';
                     return;
                 }
             }
             if (requestId !== this._adviceSearchRequestId || query !== String(this.adviceSearchQuery || '').trim()) return;
             messages = (Array.isArray(results) ? results : []).reverse();
+            visibleMessages = this.visibleAdviceMessages(messages, true);
+            total = visibleMessages.length;
+            this.prepareAdviceVirtualState(visibleMessages, 'search', { list, emptyHtml: this.renderAdviceMessages([], 0) });
         } else {
-            if ((this.adviceRange || 'today') === 'all') {
+            const isAllRange = (this.adviceRange || 'today') === 'all';
+            if (isAllRange && store?.getAllIds) {
                 try {
-                    messages = await this.loadAdviceWindowFromColdStore(this._adviceRenderLimit || 80);
-                } catch (e) {
-                    console.error('Failed to load advice history window', e);
+                    const ids = await store.getAllIds();
+                    if (requestId !== this._adviceSearchRequestId || query !== String(this.adviceSearchQuery || '').trim()) return;
                     messages = this.activeRecords(this.db.health.aiAdviceChat || []);
+                    const seedRecords = this.visibleAdviceMessages(messages, false);
+                    total = ids.length;
+                    visibleMessages = seedRecords;
+                    this.prepareAdviceVirtualState(seedRecords, 'all', {
+                        list,
+                        ids,
+                        seedRecords,
+                        emptyHtml: this.renderAdviceMessages([], 0)
+                    });
+                } catch (e) {
+                    console.error('Failed to load advice history ids', e);
+                    messages = this.activeRecords(this.db.health.aiAdviceChat || []);
+                    visibleMessages = this.visibleAdviceMessages(messages, false);
+                    total = visibleMessages.length;
+                    this.prepareAdviceVirtualState(visibleMessages, 'all-fallback', { list, emptyHtml: this.renderAdviceMessages([], 0) });
                 }
             } else {
                 messages = this.activeRecords(this.db.health.aiAdviceChat || []);
+                visibleMessages = this.visibleAdviceMessages(messages, false);
+                total = visibleMessages.length;
+                this.prepareAdviceVirtualState(visibleMessages, this.adviceRange || 'today', { list, emptyHtml: this.renderAdviceMessages([], 0) });
             }
         }
 
-        const visibleMessages = this.visibleAdviceMessages(messages, !!query);
-        const total = query ? visibleMessages.length : await this.countAdviceMessages();
         if (requestId !== this._adviceSearchRequestId || query !== String(this.adviceSearchQuery || '').trim()) return;
-        const windowed = this.visibleAdviceWindowMessages(visibleMessages, total);
-        list.innerHTML = this.renderAdviceMessages(windowed.messages, windowed.hiddenCount);
         if (summary) {
             if (query) summary.textContent = `搜索“${query}”：${visibleMessages.length} 条匹配记录${visibleMessages.length >= searchLimit ? `（显示前 ${searchLimit} 条）` : ''}`;
             else if (!total) summary.textContent = '像聊天一样提问，AI 会结合你的记录分析';
             else {
                 const rangeLabel = { today: '今日', week: '最近7天', month: '最近30天', all: '全部' }[this.adviceRange || 'today'] || '今日';
-                summary.textContent = `${rangeLabel}显示 ${Math.floor(visibleMessages.length / 2)} / 共 ${Math.floor(total / 2)} 轮建议`;
+                const visibleCount = (this.adviceRange || 'today') === 'all' ? total : visibleMessages.length;
+                summary.textContent = `${rangeLabel}显示 ${Math.floor(visibleCount / 2)} / 共 ${Math.floor(total / 2)} 轮建议`;
             }
         }
     },
@@ -1677,6 +1741,7 @@ const advicePanel = {
         this.captureAdviceDraft();
         this.captureAdviceScroll();
         this.rerenderAdvicePanel();
+        window.appRoute?.syncFromState?.();
     },
 
     toggleAdviceContext(key) {
@@ -1766,22 +1831,116 @@ const advicePanel = {
         return start ? withIndex.filter(msg => this.parseHistoryDate(msg.at) >= start) : withIndex;
     },
 
-    resetAdviceRenderWindow() {
-        this._adviceRenderLimit = 80;
+    prepareAdviceVirtualState(records = [], mode = 'recent', options = {}) {
+        const store = window.dataStore?.advice || this.advice;
+        const list = options.mount === false ? null : (options.list || this._adviceMessageList?.());
+        const emptyHtml = options.emptyHtml || this.renderAdviceMessages?.([], 0) || '';
+        this._adviceVirtualEmptyHtml = emptyHtml;
+        this._adviceVirtualFallbackRecords = Array.isArray(records) ? records : [];
+        let snapshot = null;
+        if (store && typeof store.setActiveIds === 'function' && Array.isArray(options.ids)) {
+            snapshot = store.setActiveIds(options.ids, mode, options.seedRecords || records || []);
+        } else if (store && typeof store.setActiveRecords === 'function') {
+            snapshot = store.setActiveRecords(records || [], mode);
+        }
+        this._adviceVirtualSnapshot = snapshot;
+        if (options.mount !== false) this.mountAdviceVirtualList(list);
+        return snapshot;
     },
 
-    visibleAdviceWindowMessages(messages = [], totalCount = null) {
-        const limit = Math.max(20, Number(this._adviceRenderLimit || 80));
-        const total = totalCount !== null ? totalCount : messages.length;
-        if (this.adviceSearchQuery) {
-            return { messages, hiddenCount: 0, totalCount: total };
-        }
-        const rendered = messages.slice(-limit);
-        return {
-            messages: rendered,
-            hiddenCount: Math.max(0, total - rendered.length),
-            totalCount: total
+    mountAdviceVirtualList(list = this._adviceMessageList?.()) {
+        if (!list) return null;
+        const store = window.dataStore?.advice || this.advice;
+        const emptyHtml = this._adviceVirtualEmptyHtml || this.renderAdviceMessages?.([], 0) || '';
+        const keyword = String(this.adviceSearchQuery || '').trim();
+        const renderItem = (msg, index, latest, currentKeyword, options = {}) => {
+            if (!msg || msg.skeleton) return this.renderAdviceVirtualSkeleton(msg, index);
+            const localIndex = this.findAdviceMessageIndexById?.(msg.id);
+            const renderMsg = {
+                ...msg,
+                idx: localIndex >= 0 ? localIndex : (Number.isInteger(msg.idx) ? msg.idx : index),
+                showDateMeta: !!(options.showDateMeta || msg.showDateMeta)
+            };
+            if (typeof this.renderAdviceMessage === 'function') {
+                return this.renderAdviceMessage(renderMsg, latest, currentKeyword || keyword);
+            }
+            return `<div class="advice-bubble ${this.escapeHtml?.(renderMsg.role || 'assistant') || 'assistant'}">${this.escapeHtml?.(renderMsg.content || '') || ''}</div>`;
         };
+        const records = this._adviceVirtualFallbackRecords || [];
+        const activeCount = Array.isArray(store?.activeIdsRef) ? store.activeIdsRef.length : records.length;
+        const activeMode = store?.mode || this._adviceVirtualSnapshot?.mode || this.adviceRange || 'today';
+        const staticThreshold = Math.max(80, Number(this._adviceStaticHistoryThreshold || 180));
+        const hasColdIdsBeyondSeed = activeCount > records.length;
+        const shouldVirtualize = activeMode === 'all'
+            && window.adviceVirtualList?.mountVirtualList
+            && store?.getItem
+            && store?.activeIdsRef
+            && (activeCount > staticThreshold || hasColdIdsBeyondSeed);
+        if (shouldVirtualize) {
+            if (list.dataset) list.dataset.adviceVirtualActive = 'true';
+            this._adviceVirtualController = window.adviceVirtualList.mountVirtualList(list, {
+                store,
+                keyword,
+                emptyHtml,
+                initialHeight: this._adviceSegmentAverage || 132,
+                renderItem: (msg, index, latest, currentKeyword) => renderItem(msg, index, latest, currentKeyword, { showDateMeta: true }),
+                renderSkeleton: (item, index) => this.renderAdviceVirtualSkeleton(item, index)
+            });
+            return this._adviceVirtualController;
+        }
+        if (list._adviceVirtualController) list._adviceVirtualController.destroy?.();
+        this._adviceVirtualController = null;
+        if (list.dataset) delete list.dataset.adviceVirtualActive;
+        const renderRecords = records.map((msg, index) => {
+            const localIndex = this.findAdviceMessageIndexById?.(msg.id);
+            return {
+                ...msg,
+                idx: localIndex >= 0 ? localIndex : (Number.isInteger(msg.idx) ? msg.idx : index)
+            };
+        });
+        list.innerHTML = renderRecords.length
+            ? (this.renderAdviceMessages?.(renderRecords, 0) || renderRecords.map((msg, index) => renderItem(msg, index, index === renderRecords.length - 1, keyword)).join(''))
+            : emptyHtml;
+        return null;
+    },
+
+    findAdviceMessageIndexById(id = '') {
+        if (!id) return -1;
+        return this.activeRecords(this.db?.health?.aiAdviceChat || []).findIndex(msg => msg?.id === id);
+    },
+
+    setAdviceVirtualEmpty(html = '', mode = 'empty', list = this._adviceMessageList?.()) {
+        this.prepareAdviceVirtualState([], mode, {
+            list,
+            ids: [],
+            emptyHtml: html || this.renderAdviceMessages?.([], 0) || ''
+        });
+    },
+
+    renderAdviceVirtualShell(emptyHtml = '') {
+        return `<div class="advice-virtual-inner" data-advice-virtual-inner>${emptyHtml || ''}</div>`;
+    },
+
+    renderAdviceVirtualSkeleton(item = {}, index = 0) {
+        if (window.adviceVirtualList?.defaultSkeletonHtml) return window.adviceVirtualList.defaultSkeletonHtml(item, index);
+        return `<div class="advice-bubble assistant advice-virtual-skeleton" aria-busy="true">
+            <div class="advice-virtual-shimmer"></div>
+            <div class="advice-virtual-shimmer short"></div>
+        </div>`;
+    },
+
+    async resolveAdviceRecordsByIds(ids = []) {
+        const store = window.dataStore?.advice || this.advice;
+        const cleanIds = (Array.isArray(ids) ? ids : []).map(id => String(id || '').trim()).filter(Boolean);
+        if (!cleanIds.length) return [];
+        if (store?.getByIds) return store.getByIds(cleanIds);
+        const byId = new Map(this.activeRecords(this.db?.health?.aiAdviceChat || []).map(record => [record.id, record]));
+        return cleanIds.map(id => byId.get(id)).filter(Boolean);
+    },
+
+    resetAdviceRenderWindow() {
+        this._adviceRenderLimit = 0;
+        this._adviceVirtualSnapshot = null;
     },
 
     async countAdviceMessages() {
@@ -1796,28 +1955,16 @@ const advicePanel = {
         }
     },
 
-    async expandAdviceRenderWindow(step = 80) {
-        const current = Math.max(20, Number(this._adviceRenderLimit || 80));
-        const nextLimit = current + Math.max(20, Number(step) || 80);
-        this._adviceRenderLimit = nextLimit;
-
-        if (!this.adviceSearchQuery && window.dataStore?.advice && typeof window.dataStore.advice.getPage === 'function') {
-            const memoryCount = (this.db.health.aiAdviceChat || []).length;
-            if (nextLimit > memoryCount) {
-                if (this._adviceSending) {
-                    window.toast?.show?.('AI 正在回复中，请稍后加载更多', 'info');
-                    return;
-                }
-                try {
-                    await this.loadAdviceWindowFromColdStore(nextLimit);
-                } catch (e) {
-                    console.error('Failed to load older advice', e);
-                }
-            }
-        }
-
-        this.captureAdviceDraft?.();
-        this.rerenderAdvicePanel?.();
+    async expandAdviceRenderWindow() {
+        const store = window.dataStore?.advice || this.advice;
+        const controller = this._adviceMessageList?.()?._adviceVirtualController || this._adviceVirtualController;
+        const rows = controller?.virtualizer?.getVirtualItems?.() || [];
+        const count = store?.activeIdsRef?.length || 0;
+        const range = rows.length
+            ? { startIndex: rows[0].index, endIndex: rows[rows.length - 1].index }
+            : { startIndex: Math.max(0, count - 1), endIndex: Math.max(0, count - 1) };
+        await store?.prefetchAround?.(range, 2, 'manual');
+        this.mountAdviceVirtualList?.();
     },
 
     adviceMessageSummary(messages, visibleMessages) {
@@ -2721,7 +2868,9 @@ const advicePanel = {
     renderAdvicePanel() {
         const messages = this.activeRecords(this.db.health.aiAdviceChat || []);
         const visibleMessages = this.visibleAdviceMessages(messages);
-        const windowedMessages = this.visibleAdviceWindowMessages(visibleMessages);
+        const emptyHtml = this.renderAdviceMessages([], 0);
+        this.prepareAdviceVirtualState(visibleMessages, this.adviceRange || 'today', { mount: false, emptyHtml });
+        const virtualShell = this.renderAdviceVirtualShell(emptyHtml);
         const rawDraft = this.restoreAdviceDraft();
         const draft = this.escapeHtml(rawDraft);
         const goalType = this.db.health.dietGoal?.goalType || this.db.health.goalType || 'loss';
@@ -2764,7 +2913,7 @@ const advicePanel = {
             </div>
             <div class="advice-v6-filter-bar">${this.renderAdviceFilterControls()}</div>
             <div class="sect-head"><span class="t">对话</span><button class="a" onclick="data.clearAdviceChat?.()" type="button">清空</button></div>
-            <div class="ai-msg-list advice-v6-chat-list">${this.renderAdviceMessages(windowedMessages.messages, windowedMessages.hiddenCount)}</div>
+            <div class="ai-msg-list advice-v6-chat-list" data-advice-virtual-list="true">${virtualShell}</div>
             <div class="advice-scroll-rail" aria-label="对话快速跳转">
                 <button class="advice-rail-btn" onclick="data.scrollAdviceToTop()" type="button" aria-label="跳到最顶端" title="跳到最顶端"><span class="material-symbols-rounded">vertical_align_top</span></button>
                 <button class="advice-rail-btn" onclick="data.scrollAdviceToPrevBubble()" type="button" aria-label="上一段对话" title="上一段对话"><span class="material-symbols-rounded">expand_less</span></button>

@@ -54,7 +54,9 @@
                             txDone(tx).then(function () { resolve(ids); }, function () { resolve(ids); });
                             return;
                         }
-                        ids.push(cursor.value.id);
+                        if (cursor.value && !cursor.value.deleted && !(cursor.value.role === 'assistant' && cursor.value.versionActive === false)) {
+                            ids.push(cursor.value.id);
+                        }
                         cursor.continue();
                     };
                     request.onerror = function () { reject(request.error || new Error('IDB cursor failed')); };

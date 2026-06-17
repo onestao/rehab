@@ -120,9 +120,13 @@
             try {
                 const recentAdvice = await this.advice.getRecent(50);
                 if (recentAdvice && recentAdvice.length > 0) {
-                    this.db.health.aiAdviceChat = recentAdvice.reverse();
+                    const localAdvice = Array.isArray(this.db.health.aiAdviceChat) ? this.db.health.aiAdviceChat : [];
+                    const recentChronological = recentAdvice.slice().reverse();
+                    this.db.health.aiAdviceChat = this.advice._mergeChronological(localAdvice, recentChronological);
                     this.advice.workingSet = this.db.health.aiAdviceChat;
                 }
+                this.advice.setActiveRecords(this.activeRecords(this.db.health.aiAdviceChat || []), 'recent');
+                this.advice.initSearchWorker?.();
             } catch (e) { console.error('Load recent advice failed', e); }
             this.bindFlushHooks();
             if (window.sync && typeof sync.initUI === 'function') sync.initUI();
@@ -237,19 +241,100 @@
 
         _initAdviceApi() {
             const self = this;
-            if (self.db.health && Array.isArray(self.db.health.aiAdviceChat) && self.db.health.aiAdviceChat.length > 50) {
-                self.db.health.aiAdviceChat = self.db.health.aiAdviceChat.slice(-50);
-                self._dbDirty = true;
+            if (!self.db.health) self.db.health = {};
+            if (!Array.isArray(self.db.health.aiAdviceChat)) self.db.health.aiAdviceChat = [];
+
+            function adviceTimestamp(record) {
+                const updatedAt = Number(record?.updatedAt || 0);
+                if (Number.isFinite(updatedAt) && updatedAt > 0) return updatedAt;
+                const at = new Date(record?.at || record?.date || 0).getTime();
+                return Number.isFinite(at) ? at : 0;
             }
-            this.advice = {
+
+            function mergeChronological() {
+                const byId = new Map();
+                Array.from(arguments).forEach(function (records) {
+                    (Array.isArray(records) ? records : []).forEach(function (record) {
+                        if (!record || !record.id) return;
+                        byId.set(record.id, record);
+                    });
+                });
+                return Array.from(byId.values()).sort(function (a, b) {
+                    return adviceTimestamp(a) - adviceTimestamp(b);
+                });
+            }
+
+            function localSearch(records, keyword, limit) {
+                const max = Math.max(1, Number(limit) || 20);
+                const term = String(keyword || '').trim().toLowerCase();
+                if (!term) return [];
+                return self.activeRecords(records || []).filter(function (record) {
+                    return [record.content, record.model, record.provider, record.role, record.id, record.at]
+                        .some(function (value) { return String(value || '').toLowerCase().includes(term); });
+                }).sort(function (a, b) { return adviceTimestamp(b) - adviceTimestamp(a); }).slice(0, max);
+            }
+
+            let adviceApi = null;
+            const virtualStore = window.adviceVirtualList?.createStore?.({
+                cacheCapacity: 6,
+                segmentSize: 100,
+                missThreshold: 3,
+                cooldownMs: 700,
+                fetchByIds: function (ids) { return adviceApi.getByIds(ids); }
+            }) || null;
+            const searchClient = window.adviceVirtualList?.createSearchWorkerClient?.({ workerUrl: 'advice-search.worker.js' }) || null;
+
+            adviceApi = {
                 workingSet: self.db.health.aiAdviceChat || [],
+                mode: virtualStore?.mode || 'recent',
+                version: virtualStore?.version || 0,
+                activeIdsRef: virtualStore?.activeIdsRef || [],
+                virtualStore,
+                searchClient,
+                _timestamp: adviceTimestamp,
+                _mergeChronological: mergeChronological,
+                _syncVirtualSnapshot(snapshot) {
+                    if (!snapshot) return snapshot;
+                    this.mode = snapshot.mode;
+                    this.version = snapshot.version;
+                    this.activeIdsRef = snapshot.activeIdsRef || [];
+                    return snapshot;
+                },
+                initSearchWorker() {
+                    if (!this.searchClient) return;
+                    this.searchClient.init(self.activeRecords(this.workingSet || []));
+                },
+                setActiveIds(ids, mode, seedRecords) {
+                    if (!this.virtualStore) {
+                        this.mode = mode || this.mode || 'recent';
+                        this.version = Number(this.version || 0) + 1;
+                        this.activeIdsRef = (Array.isArray(ids) ? ids : []).slice();
+                        return { mode: this.mode, version: this.version, activeIdsRef: this.activeIdsRef };
+                    }
+                    return this._syncVirtualSnapshot(this.virtualStore.setActiveIds(ids, mode, seedRecords));
+                },
+                setActiveRecords(records, mode) {
+                    const clean = self.activeRecords(records || []);
+                    if (!this.virtualStore) return this.setActiveIds(clean.map(function (record) { return record.id; }), mode, clean);
+                    return this._syncVirtualSnapshot(this.virtualStore.setActiveRecords(clean, mode));
+                },
+                getItem(index, renderVersion) {
+                    if (this.virtualStore) return this.virtualStore.getItem(index, renderVersion);
+                    const id = this.activeIdsRef[Math.max(0, Number(index) || 0)];
+                    return self.activeRecords(this.workingSet || []).find(function (record) { return record.id === id; }) || { skeleton: true, id: 'skel-' + index };
+                },
+                prefetchAround(rangeOrIndex, radius, reason) {
+                    return this.virtualStore?.prefetchAround?.(rangeOrIndex, radius, reason) || Promise.resolve([]);
+                },
                 append(record) {
                     if (!record || typeof record !== 'object') return;
                     if (!record.id) record.id = self.generateRecordId('advice');
                     if (!record.updatedAt) record.updatedAt = Date.now();
                     if (typeof record.deleted !== 'boolean') record.deleted = false;
-                    self.advice.workingSet.push(record);
-                    self.db.health.aiAdviceChat = self.advice.workingSet;
+                    this.workingSet.push(record);
+                    self.db.health.aiAdviceChat = this.workingSet;
+                    this._syncVirtualSnapshot(this.virtualStore?.upsertRecord?.(record));
+                    this.searchClient?.add?.(record);
                     if (window.adviceCollections) {
                         window.adviceCollections.append(record).catch(function (e) {
                             console.warn('advice.append store write failed', e);
@@ -258,9 +343,12 @@
                 },
                 update(record) {
                     if (!record || !record.id) return;
-                    const idx = self.advice.workingSet.findIndex(function (r) { return r && r.id === record.id; });
-                    if (idx >= 0) self.advice.workingSet[idx] = record;
-                    self.db.health.aiAdviceChat = self.advice.workingSet;
+                    const idx = this.workingSet.findIndex(function (r) { return r && r.id === record.id; });
+                    if (idx >= 0) this.workingSet[idx] = record;
+                    else if (!record.deleted) this.workingSet.push(record);
+                    self.db.health.aiAdviceChat = this.workingSet;
+                    this._syncVirtualSnapshot(this.virtualStore?.upsertRecord?.(record));
+                    this.searchClient?.update?.(record);
                     if (window.adviceCollections) {
                         window.adviceCollections.update(record).catch(function (e) {
                             console.warn('advice.update store write failed', e);
@@ -268,10 +356,12 @@
                     }
                 },
                 deleteById(id) {
-                    const record = self.advice.workingSet.find(function (r) { return r && r.id === id; });
+                    const record = this.workingSet.find(function (r) { return r && r.id === id; });
                     if (!record || record.deleted) return false;
                     record.deleted = true;
                     record.updatedAt = Date.now();
+                    this._syncVirtualSnapshot(this.virtualStore?.deleteId?.(id));
+                    this.searchClient?.remove?.(id);
                     if (window.adviceCollections) {
                         window.adviceCollections.update(record).catch(function (e) {
                             console.warn('advice.deleteById store write failed', e);
@@ -283,54 +373,82 @@
                     limit = typeof limit === 'number' ? limit : 50;
                     if (window.adviceCollections) {
                         return window.adviceCollections.getPage(0, limit).catch(function () {
-                            return self.advice.workingSet.slice(-limit).reverse();
+                            return self.activeRecords(adviceApi.workingSet).slice(-limit).reverse();
                         });
                     }
-                    return Promise.resolve(self.advice.workingSet.slice(-limit).reverse());
+                    return Promise.resolve(self.activeRecords(this.workingSet).slice(-limit).reverse());
                 },
                 getPage(offset, limit) {
-                    if (window.adviceCollections) {
-                        return window.adviceCollections.getPage(offset, limit);
-                    }
+                    if (window.adviceCollections) return window.adviceCollections.getPage(offset, limit);
                     return Promise.resolve([]);
                 },
-                getById(id) {
-                    const local = self.advice.workingSet.find(function(r) { return r && r.id === id; });
-                    if (local) return Promise.resolve(local);
-                    if (window.adviceCollections) {
-                        return window.adviceCollections.getById(id);
+                getAllIds() {
+                    if (window.adviceCollections?.getAllIds) {
+                        return window.adviceCollections.getAllIds().catch(function () {
+                            return self.activeRecords(adviceApi.workingSet).sort(function (a, b) { return adviceTimestamp(a) - adviceTimestamp(b); }).map(function (record) { return record.id; });
+                        });
                     }
-                    return Promise.resolve(null);
+                    return Promise.resolve(self.activeRecords(this.workingSet).sort(function (a, b) { return adviceTimestamp(a) - adviceTimestamp(b); }).map(function (record) { return record.id; }));
+                },
+                getByIds(ids) {
+                    const requested = (Array.isArray(ids) ? ids : []).map(function (id) { return String(id || '').trim(); }).filter(Boolean);
+                    if (!requested.length) return Promise.resolve([]);
+                    const byId = new Map();
+                    self.activeRecords(this.workingSet || []).forEach(function (record) { byId.set(record.id, record); });
+                    const missing = requested.filter(function (id) { return !byId.has(id); });
+                    const finish = function () { return requested.map(function (id) { return byId.get(id); }).filter(Boolean); };
+                    if (!missing.length || !window.adviceCollections?.getByIds) return Promise.resolve(finish());
+                    return window.adviceCollections.getByIds(missing).then(function (records) {
+                        self.activeRecords(records || []).forEach(function (record) { byId.set(record.id, record); });
+                        return finish();
+                    }).catch(function () { return finish(); });
+                },
+                getById(id) {
+                    return this.getByIds([id]).then(function (records) { return records[0] || null; });
                 },
                 getAll() {
                     if (window.adviceCollections) {
-                        return window.adviceCollections.getAll().catch(function () {
-                            return self.advice.workingSet || [];
-                        });
+                        return window.adviceCollections.getAll().catch(function () { return adviceApi.workingSet || []; });
                     }
-                    return Promise.resolve(self.advice.workingSet || []);
+                    return Promise.resolve(this.workingSet || []);
                 },
                 count() {
                     if (window.adviceCollections) {
-                        return window.adviceCollections.count().catch(function () {
-                            return (self.advice.workingSet || []).length;
-                        });
+                        return window.adviceCollections.count().catch(function () { return (adviceApi.workingSet || []).length; });
                     }
-                    return Promise.resolve((self.advice.workingSet || []).length);
+                    return Promise.resolve((this.workingSet || []).length);
+                },
+                async searchIds(keyword, limit) {
+                    const term = String(keyword || '').trim();
+                    if (!term) return [];
+                    try {
+                        if (this.searchClient) {
+                            const result = await this.searchClient.search(term, limit || 20);
+                            if (Array.isArray(result.results)) return result.results;
+                        }
+                    } catch (e) {
+                        console.warn('advice.searchIds worker fallback', e);
+                    }
+                    const records = await this.search(term, limit || 20);
+                    return records.map(function (record) { return record.id; });
                 },
                 search(keyword, limit) {
                     if (window.adviceCollections) {
-                        return window.adviceCollections.search(keyword, limit);
+                        return window.adviceCollections.search(keyword, limit).catch(function () {
+                            return localSearch(adviceApi.workingSet, keyword, limit);
+                        });
                     }
-                    return Promise.resolve([]);
+                    return Promise.resolve(localSearch(this.workingSet, keyword, limit));
                 },
                 flush() {
-                    if (!window.adviceCollections || !self.advice.workingSet || !self.advice.workingSet.length) return Promise.resolve();
-                    return window.adviceCollections.putMany(self.advice.workingSet).catch(function (e) {
+                    if (!window.adviceCollections || !this.workingSet || !this.workingSet.length) return Promise.resolve();
+                    return window.adviceCollections.putMany(this.workingSet).catch(function (e) {
                         console.warn('advice.flush store write failed', e);
                     });
                 }
             };
+            this.advice = adviceApi;
+            adviceApi.setActiveRecords(adviceApi.workingSet, 'recent');
         },
 
         purgeBefore(ts, retentionMs = 30 * 24 * 60 * 60 * 1000) {
