@@ -104,6 +104,16 @@ function checkVersionSync() {
         process.exit(1);
     }
 
+    const appUpdateVersion = appUpdate.match(/version:\s*['"](\d+)['"]/);
+    if (!appUpdateVersion) {
+        console.error('app-update.js version property not found');
+        process.exit(1);
+    }
+    if (parseInt(appUpdateVersion[1], 10) !== swVersion) {
+        console.error(`app-update.js version is ${appUpdateVersion[1]} but sw.js CACHE is v${swVersion}`);
+        process.exit(1);
+    }
+
     console.log(`version sync OK (v${swVersion})`);
 }
 
@@ -137,6 +147,7 @@ function bumpVersion() {
 
     let appUpdate = fs.readFileSync(appUpdatePath, 'utf8');
     appUpdate = appUpdate.replace(/\?v=\d+/g, `?v=${next}`);
+    appUpdate = appUpdate.replace(/version:\s*['"]\d+['"]/, `version: '${next}'`);
     fs.writeFileSync(appUpdatePath, appUpdate);
 
     console.log(`bumped to v${next} (${mode})`);

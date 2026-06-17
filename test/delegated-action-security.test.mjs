@@ -311,6 +311,9 @@ test('model picker stars models and sorts starred rows first', () => {
 
 test('app update version matches current service worker cache version', () => {
     const { api } = loadWindowModule('app-update.js', 'appUpdate', { navigator: {}, window: {} });
+    const sw = readFileSync(new URL('../sw.js', import.meta.url), 'utf8');
+    const swVersion = sw.match(/training-assistant-v(\d+)/);
 
-    assert.equal(api.version, '240');
+    assert.ok(swVersion);
+    assert.equal(api.version, swVersion[1]);
 });
