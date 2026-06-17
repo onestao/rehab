@@ -493,7 +493,11 @@ Object.assign(ai, {
         }
          return this._readSSE(res, onChunk,
               (json) => json.choices?.[0]?.delta?.content ?? json.choices?.[0]?.message?.content ?? '',
-              (json) => (json.usage ? { in: Number(json.usage.prompt_tokens || 0), out: Number(json.usage.completion_tokens || 0) } : null),
+              (json) => {
+                  const usage = json.usage ? { in: Number(json.usage.prompt_tokens || 0), out: Number(json.usage.completion_tokens || 0) } : null;
+                  const finishReason = json.choices?.[0]?.finish_reason || '';
+                  return usage || finishReason ? { usage, finishReason } : null;
+              },
               signal
           );
     },
@@ -540,10 +544,13 @@ Object.assign(ai, {
               if (json.type === 'response.output_text.delta') return json.delta || '';
               return '';
           }, (json) => {
-             if (json.type === 'response.completed' && json.response?.usage) {
-                 const u = json.response.usage;
-                 return { in: Number(u.input_tokens || 0), out: Number(u.output_tokens || 0) };
+             const response = json.response || null;
+             const finishReason = response?.incomplete_details?.reason || (response?.status && response.status !== 'completed' ? response.status : '') || '';
+             if (json.type === 'response.completed' && response?.usage) {
+                 const u = response.usage;
+                 return { usage: { in: Number(u.input_tokens || 0), out: Number(u.output_tokens || 0) }, finishReason };
              }
+             if (finishReason) return { finishReason };
               return null;
           }, signal);
     },
@@ -590,9 +597,11 @@ Object.assign(ai, {
               }
              return '';
          }, (json) => {
+             const finishReason = json.delta?.stop_reason || json.stop_reason || '';
              if (json.type === 'message_delta' && json.usage) {
-                 return { in: Number(json.usage.input_tokens || 0), out: Number(json.usage.output_tokens || 0) };
+                 return { usage: { in: Number(json.usage.input_tokens || 0), out: Number(json.usage.output_tokens || 0) }, finishReason };
              }
+             if (finishReason) return { finishReason };
               return null;
           }, signal);
     },
@@ -629,11 +638,12 @@ Object.assign(ai, {
               (json) => json.candidates?.[0]?.content?.parts?.map(p => p.text).join('') || '',
               (json) => {
                  const meta = json.usageMetadata || null;
-                 if (!meta) return null;
-                 return {
+                 const finishReason = json.candidates?.[0]?.finishReason || '';
+                 const usage = meta ? {
                      in: Number(meta.promptTokenCount || 0),
                      out: Number(meta.candidatesTokenCount || meta.totalTokenCount || 0)
-                 };
+                 } : null;
+                 return usage || finishReason ? { usage, finishReason } : null;
               },
               signal
           );
@@ -660,7 +670,18 @@ Object.assign(ai, {
          else signal?.addEventListener?.('abort', cancelReader, { once: true });
          const decoder = new TextDecoder('utf-8');
          let buffer = '', full = '';
-         let lastUsage = null;
+         let lastMeta = null;
+         const normalizeMeta = (raw) => {
+             if (!raw) return null;
+             const meta = {};
+             const usage = raw.usage || ((raw.in || raw.out) ? raw : null);
+             if (usage && (usage.in || usage.out)) {
+                 meta.usage = { in: Number(usage.in || 0), out: Number(usage.out || 0) };
+             }
+             if (raw.finishReason) meta.finishReason = String(raw.finishReason);
+             if (raw.done) meta.done = true;
+             return Object.keys(meta).length ? meta : null;
+         };
          const flush = (chunk) => {
              const parts = chunk.split(/\r?\n/).filter(Boolean);
              for (const part of parts) {
@@ -670,16 +691,16 @@ Object.assign(ai, {
                  try {
                      const json = JSON.parse(payload);
                      if (extractUsage) {
-                         const usage = extractUsage(json);
-                         if (usage && (usage.in || usage.out)) {
-                             lastUsage = usage;
-                             onChunk('', full, { usage });
+                         const meta = normalizeMeta(extractUsage(json));
+                         if (meta) {
+                             lastMeta = { ...(lastMeta || {}), ...meta };
+                             onChunk('', full, meta);
                          }
                      }
                      const delta = extract(json);
                      if (!delta) continue;
                      full += delta;
-                     onChunk(delta, full, lastUsage ? { usage: lastUsage } : undefined);
+                     onChunk(delta, full, lastMeta ? { ...lastMeta } : undefined);
                  } catch {}
              }
          };
@@ -698,8 +719,8 @@ Object.assign(ai, {
             signal?.removeEventListener?.('abort', cancelReader);
         }
          if (buffer) flush(buffer);
-         if (lastUsage && (lastUsage.in || lastUsage.out)) {
-             try { onChunk('', full, { usage: lastUsage, done: true }); } catch {}
+         if (lastMeta) {
+             try { onChunk('', full, { ...lastMeta, done: true }); } catch {}
          }
          return full;
     },

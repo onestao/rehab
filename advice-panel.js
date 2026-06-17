@@ -5,12 +5,14 @@ const advicePanel = {
     SCROLL_KEY: 'rehab_advice_scroll_top',
     PAGE_SCROLL_KEY: 'rehab_advice_page_scroll_offset',
     TEMPLATE_MANAGE_KEY: 'rehab_ai_template_manage',
+    ADVICE_OUTPUT_TOKEN_BUDGET: 4096,
     attach(target) {
         Object.assign(target, {
             DRAFT_KEY: this.DRAFT_KEY,
             SETTINGS_KEY: this.SETTINGS_KEY,
             SCROLL_KEY: this.SCROLL_KEY,
             PAGE_SCROLL_KEY: this.PAGE_SCROLL_KEY,
+            ADVICE_OUTPUT_TOKEN_BUDGET: this.ADVICE_OUTPUT_TOKEN_BUDGET,
             MODEL_ICONS: this.MODEL_ICONS,
             sendAiAdvice: this.sendAiAdvice,
             cancelAiAdvice: this.cancelAiAdvice,
@@ -2259,11 +2261,13 @@ const advicePanel = {
             const baseMessages = this.buildAdviceMessages(effectivePrompt, model, { contextMode });
             const messages = this.applyAdviceAttachmentsToMessages?.(baseMessages, attachments) || baseMessages;
             requestMessages = messages;
+            const outputTokenBudget = Math.max(2400, Number(this.ADVICE_OUTPUT_TOKEN_BUDGET) || 4096);
             window.errorBus?.event?.('advice.request', 'prepared', {
                 provider,
                 model,
                 contextMode,
                 requestMessageCount: messages.length,
+                outputTokenBudget,
                 hasImageAttachment,
                 attachmentCount: attachments.length
             });
@@ -2288,6 +2292,10 @@ const advicePanel = {
                             this.db.health.aiAdviceChat[idx].costUsd = est.costUsd;
                         }
                     }
+                    if (meta?.finishReason) {
+                        this.db.health.aiAdviceChat[idx].finishReason = String(meta.finishReason);
+                    }
+                    if (meta?.done) this.db.health.aiAdviceChat[idx].streamDone = true;
                     this.db.health.aiAdviceChat[idx].updatedAt = Date.now();
                     const bubble = document.querySelector(`[data-advice-id="${pendingId}"]`);
                     if (!bubble || !accumulated) return;
@@ -2321,7 +2329,7 @@ const advicePanel = {
                     if (!this._adviceUserScrollPaused) this.scheduleAdviceStreamScroll();
             };
             full = hasImageAttachment
-                ? await ai.callAdviceWithAttachments(messages, attachments, 2400, {
+                ? await ai.callAdviceWithAttachments(messages, attachments, outputTokenBudget, {
                     signal: controller.signal,
                     timeoutMs: 45000,
                     onProgress: ({ stage, message }) => {
@@ -2333,7 +2341,7 @@ const advicePanel = {
                         this.rerenderAdvicePanel?.();
                     }
                 })
-                : await ai.callStream(messages, 2400, onToken, { signal: controller.signal });
+                : await ai.callStream(messages, outputTokenBudget, onToken, { signal: controller.signal });
             if (hasImageAttachment) {
                 const idx = this.db.health.aiAdviceChat.findIndex(msg => msg.id === pendingId);
                 if (idx >= 0) {

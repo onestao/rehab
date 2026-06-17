@@ -1321,7 +1321,7 @@ mark.ai-hit
   files: 49-plan.css, 49-plan-ai.css
     color: var(--md-sys-on-surface-variant) (49-plan.css / 49-plan-ai.css)
 
-## COMPLEMENTS (same selector, disjoint properties): 104
+## COMPLEMENTS (same selector, disjoint properties): 106
 .bar-leading
   files: 04-layout-appbar.css, 50-v6-ui.css
 
@@ -1599,6 +1599,12 @@ body.is-paused .fab-play
   files: 54-v6-ai.css
 
 .advice-v6-page .advice-bubble b small
+  files: 54-v6-ai.css
+
+.advice-v6-page .advice-bubble-author
+  files: 54-v6-ai.css
+
+.advice-v6-page .advice-bubble-details
   files: 54-v6-ai.css
 
 .setting-row .ico

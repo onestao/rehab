@@ -165,6 +165,8 @@
 .advice-v6-page .advice-date-head,
 .advice-v6-page .advice-bubble b,
 .advice-v6-page .advice-bubble b small,
+.advice-v6-page .advice-bubble-author,
+.advice-v6-page .advice-bubble-details,
 .advice-v6-page .advice-bubble-content,
 .advice-v6-page .advice-bubble-content p,
 .advice-v6-page .advice-bubble-content li,
@@ -173,7 +175,9 @@
 }
 .advice-v6-page .advice-date-head strong,
 .advice-v6-page .advice-date-head small,
-.advice-v6-page .advice-bubble b small {
+.advice-v6-page .advice-bubble b small,
+.advice-v6-page .advice-bubble-author,
+.advice-v6-page .advice-bubble-details {
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;

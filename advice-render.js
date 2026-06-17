@@ -471,7 +471,11 @@ Object.assign(advicePanel, {
         const cost = typeof msg.costUsd === 'number' && msg.costUsd > 0
             ? ` · $${highlightKeyword(msg.costUsd.toFixed(4), currentKeyword)}`
             : '';
+        const finishReason = String(msg.finishReason || msg.errorInfo?.finishReason || '').toLowerCase();
+        const limitedByTokens = /length|max[_-]?tokens?|max[_-]?output/.test(finishReason);
+        const limitBadge = limitedByTokens ? ' · <span class="advice-limit-badge">达到上限</span>' : '';
         const stoppedBadge = msg.stopped ? ' · <span class="advice-stopped-badge">已停止</span>' : '';
+        const detailMeta = `${model}${usage}${cost}${limitBadge}${stoppedBadge}`;
         const rawContent = String(msg.content || '');
         const isLongAssistant = msg.role === 'assistant'
             && !latest
@@ -531,6 +535,7 @@ Object.assign(advicePanel, {
             </div>`
             : '';
         const errorRecovery = msg.error ? (this.renderAdviceErrorRecovery?.(msg) || '') : '';
+        const limitNotice = limitedByTokens ? '<div class="advice-limit-notice"><span class="material-symbols-rounded">data_thresholding</span>回复达到模型输出上限，结尾可能不完整。可点击重试，或直接输入“继续”。</div>' : '';
         const stoppedNotice = msg.stopped ? '<div class="advice-stopped-notice"><span class="material-symbols-rounded">stop</span>已停止生成，已保留上方部分回复。</div>' : '';
         const actions = msg.role === 'assistant'
             ? `<div class="advice-bubble-actions" aria-label="AI 回答操作">
@@ -547,11 +552,17 @@ Object.assign(advicePanel, {
             </div>`;
         return `<div class="advice-bubble ${msg.role}${state}" ${safeId ? `data-advice-id="${safeId}"` : ''} ${latest ? 'data-advice-latest="true"' : ''}>
             <div class="advice-bubble-head">
-                <b>${label}<small>${time}${model}${usage}${cost}${stoppedBadge}</small></b>
+                <b class="advice-bubble-meta">
+                    <span class="advice-bubble-author">${label}</span>
+                    <span class="advice-bubble-dot" aria-hidden="true">·</span>
+                    <small class="advice-bubble-time">${time}</small>
+                    ${detailMeta ? `<small class="advice-bubble-details">${detailMeta}</small>` : ''}
+                </b>
                 ${msg.pending ? '<span class="advice-typing-dot"></span>' : ''}
             </div>
             ${attachments}
             <div class="advice-bubble-content">${msg.pending ? '<div class="skeleton-line skeleton" style="width:80%"></div><div class="skeleton-line skeleton" style="width:60%"></div><div class="skeleton-line skeleton" style="width:90%"></div>' : content}</div>
+            ${limitNotice}
             ${stoppedNotice}
             ${errorRecovery}
             ${longMessageToggle}

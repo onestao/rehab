@@ -32,6 +32,7 @@ compare_arrows
 compress
 content_copy
 dark_mode
+data_thresholding
 delete
 diagnosis
 directions_bike

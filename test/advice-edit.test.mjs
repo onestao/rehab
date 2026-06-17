@@ -970,6 +970,29 @@ test('cancelAiAdvice immediately freezes UI and preserves partial assistant repl
     assert.ok(saveCount >= 1);
 });
 
+test('sendAiAdvice uses larger output budget and preserves length finish reason', async () => {
+    const data = loadAdvicePanelHarness();
+    data.db.health.aiAdviceChat = [];
+    let seenMaxTokens = 0;
+    data.__context.ai.callStream = async (_messages, maxTokens, onToken) => {
+        seenMaxTokens = maxTokens;
+        onToken('partial answer', 'partial answer', {
+            usage: { in: 12, out: 4096 },
+            finishReason: 'length',
+            done: true
+        });
+        return 'partial answer';
+    };
+
+    await data.sendAiAdvice('give me a long answer');
+
+    const reply = data.db.health.aiAdviceChat.find(msg => msg.role === 'assistant');
+    assert.equal(seenMaxTokens, 4096);
+    assert.equal(reply.finishReason, 'length');
+    assert.deepEqual(reply.tokenUsage, { in: 12, out: 4096 });
+    assert.equal(reply.pending, false);
+});
+
 test('attachment updateAdviceSendState keeps stop button while advice is sending', () => {
     const data = loadAdvicePanelHarness();
     const button = {

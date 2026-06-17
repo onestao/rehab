@@ -135,6 +135,22 @@ test('renderAdviceMessage marks stopped assistant replies without error state', 
     assert.doesNotMatch(html, /advice-error-recovery/);
 });
 
+test('renderAdviceMessage marks token-limited assistant replies', () => {
+    const panel = loadAdvicePanel();
+
+    const html = panel.renderAdviceMessage({
+        id: 'limit-1',
+        role: 'assistant',
+        content: 'partial long answer',
+        finishReason: 'length',
+        at: '2026-05-30T00:00:00.000Z'
+    }, true, '');
+
+    assert.match(html, /advice-limit-badge/);
+    assert.match(html, /达到上限/);
+    assert.match(html, /回复达到模型输出上限/);
+});
+
 test('renderAdviceMessage renders escaped safe failure details', () => {
     const panel = loadAdvicePanel();
     panel.renderAdviceErrorRecovery = function renderAdviceErrorRecovery(msg) {
