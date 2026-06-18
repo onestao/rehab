@@ -2005,14 +2005,60 @@ const advicePanel = {
         const scroller = this._adviceScrollContainer?.();
         const beforeTop = this._adviceCurrentScrollY?.(scroller) || 0;
         const beforeHeight = scroller?.scrollHeight || list?.scrollHeight || 0;
-        fn();
-        requestAnimationFrame(() => {
+        const captureViewport = (targetScroller) => {
+            const isDoc = targetScroller === document.scrollingElement || targetScroller === document.documentElement || targetScroller === document.body;
+            if (isDoc) return { top: 0, bottom: window.innerHeight || document.documentElement?.clientHeight || 0 };
+            const rect = targetScroller?.getBoundingClientRect?.();
+            return rect ? { top: rect.top || 0, bottom: rect.bottom || 0 } : { top: 0, bottom: window.innerHeight || 0 };
+        };
+        const anchorCandidates = (() => {
+            const root = list || document;
+            const viewport = captureViewport(scroller);
+            const nodes = Array.from(root?.querySelectorAll?.('[data-advice-id]') || []);
+            return nodes.map((node, order) => {
+                const id = node?.dataset?.adviceId || node?.getAttribute?.('data-advice-id') || '';
+                const rect = node?.getBoundingClientRect?.();
+                if (!id || !rect) return null;
+                if (rect.bottom <= viewport.top + 1 || rect.top >= viewport.bottom - 1) return null;
+                return { id, order, topOffset: (rect.top || 0) - viewport.top };
+            }).filter(Boolean).sort((a, b) => (a.topOffset - b.topOffset) || (a.order - b.order));
+        })();
+        const findAnchor = (root, id) => {
+            if (!root || !id) return null;
+            const nodes = Array.from(root.querySelectorAll?.('[data-advice-id]') || []);
+            return nodes.find(node => (node?.dataset?.adviceId || node?.getAttribute?.('data-advice-id') || '') === id) || null;
+        };
+        const restore = () => {
             const nextList = this._adviceMessageList?.();
             if (!nextList) return;
             const nextScroller = this._adviceScrollContainer?.();
+            const nextViewport = captureViewport(nextScroller);
+            const currentTop = this._adviceCurrentScrollY?.(nextScroller) || 0;
+            for (const anchor of anchorCandidates) {
+                const node = findAnchor(nextList, anchor.id);
+                const rect = node?.getBoundingClientRect?.();
+                if (!rect) continue;
+                const currentOffset = (rect.top || 0) - nextViewport.top;
+                this._adviceSetScrollY?.(nextScroller, Math.max(0, currentTop + currentOffset - anchor.topOffset), false);
+                return;
+            }
             const heightDelta = (nextScroller?.scrollHeight || nextList.scrollHeight) - beforeHeight;
             this._adviceSetScrollY?.(nextScroller, Math.max(0, beforeTop + heightDelta), false);
-        });
+        };
+        const scheduleRestore = () => requestAnimationFrame(() => restore());
+        let result;
+        try {
+            result = fn?.();
+        } catch (e) {
+            scheduleRestore();
+            throw e;
+        }
+        if (result && typeof result.then === 'function') {
+            result.then(scheduleRestore, scheduleRestore);
+        } else {
+            scheduleRestore();
+        }
+        return result;
     },
 
     extractAdviceRoutineBlocks(text = '') {
@@ -2633,11 +2679,16 @@ const advicePanel = {
         const target = this.findAdviceMessage(idx, id);
         const targetId = target?.id;
         if (!targetId) return;
-        this.preserveAdviceScroll(() => {
+        return this.preserveAdviceScroll(() => {
+            let renderResult = null;
             this.deleteWithUndo(this.db.health.aiAdviceChat, targetId, {
                 save: () => this.saveAndBackup(),
-                render: () => this.refreshAdviceSearchResults?.()
+                render: () => {
+                    renderResult = this.refreshAdviceSearchResults?.();
+                    return renderResult;
+                }
             });
+            return renderResult;
         });
     },
 
@@ -2781,18 +2832,23 @@ const advicePanel = {
                 if (m.id !== versionId) m.versionActive = false;
             });
         };
-        removeVersion();
-        this.save();
-        this.refreshAdviceSearchResults?.();
+        this.preserveAdviceScroll(() => {
+            removeVersion();
+            this.save();
+            return this.refreshAdviceSearchResults?.();
+        });
         if (window.toast?.show) {
             toast.show('已删除', 'info', {
                 action: '撤销',
                 timeout: 5000,
                 onAction: () => {
-                    restoreVersion();
-                    this.save();
-                    this.refreshAdviceSearchResults?.();
-                    window.haptics?.success?.();
+                    this.preserveAdviceScroll(() => {
+                        restoreVersion();
+                        this.save();
+                        const renderResult = this.refreshAdviceSearchResults?.();
+                        window.haptics?.success?.();
+                        return renderResult;
+                    });
                 }
             });
         }

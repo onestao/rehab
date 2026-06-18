@@ -755,6 +755,45 @@ test('deleting an advice message refreshes without dataStore advice count API', 
     assert.match(summary.textContent, /共 0 轮建议/);
 });
 
+test('preserveAdviceScroll anchors to the next visible advice message after deletion', () => {
+    const data = loadAdvicePanelHarness();
+    const bubble = (id, top, bottom) => ({
+        dataset: { adviceId: id },
+        getAttribute(name) { return name === 'data-advice-id' ? id : null; },
+        getBoundingClientRect() { return { top, bottom, width: 280, height: bottom - top }; }
+    });
+    let bubbles = [bubble('deleted', 0, 160), bubble('next', 180, 300)];
+    const list = {
+        scrollHeight: 2000,
+        clientHeight: 500,
+        querySelectorAll(selector) { return selector === '[data-advice-id]' ? bubbles : []; }
+    };
+    const scroller = {
+        scrollTop: 600,
+        scrollHeight: 2000,
+        clientHeight: 500,
+        getBoundingClientRect() { return { top: 0, bottom: 500 }; }
+    };
+    const scrollCalls = [];
+
+    data.preserveAdviceScroll = data.__context.__advicePanel.preserveAdviceScroll;
+    data._adviceMessageList = () => list;
+    data._adviceScrollContainer = () => scroller;
+    data._adviceCurrentScrollY = (target) => target.scrollTop || 0;
+    data._adviceSetScrollY = (target, y, smooth) => {
+        scrollCalls.push({ y, smooth });
+        target.scrollTop = y;
+    };
+
+    data.preserveAdviceScroll(() => {
+        bubbles = [bubble('next', 20, 140)];
+        list.scrollHeight = 1500;
+        scroller.scrollHeight = 1500;
+    });
+
+    assert.deepEqual(scrollCalls, [{ y: 440, smooth: false }]);
+});
+
 test('v6 advice panel does not reuse legacy nested chat scroll class', () => {
     const data = loadAdvicePanelHarness();
 
