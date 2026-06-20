@@ -442,18 +442,31 @@
                     title: plan.title || '',
                     notes: plan.notes || '',
                     completion: this.completionRate?.(plan),
-                    items: (plan.items || []).filter((item) => item && !item.deleted).map((item) => ({
-                        id: item.id || '',
-                        name: item.name || '',
-                        category: item.category || 'main',
-                        status: item.status || 'todo',
-                        spec: item.spec || {},
-                        currentLevel: item.currentLevel ?? null,
-                        feedback: item.feedback || null,
-                        userOverride: !!item.userOverride,
-                        aiReasoning: item.aiReasoning || '',
-                        bodyPart: inferBodyPart(`${item.name || ''} ${item.aiReasoning || ''}`)
-                    }))
+                    items: (plan.items || []).filter((item) => item && !item.deleted).map((item) => {
+                        let progressionSignal = undefined;
+                        if (item.chainId && window.planProgression?.evaluate) {
+                            const chain = window.planChains?.get?.(item.chainId);
+                            progressionSignal = window.planProgression.evaluate({
+                                taskItem: item,
+                                chain,
+                                history: item.progressionHistory || [],
+                                planType: plan.type
+                            });
+                        }
+                        return {
+                            id: item.id || '',
+                            name: item.name || '',
+                            category: item.category || 'main',
+                            status: item.status || 'todo',
+                            spec: item.spec || {},
+                            currentLevel: item.currentLevel ?? null,
+                            feedback: item.feedback || null,
+                            userOverride: !!item.userOverride,
+                            aiReasoning: item.aiReasoning || '',
+                            bodyPart: inferBodyPart(`${item.name || ''} ${item.aiReasoning || ''}`),
+                            progressionSignal
+                        };
+                    })
                 }));
             const promptMode = mode === 'week'
                 ? '请为接下来 7 天输出严格 JSON，结构为：{"plans":[{"date":"YYYY-MM-DD","type":"<rehab|cut|bulk|maintenance|custom>","title":"...","notes":"...","items":[{"name":"...","category":"<warmup|main|cooldown>","chainHint":"","spec":{"sets":<int>,"reps":<int>,"work":<int>,"repRest":<int>,"actionRest":<int>,"isAlt":<bool>,"mode":"<reps|hold|alt-reps|alt-hold>"},"cooldownRefs":[],"aiReasoning":"...","durationEstHint":"","requiresUserConfirm":false}]}]}'
@@ -479,7 +492,15 @@
             const overwriteRules = [
                 '当前计划覆盖规则: 你正在重写目标日期/类型的计划，而不是只追加动作。必须先参考“目标当前计划完整摘要”。',
                 '同日期同类型保存时客户端会保留已完成任务和用户锁定(userOverride=true)任务；你输出的 items 应作为未完成未锁定部分的替代方案。',
-                '若当前计划中的未完成动作仍安全且符合最新处方，可保留或微调；若与禁忌、dropped 处方、疼痛>=4/10 或部位排程冲突，必须替换、降级或移到其他日期。'
+                '若当前计划中的未完成动作仍安全且符合最新处方，可保留或微调；若与禁忌、dropped 处方、疼痛>=4/10 或部位排程冲突，必须替换、降级或移到其他日期。',
+                '【极其重要：动作进阶与降阶规则】',
+                '1. 如果某动作包含了 progressionSignal，你必须严格遵守其 decision 字段的建议（hold/progress/deload/volume-up）。',
+                '2. 如果 progressionSignal.decision 为 "progress"，并且提供了 chainAlternatives，你可以从中选择一个进阶动作替换原动作。',
+                '3. 如果 progressionSignal.decision 为 "deload"，你可以减少 sets/work/reps 或从 chainAlternatives 选择一个降阶动作。',
+                '4. 如果 progressionSignal.decision 为 "volume-up"，建议只增加 sets。',
+                '5. 如果 progressionSignal.decision 为 "hold"，严禁替换该动作，维持原有动作和原有规格。',
+                '6. 不要随意调整原本已适应良好动作（无 progressionSignal 要求调整）的难度或更换不同动作，以免引起 "莫名其妙的降阶或变动"。',
+                '7. 不要无脑堆砌容量（如超过 5 组），如果连续合适，应该优先增加负荷、换高阶动作（如 progressionSignal 所述）。'
             ].join('\n');
             const conditionRules = [
                 '病症目标规则: 本次康复计划必须围绕“本次选中训练病症/检查结果”制定；即使某个目标没有对应康复中心处方，也要根据诊断、检查结果、严重程度、禁忌和器材安排中低风险训练。',

@@ -113,6 +113,23 @@ export function normalizeTaskItem(item = {}, options = {}) {
     const work = Math.max(0, Number(spec.work || 0));
     if (reps <= 0 && work > 0) reps = 1;
     const invalidSpec = !item.deleted && (reps <= 0 && work <= 0);
+
+    const isNew = !item.id;
+    const originalSpecRaw = item?.originalSpec && typeof item.originalSpec === 'object' ? item.originalSpec : null;
+    const originalSpec = originalSpecRaw || {
+        sets: Math.max(1, Number(spec.sets || 1)),
+        reps,
+        work,
+        repRest: Math.max(0, Number(spec.repRest || 0)),
+        actionRest: Math.max(0, Number(spec.actionRest || 0)),
+        isAlt: !!spec.isAlt,
+        ...(spec.mode ? { mode: String(spec.mode) } : {}),
+        ...(spec.weight != null ? { weight: Number(spec.weight || 0) } : {})
+    };
+    const specSource = ['initial', 'migrated'].includes(item.specSource) ? item.specSource : (originalSpecRaw ? 'initial' : (isNew ? 'initial' : 'migrated'));
+    const progressionPhase = ['baseline', 'volume-up', 'ready-to-progress', 'progressed', 'deload'].includes(item.progressionPhase) ? item.progressionPhase : 'baseline';
+    const progressionHistory = Array.isArray(item.progressionHistory) ? item.progressionHistory : [];
+
     return touchRecord({
         id: item.id || idFactory('plan-task'),
         name: String(item.name || '未命名任务'),
@@ -128,6 +145,10 @@ export function normalizeTaskItem(item = {}, options = {}) {
             ...(spec.mode ? { mode: String(spec.mode) } : {}),
             ...(spec.weight != null ? { weight: Number(spec.weight || 0) } : {})
         },
+        originalSpec,
+        specSource,
+        progressionPhase,
+        progressionHistory,
         chainId: item.chainId ? String(item.chainId) : '',
         invalidSpec,
         currentLevel: item.currentLevel == null ? null : Math.max(1, Number(item.currentLevel || 1)),

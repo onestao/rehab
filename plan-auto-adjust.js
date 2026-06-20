@@ -51,13 +51,13 @@
     function feedbackStats(plans = []) {
         const rows = plans.flatMap((plan) => mainItems(plan).map((item) => ({ plan, item }))).filter(({ item }) => item.feedback?.rpe);
         const rpes = rows.map(({ item }) => Number(item.feedback?.rpe || 0)).filter(Boolean);
-        const high = rows.filter(({ item }) => Number(item.feedback?.rpe || 0) >= 4);
+        const tooHard = rows.filter(({ item }) => Number(item.feedback?.rpe || 0) === 5);
         const easy = rows.filter(({ item }) => [1, 2].includes(Number(item.feedback?.rpe || 0)));
         return {
             count: rpes.length,
             maxRpe: rpes.length ? Math.max(...rpes) : 0,
             avgRpe: rpes.length ? Number((rpes.reduce((sum, value) => sum + value, 0) / rpes.length).toFixed(1)) : 0,
-            highPainParts: [...new Set(high.map(({ item }) => inferBodyPart(`${item.name || ''} ${item.feedback?.note || ''} ${item.aiReasoning || ''}`)).filter(Boolean))],
+            tooHardParts: [...new Set(tooHard.map(({ item }) => inferBodyPart(`${item.name || ''} ${item.feedback?.note || ''} ${item.aiReasoning || ''}`)).filter(Boolean))],
             easyParts: [...new Set(easy.map(({ item }) => inferBodyPart(`${item.name || ''} ${item.feedback?.note || ''} ${item.aiReasoning || ''}`)).filter(Boolean))],
             notes: rows.map(({ item }) => `${item.name || '任务'}: RPE${item.feedback.rpe}${item.feedback.note ? ` ${item.feedback.note}` : ''}`).slice(0, 10)
         };
@@ -138,9 +138,9 @@
         next.userOverride = false;
         const part = inferBodyPart(`${item.name || ''} ${item.aiReasoning || ''}`);
         const rpe = Number(item.feedback?.rpe || 0);
-        if (rpe >= 4 || (part && stats.highPainParts?.includes(part))) {
+        if (rpe === 5 || (part && stats.tooHardParts?.includes(part))) {
             next.spec = lowerSpec(next.spec || {});
-            next.aiReasoning = `自动降载：今日反馈偏高，明天避开${part || '同部位'}高负荷。`;
+            next.aiReasoning = `自动降载：今日反馈做不动(RPE 5)，明天避开${part || '同部位'}高负荷。`;
         } else if (rpe === 1 || rpe === 2) {
             next.spec = raiseSpec(next.spec || {});
             next.aiReasoning = `自动小幅加量：今日反馈${rpe === 1 ? '太轻' : '合适'}，在安全范围内推进。`;
@@ -269,14 +269,28 @@
             const stats = feedbackStats(sourcePlans);
             const prescription = preferredPrescriptionActions(this.db || {});
             const avoided = avoidedActionNames(this.db || {});
+            
+            const sourceSignals = sourcePlans.flatMap(plan => mainItems(plan).map(item => {
+                if (!item.chainId || !window.planProgression?.evaluate) return null;
+                const chain = window.planChains?.get?.(item.chainId);
+                const signal = window.planProgression.evaluate({
+                    taskItem: item,
+                    chain,
+                    history: item.progressionHistory || [],
+                    planType: plan.type
+                });
+                return { name: item.name, signal };
+            }).filter(Boolean));
+
             const extra = [
                 '自动调整模式：今天训练已经结束，请直接生成/重写明天计划。',
                 `源日期: ${sourceDate}；目标日期必须是: ${targetDate}。`,
                 '必须延续今天已完成的计划类型，不要凭空新增未训练类型。',
-                '用户要求：根据反馈及时调整第二天强度；反馈“太轻”或“合适”(RPE 1-2)时必须小幅增加难度，RPE 3 维持或微调，RPE 4-5 降载、替换或避开高负荷。',
+                '用户要求：根据反馈及时调整第二天强度；反馈“太轻”或“合适”(RPE 1-2)时必须小幅增加难度，RPE 3-4 维持当前难度不降级，RPE 5 降载、替换或避开高负荷。',
                 '部位要求：疼痛避让，同时保证康复尽可能科学锻炼到相关功能链和全身部位，不要机械重复单一处方动作。',
                 '处方优先：有康复处方时尽量使用最近3周处方动作作为主框架；可加入辅助/活动度/拮抗肌动作来补足部位覆盖，但必须在 aiReasoning 中说明。',
                 '硬红线：dropped/avoid/暂停/停做/疼痛>=4 的处方动作不得出现；用户锁定任务由客户端保留，不要试图覆盖。',
+                `今日已完成动作进阶信号(progressionSignal): ${JSON.stringify(sourceSignals)}`,
                 `今日反馈统计: ${JSON.stringify(stats)}`,
                 `优先处方动作: ${JSON.stringify(prescription)}`,
                 `禁用/高疼痛处方动作: ${JSON.stringify(avoided)}`

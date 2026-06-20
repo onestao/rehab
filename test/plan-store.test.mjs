@@ -40,11 +40,14 @@ test('create and fetch daily plan by date', () => {
     const plan = createDailyPlanRecord({
         id: 'plan-1',
         date: '2026-05-24',
-        items: [{ id: 'task-1', name: '桥式', spec: { sets: 3, reps: 12 } }]
+        items: [{ id: 'task-1', name: '桥式', spec: { sets: 3, reps: 12 }, chainId: 'chain-1', progressionHistory: [{ rpe: 2, doneAt: 100 }] }]
     }, { nowTs: 100 });
     const list = upsertDailyPlan([], plan, { nowTs: 100 });
     assert.equal(list.length, 1);
-    assert.equal(getPlanByDate(list, '2026-05-24').id, 'plan-1');
+    const fetched = getPlanByDate(list, '2026-05-24');
+    assert.equal(fetched.id, 'plan-1');
+    assert.equal(fetched.items[0].chainId, 'chain-1');
+    assert.deepEqual(fetched.items[0].progressionHistory, [{ rpe: 2, doneAt: 100 }]);
 });
 
 test('update item status marks completion and keeps metadata', () => {
