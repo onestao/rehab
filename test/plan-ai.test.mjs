@@ -110,11 +110,11 @@ test('plan AI parser fills usable spec defaults and preserves alternation', () =
     mode: 'alt-reps'
   });
   assert.deepEqual(JSON.parse(JSON.stringify(parsed.plans[0].items[1].spec)), {
-    sets: 3,
+    sets: 2,
     reps: 1,
     work: 40,
-    repRest: 10,
-    actionRest: 75,
+    repRest: 0,
+    actionRest: 30,
     isAlt: false,
     mode: 'hold'
   });
@@ -222,6 +222,59 @@ test('plan AI context includes today completed workouts and manual exercises', (
   assert.match(prompt, /卧推/);
   assert.match(prompt, /哑铃划船/);
   assert.match(prompt, /背部已疲劳/);
+});
+
+test('plan AI context tells the model to keep warmup and cooldown below main training load', () => {
+  const api = loadPlanAi();
+  const prompt = api.buildPlanAiContext.call(createContext(api), 'today', '安排高强度主训练', ['bulk']);
+
+  assert.match(prompt, /阶段难度必须分层/);
+  assert.match(prompt, /warmup 只用于准备身体/);
+  assert.match(prompt, /cooldown 只用于拉伸\/呼吸\/恢复/);
+  assert.match(prompt, /main 才承载主要训练负荷/);
+  assert.match(prompt, /不得作为进阶加量对象/);
+});
+
+test('plan AI parser caps warmup and cooldown intensity even when model copies main training load', () => {
+  const api = loadPlanAi();
+  const ctx = createContext(api);
+  const parsed = api.parsePlanAiPayload.call(ctx, JSON.stringify({
+    date: '2026-05-25',
+    type: 'bulk',
+    items: [
+      { name: '动态热身深蹲', category: 'warmup', chainId: 'squat-chain', currentLevel: 4, spec: { sets: 5, reps: 20, work: 5, repRest: 15, actionRest: 75, isAlt: false, mode: 'reps' } },
+      { name: '腿后侧拉伸', category: 'cooldown', chainId: 'stretch-chain', currentLevel: 3, spec: { sets: 4, reps: 12, work: 60, repRest: 10, actionRest: 90, isAlt: false, mode: 'hold' } },
+      { name: '杠铃深蹲', category: 'main', chainId: 'squat-chain', currentLevel: 4, spec: { sets: 5, reps: 5, work: 4, repRest: 15, actionRest: 75, isAlt: false, mode: 'reps' } }
+    ]
+  }), ['bulk']);
+
+  assert.equal(parsed.ok, true);
+  assert.deepEqual(JSON.parse(JSON.stringify(parsed.plans[0].items[0].spec)), {
+    sets: 2,
+    reps: 12,
+    work: 5,
+    repRest: 5,
+    actionRest: 30,
+    isAlt: false,
+    mode: 'reps'
+  });
+  assert.deepEqual(JSON.parse(JSON.stringify(parsed.plans[0].items[1].spec)), {
+    sets: 2,
+    reps: 8,
+    work: 45,
+    repRest: 0,
+    actionRest: 30,
+    isAlt: false,
+    mode: 'hold'
+  });
+  assert.equal(parsed.plans[0].items[0].chainId, '');
+  assert.equal(parsed.plans[0].items[0].currentLevel, null);
+  assert.equal(parsed.plans[0].items[1].chainId, '');
+  assert.equal(parsed.plans[0].items[1].currentLevel, null);
+  assert.equal(parsed.plans[0].items[2].chainId, 'squat-chain');
+  assert.equal(parsed.plans[0].items[2].currentLevel, 4);
+  assert.match(parsed.warnings.join('\n'), /phaseCap\.sets/);
+  assert.match(parsed.warnings.join('\n'), /phaseCap\.actionRest/);
 });
 
 test('plan AI context includes six recent rehab prescriptions', () => {
@@ -362,8 +415,11 @@ test('plan AI preview exposes rest and alternation controls', () => {
 
   assert.match(html, /data-preview-category/);
   assert.match(html, /value="warmup" selected/);
+  assert.match(html, /data-preview-sets value="2"/);
   assert.match(html, /data-preview-rep-rest/);
+  assert.match(html, /data-preview-rep-rest value="5"/);
   assert.match(html, /data-preview-rest/);
+  assert.match(html, /data-preview-rest value="30"/);
   assert.match(html, /data-preview-is-alt checked/);
   assert.match(html, /每组次数/);
   assert.match(html, /组间休息/);

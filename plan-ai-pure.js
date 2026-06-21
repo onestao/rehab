@@ -89,15 +89,28 @@
             || /踝泵|股四头肌|等长|激活|活动度|低阶|初级|mobility|activation|isometric/.test(text);
     }
 
+    function phaseIntensityCaps(category = 'main') {
+        if (category === 'warmup') {
+            return { sets: 2, reps: 12, work: 30, repRest: 5, actionRest: 30 };
+        }
+        if (category === 'cooldown') {
+            return { sets: 2, reps: 8, work: 45, repRest: 0, actionRest: 30 };
+        }
+        return null;
+    }
+
     function coerceAiSpec(item = {}, options = {}) {
         const spec = item.spec && typeof item.spec === 'object' ? { ...item.spec } : {};
+        const category = normalizeAiCategory(item.category || item.phase || item.section);
         const timed = isTimedAiAction(item);
         const lowLevelRehab = isLowLevelRehabAction(item, options.planType || item.planType || '');
+        const caps = phaseIntensityCaps(category);
         const autoFilled = [];
         const isAlt = parseBoolean(spec.isAlt ?? item.isAlt ?? item.alternating ?? item.bilateral ?? item.sideMode);
 
         let sets = readPositiveInteger(spec.sets ?? item.sets, 0);
         if (sets < 1) { sets = 3; autoFilled.push('sets'); }
+        if (caps && sets > caps.sets) { sets = caps.sets; autoFilled.push('phaseCap.sets'); }
 
         let reps = readPositiveNumber(spec.reps ?? item.reps ?? item.count ?? item.times ?? item.perSet, 0);
         let work = readCappedPositiveNumber(spec.work ?? item.work ?? item.seconds ?? item.duration, 0, 90);
@@ -110,19 +123,23 @@
         } else if (timed && reps <= 0) {
             reps = 1; autoFilled.push('reps');
         }
+        if (caps && reps > caps.reps) { reps = caps.reps; autoFilled.push('phaseCap.reps'); }
+        if (caps && work > caps.work) { work = caps.work; autoFilled.push('phaseCap.work'); }
 
         const mode = isAlt ? (timed ? 'alt-hold' : 'alt-reps') : (timed ? 'hold' : 'reps');
 
         const repRestDefault = lowLevelRehab ? 0 : (timed ? 10 : 15);
         const actionRestDefault = lowLevelRehab ? 20 : (timed ? 30 : 45);
-        const repRest = readCappedPositiveNumber(spec.repRest ?? item.repRest ?? item.restBetweenReps, repRestDefault, 30);
+        let repRest = readCappedPositiveNumber(spec.repRest ?? item.repRest ?? item.restBetweenReps, repRestDefault, 30);
         if (spec.repRest === undefined && item.repRest === undefined && item.restBetweenReps === undefined) {
             autoFilled.push('repRest');
         }
-        const actionRest = readCappedPositiveNumber(spec.actionRest ?? item.actionRest ?? item.restBetweenSets ?? item.groupRest, actionRestDefault, lowLevelRehab ? 45 : 75);
+        if (caps && repRest > caps.repRest) { repRest = caps.repRest; autoFilled.push('phaseCap.repRest'); }
+        let actionRest = readCappedPositiveNumber(spec.actionRest ?? item.actionRest ?? item.restBetweenSets ?? item.groupRest, actionRestDefault, lowLevelRehab ? 45 : 75);
         if (spec.actionRest === undefined && item.actionRest === undefined && item.restBetweenSets === undefined && item.groupRest === undefined) {
             autoFilled.push('actionRest');
         }
+        if (caps && actionRest > caps.actionRest) { actionRest = caps.actionRest; autoFilled.push('phaseCap.actionRest'); }
 
         return {
             spec: { sets, reps, work, repRest, actionRest, isAlt, mode },
@@ -139,6 +156,7 @@
         inferSpecMode,
         validateAiSpec,
         isTimedAiAction,
+        phaseIntensityCaps,
         coerceAiSpec,
         normalizeAiCategory
     };

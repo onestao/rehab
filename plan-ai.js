@@ -480,6 +480,8 @@
                 '  mode="alt-reps"：双侧交替次数（如侧弓步、单臂划船）→ reps≥1, work≥1, isAlt=true',
                 '  mode="alt-hold"：双侧交替保持（如单腿站立）→ reps=0, work≥15, isAlt=true',
                 'category 只能是 warmup（热身）/ main（主训练）/ cooldown（拉伸放松）三选一；不要使用其他词。',
+                '阶段难度必须分层：warmup 只用于准备身体，不得复制主训练难度，最多 1-2 组、轻中等强度、短休息；cooldown 只用于拉伸/呼吸/恢复，最多 1-2 组、低强度、不得作为进阶加量对象；main 才承载主要训练负荷。',
+                'warmup/cooldown 即使服务于高强度主训练，也必须明显低于主训练：不要给 3-5 组、接近力竭、长组间休息、大重量、复杂高阶动作或 progression chain。',
                 'spec.work 是每次动作的执行/保持秒数，必须 >0：力量/次数动作 2-5 秒；静态保持/拉伸/呼吸/支撑 20-45 秒。识别不出来时按"次数动作 reps=12, work=3"兜底，绝对禁止 work=0 或省略。',
                 'spec.repRest 是同一组内每次/左右侧之间的休息秒数：常规力量 0-10、慢速/高强度最多 15、连续次数动作直接 0；上限 20。必须显式给出该字段。',
                 'spec.actionRest 是组间休息秒数：康复/激活/活动度/拉伸 15-30、常规主训 30-60、大重量复合最多 75；严禁 >90。必须显式给出该字段。',
@@ -668,12 +670,14 @@
                 const items = (Array.isArray(plan.items) ? plan.items : []).map((item) => {
                     const name = String(item.name || '');
                     if (!name) return null;
-                    const coerced = coerceAiSpec(item, { planType });
+                    const category = normalizeAiCategory(item.category || item.phase || item.section);
+                    const progressionAllowed = category === 'main';
+                    const coerced = coerceAiSpec({ ...item, category }, { planType });
                     return {
                         name,
-                        category: normalizeAiCategory(item.category || item.phase || item.section),
-                        chainId: String(item.chainId || item.chainHint || ''),
-                        currentLevel: item.currentLevel == null ? null : Number(item.currentLevel),
+                        category,
+                        chainId: progressionAllowed ? String(item.chainId || item.chainHint || '') : '',
+                        currentLevel: progressionAllowed && item.currentLevel != null ? Number(item.currentLevel) : null,
                         spec: coerced.spec,
                         cooldownRefs: Array.isArray(item.cooldownRefs) ? item.cooldownRefs.map((value) => String(value || '')) : [],
                         aiReasoning: String(item.aiReasoning || ''),
@@ -921,9 +925,10 @@
                         if (input?.hasAttribute('data-preview-rest')) return 'actionRest';
                         return '';
                     }).filter(Boolean);
-                    items.push({
+                    const category = normalizeAiCategory(itemEl.querySelector('[data-preview-category]')?.value || 'main');
+                    const coerced = coerceAiSpec({
                         name,
-                        category: normalizeAiCategory(itemEl.querySelector('[data-preview-category]')?.value || 'main'),
+                        category,
                         spec: {
                             sets: Math.max(1, Math.round(readNumber(itemEl.querySelector('[data-preview-sets]')?.value, 3))),
                             reps,
@@ -932,7 +937,12 @@
                             actionRest: Math.max(0, readNumber(itemEl.querySelector('[data-preview-rest]')?.value, 45)),
                             isAlt,
                             mode
-                        },
+                        }
+                    });
+                    items.push({
+                        name,
+                        category,
+                        spec: coerced.spec,
                         cooldownRefs: [],
                         aiReasoning: String(itemEl.querySelector('[data-preview-reason]')?.value || '').trim(),
                         durationEstHint: '',
@@ -942,7 +952,7 @@
                         doneSets: 0,
                         userOverride: false,
                         excludeFromPr: true,
-                        ...(autoFilled.length ? { autoFilled } : {})
+                        ...((autoFilled.length || coerced.autoFilled.length) ? { autoFilled: [...new Set([...autoFilled, ...coerced.autoFilled])] } : {})
                     });
                 });
                 const typeText = String(planEl.querySelector('.plan-ai-preview-type')?.textContent || '').trim();
