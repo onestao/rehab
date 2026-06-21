@@ -409,6 +409,48 @@ test('custom advice template can access manual exercise variables', () => {
     assert.doesNotMatch(userContent, /\{todayManualExercises\}/);
 });
 
+test('AI advice ignores structured plan template for normal coach questions', () => {
+    const { data } = loadCoachContextHarness({
+        db: {
+            history: [],
+            health: {
+                foodLogs: [],
+                weights: [],
+                exerciseLogs: [],
+                rehabWeekly: [],
+                reports: [],
+                dietGoal: null,
+                bodyPlan: null,
+                weightPlan: null,
+                weeklyGoalSessions: 4,
+                aiAdviceChat: []
+            },
+            actions: [],
+            routines: [],
+            dailyPlans: [],
+            weeklyPlan: {},
+            aiTemplates: [{
+                id: 'tpl-plan-json',
+                name: '训练计划生成',
+                scenario: 'plan_generate',
+                system: '你是训练日程计划助手。只输出严格 JSON 文本，不要 Markdown 代码块、不要解释。',
+                user: '{"plans":[{"items":[]}]}'
+            }],
+            aiTemplateActiveId: 'tpl-plan-json'
+        },
+        getActiveAdviceTemplate() { return this.db.aiTemplates[0]; }
+    });
+
+    const messages = data.buildAdviceMessages('我今天早餐蛋白质够吗？', 'test-model');
+    const systemContent = messages.find(message => message.role === 'system')?.content || '';
+    const userContent = messages.find(message => message.role === 'user')?.content || '';
+
+    assert.match(systemContent, /当前启用的分析维度/);
+    assert.doesNotMatch(systemContent, /训练日程计划助手|只输出严格 JSON/);
+    assert.match(userContent, /用户提问：我今天早餐蛋白质够吗？/);
+    assert.doesNotMatch(userContent, /"plans"|"items"/);
+});
+
 test('editing a user advice prompt inserts a new active answer version after the original prompt', async () => {
     const data = loadAdvicePanelHarness();
 

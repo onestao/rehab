@@ -164,7 +164,12 @@ Object.assign(advicePanel, {
             if (contexts.goal) blocks.push(`【目标与计划】\n${formatGoalPlans() || '暂无目标计划'}`);
             if (rangeReports.length) blocks.push(`【近期报告摘要】\n${formatReports(rangeReports)}`);
             const conversation = this.adviceConversationContext(mode === 'none' ? 0 : mode === 'light' ? 2 : 8);
-            const template = this.getActiveAdviceTemplate?.() || null;
+            const activeTemplate = this.getActiveAdviceTemplate?.() || null;
+            const structuredScenarios = new Set(['plan_generate', 'weekly_report', 'monthly_report', 'food_parse_text', 'food_parse_image', 'body_goal_plan', 'rehab_weekly_parse', 'food_alias_merge', 'insight_advice']);
+            const templateScenario = String(activeTemplate?.scenario || '').trim();
+            const templateText = `${activeTemplate?.system || ''}\n${activeTemplate?.user || ''}`;
+            const structuredTemplate = structuredScenarios.has(templateScenario) || /只输出严格 JSON|训练日程计划助手|"plans"\s*:|"items"\s*:/.test(templateText);
+            const template = activeTemplate && !structuredTemplate ? activeTemplate : null;
             if (template) {
                 const vars = this.buildAdviceTemplateVars?.({ prompt, range, blocks, today, todayFoods, todayHistory, todayExerciseLogs, todayExerciseText, todayManualExercises: todayExerciseText, todayWeights, todayDailyPlans, rangeFoods, rangeHistory, rangeExerciseLogs, rangeExerciseText, manualExercises: rangeExerciseText, rangeWeights, rangeDailyPlans, targetExerciseLogs, targetExerciseText, targetManualExercises: targetExerciseText, targetDailyPlans }) || {};
                 return [{ role: 'system', content: String(template.system || '').trim() || sys }, ...conversation, { role: 'user', content: this.applyAdviceTemplate?.(template.user || '{prompt}', vars) || blocks.join('\n\n') }];
