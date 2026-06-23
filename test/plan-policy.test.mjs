@@ -102,6 +102,42 @@ test('plan policy keeps AI progressed bridge when safety note says avoid pressur
     assert.equal(policyDebug[0].removedBlocked.length, 0);
 });
 
+test('plan policy can keep blocked AI candidates for user confirmation', () => {
+    const policy = loadPlanPolicy();
+    const db = {
+        dailyPlans: [],
+        health: {
+            rehabWeekly: [{
+                weekStart: '2026-06-24',
+                actions: [{ name: '侧卧夹毛巾抬腿', status: 'dropped', rawDescription: '昨日反馈不适合，暂停该动作' }]
+            }]
+        }
+    };
+    const policyDebug = [];
+    const plans = policy.sanitizeGeneratedPlans([{
+        date: '2026-06-24',
+        type: 'rehab',
+        items: [{ name: '侧卧夹毛巾抬腿', category: 'main', spec: { sets: 2, reps: 10, work: 3 } }]
+    }], {
+        db,
+        targetDate: '2026-06-24',
+        types: ['rehab'],
+        ensureTaskShape: (item) => item,
+        keepBlockedAsConfirm: true,
+        onDebug: (entry) => policyDebug.push(entry)
+    });
+
+    const candidate = plans[0].items[0];
+    assert.equal(plans[0].items.length, 1);
+    assert.equal(candidate.name, '侧卧夹毛巾抬腿');
+    assert.equal(candidate.requiresUserConfirm, true);
+    assert.equal(candidate.userConfirmed, false);
+    assert.equal(candidate.policy.blocked, true);
+    assert.match(candidate.aiReasoning, /暂停\/避免记录冲突/);
+    assert.equal(policyDebug[0].removedBlocked.length, 0);
+    assert.equal(policyDebug[0].keptBlockedForConfirm.length, 1);
+});
+
 test('plan policy sanitizes oral prescription plans without losing legacy context', () => {
     const policy = loadPlanPolicy();
     const db = {

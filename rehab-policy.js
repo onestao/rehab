@@ -403,6 +403,7 @@
     const stableLegacy = context?.legacyContinueAllowed && matchAction(context?.stableLegacyItems, item);
     const nonPrescriptionNew = type === 'main' && !prescription && !sourceItem && !stableLegacy;
     const requiresUserConfirm = Boolean(item?.requiresUserConfirm)
+      || Boolean(blocked)
       || Boolean(cautious)
       || Boolean(meta?.conditional)
       || nonPrescriptionNew;
@@ -431,7 +432,7 @@
         requiresUserConfirm
       }
     };
-    if (blocked) return appendReason(annotated, '已从结果移除：最新医嘱或反馈要求暂停/避免');
+    if (blocked) return appendReason(annotated, '与最新医嘱或反馈中的暂停/避免记录冲突，需要用户主动确认后才执行');
     if (requiresUserConfirm && nonPrescriptionNew) return appendReason(annotated, '非医嘱新增动作，需要用户确认后再执行');
     if (requiresUserConfirm && cautious) return appendReason(annotated, '条件性医嘱，需要用户确认当前状态符合后再执行');
     return annotated;
@@ -476,11 +477,13 @@
     const sourcePlans = activeRecords(options.sourcePlans || []);
     const ensureTaskShape = typeof options.ensureTaskShape === 'function' ? options.ensureTaskShape : (item) => item;
     const emitDebug = typeof options.onDebug === 'function' ? options.onDebug : null;
+    const keepBlockedAsConfirm = options.keepBlockedAsConfirm === true;
     return activeRecords(plans).map((plan) => {
       const policyDebug = {
         date: plan.date || options.targetDate || '',
         type: plan.type || 'rehab',
         removedBlocked: [],
+        keptBlockedForConfirm: [],
         addedCooldown: [],
         mustKeep: []
       };
@@ -489,6 +492,10 @@
       let items = activePlanItems(plan).map((item) => annotatePlanItem(item, context, sourceItems));
       items = items.filter((item) => {
         if (!item.policy?.blocked) return true;
+        if (keepBlockedAsConfirm) {
+          policyDebug.keptBlockedForConfirm.push(summarizePolicyItemForDebug(item));
+          return true;
+        }
         policyDebug.removedBlocked.push(summarizePolicyItemForDebug(item));
         return false;
       });

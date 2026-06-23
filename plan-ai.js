@@ -1074,6 +1074,7 @@
                     sourcePlans: this.activeRecords?.(this.db?.dailyPlans || []) || [],
                     types: normalizePlanTypes(this._planAiTypes || plans.map((plan) => plan.type || 'rehab')),
                     ensureTaskShape: (item) => item,
+                    keepBlockedAsConfirm: true,
                     onDebug: (entry) => policyDebug.push(entry)
                 });
                 planAiDebug('sanitize:preview', {
@@ -1123,6 +1124,9 @@
             const autoSet = new Set(item.autoFilled || []);
             const af = (field) => autoSet.has(field) ? ' data-auto-filled' : '';
             const category = normalizeAiCategory(item.category || item.phase);
+            const confirmLabel = item.policy?.blocked || item.policy?.source === 'blocked'
+                ? '我确认了解此动作与暂停/避免记录冲突，仍保留为候选'
+                : '我确认接受此非处方/中低风险建议';
             return `<div class="plan-ai-preview-item" data-item-index="${itemIndex}">
                 <div class="md-field plan-ai-preview-name">
                     <input type="text" data-preview-name value="${this.escapeHtml(item.name || '')}" placeholder=" ">
@@ -1156,7 +1160,7 @@
                     <input type="text" data-preview-reason value="${this.escapeHtml(item.aiReasoning || '')}" placeholder=" ">
                     <label>理由</label>
                 </div>
-                ${item.requiresUserConfirm ? `<label class="plan-ai-preview-confirm"><input type="checkbox" data-preview-user-confirm ${item.userConfirmed ? 'checked' : ''}><span>我确认接受此非处方/中低风险建议</span></label>` : ''}
+                ${item.requiresUserConfirm ? `<label class="plan-ai-preview-confirm"><input type="checkbox" data-preview-user-confirm ${item.userConfirmed ? 'checked' : ''}><span>${this.escapeHtml(confirmLabel)}</span></label>` : ''}
                 <button class="md-icon-btn" type="button" onclick="data.deletePlanAiPreviewItem(${planIndex}, ${itemIndex})" aria-label="删除动作"><span class="material-symbols-rounded">delete</span></button>
             </div>`;
         },
@@ -1301,6 +1305,7 @@
                     sourcePlans: this.activeRecords?.(this.db?.dailyPlans || []) || [],
                     types: normalizePlanTypes(this._planAiTypes || plans.map((plan) => plan.type || 'rehab')),
                     ensureTaskShape: (item) => item,
+                    keepBlockedAsConfirm: true,
                     onDebug: (entry) => policyDebug.push(entry)
                 });
                 planAiDebug('sanitize:confirm', {
@@ -1318,7 +1323,7 @@
                     count: unconfirmed.length,
                     plans: summarizePlanAiPlansForDebug(plans)
                 });
-                window.toast?.show?.(`有 ${unconfirmed.length} 个非处方建议尚未确认`, 'error');
+                window.toast?.show?.(`有 ${unconfirmed.length} 个需要确认的动作尚未确认`, 'error');
                 return;
             }
             const hasAutoFilled = plans.some((plan) => plan.items.some((item) => item.autoFilled?.length));
