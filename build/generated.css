@@ -9184,6 +9184,88 @@ body.is-training .fab-pip.active {
     z-index: 1;
 }
 
+.plan-feedback-detail-grid {
+    display: grid;
+    grid-template-columns: minmax(110px, 160px) minmax(0, 1fr);
+    gap: 10px;
+}
+
+.plan-feedback-field {
+    display: grid;
+    gap: 6px;
+    min-width: 0;
+    color: var(--md-sys-on-surface-variant);
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.plan-feedback-field select,
+.plan-feedback-field input {
+    width: 100%;
+    min-height: 44px;
+    border: 1.5px solid var(--md-sys-outline-variant);
+    border-radius: var(--md-sys-shape-sm);
+    background: var(--md-sys-surface-container-lowest);
+    color: var(--md-sys-on-surface);
+    font: inherit;
+    padding: 0 12px;
+    outline: none;
+}
+
+.plan-feedback-checks {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+}
+
+.plan-feedback-checks label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    min-height: 42px;
+    padding: 8px 10px;
+    border: 1px solid color-mix(in srgb, var(--md-sys-outline-variant) 72%, transparent);
+    border-radius: var(--md-sys-shape-sm);
+    background: var(--md-sys-surface-container-low);
+    color: var(--md-sys-on-surface);
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.plan-feedback-checks input {
+    flex: 0 0 auto;
+}
+
+.plan-policy-badge {
+    width: fit-content;
+    max-width: 100%;
+    display: inline-flex;
+    align-items: center;
+    min-height: 24px;
+    padding: 3px 8px;
+    border-radius: var(--md-sys-shape-sm);
+    border: 1px solid color-mix(in srgb, var(--md-sys-outline-variant) 72%, transparent);
+    background: var(--md-sys-surface-container-low);
+    color: var(--md-sys-on-surface-variant);
+    font-size: 12px;
+    font-weight: 800;
+    line-height: 1.2;
+}
+
+.plan-policy-badge.is-warning,
+.plan-policy-confirm-row {
+    border-color: color-mix(in srgb, var(--md-sys-error) 42%, transparent);
+    background: color-mix(in srgb, var(--md-sys-error-container) 68%, var(--md-sys-surface-container-low));
+    color: var(--md-sys-on-error-container);
+}
+
+.plan-policy-badge.is-confirmed {
+    border-color: color-mix(in srgb, var(--md-sys-tertiary) 36%, transparent);
+    background: color-mix(in srgb, var(--md-sys-tertiary-container) 68%, var(--md-sys-surface-container-low));
+    color: var(--md-sys-on-tertiary-container);
+}
+
 .plan-feedback-sheet .md-field textarea,
 .plan-ai-sheet .md-field textarea {
     width: 100%;
@@ -9590,6 +9672,11 @@ body.is-training .fab-pip.active {
 }
 
 @media (max-width: 480px) {
+    .plan-feedback-sheet .plan-feedback-detail-grid,
+    .plan-feedback-sheet .plan-feedback-checks {
+        grid-template-columns: 1fr;
+    }
+
     .plan-ai-preview-spec {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
@@ -11032,6 +11119,23 @@ body.is-training .fab-pip.active {
     background: var(--md-sys-primary-container);
     color: var(--md-sys-on-primary-container);
     box-shadow: var(--md-sys-elevation-1);
+}
+.weight-granularity-tabs {
+    width: max-content;
+    max-width: 100%;
+    margin: -4px 0 0;
+    padding: 0;
+    align-self: flex-end;
+    background: transparent;
+}
+.weight-granularity-tabs .weight-range {
+    min-height: 30px;
+    padding: 0 10px;
+    background: var(--md-sys-surface-container);
+}
+.weight-granularity-tabs .weight-range.active {
+    background: var(--md-sys-primary-container);
+    color: var(--md-sys-on-primary-container);
 }
 .weight-range:active { transform: scale(0.94); }
 .weight-period-nav {

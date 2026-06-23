@@ -389,8 +389,17 @@
         },
 
         renderPlanTaskRow(planId, task, index, compact = false) {
-            const doneMeta = task.feedback?.doneAt ? `<small>${formatTime(task.feedback.doneAt)} · ${this.escapeHtml(task.feedback?.note || '')}</small>` : '';
+            const feedbackBits = [];
+            if (task.feedback?.painScore != null) feedbackBits.push(`疼痛 ${task.feedback.painScore}/10${task.feedback.painPart ? ` ${this.escapeHtml(task.feedback.painPart)}` : ''}`);
+            if (task.feedback?.noIncrease) feedbackBits.push('不加量');
+            if (task.feedback?.keepNextTime) feedbackBits.push('下次保持');
+            if (task.feedback?.wantsContinue === false) feedbackBits.push('不想继续');
+            if (task.feedback?.unsuitable) feedbackBits.push('不适合');
+            const doneMeta = task.feedback?.doneAt ? `<small>${formatTime(task.feedback.doneAt)}${feedbackBits.length ? ` · ${feedbackBits.join(' · ')}` : ''}${task.feedback?.note ? ` · ${this.escapeHtml(task.feedback.note)}` : ''}</small>` : '';
             const meta = taskStatusMeta(task);
+            const policyBadge = task.requiresUserConfirm
+                ? `<span class="plan-policy-badge ${task.userConfirmed ? 'is-confirmed' : 'is-warning'}">${task.userConfirmed ? '非医嘱新增 · 已确认' : '非医嘱新增 · 待确认'}</span>`
+                : '';
             return `<div class="plan-task-row ${meta.className}">
                 <button class="plan-task-main" type="button" onclick="data.handlePlanTaskTap('${planId}','${task.id}')">
                     <span class="plan-task-order">${index}</span>
@@ -399,6 +408,7 @@
                             <strong>${this.escapeHtml(task.name || '未命名任务')}</strong>
                             <em><span class="material-symbols-rounded">${meta.icon}</span>${meta.label}</em>
                         </span>
+                        ${policyBadge}
                         <small>${taskSpecText(task)}${task.currentLevel ? ` · Lv${task.currentLevel}` : ''}${task.userOverride ? ' · 已锁定' : ''}${task.invalidSpec ? ' · ⚠️ 参数不完整' : ''}</small>
                         ${!compact && doneMeta}
                     </span>
@@ -495,6 +505,19 @@
         },
 
         markPlanTaskDone(planId, taskId) {
+            const { task } = this.findTask?.(planId, taskId) || {};
+            if (task?.requiresUserConfirm && !task.userConfirmed) {
+                this._openModal?.({
+                    title: '确认非医嘱新增动作',
+                    icon: 'verified',
+                    bodyHtml: `<p class="md-muted">${this.escapeHtml(task.name || '此动作')} 不是当前医嘱中明确要求的动作。确认后才会标记完成并记录体验反馈。</p>`,
+                    actionsHtml: `
+                        <button class="md-btn" type="button" data-modal-close>取消</button>
+                        <button class="md-btn md-btn-filled" type="button" onclick="data.confirmPlanTaskSuggestion('${planId}','${taskId}', { silent: true, keepModalOpen: true }); data.markPlanTaskDone('${planId}','${taskId}')">确认并完成</button>
+                    `
+                });
+                return;
+            }
             this.updateItemStatus?.(planId, taskId, 'done');
             this.openPlanFeedback?.(planId, taskId);
             this.render?.();
@@ -510,6 +533,7 @@
                 title: this.escapeHtml(task.name || '任务'),
                 icon: 'more_vert',
                 bodyHtml: `<div class="weekly-plan-picker">
+                    ${task.requiresUserConfirm && !task.userConfirmed ? `<button class="model-picker-row plan-policy-confirm-row" type="button" onclick="data.confirmPlanTaskSuggestion('${planId}','${taskId}')"><span class="material-symbols-rounded">verified</span><span class="model-picker-main"><strong>确认非医嘱新增动作</strong><small>确认后才会作为你的训练动作执行</small></span></button>` : ''}
                     <button class="model-picker-row" type="button" onclick="data.openPlanTaskEdit('${planId}','${taskId}')"><span class="material-symbols-rounded">edit</span><span class="model-picker-main"><strong>编辑动作</strong><small>临时修改名称、阶段和训练参数</small></span></button>
                     <button class="model-picker-row" type="button" onclick="data.movePlanTaskTo('${planId}','${taskId}','${this.logicalDateKey?.() || this.dateKey(new Date())}')"><span class="material-symbols-rounded">today</span><span class="model-picker-main"><strong>移到今天</strong><small>回到当前日期执行</small></span></button>
                     <button class="model-picker-row" type="button" onclick="data.movePlanTaskTo('${planId}','${taskId}','${tomorrowKey}')"><span class="material-symbols-rounded">event</span><span class="model-picker-main"><strong>移到明天</strong><small>延后一天执行</small></span></button>
@@ -534,6 +558,20 @@
             this.render?.();
         },
 
+        confirmPlanTaskSuggestion(planId, taskId, options = {}) {
+            const { plan, task } = this.findTask?.(planId, taskId) || {};
+            if (!plan || !task) return false;
+            task.userConfirmed = true;
+            task.policy = { ...(task.policy || {}), userConfirmedAt: Date.now() };
+            this.touchRecord?.(task, ['userConfirmed', 'policy']);
+            this.touchRecord?.(plan, ['items']);
+            if (options.save !== false) this.save?.();
+            if (options.close !== false) this._closeActiveModal?.();
+            if (options.render !== false) this.render?.();
+            window.toast?.show?.('已确认此非医嘱新增动作', 'success');
+            return true;
+        },
+
         deletePlanTaskConfirm(planId, taskId) {
             this.deleteTask?.(planId, taskId);
             this._closeActiveModal?.();
@@ -545,6 +583,20 @@
         async handlePlanTaskTap(planId, taskId) {
             const { task } = this.findTask?.(planId, taskId) || {};
             if (!task) return;
+            if (task.requiresUserConfirm && !task.userConfirmed) {
+                this._confirmModal?.({
+                    title: '确认非医嘱新增动作',
+                    icon: 'verified',
+                    message: '这个动作不是最新医嘱中明确要求的动作。确认后才会开始训练。',
+                    okText: '确认并开始',
+                    cancelText: '先不做',
+                    onOk: async () => {
+                        this.confirmPlanTaskSuggestion?.(planId, taskId, { save: false, close: false, render: false });
+                        await this.runPlanTask(planId, taskId, { confirmedSuggestion: true });
+                    }
+                });
+                return;
+            }
             if (window.workout?.isPlaying) {
                 const ok = confirm('正在训练，切换到计划任务？');
                 if (!ok) return;
@@ -582,6 +634,10 @@
         async runPlanTask(planId, taskId, options = {}) {
             const { plan, task } = this.findTask?.(planId, taskId) || {};
             if (!plan || !task) return;
+            if (task.requiresUserConfirm && !task.userConfirmed && !options.confirmedSuggestion) {
+                window.toast?.show?.('这个非医嘱新增动作需要先确认', 'error');
+                return;
+            }
             this.updateItemStatus?.(planId, taskId, 'in-progress', {}, { save: false });
             const previousPlan = JSON.parse(JSON.stringify(this._planActions?.() || []));
             this.activeRun = {

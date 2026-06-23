@@ -295,14 +295,34 @@
         setWeightTrendRange(range) {
             this.weightTrendRange = range;
             this.weightRange = range;
+            this.weightTrendGranularity = this.defaultWeightGranularity?.(range) || 'record';
             const latestKey = this.latestWeightDateKey?.() || this.logicalDateKey();
             this.weightTrendAnchorKey = this.resolveWeightTrendAnchor?.(range, latestKey) || latestKey;
             this.renderHistory();
         },
 
+        setWeightTrendGranularity(granularity) {
+            const range = this.normalizeWeightTrendRange?.() || this.weightTrendRange || 'month';
+            const options = this.weightGranularityOptions?.(range) || ['record'];
+            this.weightTrendGranularity = options.includes(granularity)
+                ? granularity
+                : (this.defaultWeightGranularity?.(range) || 'record');
+            this.renderHistory();
+        },
+
         setWeightRecordRange(range) {
             this.weightRecordRange = range;
+            this.weightRecordGranularity = this.defaultWeightGranularity?.(range) || 'record';
             this.ensureWeightRecordAnchor?.();
+            this.renderHistory();
+        },
+
+        setWeightRecordGranularity(granularity) {
+            const range = this.normalizeWeightRecordRange?.() || this.weightRecordRange || 'month';
+            const options = this.weightGranularityOptions?.(range) || ['record'];
+            this.weightRecordGranularity = options.includes(granularity)
+                ? granularity
+                : (this.defaultWeightGranularity?.(range) || 'record');
             this.renderHistory();
         },
 

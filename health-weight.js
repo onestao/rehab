@@ -160,17 +160,18 @@
 
         renderWeightTrendCard() {
             const range = this.normalizeWeightTrendRange();
-            const points = this.weightTrendPointsForRange(range);
+            const rawPoints = this.weightTrendPointsForRange(range);
+            const granularity = this.normalizeWeightGranularity('trend', range);
+            const points = this.weightChartPointsForDisplay(rawPoints, granularity);
             const analysis = this.weightAnalysis(points);
             const ranges = [['week', '7天'], ['month', '30天'], ['quarter', '90天'], ['year', '1年'], ['all', '全部']];
-            const anchorText = range === 'all' ? '' : ` · 截至 ${this.escapeHtml(this.weightTrendAnchorKey || this.logicalDateKey())}`;
             const reportNew = this.hasNewWeightReport?.() ? ' data-has-new="true"' : '';
             return `<div class="md-card weight-card weight-trend-card">
                 <div class="weight-section-head weight-trend-head">
                     <div class="weight-section-title">
                         <span class="cardio-kicker">趋势</span>
                         <h3>体重变化</h3>
-                        <small>${this.weightTrendLabel(range)}${anchorText} · ${points.length} 条记录</small>
+                        <small>${this.weightTrendMetaText(range, rawPoints, points, granularity, true)}</small>
                     </div>
                     <div class="weight-section-actions">
                         <button class="md-icon-btn weight-report-btn" onclick="data.openWeightReport('weekly')" type="button" aria-label="查看周报与月报"${reportNew}><span class="material-symbols-rounded">assignment</span></button>
@@ -180,6 +181,7 @@
                 <div class="weight-range-tabs weight-range-tabs-scroll weight-trend-tabs">
                     ${ranges.map(([key, label]) => `<button class="weight-range ${range === key ? 'active' : ''}" onclick="data.setWeightTrendRange('${key}')" type="button">${label}</button>`).join('')}
                 </div>
+                ${this.renderWeightGranularityTabs('trend', range, granularity)}
                 ${this.renderWeightChart(points, { id: 'weightTrendChartWrap', emptyLabel: '至少需要 2 条记录生成趋势', enablePinch: true, pinchKind: 'trend' })}
                 <div class="weight-analysis">
                     <div><b>${analysis.avgText}</b><small>日均变化</small></div>
@@ -193,6 +195,8 @@
             const range = this.normalizeWeightRecordRange();
             const period = this.weightRecordPeriod(range);
             const points = this.weightRecordPointsForRange(range, period);
+            const granularity = this.normalizeWeightGranularity('record', range);
+            const chartPoints = this.weightChartPointsForDisplay(points, granularity);
             const ranges = [['week', '周'], ['month', '月'], ['year', '年'], ['all', '全部']];
             const canShift = range !== 'all';
             return `<div class="md-card weight-card weight-record-card">
@@ -212,7 +216,8 @@
                     <div><b>${period.title}</b><small>${period.sub}</small></div>
                     <button class="weight-period-btn" onclick="data.shiftWeightRecordPeriod(1)" type="button" ${canShift ? '' : 'disabled'} aria-label="下一周期"><span class="material-symbols-rounded">chevron_right</span></button>
                 </div>
-                ${this.renderWeightChart(points, {
+                ${this.renderWeightGranularityTabs('record', range, granularity)}
+                ${this.renderWeightChart(chartPoints, {
                     id: 'weightRecordChartWrap',
                     emptyLabel: '当前范围至少需要 2 条记录生成曲线',
                     start: period.start,
@@ -226,6 +231,102 @@
                     collapseKey: `weight_${range}_older`
                 })}
             </div>`;
+        },
+
+        defaultWeightGranularity(range) {
+            if (range === 'year') return 'week';
+            if (range === 'all') return 'month';
+            return 'record';
+        },
+
+        weightGranularityOptions(range) {
+            return (range === 'year' || range === 'all') ? ['record', 'week', 'month'] : ['record'];
+        },
+
+        normalizeWeightGranularity(kind, range) {
+            const options = this.weightGranularityOptions(range);
+            const selected = kind === 'record' ? this.weightRecordGranularity : this.weightTrendGranularity;
+            return options.includes(selected) ? selected : this.defaultWeightGranularity(range);
+        },
+
+        renderWeightGranularityTabs(kind, range, granularity) {
+            const options = this.weightGranularityOptions(range);
+            if (options.length < 2) return '';
+            const labels = { record: '记录', week: '周均', month: '月均' };
+            const method = kind === 'record' ? 'setWeightRecordGranularity' : 'setWeightTrendGranularity';
+            return `<div class="weight-range-tabs weight-granularity-tabs" aria-label="体重图表显示粒度">
+                ${options.map(option => `<button class="weight-range ${granularity === option ? 'active' : ''}" onclick="data.${method}('${option}')" type="button">${labels[option] || option}</button>`).join('')}
+            </div>`;
+        },
+
+        weightChartPointsForDisplay(points, granularity) {
+            if (granularity === 'week' || granularity === 'month') return this.aggregateWeightPoints(points, granularity);
+            return points;
+        },
+
+        aggregateWeightPoints(points, granularity) {
+            const groups = new Map();
+            points.forEach(point => {
+                const bucket = this.weightAggregateBucket(point.date, granularity);
+                if (!bucket) return;
+                if (!groups.has(bucket.key)) groups.set(bucket.key, { ...bucket, points: [] });
+                groups.get(bucket.key).points.push(point);
+            });
+            return Array.from(groups.values()).map(group => {
+                const count = group.points.length;
+                const totalWeight = group.points.reduce((sum, point) => sum + Number(point.weight || 0), 0);
+                const totalTime = group.points.reduce((sum, point) => sum + this.dateFromKey(point.date).getTime(), 0);
+                const date = this.dateKey(new Date(totalTime / Math.max(1, count)));
+                const label = `${group.label} · ${count}条均值`;
+                return {
+                    date,
+                    weight: totalWeight / Math.max(1, count),
+                    label,
+                    axisLabel: group.axisLabel,
+                    count,
+                    granularity
+                };
+            }).sort((a, b) => this.dateFromKey(a.date) - this.dateFromKey(b.date));
+        },
+
+        weightAggregateBucket(dateKey, granularity) {
+            const date = this.dateFromKey(dateKey);
+            if (Number.isNaN(date.getTime())) return null;
+            if (granularity === 'month') {
+                const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+                return {
+                    key,
+                    label: `${date.getFullYear()}年${date.getMonth() + 1}月`,
+                    axisLabel: key
+                };
+            }
+            if (granularity === 'week') {
+                const start = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+                const dow = (start.getDay() + 6) % 7;
+                start.setDate(start.getDate() - dow);
+                const end = new Date(start);
+                end.setDate(start.getDate() + 6);
+                const weekNo = this.weightWeekNumber(start);
+                return {
+                    key: this.dateKey(start),
+                    label: `${this.dateKey(start).slice(5)} 至 ${this.dateKey(end).slice(5)}`,
+                    axisLabel: `${start.getFullYear()} W${String(weekNo).padStart(2, '0')}`
+                };
+            }
+            return null;
+        },
+
+        weightChartCountText(rawPoints, chartPoints, granularity) {
+            if (granularity === 'record') return `${rawPoints.length} 条记录`;
+            const label = granularity === 'week' ? '周均' : '月均';
+            return `${label} ${chartPoints.length} 点 · 原始 ${rawPoints.length} 条`;
+        },
+
+        weightTrendMetaText(range, rawPoints, chartPoints, granularity, escape = false) {
+            const anchor = range === 'all' ? '' : (this.weightTrendAnchorKey || this.logicalDateKey());
+            const safeAnchor = escape ? this.escapeHtml(anchor) : anchor;
+            const anchorText = range === 'all' ? '' : ` · 截至 ${safeAnchor}`;
+            return `${this.weightTrendLabel(range)}${anchorText} · ${this.weightChartCountText(rawPoints, chartPoints, granularity)}`;
         },
 
         renderWeightChart(points, opts = {}) {
@@ -260,7 +361,7 @@
                 : '').join('');
 
             const dots = coords.map(p => {
-                const date = this.escapeHtml(p.date || '');
+                const date = this.escapeHtml(p.label || p.date || '');
                 const weight = Number(p.weight || 0).toFixed(2);
                 return `<circle class="weight-dot" cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="6" data-date="${date}" data-weight="${weight}" onclick="data.showWeightTipFromNode(event, this)"><title>${date}: ${weight}kg</title></circle>`;
             }).join('');
@@ -277,7 +378,7 @@
                         ${dots}
                         ${labels}
                     </svg>
-                    <div class="weight-chart-labels"><span>${this.escapeHtml(points[0].date || '').slice(5)}</span><span>${this.escapeHtml(points[points.length - 1].date || '').slice(5)}</span></div>
+                    <div class="weight-chart-labels"><span>${this.escapeHtml(points[0].axisLabel || points[0].date || '').slice(5)}</span><span>${this.escapeHtml(points[points.length - 1].axisLabel || points[points.length - 1].date || '').slice(5)}</span></div>
                 </div>
                 <div class="weight-chart-tip" style="display:none"></div>
             </div>`;
@@ -315,12 +416,16 @@
         renderWeightChartForKind(kind) {
             if (kind === 'trend') {
                 const range = this.normalizeWeightTrendRange();
-                const points = this.weightTrendPointsForRange(range);
+                const rawPoints = this.weightTrendPointsForRange(range);
+                const granularity = this.normalizeWeightGranularity('trend', range);
+                const points = this.weightChartPointsForDisplay(rawPoints, granularity);
                 return this.renderWeightChart(points, { id: 'weightTrendChartWrap', emptyLabel: '至少需要 2 条记录生成趋势', enablePinch: true, pinchKind: 'trend' });
             }
             const range = this.normalizeWeightRecordRange();
             const period = this.weightRecordPeriod(range);
-            const points = this.weightRecordPointsForRange(range, period);
+            const rawPoints = this.weightRecordPointsForRange(range, period);
+            const granularity = this.normalizeWeightGranularity('record', range);
+            const points = this.weightChartPointsForDisplay(rawPoints, granularity);
             return this.renderWeightChart(points, {
                 id: 'weightRecordChartWrap',
                 emptyLabel: '当前范围至少需要 2 条记录生成曲线',
@@ -356,12 +461,14 @@
         updateWeightChartMeta(kind, card) {
             if (kind === 'trend') {
                 const range = this.normalizeWeightTrendRange();
-                const points = this.weightTrendPointsForRange(range);
+                const rawPoints = this.weightTrendPointsForRange(range);
+                const granularity = this.normalizeWeightGranularity('trend', range);
+                const points = this.weightChartPointsForDisplay(rawPoints, granularity);
                 const analysis = this.weightAnalysis(points);
-                const anchorText = range === 'all' ? '' : ` · 截至 ${this.weightTrendAnchorKey || this.logicalDateKey()}`;
                 const small = card.querySelector('.weight-trend-head small');
-                if (small) small.textContent = `${this.weightTrendLabel(range)}${anchorText} · ${points.length} 条记录`;
+                if (small) small.textContent = this.weightTrendMetaText(range, rawPoints, points, granularity);
                 this.updateWeightRangeTabs(card.querySelector('.weight-trend-tabs'), range);
+                this.updateWeightRangeTabs(card.querySelector('.weight-granularity-tabs'), granularity);
                 const values = card.querySelectorAll('.weight-analysis b');
                 if (values[0]) values[0].textContent = analysis.avgText;
                 if (values[1]) values[1].textContent = analysis.trend;
@@ -371,12 +478,14 @@
             const range = this.normalizeWeightRecordRange();
             const period = this.weightRecordPeriod(range);
             const points = this.weightRecordPointsForRange(range, period);
+            const granularity = this.normalizeWeightGranularity('record', range);
             const canShift = range !== 'all';
             const title = card.querySelector('.weight-record-head h3');
             const small = card.querySelector('.weight-record-head small');
             if (title) title.textContent = period.title;
             if (small) small.textContent = points.length ? `${points.length} 条体重记录` : '当前范围暂无记录';
             this.updateWeightRangeTabs(card.querySelector('.weight-record-tabs'), range);
+            this.updateWeightRangeTabs(card.querySelector('.weight-granularity-tabs'), granularity);
             const nav = card.querySelector('.weight-period-nav');
             nav?.classList.toggle('is-all', !canShift);
             nav?.querySelectorAll('button').forEach(btn => { btn.disabled = !canShift; });
@@ -680,8 +789,10 @@
             if (kind === 'trend') {
                 this.weightTrendRange = nextRange;
                 this.weightRange = this.weightTrendRange;
+                this.weightTrendGranularity = this.defaultWeightGranularity(nextRange);
             } else {
                 this.weightRecordRange = nextRange;
+                this.weightRecordGranularity = this.defaultWeightGranularity(nextRange);
             }
             if (opts.transition) {
                 const existing = this._weightChartRangeTransition;

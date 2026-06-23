@@ -411,6 +411,7 @@
             const bodyPartConstraints = summarizeBodyPartConstraints(profile, rehabWeekly, selectedConditionIds, temporaryConditions);
             const recentPlans = this.activeRecords(this.db.dailyPlans || [])
                 .filter((plan) => types.includes(plan.type || 'rehab'))
+                .sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')) || Number(b.updatedAt || 0) - Number(a.updatedAt || 0))
                 .slice(0, 14)
                 .map((plan) => ({
                 date: plan.date,
@@ -444,12 +445,14 @@
                     completion: this.completionRate?.(plan),
                     items: (plan.items || []).filter((item) => item && !item.deleted).map((item) => {
                         let progressionSignal = undefined;
-                        if (item.chainId && window.planProgression?.evaluate) {
-                            const chain = window.planChains?.get?.(item.chainId);
+                        const meta = window.planPolicy?.actionMetaForName?.(item.name || '') || {};
+                        const chainId = item.chainId || meta.chainId || '';
+                        if (chainId && window.planProgression?.evaluate) {
+                            const chain = window.planChains?.find?.(chainId) || window.planChains?.get?.(chainId);
                             progressionSignal = window.planProgression.evaluate({
                                 taskItem: item,
                                 chain,
-                                history: item.progressionHistory || [],
+                                history: this.buildFeedbackHistory?.(chainId, item) || item.progressionHistory || [],
                                 planType: plan.type
                             });
                         }
@@ -460,6 +463,9 @@
                             status: item.status || 'todo',
                             spec: item.spec || {},
                             currentLevel: item.currentLevel ?? null,
+                            actionKey: item.actionKey || meta.actionKey || '',
+                            progressionGroup: item.progressionGroup || meta.progressionGroup || '',
+                            progressionLevel: item.progressionLevel ?? meta.progressionLevel ?? null,
                             feedback: item.feedback || null,
                             userOverride: !!item.userOverride,
                             aiReasoning: item.aiReasoning || '',
@@ -468,6 +474,12 @@
                         };
                     })
                 }));
+            const policyContext = window.planPolicy?.buildPlanPolicyContext?.({
+                db: this.db || {},
+                activeRecords: this.activeRecords?.bind(this),
+                sourcePlans: this.activeRecords(this.db.dailyPlans || []),
+                types
+            });
             const promptMode = mode === 'week'
                 ? '请为接下来 7 天输出严格 JSON，结构为：{"plans":[{"date":"YYYY-MM-DD","type":"<rehab|cut|bulk|maintenance|custom>","title":"...","notes":"...","items":[{"name":"...","category":"<warmup|main|cooldown>","chainHint":"","spec":{"sets":<int>,"reps":<int>,"work":<int>,"repRest":<int>,"actionRest":<int>,"isAlt":<bool>,"mode":"<reps|hold|alt-reps|alt-hold>"},"cooldownRefs":[],"aiReasoning":"...","durationEstHint":"","requiresUserConfirm":false}]}]}'
                 : '请输出严格 JSON，结构为：{"date":"YYYY-MM-DD","type":"<rehab|cut|bulk|maintenance|custom>","title":"...","notes":"...","items":[{"name":"...","category":"<warmup|main|cooldown>","chainHint":"","spec":{"sets":<int>,"reps":<int>,"work":<int>,"repRest":<int>,"actionRest":<int>,"isAlt":<bool>,"mode":"<reps|hold|alt-reps|alt-hold>"},"cooldownRefs":[],"aiReasoning":"...","durationEstHint":"","requiresUserConfirm":false}]}';
@@ -514,7 +526,13 @@
             const bodyPartRules = mode === 'week'
                 ? '部位排程规则: 生成 7 天计划时必须按 bodyPart 分配频次和恢复日；同一疼痛/损伤部位避免连续高负荷训练，优先把处方 required 动作分散到合适日期；cautious/new/watch 动作只能低强度观察，不得自动加量；dropped/avoid 动作不得出现。'
                 : '部位排程规则: 生成今日计划时按 warmup → 处方/主训练 → 辅助 → cooldown 排序；同一 bodyPart 动作可分段聚合，但疼痛/损伤部位不得连续高负荷，必须穿插恢复、低强度技术练习或放松；dropped/avoid 动作不得出现。';
-            const confirmationRules = '确认规则: 任何非康复中心处方、仅基于诊断推断的中低风险康复动作，requiresUserConfirm 必须为 true，且 aiReasoning 必须说明风险点和用户需确认内容；来自目标病症处方且无疼痛/低置信问题的动作可为 false。';
+            const confirmationRules = '确认规则: 任何非康复中心处方、仅基于诊断推断的中低风险康复动作，requiresUserConfirm 必须为 true，userConfirmed 必须为 false，且 aiReasoning 必须醒目说明“非医嘱新增，需要用户确认”；来自目标病症处方且无疼痛/低置信问题的动作可为 false。';
+            const rehabPolicyRules = [
+                '自动调整风格: 平衡。最新医嘱是强约束，但“之前动作可以继续做”表示历史稳定动作可作为候选，不代表必须把所有旧动作塞回计划。',
+                '动作链: 基础臀桥 -> 夹砖臀桥 -> 骨盆内收夹砖臀桥 是同一条进阶链；单腿臀桥只在“哪侧不稳”条件满足时作为待确认动作，不得自动替代该链。',
+                '用户真实体验反馈优先: 疼痛部位、疼痛分数、RPE、不想继续、不再加量、保持下次、不适合都会影响进阶。若用户选择不再加量/保持下次，必须 hold；疼痛>=4 或不适合必须降载或等待确认。',
+                '非医嘱新增动作必须在输出中 requiresUserConfirm=true、userConfirmed=false；不要把它伪装成处方动作。'
+            ].join('\n');
             const typeInstructions = types.map((type, index) => `${index + 1}. ${type} / ${this.planTypeMeta?.(type)?.label || type}`).join('\n');
             return [
                 prefSys || '你是训练日程计划助手。只输出严格 JSON 文本，不要 Markdown 代码块、不要解释、不要追加任何说明。',
@@ -522,6 +540,7 @@
                 specRules,
                 overwriteRules,
                 conditionRules,
+                rehabPolicyRules,
                 bodyPartRules,
                 confirmationRules,
                 '所有 spec 字段（sets/reps/work/repRest/actionRest/isAlt/mode）都必须由你显式填写，不能依赖客户端推断；如果你拿不准就按规则中的默认值填上，但绝不能省略字段或填 0/空。mode 必须根据动作类型正确选择 reps/hold/alt-reps/alt-hold。',
@@ -535,6 +554,7 @@
                 `本次选中训练病症: ${JSON.stringify(conditionTargets.target)}`,
                 `未选中病症安全限制: ${JSON.stringify(conditionTargets.safetyOnly)}`,
                 `检查结果证据/安全背景: ${JSON.stringify(conditionTargets.examEvidence || [])}`,
+                `训练计划策略上下文: ${JSON.stringify(policyContext?.summary || policyContext || {})}`,
                 `目标当前计划完整摘要: ${JSON.stringify(currentTargetPlans)}`,
                 `今日已完成运动摘要: ${JSON.stringify(todayCompleted)}`,
                 `近6周康复中心处方: ${JSON.stringify(rehabWeekly)}`,
@@ -672,17 +692,24 @@
                     if (!name) return null;
                     const category = normalizeAiCategory(item.category || item.phase || item.section);
                     const progressionAllowed = category === 'main';
+                    const meta = window.planPolicy?.actionMetaForName?.(`${name} ${item.aiReasoning || ''}`) || {};
                     const coerced = coerceAiSpec({ ...item, category }, { planType });
                     return {
                         name,
                         category,
-                        chainId: progressionAllowed ? String(item.chainId || item.chainHint || '') : '',
+                        actionKey: item.actionKey || meta.actionKey || '',
+                        canonicalName: item.canonicalName || meta.canonicalName || name,
+                        progressionGroup: item.progressionGroup || meta.progressionGroup || '',
+                        progressionLevel: Number(item.progressionLevel ?? meta.progressionLevel ?? 0),
+                        chainId: progressionAllowed ? String(item.chainId || item.chainHint || meta.chainId || '') : '',
                         currentLevel: progressionAllowed && item.currentLevel != null ? Number(item.currentLevel) : null,
                         spec: coerced.spec,
                         cooldownRefs: Array.isArray(item.cooldownRefs) ? item.cooldownRefs.map((value) => String(value || '')) : [],
                         aiReasoning: String(item.aiReasoning || ''),
                         durationEstHint: String(item.durationEstHint || ''),
                         requiresUserConfirm: !!(item.requiresUserConfirm || item.requiresConfirmation || item.needsReview),
+                        userConfirmed: item.userConfirmed === true,
+                        policy: item.policy && typeof item.policy === 'object' ? item.policy : null,
                         status: 'todo',
                         doneSets: 0,
                         userOverride: false,
@@ -793,6 +820,15 @@
         },
 
         previewPlanAiPlans(plans = []) {
+            if (window.planPolicy?.sanitizeGeneratedPlans) {
+                plans = window.planPolicy.sanitizeGeneratedPlans(plans, {
+                    db: this.db || {},
+                    activeRecords: this.activeRecords?.bind(this),
+                    sourcePlans: this.activeRecords?.(this.db?.dailyPlans || []) || [],
+                    types: normalizePlanTypes(this._planAiTypes || plans.map((plan) => plan.type || 'rehab')),
+                    ensureTaskShape: (item) => item
+                });
+            }
             this._pendingPlanAiPlans = plans;
             this._openModal?.({
                 title: '确认训练计划',
@@ -864,7 +900,7 @@
                     <input type="text" data-preview-reason value="${this.escapeHtml(item.aiReasoning || '')}" placeholder=" ">
                     <label>理由</label>
                 </div>
-                ${item.requiresUserConfirm ? `<label class="plan-ai-preview-confirm"><input type="checkbox" data-preview-user-confirm><span>我确认接受此非处方/中低风险建议</span></label>` : ''}
+                ${item.requiresUserConfirm ? `<label class="plan-ai-preview-confirm"><input type="checkbox" data-preview-user-confirm ${item.userConfirmed ? 'checked' : ''}><span>我确认接受此非处方/中低风险建议</span></label>` : ''}
                 <button class="md-icon-btn" type="button" onclick="data.deletePlanAiPreviewItem(${planIndex}, ${itemIndex})" aria-label="删除动作"><span class="material-symbols-rounded">delete</span></button>
             </div>`;
         },
@@ -993,10 +1029,19 @@
         },
 
         confirmPlanAiPlans() {
-            const plans = this.collectPlanAiPreviewPlans?.() || [];
+            let plans = this.collectPlanAiPreviewPlans?.() || [];
             if (!plans.length) {
                 window.toast?.show?.('预览里没有可保存的训练动作', 'error');
                 return;
+            }
+            if (window.planPolicy?.sanitizeGeneratedPlans) {
+                plans = window.planPolicy.sanitizeGeneratedPlans(plans, {
+                    db: this.db || {},
+                    activeRecords: this.activeRecords?.bind(this),
+                    sourcePlans: this.activeRecords(this.db.dailyPlans || []),
+                    types: normalizePlanTypes(this._planAiTypes || plans.map((plan) => plan.type || 'rehab')),
+                    ensureTaskShape: (item) => item
+                });
             }
             const unconfirmed = plans.flatMap((plan) => plan.items || []).filter((item) => item.requiresUserConfirm && !item.userConfirmed);
             if (unconfirmed.length) {
@@ -1017,11 +1062,16 @@
                 const current = this.getDailyPlans?.(plan.date)?.find((item) => (item.type || 'rehab') === (plan.type || 'rehab'));
                 const preserved = (current?.items || []).filter((item) => item && !item.deleted && (item.userOverride || item.status === 'done'));
                 const aiItems = plan.items.map((item) => {
-                    const { userConfirmed, ...taskItem } = item;
-                    void userConfirmed;
+                    const meta = window.planPolicy?.actionMetaForName?.(item.name || '') || {};
+                    const chain = this.activeRecords(this.db.progressionChains || []).find((entry) => entry.id === item.chainId || entry.group === item.chainId)
+                        || window.planChains?.find?.(item.chainId || meta.chainId || '');
                     return this.ensureTaskShape({
-                    ...taskItem,
-                    chainId: (this.activeRecords(this.db.progressionChains || []).find((chain) => chain.id === item.chainId || chain.group === item.chainId)?.id) || ''
+                        ...item,
+                        actionKey: item.actionKey || meta.actionKey || '',
+                        canonicalName: item.canonicalName || meta.canonicalName || item.name || '',
+                        progressionGroup: item.progressionGroup || meta.progressionGroup || '',
+                        progressionLevel: Number(item.progressionLevel ?? meta.progressionLevel ?? 0),
+                        chainId: chain?.id || item.chainId || meta.chainId || ''
                     });
                 });
                 const merged = this.ensureDailyPlanShape({

@@ -139,8 +139,10 @@ trending_down
 trending_flat
 trending_up
 tune
+upgrade
 upload
 upload_file
+verified
 vertical_align_bottom
 vertical_align_top
 vibration
@@ -150,4 +152,3 @@ volume_off
 volume_up
 warning
 waterfall_chart
-week

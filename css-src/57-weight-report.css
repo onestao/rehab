@@ -410,6 +410,23 @@
     color: var(--md-sys-on-primary-container);
     box-shadow: var(--md-sys-elevation-1);
 }
+.weight-granularity-tabs {
+    width: max-content;
+    max-width: 100%;
+    margin: -4px 0 0;
+    padding: 0;
+    align-self: flex-end;
+    background: transparent;
+}
+.weight-granularity-tabs .weight-range {
+    min-height: 30px;
+    padding: 0 10px;
+    background: var(--md-sys-surface-container);
+}
+.weight-granularity-tabs .weight-range.active {
+    background: var(--md-sys-primary-container);
+    color: var(--md-sys-on-primary-container);
+}
 .weight-range:active { transform: scale(0.94); }
 .weight-period-nav {
     padding: 8px;

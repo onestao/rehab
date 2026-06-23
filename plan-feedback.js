@@ -14,6 +14,10 @@
         return document.getElementById(id);
     }
 
+    function checked(value) {
+        return value ? 'checked' : '';
+    }
+
     window.dataPlanFeedback = {
         _planFeedbackCtx: null,
 
@@ -24,6 +28,8 @@
             const body = qs('planFeedbackSheetBody');
             if (!sheet || !body) return;
             this._planFeedbackCtx = { planId, taskId, rpe: Number(task.feedback?.rpe || 0) || 0 };
+            const feedback = task.feedback || {};
+            const painScore = feedback.painScore ?? feedback.painLevel ?? '';
             body.innerHTML = `
                 <div class="plan-feedback-sheet">
                     <div class="plan-sheet-head plan-feedback-head">
@@ -36,14 +42,33 @@
                     </div>
                     <div class="plan-feedback-grid">
                         ${FEEDBACK_OPTIONS.map((item) => `
-                            <button class="plan-feedback-btn ${Number(task.feedback?.rpe || 0) === item.rpe ? 'active' : ''}" type="button" onclick="data.selectPlanFeedback(${item.rpe})" data-plan-rpe="${item.rpe}">
+                            <button class="plan-feedback-btn ${Number(feedback.rpe || 0) === item.rpe ? 'active' : ''}" type="button" onclick="data.selectPlanFeedback(${item.rpe})" data-plan-rpe="${item.rpe}">
                                 <span class="plan-feedback-emoji">${item.emoji}</span>
                                 <strong>${item.label}</strong>
                             </button>
                         `).join('')}
                     </div>
+                    <div class="plan-feedback-detail-grid">
+                        <label class="plan-feedback-field">
+                            <span>疼痛分数</span>
+                            <select id="planFeedbackPainScore">
+                                <option value="" ${painScore === '' || painScore == null ? 'selected' : ''}>无/未记录</option>
+                                ${Array.from({ length: 11 }, (_, value) => `<option value="${value}" ${Number(painScore) === value ? 'selected' : ''}>${value}/10</option>`).join('')}
+                            </select>
+                        </label>
+                        <label class="plan-feedback-field">
+                            <span>疼痛部位</span>
+                            <input id="planFeedbackPainPart" type="text" value="${this.escapeHtml(feedback.painPart || '')}" placeholder="例如：右髋外侧/腹股沟">
+                        </label>
+                    </div>
+                    <div class="plan-feedback-checks">
+                        <label><input id="planFeedbackWantsContinue" type="checkbox" ${checked(feedback.wantsContinue !== false)}><span>这个动作还想继续</span></label>
+                        <label><input id="planFeedbackNoIncrease" type="checkbox" ${checked(feedback.noIncrease || feedback.dontIncrease)}><span>不要再加量</span></label>
+                        <label><input id="planFeedbackKeepNextTime" type="checkbox" ${checked(feedback.keepNextTime)}><span>下次保持这样</span></label>
+                        <label><input id="planFeedbackUnsuitable" type="checkbox" ${checked(feedback.unsuitable)}><span>这个动作不适合我</span></label>
+                    </div>
                     <div class="md-field">
-                        <textarea id="planFeedbackNote" rows="3" placeholder=" ">${this.escapeHtml(task.feedback?.note || '')}</textarea>
+                        <textarea id="planFeedbackNote" rows="3" placeholder=" ">${this.escapeHtml(feedback.note || '')}</textarea>
                         <label>备注（可选）</label>
                     </div>
                     <div class="md-row modal-actions">
@@ -91,7 +116,18 @@
                 return;
             }
             const note = String(qs('planFeedbackNote')?.value || '').trim();
-            this.addFeedback?.(ctx.planId, ctx.taskId, { rpe: ctx.rpe, note, doneAt: Date.now() });
+            const rawPainScore = qs('planFeedbackPainScore')?.value ?? '';
+            this.addFeedback?.(ctx.planId, ctx.taskId, {
+                rpe: ctx.rpe,
+                painScore: rawPainScore === '' ? null : Number(rawPainScore),
+                painPart: String(qs('planFeedbackPainPart')?.value || '').trim(),
+                wantsContinue: !!qs('planFeedbackWantsContinue')?.checked,
+                noIncrease: !!qs('planFeedbackNoIncrease')?.checked,
+                keepNextTime: !!qs('planFeedbackKeepNextTime')?.checked,
+                unsuitable: !!qs('planFeedbackUnsuitable')?.checked,
+                note,
+                doneAt: Date.now()
+            });
             this.maybeApplyProgression?.(ctx.planId, ctx.taskId);
             this.closePlanFeedback();
             this.render?.();

@@ -1,0 +1,233 @@
+// @ts-nocheck
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import vm from 'node:vm';
+
+function loadPlanAutoAdjust() {
+    const policyCode = readFileSync(new URL('../rehab-policy.js', import.meta.url), 'utf8');
+    const code = readFileSync(new URL('../plan-auto-adjust.js', import.meta.url), 'utf8');
+    const sandbox = {
+        window: {
+            toast: { show() {} },
+            data: { dateKey: () => '2026-06-23' }
+        },
+        data: { dateKey: () => '2026-06-23' },
+        console
+    };
+    vm.runInNewContext(policyCode, sandbox);
+    vm.runInNewContext(code, sandbox);
+    return sandbox.window.dataPlanAutoAdjust;
+}
+
+function normalizeCategory(value = 'main') {
+    const raw = String(value || '').trim().toLowerCase();
+    if (['warmup', 'warm-up', '热身'].includes(raw)) return 'warmup';
+    if (['cooldown', 'cool-down', 'stretch', 'stretching', '拉伸', '放松'].includes(raw)) return 'cooldown';
+    return 'main';
+}
+
+function createContext(api, db) {
+    let nextId = 1;
+    const ctx = {
+        ...api,
+        db,
+        activeRecords(list) {
+            return (list || []).filter((item) => item && !item.deleted);
+        },
+        logicalDateKey() {
+            return '2026-06-22';
+        },
+        dateKey() {
+            return '2026-06-22';
+        },
+        planTypeMeta(type = 'rehab') {
+            return { label: type === 'rehab' ? '康复计划' : '训练计划' };
+        },
+        ensureTaskShape(item = {}, options = {}) {
+            const spec = item.spec || {};
+            return {
+                id: item.id || `task-${nextId++}`,
+                name: String(item.name || '未命名任务'),
+                planType: item.planType || options.planType || 'rehab',
+                category: normalizeCategory(item.category),
+                spec: {
+                    sets: Math.max(1, Number(spec.sets || 1)),
+                    reps: Math.max(0, Number(spec.reps || 0)),
+                    work: Math.max(0, Number(spec.work || 0)),
+                    repRest: Math.max(0, Number(spec.repRest || 0)),
+                    actionRest: Math.max(0, Number(spec.actionRest || 0)),
+                    isAlt: !!spec.isAlt,
+                    ...(spec.mode ? { mode: String(spec.mode) } : {})
+                },
+                status: ['todo', 'done', 'skipped', 'in-progress'].includes(item.status) ? item.status : 'todo',
+                doneSets: Math.max(0, Number(item.doneSets || 0)),
+                feedback: item.feedback || null,
+                userOverride: !!item.userOverride,
+                excludeFromPr: item.excludeFromPr !== false,
+                requiresUserConfirm: !!item.requiresUserConfirm,
+                userConfirmed: item.requiresUserConfirm ? item.userConfirmed === true : item.userConfirmed !== false,
+                actionKey: item.actionKey || '',
+                canonicalName: item.canonicalName || '',
+                progressionGroup: item.progressionGroup || '',
+                progressionLevel: Number(item.progressionLevel || 0),
+                chainId: item.chainId || '',
+                policy: item.policy || null,
+                aiReasoning: String(item.aiReasoning || ''),
+                updatedAt: Number(item.updatedAt || 0),
+                deleted: !!item.deleted
+            };
+        },
+        ensureDailyPlanShape(plan = {}) {
+            const type = plan.type || 'rehab';
+            return {
+                id: plan.id || `plan-${nextId++}`,
+                date: plan.date,
+                type,
+                title: plan.title || '康复计划',
+                source: plan.source || 'ai',
+                notes: String(plan.notes || ''),
+                items: (plan.items || []).map((item) => ctx.ensureTaskShape({ ...item, planType: type }, { planType: type })),
+                deleted: !!plan.deleted
+            };
+        },
+        saveDailyPlan(plan) {
+            const index = this.db.dailyPlans.findIndex((item) => item.date === plan.date && (item.type || 'rehab') === (plan.type || 'rehab'));
+            if (index >= 0) this.db.dailyPlans[index] = plan;
+            else this.db.dailyPlans.unshift(plan);
+        },
+        save() {
+            this.saved = true;
+        },
+        render() {
+            this.rendered = true;
+        },
+        async ensureAutoPlanAiReady() {
+            throw new Error('AI parse failed in test');
+        }
+    };
+    return ctx;
+}
+
+function doneItem(input) {
+    return {
+        category: 'main',
+        status: 'done',
+        doneSets: input.spec?.sets || 1,
+        updatedAt: 100,
+        feedback: { rpe: input.rpe || 2, note: '', doneAt: input.doneAt || 100 },
+        ...input
+    };
+}
+
+test('auto-adjust fallback preserves recovery structure and respects prescription caution', async () => {
+    const api = loadPlanAutoAdjust();
+    const db = {
+        dailyPlans: [{
+            id: 'source-plan',
+            date: '2026-06-22',
+            type: 'rehab',
+            title: '康复计划',
+            items: [
+                doneItem({ name: '髋部热身', category: 'warmup', spec: { sets: 1, reps: 8, work: 3 }, rpe: 1 }),
+                doneItem({ name: '单腿站立外展', spec: { sets: 2, reps: 12, work: 3 }, rpe: 2 }),
+                doneItem({ name: '靠墙深蹲', spec: { sets: 2, reps: 10, work: 3 }, rpe: 1 }),
+                doneItem({ name: '动态哥本哈根侧桥', spec: { sets: 2, reps: 8, work: 5 }, rpe: 1 }),
+                { name: '臀中肌泡沫轴放松', category: 'cooldown', status: 'todo', spec: { sets: 1, reps: 1, work: 45 } }
+            ]
+        }],
+        health: {
+            rehabWeekly: [{
+                weekStart: '2026-06-15',
+                actions: [
+                    { name: '单腿站立外展', status: 'watch', needsReview: true, confidence: 70, spec: { sets: 2, reps: 12, work: 3 } },
+                    { name: '动态哥本哈根侧桥', status: 'dropped', coachNote: '暂停' },
+                    { name: '夹砖臀桥', status: 'continued', confidence: 95, spec: { sets: 2, reps: 12, work: 3 } }
+                ]
+            }]
+        }
+    };
+    const ctx = createContext(api, db);
+
+    const applied = await api.autoAdjustNextDayPlans.call(ctx, { sourceDate: '2026-06-22', targetDate: '2026-06-23' });
+
+    assert.equal(applied, true);
+    const plan = db.dailyPlans.find((item) => item.date === '2026-06-23');
+    assert.ok(plan);
+    assert.equal(db.lastPlanAutoAdjust.fallback, true);
+    assert.equal(db.lastPlanAutoAdjust.mode, 'local-fallback');
+    assert.match(db.lastPlanAutoAdjust.fallbackReason, /AI parse failed/);
+
+    const names = Array.from(plan.items.map((item) => item.name));
+    assert.deepEqual(names, ['髋部热身', '单腿站立外展', '靠墙深蹲', '夹砖臀桥', '臀中肌泡沫轴放松']);
+    assert.equal(names.includes('动态哥本哈根侧桥'), false);
+
+    const warmup = plan.items.find((item) => item.name === '髋部热身');
+    assert.equal(warmup.category, 'warmup');
+    assert.equal(warmup.spec.sets, 1);
+    assert.equal(warmup.spec.reps, 8);
+    assert.match(warmup.aiReasoning, /热身动作仅沿用/);
+
+    const cautious = plan.items.find((item) => item.name === '单腿站立外展');
+    assert.equal(cautious.spec.sets, 2);
+    assert.equal(cautious.spec.reps, 12);
+    assert.match(cautious.aiReasoning, /待确认|条件性|不自动加量/);
+
+    const progressed = plan.items.find((item) => item.name === '靠墙深蹲');
+    assert.equal(progressed.spec.sets, 3);
+    assert.equal(progressed.spec.reps, 12);
+    assert.match(progressed.aiReasoning, /太轻/);
+
+    const prescription = plan.items.find((item) => item.name === '夹砖臀桥');
+    assert.equal(prescription.category, 'main');
+    assert.match(prescription.aiReasoning, /处方动作/);
+
+    const cooldown = plan.items.find((item) => item.name === '臀中肌泡沫轴放松');
+    assert.equal(cooldown.category, 'cooldown');
+    assert.equal(cooldown.spec.work, 45);
+    assert.match(cooldown.aiReasoning, /保留冷却/);
+});
+
+test('auto-adjust sanitizer filters blocked actions and caps categories', () => {
+    const api = loadPlanAutoAdjust();
+    const db = {
+        dailyPlans: [],
+        health: {
+            rehabWeekly: [{
+                weekStart: '2026-06-15',
+                actions: [
+                    { name: '动态哥本哈根侧桥', status: 'dropped', coachNote: '暂停' },
+                    { name: '单腿臀桥', status: 'watch', needsReview: true, confidence: 60 }
+                ]
+            }]
+        }
+    };
+    const ctx = createContext(api, db);
+    const plans = api.sanitizeAutoAdjustedPlans.call(ctx, [{
+        date: '2026-06-23',
+        type: 'rehab',
+        items: [
+            { name: '动态哥本哈根侧桥', category: 'main', spec: { sets: 2, reps: 8 } },
+            { name: '热身1', category: 'warmup', spec: { sets: 1, reps: 8 } },
+            { name: '热身2', category: 'warmup', spec: { sets: 1, reps: 8 } },
+            { name: '热身3', category: 'warmup', spec: { sets: 1, reps: 8 } },
+            { name: '单腿臀桥', category: 'main', spec: { sets: 2, reps: 10 }, aiReasoning: '今日反馈轻松' },
+            { name: '主项2', category: 'main', spec: { sets: 2, reps: 10 } },
+            { name: '主项3', category: 'main', spec: { sets: 2, reps: 10 } },
+            { name: '主项4', category: 'main', spec: { sets: 2, reps: 10 } },
+            { name: '主项5', category: 'main', spec: { sets: 2, reps: 10 } },
+            { name: '主项6', category: 'main', spec: { sets: 2, reps: 10 } },
+            { name: '主项7', category: 'main', spec: { sets: 2, reps: 10 } },
+            { name: '放松1', category: 'cooldown', spec: { sets: 1, work: 30 } },
+            { name: '放松2', category: 'cooldown', spec: { sets: 1, work: 30 } },
+            { name: '放松3', category: 'cooldown', spec: { sets: 1, work: 30 } }
+        ]
+    }], { sourceDate: '2026-06-22', targetDate: '2026-06-23', types: ['rehab'] });
+
+    assert.equal(plans.length, 1);
+    assert.equal(plans[0].items.some((item) => item.name === '动态哥本哈根侧桥'), false);
+    assert.equal(plans[0].items.filter((item) => item.category === 'warmup').length, 2);
+    assert.equal(plans[0].items.filter((item) => item.category === 'main').length, 6);
+    assert.equal(plans[0].items.filter((item) => item.category === 'cooldown').length, 2);
+    assert.match(plans[0].items.find((item) => item.name === '单腿臀桥').aiReasoning, /观察|待确认|用户确认|条件性/);
+});

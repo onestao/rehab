@@ -80,6 +80,11 @@
         return 'none';
     }
 
+    function hasLegacyContinueIntent(text = '') {
+        const value = String(text || '');
+        return /之前.*(动作|训练|项目)?.*(都)?(可以)?继续|之前的.*都.*继续|原来.*(动作|训练|项目)?.*(可以)?继续|此前.*(动作|训练|项目)?.*(可以)?继续/.test(value);
+    }
+
     function extractJsonObject(raw = '') {
         const text = String(raw || '').trim();
         try { return JSON.parse(text); } catch {}
@@ -858,6 +863,7 @@
                 '- bodyPart 表示该动作或诊断主要影响部位；能判断时必须填写膝/踝/髋/腰背/肩/肘腕/颈/全身/其他之一。',
                 '- conditionId/conditionLabel 必须尽量匹配【用户健康档案】中最相关的病症；无法匹配时 conditionId 为空，但 conditionLabel 要解释归属。',
                 '- status 必须通过本周描述和最近处方对比判断：首次出现为 new；延续为 continued；加量/改强度为 progressed；明确停做为 dropped；疼痛或需观察为 watch。',
+                '- 如果用户说“之前的动作都可以继续做/原来的动作继续/此前动作继续”，必须理解为 legacyContinueAllowed=true；不要把历史动作指纹表中本周未逐条提到的动作标记为 dropped，除非用户明确说停做/暂停/不要做。',
                 `- 低置信动作 confidence < ${confidenceThreshold} 或疼痛 >= ${painThreshold} 必须 needsReview=true。`,
                 '- dropped 动作 spec 可以为 null。',
                 '- 不要编造用户没提到的动作。',
@@ -903,6 +909,7 @@
                 visitDate: String(payload.visitDate || fallback.visitDate || this.logicalDateKey?.() || '').slice(0, 10),
                 source: 'ai-parsed-natural-language',
                 rawText: String(fallback.rawText || '').slice(0, 4000),
+                legacyContinueAllowed: !!payload.legacyContinueAllowed || hasLegacyContinueIntent(fallback.rawText || payload.homework || payload.therapistAssessment || ''),
                 therapistAssessment: String(payload.therapistAssessment || '').slice(0, 500),
                 homework: String(payload.homework || '').slice(0, 500),
                 actions
@@ -929,9 +936,11 @@
                 const parsed = extractJsonObject(result);
                 if (!parsed) throw new Error('AI 返回不是有效 JSON');
                 const draft = this.normalizeRehabWeeklyPayload(parsed, { weekStart, visitDate, rawText });
-                // Auto-mark previously active actions as dropped if not mentioned this week
+                // Auto-mark previously active actions as dropped if not mentioned this week,
+                // unless the therapist explicitly allowed previous actions to continue.
                 const prevWeek = this.latestRehabWeekly?.(1)?.[0];
-                if (prevWeek?.actions?.length) {
+                const legacyContinueAllowed = !!draft.legacyContinueAllowed || hasLegacyContinueIntent(rawText);
+                if (prevWeek?.actions?.length && !legacyContinueAllowed) {
                     const mentionedIds = new Set(draft.actions.map(a => a.progressesFrom).filter(Boolean));
                     const mentionedNames = new Set(draft.actions.map(a => (a.name || '').trim().toLowerCase()));
                     (prevWeek.actions || []).forEach(prevAction => {
@@ -957,6 +966,8 @@
                             });
                         }
                     });
+                } else if (prevWeek?.actions?.length && legacyContinueAllowed) {
+                    draft.homework = [draft.homework, '用户口述：之前动作可以继续做；未逐条提到的历史动作不会自动标记为暂停。'].filter(Boolean).join('\n');
                 }
                 if (!draft.actions.length) throw new Error('AI 未解析出可用动作');
                 this._rehabWeeklyDraft = draft;

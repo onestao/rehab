@@ -15,12 +15,11 @@
         },
         {
             id: 'plan-chain-bridge',
-            group: '桥式',
+            group: '臀桥内收链',
             levels: [
-                { lv: 1, name: '康复·桥式保持', requiredEquipment: [], hint: '双脚踩稳，抬髋保持' },
-                { lv: 2, name: '康复·桥式慢速重复', requiredEquipment: [], hint: '上顶 2 秒再缓慢下放' },
-                { lv: 3, name: '康复·弹力带桥式', requiredEquipment: ['band'], hint: '膝外推维持张力' },
-                { lv: 4, name: '康复·瑜伽球桥式', requiredEquipment: ['yoga_ball'], hint: '脚跟放球上增加不稳定' }
+                { lv: 1, name: '基础臀桥', requiredEquipment: [], hint: '双脚踩稳，抬髋保持骨盆稳定' },
+                { lv: 2, name: '夹砖臀桥', requiredEquipment: [], hint: '夹砖建立内收控制，可按医嘱调整靠近/远离大腿' },
+                { lv: 3, name: '骨盆内收夹砖臀桥', requiredEquipment: [], hint: '在夹砖基础上强调骨盆内收控制，稳定无痛后再进入' }
             ]
         },
         {

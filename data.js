@@ -32,8 +32,10 @@ const data = {
     weightRange: 'month',
     weightTrendRange: 'month',
     weightTrendAnchorKey: '',
+    weightTrendGranularity: '',
     weightRecordRange: 'month',
     weightRecordAnchorKey: '',
+    weightRecordGranularity: '',
     selectedCalendarDate: null,
     adviceModel: '__current__',
     historyColors: ['#2563eb', '#7c3aed', '#059669', '#f59e0b', '#e11d48', '#0891b2', '#9333ea', '#ea580c']
