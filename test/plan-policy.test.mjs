@@ -37,6 +37,71 @@ test('conditional single-leg bridge is cautious and needs user confirmation', ()
     assert.equal(action.canAutoAdd, false);
 });
 
+test('pressure avoidance notes do not block progressed bridge prescriptions', () => {
+    const policy = loadPlanPolicy();
+    const action = policy.classifyPrescriptionAction({
+        name: '基础臀桥',
+        status: 'continued',
+        rawDescription: '基础臀桥已按进度进阶为夹砖臀桥，强化骨盆内收控制。请注意左侧大粗隆避免直接受压，穿运动鞋进行站立训练。'
+    });
+    const blocked = policy.classifyPrescriptionAction({
+        name: '夹砖臀桥',
+        status: 'continued',
+        rawDescription: '避免夹砖臀桥，先暂停该动作。'
+    });
+
+    assert.equal(action.policyType, 'preferred');
+    assert.equal(action.canonicalName, '夹砖臀桥');
+    assert.equal(action.canAutoAdd, true);
+    assert.equal(blocked.policyType, 'blocked');
+});
+
+test('plan policy keeps AI progressed bridge when safety note says avoid pressure', () => {
+    const policy = loadPlanPolicy();
+    const db = {
+        dailyPlans: [],
+        health: {
+            rehabWeekly: [{
+                weekStart: '2026-06-23',
+                actions: [{
+                    name: '基础臀桥',
+                    status: 'continued',
+                    rawDescription: '基础臀桥已按进度进阶为夹砖臀桥，强化骨盆内收控制。请注意左侧大粗隆避免直接受压，穿运动鞋进行站立训练。',
+                    spec: { sets: 2, reps: 12, work: 3 }
+                }]
+            }]
+        }
+    };
+    const policyDebug = [];
+    const plans = policy.sanitizeGeneratedPlans([{
+        date: '2026-06-23',
+        type: 'rehab',
+        items: [
+            { name: '刷子轻抚阔筋膜张肌感觉激活', category: 'warmup' },
+            { name: '泡沫轴放松臀中肌与大腿前外侧', category: 'warmup' },
+            { name: '靠墙夹砖闭眼平衡', category: 'main' },
+            { name: '单腿站立外展', category: 'main' },
+            { name: '夹砖臀桥', category: 'main', spec: { sets: 2, reps: 12, work: 3 } },
+            { name: '四肢抬起压毛巾', category: 'main' },
+            { name: '髂胫束/阔筋膜张肌拉伸', category: 'cooldown' },
+            { name: '臀肌拉伸', category: 'cooldown' }
+        ]
+    }], {
+        db,
+        sourcePlans: db.dailyPlans,
+        targetDate: '2026-06-23',
+        types: ['rehab'],
+        ensureTaskShape: (item) => item,
+        onDebug: (entry) => policyDebug.push(entry)
+    });
+
+    const names = plans[0].items.map((item) => item.name);
+    assert.equal(names.length, 8);
+    assert.ok(names.includes('夹砖臀桥'));
+    assert.equal(names.includes('基础臀桥'), false);
+    assert.equal(policyDebug[0].removedBlocked.length, 0);
+});
+
 test('plan policy sanitizes oral prescription plans without losing legacy context', () => {
     const policy = loadPlanPolicy();
     const db = {

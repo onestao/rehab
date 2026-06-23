@@ -183,6 +183,26 @@
             ...summarizePlanAiItemsForDebug(items)
         };
     });
+    const summarizePlanAiSanitizeChanges = (beforePlans = [], afterPlans = []) => (Array.isArray(beforePlans) ? beforePlans : []).map((beforePlan, index) => {
+        const afterPlan = (Array.isArray(afterPlans) ? afterPlans : []).find((plan) => String(plan?.date || '') === String(beforePlan?.date || '') && String(plan?.type || '') === String(beforePlan?.type || '')) || (Array.isArray(afterPlans) ? afterPlans[index] : null) || {};
+        const beforeItems = Array.isArray(beforePlan?.items) ? beforePlan.items : collectPlanAiRawItems(beforePlan);
+        const afterItems = Array.isArray(afterPlan?.items) ? afterPlan.items : collectPlanAiRawItems(afterPlan);
+        const afterNames = afterItems.map((item) => String(item?.name || item?.title || item?.label || '').trim()).filter(Boolean);
+        const beforeNames = beforeItems.map((item) => String(item?.name || item?.title || item?.label || '').trim()).filter(Boolean);
+        const removed = beforeNames.filter((name) => !afterNames.includes(name));
+        const added = afterNames.filter((name) => !beforeNames.includes(name));
+        return {
+            index,
+            date: String(beforePlan?.date || afterPlan?.date || ''),
+            type: String(beforePlan?.type || afterPlan?.type || ''),
+            beforeCount: beforeNames.length,
+            afterCount: afterNames.length,
+            removedCount: removed.length,
+            addedCount: added.length,
+            removedText: removed.slice(0, 12).join(' | '),
+            addedText: added.slice(0, 12).join(' | ')
+        };
+    }).filter((entry) => entry.removedCount || entry.addedCount || entry.beforeCount !== entry.afterCount);
     const planAiDebug = (type, meta = {}) => { try { window.errorBus?.event?.('plan-ai', type, meta); } catch {} };
 
     function setText(id, text) {
@@ -1044,17 +1064,22 @@
 
         previewPlanAiPlans(plans = []) {
             const beforeSanitize = summarizePlanAiPlansForDebug(plans);
+            const beforeSanitizePlans = Array.isArray(plans) ? plans : [];
             if (window.planPolicy?.sanitizeGeneratedPlans) {
+                const policyDebug = [];
                 plans = window.planPolicy.sanitizeGeneratedPlans(plans, {
                     db: this.db || {},
                     activeRecords: this.activeRecords?.bind(this),
                     sourcePlans: this.activeRecords?.(this.db?.dailyPlans || []) || [],
                     types: normalizePlanTypes(this._planAiTypes || plans.map((plan) => plan.type || 'rehab')),
-                    ensureTaskShape: (item) => item
+                    ensureTaskShape: (item) => item,
+                    onDebug: (entry) => policyDebug.push(entry)
                 });
                 planAiDebug('sanitize:preview', {
                     before: beforeSanitize,
-                    after: summarizePlanAiPlansForDebug(plans)
+                    after: summarizePlanAiPlansForDebug(plans),
+                    changes: summarizePlanAiSanitizeChanges(beforeSanitizePlans, plans),
+                    policy: policyDebug
                 });
             } else {
                 planAiDebug('sanitize:preview:skipped', { before: beforeSanitize });
@@ -1266,17 +1291,22 @@
             }
             planAiDebug('confirm:collected', { plans: summarizePlanAiPlansForDebug(plans) });
             const beforeSanitize = summarizePlanAiPlansForDebug(plans);
+            const beforeSanitizePlans = Array.isArray(plans) ? plans : [];
             if (window.planPolicy?.sanitizeGeneratedPlans) {
+                const policyDebug = [];
                 plans = window.planPolicy.sanitizeGeneratedPlans(plans, {
                     db: this.db || {},
                     activeRecords: this.activeRecords?.bind(this),
                     sourcePlans: this.activeRecords?.(this.db?.dailyPlans || []) || [],
                     types: normalizePlanTypes(this._planAiTypes || plans.map((plan) => plan.type || 'rehab')),
-                    ensureTaskShape: (item) => item
+                    ensureTaskShape: (item) => item,
+                    onDebug: (entry) => policyDebug.push(entry)
                 });
                 planAiDebug('sanitize:confirm', {
                     before: beforeSanitize,
-                    after: summarizePlanAiPlansForDebug(plans)
+                    after: summarizePlanAiPlansForDebug(plans),
+                    changes: summarizePlanAiSanitizeChanges(beforeSanitizePlans, plans),
+                    policy: policyDebug
                 });
             } else {
                 planAiDebug('sanitize:confirm:skipped', { before: beforeSanitize });

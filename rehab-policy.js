@@ -210,7 +210,13 @@
     const status = String(action?.status || '').toLowerCase();
     const text = sourceText(action);
     const pain = Number(action?.painScore ?? action?.painLevel ?? action?.pain ?? 0);
-    return BLOCKED_STATUS.has(status) || /停做|暂停|不要做|避免|禁止|先别做|疼痛明显/.test(text) || pain >= 4;
+    if (BLOCKED_STATUS.has(status) || pain >= 4) return true;
+    if (/停做|暂停|不要做|禁止|先别做|疼痛明显/.test(text)) return true;
+    if (!/避免/.test(text)) return false;
+    const name = action?.name || action?.title || action?.actionName || '';
+    const escapedName = String(name || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    if (escapedName && new RegExp(`避免.{0,16}${escapedName}|${escapedName}.{0,8}避免`).test(text)) return true;
+    return /避免.{0,12}(臀桥|桥式|侧桥|深蹲|下蹲|外展|内收|行走|跑步|跳跃|拉伸|放松|按压)/.test(text);
   }
 
   function isCautiousAction(action) {
@@ -284,6 +290,33 @@
     const leftName = normalizeActionName(left.canonicalName || sourceText(a));
     const rightName = normalizeActionName(right.canonicalName || sourceText(b));
     return Boolean(leftName && rightName && leftName === rightName);
+  }
+
+  function itemCoversMustKeepAction(item, action) {
+    if (itemsExactMatch(item, action)) return true;
+    const left = item?.actionKey ? item : actionMetaForName(sourceText(item));
+    const right = action?.actionKey ? action : actionMetaForName(sourceText(action));
+    if (!left || !right) return false;
+    const leftLevel = Number(item?.progressionLevel || left.progressionLevel || 0);
+    const rightLevel = Number(action?.progressionLevel || right.progressionLevel || 0);
+    return Boolean(left.progressionGroup
+      && right.progressionGroup
+      && left.progressionGroup === right.progressionGroup
+      && leftLevel
+      && rightLevel
+      && leftLevel >= rightLevel);
+  }
+
+  function summarizePolicyItemForDebug(item = {}) {
+    return {
+      name: item.name || item.canonicalName || '',
+      source: item.policy?.source || item.source || '',
+      category: inferCategory(item.type || item.category, item.name || item.canonicalName || ''),
+      actionKey: item.actionKey || '',
+      progressionGroup: item.progressionGroup || '',
+      progressionLevel: Number(item.progressionLevel || 0),
+      reason: item.aiReasoning || item.reason || ''
+    };
   }
 
   function itemFeedbackFlags(item) {
@@ -442,20 +475,44 @@
     const context = options.policyContext || buildPlanPolicyContext(options);
     const sourcePlans = activeRecords(options.sourcePlans || []);
     const ensureTaskShape = typeof options.ensureTaskShape === 'function' ? options.ensureTaskShape : (item) => item;
+    const emitDebug = typeof options.onDebug === 'function' ? options.onDebug : null;
     return activeRecords(plans).map((plan) => {
+      const policyDebug = {
+        date: plan.date || options.targetDate || '',
+        type: plan.type || 'rehab',
+        removedBlocked: [],
+        addedCooldown: [],
+        mustKeep: []
+      };
       const sourcePlan = sourcePlans.find((candidate) => candidate.type === plan.type) || sourcePlans[0] || {};
       const sourceItems = activePlanItems(sourcePlan);
       let items = activePlanItems(plan).map((item) => annotatePlanItem(item, context, sourceItems));
-      items = items.filter((item) => !item.policy?.blocked);
+      items = items.filter((item) => {
+        if (!item.policy?.blocked) return true;
+        policyDebug.removedBlocked.push(summarizePolicyItemForDebug(item));
+        return false;
+      });
 
       sourceItems.filter((item) => inferCategory(item.type, item.name) === 'cooldown').slice(0, 2).forEach((sourceItem) => {
         if (!items.some((item) => inferCategory(item.type, item.name) === 'cooldown' && itemsMatch(item, sourceItem))) {
-          items.push(appendReason(annotatePlanItem({ ...sourceItem, status: 'todo' }, context, sourceItems), '保留原计划放松，避免自动调整后缺少收操'));
+          const cooldownTask = appendReason(annotatePlanItem({ ...sourceItem, status: 'todo' }, context, sourceItems), '保留原计划放松，避免自动调整后缺少收操');
+          policyDebug.addedCooldown.push(summarizePolicyItemForDebug(cooldownTask));
+          items.push(cooldownTask);
         }
       });
 
       const mainCount = () => items.filter((item) => inferCategory(item.type, item.name) === 'main').length;
-      const missingMustKeep = context.mustKeepActions.filter((action) => !items.some((item) => itemsExactMatch(item, action)));
+      const missingMustKeep = context.mustKeepActions.filter((action) => {
+        const coveringItem = items.find((item) => itemCoversMustKeepAction(item, action));
+        if (coveringItem && !itemsExactMatch(coveringItem, action)) {
+          policyDebug.mustKeep.push({
+            action: action.canonicalName || action.name || '',
+            mode: 'covered-by-progression',
+            item: summarizePolicyItemForDebug(coveringItem)
+          });
+        }
+        return !coveringItem;
+      });
       missingMustKeep.forEach((action) => {
         const task = annotatePlanItem(prescriptionTask(action), context, sourceItems);
         const chainReplaceIndex = items.findIndex((item) => inferCategory(item.type, item.name) === inferCategory(task.type, task.name)
@@ -463,19 +520,38 @@
           && item.progressionGroup === task.progressionGroup
           && Number(item.progressionLevel || 0) < Number(task.progressionLevel || 0));
         if (chainReplaceIndex >= 0) {
+          policyDebug.mustKeep.push({
+            action: action.canonicalName || action.name || '',
+            mode: 'replace-lower-progression',
+            replaced: summarizePolicyItemForDebug(items[chainReplaceIndex]),
+            item: summarizePolicyItemForDebug(task)
+          });
           items[chainReplaceIndex] = task;
           return;
         }
         if (mainCount() >= 6 && inferCategory(task.type, task.name) === 'main') {
           const replaceIndex = items.findIndex((item) => inferCategory(item.type, item.name) === 'main' && item.policy?.source === 'non-prescription');
-          if (replaceIndex >= 0) items[replaceIndex] = task;
+          if (replaceIndex >= 0) {
+            policyDebug.mustKeep.push({
+              action: action.canonicalName || action.name || '',
+              mode: 'replace-non-prescription',
+              replaced: summarizePolicyItemForDebug(items[replaceIndex]),
+              item: summarizePolicyItemForDebug(task)
+            });
+            items[replaceIndex] = task;
+          }
         } else {
+          policyDebug.mustKeep.push({
+            action: action.canonicalName || action.name || '',
+            mode: 'append',
+            item: summarizePolicyItemForDebug(task)
+          });
           items.push(task);
         }
       });
 
       items = capItems(items).map((item) => ensureTaskShape(item, plan.type));
-      return {
+      const result = {
         ...plan,
         date: plan.date || options.targetDate || '',
         items,
@@ -483,6 +559,8 @@
         main: items.filter((item) => inferCategory(item.type, item.name) === 'main'),
         cooldown: items.filter((item) => inferCategory(item.type, item.name) === 'cooldown')
       };
+      if (emitDebug) emitDebug(policyDebug);
+      return result;
     });
   }
 
