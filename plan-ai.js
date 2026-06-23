@@ -21,6 +21,77 @@
         return raw.length > max ? `${raw.slice(0, max)}…` : raw;
     }
 
+    const PLAN_AI_TYPES = ['rehab', 'cut', 'bulk', 'maintenance', 'custom'];
+    const AI_ITEM_KEYS = ['items', 'exercises', 'actions', 'tasks', 'movements', 'drills', 'list'];
+    const isPlainObject = (value) => value && typeof value === 'object' && !Array.isArray(value);
+    const normalizeAiKey = (key = '') => String(key || '').trim().replace(/[\s_-]+/g, '').toLowerCase();
+    const aiCategoryFromLabel = (value = '') => {
+        const text = normalizeAiKey(value);
+        return /warm|prep|activation|mobility|热身|准备|激活|活动度|动态活动/.test(text) ? 'warmup'
+            : /cool|stretch|relax|recovery|breath|拉伸|放松|冷身|收操|恢复|呼吸/.test(text) ? 'cooldown'
+                : /main|workout|training|strength|主训|主训练|主体|训练动作|处方动作/.test(text) ? 'main' : '';
+    };
+    function firstStringValue(source = {}, keys = ['name', 'title', 'label', 'actionName', 'exerciseName', 'movement', 'exercise', 'action', 'task', 'drill']) {
+        for (const key of keys) {
+            const value = source?.[key];
+            if (typeof value === 'string' || typeof value === 'number') return String(value).trim();
+            if (isPlainObject(value)) { const nested = firstStringValue(value, ['name', 'title', 'label', 'actionName', 'exerciseName']); if (nested) return nested; }
+        }
+        return '';
+    }
+    function normalizePlanAiRawItem(rawItem, categoryHint = '') {
+        if (typeof rawItem === 'string') { const name = rawItem.trim(); return name ? { name, category: normalizeAiCategory(categoryHint || 'main') } : null; }
+        if (!isPlainObject(rawItem)) return null;
+        const nestedKey = ['exercise', 'action', 'movement', 'task', 'drill'].find((key) => isPlainObject(rawItem[key]));
+        const item = nestedKey ? { ...rawItem[nestedKey], ...rawItem } : rawItem;
+        const name = firstStringValue(item);
+        if (!name) return null;
+        const spec = isPlainObject(item.spec) ? item.spec : (isPlainObject(item.prescription) ? item.prescription : (isPlainObject(item.dosage) ? item.dosage : {}));
+        return { ...item, name, category: normalizeAiCategory(categoryHint || aiCategoryFromLabel(item.category || item.phase || item.section || item.type || '') || item.category || item.phase || item.section || 'main'), spec };
+    }
+    function collectPlanAiRawItems(plan = {}) {
+        const items = [];
+        const pushItem = (entry, categoryHint = '') => { const item = normalizePlanAiRawItem(entry, categoryHint); if (item) items.push(item); };
+        const eachItem = (list, categoryHint = '') => (Array.isArray(list) ? list : []).forEach((entry) => {
+            if (!isPlainObject(entry)) { pushItem(entry, categoryHint); return; }
+            const sectionCategory = aiCategoryFromLabel(entry.category || entry.phase || entry.section || entry.title || entry.name) || categoryHint;
+            const nestedKeys = AI_ITEM_KEYS.filter((key) => Array.isArray(entry[key]));
+            nestedKeys.length ? nestedKeys.forEach((key) => eachItem(entry[key], sectionCategory)) : pushItem(entry, sectionCategory);
+        });
+        if (Array.isArray(plan)) eachItem(plan, 'main');
+        else if (isPlainObject(plan)) Object.entries(plan).forEach(([key, value]) => {
+            if (!Array.isArray(value)) return;
+            const normalizedKey = normalizeAiKey(key);
+            const keyCategory = aiCategoryFromLabel(key) || (/^(items|exercises|actions|tasks|movements|drills|list)$/.test(normalizedKey) ? 'main' : '');
+            if (keyCategory || /^(sections|phases|blocks|parts|groups|segments)$/.test(normalizedKey)) eachItem(value, keyCategory);
+        });
+        if (!items.length) pushItem(plan, 'main');
+        return items;
+    }
+    function parsePlanAiJson(rawText = '') {
+        const text = String(rawText || '').trim();
+        let value = safeJsonParse(text);
+        if (value) return { value, source: 'direct' };
+        const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
+        if (fenced?.[1] && (value = safeJsonParse(fenced[1].trim()))) return { value, source: 'fenced' };
+        const start = text.search(/[\[{]/);
+        const end = Math.max(text.lastIndexOf('}'), text.lastIndexOf(']'));
+        value = start >= 0 && end > start ? safeJsonParse(text.slice(start, end + 1)) : null;
+        return { value, source: value ? 'sliced' : 'none' };
+    }
+    function extractPlanAiPlanCandidates(parsed) {
+        if (Array.isArray(parsed)) return [{ sections: parsed }];
+        if (!isPlainObject(parsed)) return [];
+        for (const [key, value] of Object.entries(parsed)) if (/^(plans|dailyplans|days|schedule|week|weeklyplan|weeklyplans|planlist)$/.test(normalizeAiKey(key)) && Array.isArray(value)) return value;
+        for (const [key, value] of Object.entries(parsed)) if (/^(plan|dailyplan|trainingplan|workoutplan|rehabplan|program|routine|session|result|data|payload)$/.test(normalizeAiKey(key)) && isPlainObject(value)) return extractPlanAiPlanCandidates(value);
+        return [parsed];
+    }
+    const normalizePlanAiPlanCandidate = (plan) => Array.isArray(plan) ? { sections: plan } : (isPlainObject(plan) ? plan : {});
+    const planAiPlanType = (plan = {}, allowedTypes = [], index = 0) => PLAN_AI_TYPES.includes(String(plan.type || plan.planType || plan.goal || '').trim().toLowerCase()) ? String(plan.type || plan.planType || plan.goal).trim().toLowerCase() : (allowedTypes[index] || allowedTypes[0] || 'rehab');
+    const planAiNotes = (plan = {}) => ['notes', 'note', 'overview', 'intro', 'description', 'summary', 'safety', 'advice'].map((key) => typeof plan[key] === 'string' ? plan[key].trim() : '').filter(Boolean).join('；');
+    const summarizePlanAiPlansForDebug = (plans = []) => (Array.isArray(plans) ? plans : []).map((plan) => ({ date: String(plan?.date || plan?.day || plan?.dayKey || ''), type: String(plan?.type || plan?.planType || ''), itemCount: (Array.isArray(plan?.items) ? plan.items : collectPlanAiRawItems(plan)).length }));
+    const planAiDebug = (type, meta = {}) => { try { window.errorBus?.event?.('plan-ai', type, meta); } catch {} };
+
     function setText(id, text) {
         const el = document.getElementById(id);
         if (el) el.textContent = text;
@@ -33,9 +104,8 @@
     }
 
     function normalizePlanTypes(input) {
-        const allowed = ['rehab', 'cut', 'bulk', 'maintenance', 'custom'];
         const list = Array.isArray(input) ? input : [input];
-        const normalized = list.map((item) => String(item || '').trim()).filter((item) => allowed.includes(item));
+        const normalized = list.map((item) => String(item || '').trim()).filter((item) => PLAN_AI_TYPES.includes(item));
         return normalized.length ? [...new Set(normalized)] : ['rehab'];
     }
 
@@ -682,17 +752,27 @@
 
         parsePlanAiPayload(rawText, fallbackTypes = 'rehab') {
             const allowedTypes = normalizePlanTypes(fallbackTypes);
-            const parsed = safeJsonParse(String(rawText || '').trim());
-            if (!parsed || typeof parsed !== 'object') return { ok: false, reason: 'AI 返回不是有效 JSON', rawText };
-            const plans = Array.isArray(parsed.plans) ? parsed.plans : [parsed];
-            const validPlans = plans.map((plan, index) => {
-                const planType = ['rehab', 'cut', 'bulk', 'maintenance', 'custom'].includes(plan.type) ? plan.type : (allowedTypes[index] || allowedTypes[0] || 'rehab');
-                const items = (Array.isArray(plan.items) ? plan.items : []).map((item) => {
+            const parsedResult = parsePlanAiJson(rawText);
+            const parsed = parsedResult.value;
+            if (!parsed || typeof parsed !== 'object') {
+                planAiDebug('parse:failed', {
+                    reason: 'invalid-json',
+                    parseSource: parsedResult.source,
+                    rawChars: String(rawText || '').length
+                });
+                return { ok: false, reason: 'AI 返回不是有效 JSON', rawText };
+            }
+            const rawPlans = extractPlanAiPlanCandidates(parsed);
+            const validPlans = rawPlans.map((rawPlan, index) => {
+                const plan = normalizePlanAiPlanCandidate(rawPlan);
+                const planType = planAiPlanType(plan, allowedTypes, index);
+                const rawItems = collectPlanAiRawItems(plan);
+                const items = rawItems.map((item) => {
                     const name = String(item.name || '');
                     if (!name) return null;
                     const category = normalizeAiCategory(item.category || item.phase || item.section);
                     const progressionAllowed = category === 'main';
-                    const meta = window.planPolicy?.actionMetaForName?.(`${name} ${item.aiReasoning || ''}`) || {};
+                    const meta = window.planPolicy?.actionMetaForName?.(`${name} ${item.aiReasoning || item.reason || item.note || ''}`) || {};
                     const coerced = coerceAiSpec({ ...item, category }, { planType });
                     return {
                         name,
@@ -705,8 +785,8 @@
                         currentLevel: progressionAllowed && item.currentLevel != null ? Number(item.currentLevel) : null,
                         spec: coerced.spec,
                         cooldownRefs: Array.isArray(item.cooldownRefs) ? item.cooldownRefs.map((value) => String(value || '')) : [],
-                        aiReasoning: String(item.aiReasoning || ''),
-                        durationEstHint: String(item.durationEstHint || ''),
+                        aiReasoning: String(item.aiReasoning || item.reason || item.rationale || item.note || ''),
+                        durationEstHint: String(item.durationEstHint || item.durationHint || item.estimatedDuration || ''),
                         requiresUserConfirm: !!(item.requiresUserConfirm || item.requiresConfirmation || item.needsReview),
                         userConfirmed: item.userConfirmed === true,
                         policy: item.policy && typeof item.policy === 'object' ? item.policy : null,
@@ -718,35 +798,72 @@
                     };
                 }).filter(Boolean);
                 return {
-                    date: String(plan.date || this.logicalDateKey?.() || this.dateKey(new Date())),
+                    date: String(plan.date || plan.day || plan.dayKey || plan.targetDate || this.logicalDateKey?.() || this.dateKey(new Date())),
                     type: planType,
-                    title: String(plan.title || this.planTypeMeta?.(planType)?.label || '训练计划'),
-                    notes: String(plan.notes || ''),
+                    title: String(plan.title || plan.name || this.planTypeMeta?.(planType)?.label || '训练计划'),
+                    notes: planAiNotes(plan),
                     source: 'ai',
                     items
                 };
             }).filter((plan) => plan.items.length > 0);
-            if (!validPlans.length) return { ok: false, reason: 'JSON 缺少可用 items', rawText };
+            if (!validPlans.length) {
+                planAiDebug('parse:failed', {
+                    reason: 'no-usable-items',
+                    parseSource: parsedResult.source,
+                    rawChars: String(rawText || '').length,
+                    rawPlans: summarizePlanAiPlansForDebug(rawPlans)
+                });
+                return { ok: false, reason: 'JSON 缺少可用 items', rawText };
+            }
             const warnings = validPlans.flatMap((plan) => plan.items).flatMap((item) => item.autoFilled?.length ? [`${item.name} 字段已自动补全: ${item.autoFilled.join(', ')}`] : []);
+            planAiDebug('parse:success', {
+                parseSource: parsedResult.source,
+                rawChars: String(rawText || '').length,
+                parsedPlans: summarizePlanAiPlansForDebug(validPlans),
+                warningCount: warnings.length
+            });
             return { ok: true, plans: validPlans, warnings };
         },
 
         validatePlanAiPayload(rawText, fallbackTypes = 'rehab') {
             const allowedTypes = normalizePlanTypes(fallbackTypes);
-            const parsed = safeJsonParse(String(rawText || '').trim());
-            if (!parsed || typeof parsed !== 'object') return { ok: false, errors: ['AI 返回不是有效 JSON'] };
-            const plans = Array.isArray(parsed.plans) ? parsed.plans : [parsed];
+            const parsedResult = parsePlanAiJson(rawText);
+            const parsed = parsedResult.value;
+            if (!parsed || typeof parsed !== 'object') {
+                planAiDebug('validate', {
+                    ok: false,
+                    reason: 'invalid-json',
+                    parseSource: parsedResult.source,
+                    rawChars: String(rawText || '').length
+                });
+                return { ok: false, errors: ['AI 返回不是有效 JSON'] };
+            }
+            const plans = extractPlanAiPlanCandidates(parsed);
             const allErrors = [];
-            plans.forEach((plan, index) => {
-                void (['rehab', 'cut', 'bulk', 'maintenance', 'custom'].includes(plan.type) ? plan.type : (allowedTypes[index] || allowedTypes[0] || 'rehab'));
-                (Array.isArray(plan.items) ? plan.items : []).forEach((item) => {
+            if (!plans.length) allErrors.push('JSON 缺少 plans/items');
+            plans.forEach((rawPlan, index) => {
+                const plan = normalizePlanAiPlanCandidate(rawPlan);
+                const planType = planAiPlanType(plan, allowedTypes, index);
+                const items = collectPlanAiRawItems(plan);
+                if (!items.length) {
+                    allErrors.push(`第 ${index + 1} 个计划缺少可用动作 items/main/warmup/cooldown`);
+                    return;
+                }
+                items.forEach((item) => {
                     const name = String(item.name || '');
                     if (!name) return;
-                    const rawSpec = item.spec && typeof item.spec === 'object' ? item.spec : {};
-                    const mode = inferSpecMode(rawSpec, item);
-                    const itemErrors = validateAiSpec({ ...rawSpec, mode }, name);
+                    const category = normalizeAiCategory(item.category || item.phase || item.section);
+                    const coerced = coerceAiSpec({ ...item, category }, { planType });
+                    const mode = inferSpecMode(coerced.spec, item);
+                    const itemErrors = validateAiSpec({ ...coerced.spec, mode }, name);
                     if (itemErrors.length) allErrors.push(...itemErrors);
                 });
+            });
+            planAiDebug('validate', {
+                ok: allErrors.length === 0,
+                parseSource: parsedResult.source,
+                errorCount: allErrors.length,
+                rawPlans: summarizePlanAiPlansForDebug(plans)
             });
             return { ok: allErrors.length === 0, errors: allErrors };
         },
@@ -820,6 +937,7 @@
         },
 
         previewPlanAiPlans(plans = []) {
+            const beforeSanitize = summarizePlanAiPlansForDebug(plans);
             if (window.planPolicy?.sanitizeGeneratedPlans) {
                 plans = window.planPolicy.sanitizeGeneratedPlans(plans, {
                     db: this.db || {},
@@ -828,6 +946,12 @@
                     types: normalizePlanTypes(this._planAiTypes || plans.map((plan) => plan.type || 'rehab')),
                     ensureTaskShape: (item) => item
                 });
+                planAiDebug('sanitize:preview', {
+                    before: beforeSanitize,
+                    after: summarizePlanAiPlansForDebug(plans)
+                });
+            } else {
+                planAiDebug('sanitize:preview:skipped', { before: beforeSanitize });
             }
             this._pendingPlanAiPlans = plans;
             this._openModal?.({
@@ -1034,21 +1158,34 @@
                 window.toast?.show?.('预览里没有可保存的训练动作', 'error');
                 return;
             }
+            planAiDebug('confirm:collected', { plans: summarizePlanAiPlansForDebug(plans) });
+            const beforeSanitize = summarizePlanAiPlansForDebug(plans);
             if (window.planPolicy?.sanitizeGeneratedPlans) {
                 plans = window.planPolicy.sanitizeGeneratedPlans(plans, {
                     db: this.db || {},
                     activeRecords: this.activeRecords?.bind(this),
-                    sourcePlans: this.activeRecords(this.db.dailyPlans || []),
+                    sourcePlans: this.activeRecords?.(this.db?.dailyPlans || []) || [],
                     types: normalizePlanTypes(this._planAiTypes || plans.map((plan) => plan.type || 'rehab')),
                     ensureTaskShape: (item) => item
                 });
+                planAiDebug('sanitize:confirm', {
+                    before: beforeSanitize,
+                    after: summarizePlanAiPlansForDebug(plans)
+                });
+            } else {
+                planAiDebug('sanitize:confirm:skipped', { before: beforeSanitize });
             }
             const unconfirmed = plans.flatMap((plan) => plan.items || []).filter((item) => item.requiresUserConfirm && !item.userConfirmed);
             if (unconfirmed.length) {
+                planAiDebug('confirm:blocked-unconfirmed', {
+                    count: unconfirmed.length,
+                    plans: summarizePlanAiPlansForDebug(plans)
+                });
                 window.toast?.show?.(`有 ${unconfirmed.length} 个非处方建议尚未确认`, 'error');
                 return;
             }
             const hasAutoFilled = plans.some((plan) => plan.items.some((item) => item.autoFilled?.length));
+            const savedSummaries = [];
             plans.forEach((plan) => {
                 const sameDay = this.activeRecords(this.db.dailyPlans || []).filter((p) => p.date === plan.date && !p.deleted);
                 sameDay.forEach((old) => {
@@ -1084,6 +1221,13 @@
                     items: [...preserved, ...aiItems]
                 });
                 this.saveDailyPlan?.(merged, { save: false });
+                savedSummaries.push({
+                    date: plan.date,
+                    type: plan.type || 'rehab',
+                    preservedCount: preserved.length,
+                    aiItemCount: aiItems.length,
+                    totalCount: merged.items?.length || 0
+                });
             });
             this.cleanupEmptyUnselectedPlanTypes(plans);
             if (!this.selectedPlanId && plans[0]) {
@@ -1094,6 +1238,10 @@
             this.closePlanAiSheet();
             this._closeActiveModal?.();
             this.render?.();
+            planAiDebug('confirm:saved', {
+                autoFilled: hasAutoFilled,
+                plans: savedSummaries
+            });
             if (hasAutoFilled) {
                 window.toast?.show?.('训练计划已落库（部分字段由默认值补全，可进入「调整任务参数」修正）', 'info', 5000);
             } else {

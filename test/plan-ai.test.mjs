@@ -120,6 +120,66 @@ test('plan AI parser fills usable spec defaults and preserves alternation', () =
   });
 });
 
+test('plan AI parser accepts grouped warmup main and stretching structures', () => {
+  const api = loadPlanAi();
+  const ctx = createContext(api);
+  const parsed = api.parsePlanAiPayload.call(ctx, JSON.stringify({
+    date: '2026-05-25',
+    type: 'rehab',
+    title: '左髋康复',
+    overview: '根据您的要求，若任何动作导致疼痛达到4/10，请立即降级或停止。',
+    warmup: [
+      { name: '踝泵', sets: 1, reps: 15, work: 1 }
+    ],
+    mainExercises: [
+      { exercise: '侧卧髋外展', sets: 2, reps: 10, work: 3, reason: '臀中肌轻量激活' },
+      { action: { name: '基础臀桥' }, prescription: { sets: 2, reps: 12, work: 3, actionRest: 20 } }
+    ],
+    stretching: [
+      { title: '臀中肌拉伸', duration: 45 }
+    ]
+  }), ['rehab']);
+
+  assert.equal(parsed.ok, true);
+  assert.equal(parsed.plans[0].items.length, 4);
+  assert.deepEqual(JSON.parse(JSON.stringify(parsed.plans[0].items.map((item) => item.category))), ['warmup', 'main', 'main', 'cooldown']);
+  assert.deepEqual(JSON.parse(JSON.stringify(parsed.plans[0].items.map((item) => item.name))), ['踝泵', '侧卧髋外展', '基础臀桥', '臀中肌拉伸']);
+  assert.match(parsed.plans[0].notes, /疼痛达到4\/10/);
+  assert.equal(api.validatePlanAiPayload.call(ctx, JSON.stringify({
+    date: '2026-05-25',
+    type: 'rehab',
+    warmup: [{ name: '踝泵', sets: 1, reps: 15, work: 1 }],
+    mainExercises: [{ exercise: '侧卧髋外展', sets: 2, reps: 10, work: 3 }],
+    stretching: [{ title: '臀中肌拉伸', duration: 45 }]
+  }), ['rehab']).ok, true);
+});
+
+test('plan AI parser extracts fenced JSON with phase sections', () => {
+  const api = loadPlanAi();
+  const ctx = createContext(api);
+  const raw = `好的，以下是计划：
+\`\`\`json
+{
+  "plan": {
+    "date": "2026-05-25",
+    "type": "rehab",
+    "sections": [
+      { "phase": "热身", "items": [{ "name": "站姿髋屈伸", "spec": { "sets": 1, "reps": 12, "work": 2 } }] },
+      { "phase": "主训练", "exercises": [{ "name": "弹力带侧步", "sets": 2, "reps": 10, "work": 3 }] },
+      { "phase": "拉伸", "actions": [{ "name": "髂胫束放松", "duration": 40 }] }
+    ]
+  }
+}
+\`\`\`
+请按疼痛阈值执行。`;
+  const parsed = api.parsePlanAiPayload.call(ctx, raw, ['rehab']);
+
+  assert.equal(parsed.ok, true);
+  assert.equal(parsed.plans[0].items.length, 3);
+  assert.deepEqual(JSON.parse(JSON.stringify(parsed.plans[0].items.map((item) => item.category))), ['warmup', 'main', 'cooldown']);
+  assert.deepEqual(JSON.parse(JSON.stringify(parsed.plans[0].items.map((item) => item.name))), ['站姿髋屈伸', '弹力带侧步', '髂胫束放松']);
+});
+
 test('plan AI parser supplies hold duration and caps very long rests', () => {
   const api = loadPlanAi();
   const ctx = createContext(api);
