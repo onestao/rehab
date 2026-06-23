@@ -271,6 +271,32 @@ test('plan AI parser prefers direct action arrays over whole-plan fallback item'
   assert.deepEqual(JSON.parse(JSON.stringify(parsed.plans[0].items.map((item) => item.category))), ['warmup', 'warmup', 'main', 'main', 'main', 'main', 'cooldown', 'cooldown']);
 });
 
+test('plan AI parser keeps explicit item categories when direct items array is chosen', () => {
+  const api = loadPlanAi();
+  const ctx = createContext(api);
+  const parsed = api.parsePlanAiPayload.call(ctx, JSON.stringify({
+    date: '2026-06-24',
+    type: 'rehab',
+    name: '康复计划',
+    items: [
+      { name: '刷子轻抚阔筋膜张肌感觉激活', category: 'warmup', sets: 1, reps: 10, work: 2 },
+      { name: '泡沫轴放松臀中肌与大腿前外侧', category: 'warmup', duration: 40 },
+      { name: '侧卧夹毛巾抬腿', category: 'main', sets: 2, reps: 10, work: 3 },
+      { name: '靠墙深蹲', category: 'main', duration: 30 },
+      { name: '靠墙夹砖闭眼平衡', category: 'main', duration: 30 },
+      { name: '单腿站立外展', category: 'main', sets: 2, reps: 10, work: 3 },
+      { name: '夹砖内收骨盆臀桥', category: 'main', sets: 2, reps: 12, work: 3 },
+      { name: '四肢抬起压毛巾', category: 'main', sets: 2, reps: 10, work: 3 },
+      { name: '髂胫束/阔筋膜张肌拉伸', category: 'cooldown', duration: 40 },
+      { name: '臀肌拉伸', category: 'cooldown', duration: 40 }
+    ]
+  }), ['rehab']);
+
+  assert.equal(parsed.ok, true);
+  assert.equal(parsed.plans[0].items.length, 10);
+  assert.deepEqual(JSON.parse(JSON.stringify(parsed.plans[0].items.map((item) => item.category))), ['warmup', 'warmup', 'main', 'main', 'main', 'main', 'main', 'main', 'cooldown', 'cooldown']);
+});
+
 test('plan AI parser extracts fenced JSON with phase sections', () => {
   const api = loadPlanAi();
   const ctx = createContext(api);

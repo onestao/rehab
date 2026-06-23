@@ -59,7 +59,8 @@
         const name = firstStringValue(item);
         if (!name) return null;
         const spec = isPlainObject(item.spec) ? item.spec : (isPlainObject(item.prescription) ? item.prescription : (isPlainObject(item.dosage) ? item.dosage : {}));
-        return { ...item, name, category: normalizeAiCategory(categoryHint || aiCategoryFromLabel(item.category || item.phase || item.section || item.type || '') || item.category || item.phase || item.section || 'main'), spec };
+        const explicitCategory = aiCategoryFromLabel(item.category || item.phase || item.section || item.type || '') || item.category || item.phase || item.section || item.type || '';
+        return { ...item, name, category: normalizeAiCategory(explicitCategory || categoryHint || 'main'), spec };
     }
     function arrayLooksLikePlanAiItems(list = []) {
         return (Array.isArray(list) ? list : []).some((entry) => {
