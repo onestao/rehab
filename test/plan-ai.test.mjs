@@ -211,6 +211,7 @@ test('plan AI parser keeps exercise items that include instruction steps', () =>
   const raw = JSON.stringify({
     date: '2026-06-23',
     type: 'rehab',
+    title: '康复计划',
     items: [
       {
         name: '站姿髋环绕',
@@ -240,8 +241,34 @@ test('plan AI parser keeps exercise items that include instruction steps', () =>
   assert.equal(validated.ok, true);
   assert.equal(parsed.ok, true);
   assert.equal(parsed.plans[0].items.length, 3);
+  assert.equal(parsed.plans[0].title, '康复计划');
   assert.deepEqual(JSON.parse(JSON.stringify(parsed.plans[0].items.map((item) => item.name))), ['站姿髋环绕', '侧卧髋外展', '臀中肌拉伸']);
   assert.deepEqual(JSON.parse(JSON.stringify(parsed.plans[0].items.map((item) => item.category))), ['warmup', 'main', 'cooldown']);
+});
+
+test('plan AI parser prefers direct action arrays over whole-plan fallback item', () => {
+  const api = loadPlanAi();
+  const ctx = createContext(api);
+  const parsed = api.parsePlanAiPayload.call(ctx, JSON.stringify({
+    date: '2026-06-23',
+    type: 'rehab',
+    name: '康复计划',
+    items: [
+      { name: '刷子轻抚阔筋膜张肌感觉激活', category: 'warmup', sets: 1, reps: 10, work: 2 },
+      { name: '泡沫轴放松臀中肌与大腿前外侧', category: 'warmup', duration: 40 },
+      { name: '弹力带侧卧髋部外展', category: 'main', prescription: { sets: 2, reps: 10, work: 3 } },
+      { name: '靠墙夹砖闭眼平衡', category: 'main', duration: 30 },
+      { name: '夹砖臀桥', category: 'main', sets: 2, reps: 12, work: 3 },
+      { name: '动态哥本哈根侧桥', category: 'main', duration: 20 },
+      { name: '泡沫轴放松大腿内侧', category: 'cooldown', duration: 40 },
+      { name: '髂胫束/阔筋膜张肌拉伸', category: 'cooldown', duration: 40 }
+    ]
+  }), ['rehab']);
+
+  assert.equal(parsed.ok, true);
+  assert.equal(parsed.plans[0].items.length, 8);
+  assert.notEqual(parsed.plans[0].items[0].name, '康复计划');
+  assert.deepEqual(JSON.parse(JSON.stringify(parsed.plans[0].items.map((item) => item.category))), ['warmup', 'warmup', 'main', 'main', 'main', 'main', 'cooldown', 'cooldown']);
 });
 
 test('plan AI parser extracts fenced JSON with phase sections', () => {

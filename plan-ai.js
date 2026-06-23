@@ -116,6 +116,19 @@
         if (!items.length) pushItem(plan, 'main');
         return items;
     }
+    function collectPlanAiDirectArrayItems(plan = {}) {
+        if (!isPlainObject(plan)) return [];
+        const items = [];
+        Object.entries(plan).forEach(([key, value]) => {
+            const keyCategory = aiCategoryFromLabel(key) || (isPlanAiItemArrayKey(key) ? 'main' : '');
+            if (!keyCategory || !Array.isArray(value)) return;
+            value.forEach((entry) => {
+                const item = normalizePlanAiRawItem(entry, keyCategory);
+                if (item) items.push(item);
+            });
+        });
+        return items;
+    }
     function parsePlanAiJson(rawText = '') {
         const text = String(rawText || '').trim();
         let value = safeJsonParse(text);
@@ -843,10 +856,21 @@
                 return { ok: false, reason: 'AI 返回不是有效 JSON', rawText };
             }
             const rawPlans = extractPlanAiPlanCandidates(parsed);
+            const conversionSummaries = [];
             const validPlans = rawPlans.map((rawPlan, index) => {
                 const plan = normalizePlanAiPlanCandidate(rawPlan);
                 const planType = planAiPlanType(plan, allowedTypes, index);
-                const rawItems = collectPlanAiRawItems(plan);
+                const collectedItems = collectPlanAiRawItems(plan);
+                const directItems = collectPlanAiDirectArrayItems(plan);
+                const rawItems = directItems.length > collectedItems.length ? directItems : collectedItems;
+                conversionSummaries.push({
+                    index,
+                    source: directItems.length > collectedItems.length ? 'direct-arrays' : 'recursive',
+                    collectedCount: collectedItems.length,
+                    directCount: directItems.length,
+                    chosenCount: rawItems.length,
+                    chosenNames: rawItems.map((item) => item.name).filter(Boolean).slice(0, 12).join(' | ')
+                });
                 const items = rawItems.map((item) => {
                     const name = String(item.name || '');
                     if (!name) return null;
@@ -900,6 +924,7 @@
                 parseSource: parsedResult.source,
                 rawChars: String(rawText || '').length,
                 rawPlans: summarizePlanAiPlansForDebug(rawPlans),
+                conversion: conversionSummaries,
                 parsedPlans: summarizePlanAiPlansForDebug(validPlans),
                 warningCount: warnings.length
             });
