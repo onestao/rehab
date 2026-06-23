@@ -154,6 +154,57 @@ test('plan AI parser accepts grouped warmup main and stretching structures', () 
   }), ['rehab']).ok, true);
 });
 
+test('plan AI parser descends into object phase containers', () => {
+  const api = loadPlanAi();
+  const ctx = createContext(api);
+  const parsed = api.parsePlanAiPayload.call(ctx, JSON.stringify({
+    plan: {
+      date: '2026-05-25',
+      type: 'rehab',
+      warmup: {
+        items: [{ name: '站姿髋环绕', sets: 1, reps: 10, work: 2 }]
+      },
+      main: {
+        exercises: [
+          { name: '侧卧髋外展', sets: 2, reps: 10, work: 3 },
+          { name: '基础臀桥', prescription: { sets: 2, reps: 12, work: 3 } }
+        ]
+      },
+      cooldown: {
+        stretches: [{ name: '臀中肌拉伸', duration: 40 }]
+      }
+    }
+  }), ['rehab']);
+
+  assert.equal(parsed.ok, true);
+  assert.equal(parsed.plans[0].items.length, 4);
+  assert.deepEqual(JSON.parse(JSON.stringify(parsed.plans[0].items.map((item) => item.category))), ['warmup', 'main', 'main', 'cooldown']);
+  assert.deepEqual(JSON.parse(JSON.stringify(parsed.plans[0].items.map((item) => item.name))), ['站姿髋环绕', '侧卧髋外展', '基础臀桥', '臀中肌拉伸']);
+});
+
+test('plan AI parser accepts suffixed plan and action container names', () => {
+  const api = loadPlanAi();
+  const ctx = createContext(api);
+  const parsed = api.parsePlanAiPayload.call(ctx, JSON.stringify({
+    dayPlan: {
+      date: '2026-05-25',
+      type: 'rehab',
+      exercisePlan: {
+        warmupExercises: [{ name: '猫牛式', sets: 1, reps: 8, work: 2 }],
+        trainingActions: [
+          { name: '弹力带侧向行走', prescription: { sets: 2, reps: 10, work: 3 } }
+        ],
+        stretchList: [{ name: '髋屈肌拉伸', duration: 40 }]
+      }
+    }
+  }), ['rehab']);
+
+  assert.equal(parsed.ok, true);
+  assert.equal(parsed.plans[0].items.length, 3);
+  assert.deepEqual(JSON.parse(JSON.stringify(parsed.plans[0].items.map((item) => item.category))), ['warmup', 'main', 'cooldown']);
+  assert.deepEqual(JSON.parse(JSON.stringify(parsed.plans[0].items.map((item) => item.name))), ['猫牛式', '弹力带侧向行走', '髋屈肌拉伸']);
+});
+
 test('plan AI parser extracts fenced JSON with phase sections', () => {
   const api = loadPlanAi();
   const ctx = createContext(api);

@@ -21,10 +21,20 @@
         return raw.length > max ? `${raw.slice(0, max)}…` : raw;
     }
 
-    const PLAN_AI_TYPES = ['rehab', 'cut', 'bulk', 'maintenance', 'custom'];
-    const AI_ITEM_KEYS = ['items', 'exercises', 'actions', 'tasks', 'movements', 'drills', 'list'];
     const isPlainObject = (value) => value && typeof value === 'object' && !Array.isArray(value);
     const normalizeAiKey = (key = '') => String(key || '').trim().replace(/[\s_-]+/g, '').toLowerCase();
+    const PLAN_AI_TYPES = ['rehab', 'cut', 'bulk', 'maintenance', 'custom'];
+    const AI_ITEM_KEYS = ['items', 'exercises', 'exercise', 'actions', 'tasks', 'movements', 'drills', 'stretches', 'stretching', 'activities', 'steps', 'list', 'mainExercises', 'warmupExercises', 'cooldownExercises'];
+    const AI_ITEM_KEY_SET = new Set(AI_ITEM_KEYS.map(normalizeAiKey));
+    const PLAN_AI_SECTION_KEYS = new Set(['sections', 'phases', 'blocks', 'parts', 'groups', 'segments', 'schedule', 'program', 'routine', 'session', 'plan', 'dayplan', 'dailyplan', 'trainingplan', 'workoutplan', 'rehabplan', 'exerciseplan', 'movementplan', 'actionplan', 'workout', 'workouts', 'training']);
+    const isPlanAiItemArrayKey = (key = '') => {
+        const text = normalizeAiKey(key);
+        return AI_ITEM_KEY_SET.has(text) || /(?:items|exercises?|actions?|tasks?|movements?|drills?|stretches?|stretching|activities|steps|list)$/.test(text);
+    };
+    const isPlanAiSectionContainerKey = (key = '') => {
+        const text = normalizeAiKey(key);
+        return PLAN_AI_SECTION_KEYS.has(text) || /(?:sections?|phases?|blocks?|parts?|groups?|segments?|schedule|program|routine|session|plan)$/.test(text);
+    };
     const aiCategoryFromLabel = (value = '') => {
         const text = normalizeAiKey(value);
         return /warm|prep|activation|mobility|热身|准备|激活|活动度|动态活动/.test(text) ? 'warmup'
@@ -52,18 +62,42 @@
     function collectPlanAiRawItems(plan = {}) {
         const items = [];
         const pushItem = (entry, categoryHint = '') => { const item = normalizePlanAiRawItem(entry, categoryHint); if (item) items.push(item); };
+        const containerCategory = (key, fallback = '') => aiCategoryFromLabel(key) || fallback;
+        const shouldReadArrayContainer = (key) => isPlanAiItemArrayKey(key) || isPlanAiSectionContainerKey(key) || !!aiCategoryFromLabel(key);
+        const shouldReadObjectContainer = (key) => isPlanAiSectionContainerKey(key) || !!aiCategoryFromLabel(key);
+        const collectFromContainer = (value, categoryHint = '') => {
+            if (Array.isArray(value)) { eachItem(value, categoryHint); return; }
+            if (!isPlainObject(value)) { pushItem(value, categoryHint); return; }
+            let consumed = false;
+            Object.entries(value).forEach(([key, child]) => {
+                const nextCategory = containerCategory(key, categoryHint);
+                if (Array.isArray(child) && shouldReadArrayContainer(key)) {
+                    eachItem(child, nextCategory);
+                    consumed = true;
+                } else if (isPlainObject(child) && shouldReadObjectContainer(key)) {
+                    collectFromContainer(child, nextCategory);
+                    consumed = true;
+                }
+            });
+            if (!consumed) pushItem(value, categoryHint);
+        };
         const eachItem = (list, categoryHint = '') => (Array.isArray(list) ? list : []).forEach((entry) => {
             if (!isPlainObject(entry)) { pushItem(entry, categoryHint); return; }
             const sectionCategory = aiCategoryFromLabel(entry.category || entry.phase || entry.section || entry.title || entry.name) || categoryHint;
-            const nestedKeys = AI_ITEM_KEYS.filter((key) => Array.isArray(entry[key]));
-            nestedKeys.length ? nestedKeys.forEach((key) => eachItem(entry[key], sectionCategory)) : pushItem(entry, sectionCategory);
+            const nestedEntries = Object.entries(entry).filter(([key, value]) => {
+                if (Array.isArray(value)) return shouldReadArrayContainer(key);
+                if (isPlainObject(value)) return shouldReadObjectContainer(key);
+                return false;
+            });
+            nestedEntries.length
+                ? nestedEntries.forEach(([key, value]) => collectFromContainer(value, containerCategory(key, sectionCategory)))
+                : pushItem(entry, sectionCategory);
         });
         if (Array.isArray(plan)) eachItem(plan, 'main');
         else if (isPlainObject(plan)) Object.entries(plan).forEach(([key, value]) => {
-            if (!Array.isArray(value)) return;
-            const normalizedKey = normalizeAiKey(key);
-            const keyCategory = aiCategoryFromLabel(key) || (/^(items|exercises|actions|tasks|movements|drills|list)$/.test(normalizedKey) ? 'main' : '');
-            if (keyCategory || /^(sections|phases|blocks|parts|groups|segments)$/.test(normalizedKey)) eachItem(value, keyCategory);
+            const keyCategory = aiCategoryFromLabel(key) || (isPlanAiItemArrayKey(key) ? 'main' : '');
+            if (Array.isArray(value) && shouldReadArrayContainer(key)) eachItem(value, keyCategory);
+            else if (isPlainObject(value) && shouldReadObjectContainer(key)) collectFromContainer(value, keyCategory);
         });
         if (!items.length) pushItem(plan, 'main');
         return items;
@@ -89,7 +123,35 @@
     const normalizePlanAiPlanCandidate = (plan) => Array.isArray(plan) ? { sections: plan } : (isPlainObject(plan) ? plan : {});
     const planAiPlanType = (plan = {}, allowedTypes = [], index = 0) => PLAN_AI_TYPES.includes(String(plan.type || plan.planType || plan.goal || '').trim().toLowerCase()) ? String(plan.type || plan.planType || plan.goal).trim().toLowerCase() : (allowedTypes[index] || allowedTypes[0] || 'rehab');
     const planAiNotes = (plan = {}) => ['notes', 'note', 'overview', 'intro', 'description', 'summary', 'safety', 'advice'].map((key) => typeof plan[key] === 'string' ? plan[key].trim() : '').filter(Boolean).join('；');
-    const summarizePlanAiPlansForDebug = (plans = []) => (Array.isArray(plans) ? plans : []).map((plan) => ({ date: String(plan?.date || plan?.day || plan?.dayKey || ''), type: String(plan?.type || plan?.planType || ''), itemCount: (Array.isArray(plan?.items) ? plan.items : collectPlanAiRawItems(plan)).length }));
+    const summarizePlanAiItemsForDebug = (items = []) => {
+        const list = (Array.isArray(items) ? items : []).filter(Boolean);
+        const categories = list.reduce((acc, item) => {
+            const category = normalizeAiCategory(item?.category || item?.type || item?.phase || item?.section || 'main');
+            acc[category] = (acc[category] || 0) + 1;
+            return acc;
+        }, {});
+        const policySources = list.reduce((acc, item) => {
+            const source = String(item?.policy?.source || '').trim();
+            if (source) acc[source] = (acc[source] || 0) + 1;
+            return acc;
+        }, {});
+        return {
+            itemCount: list.length,
+            categories,
+            names: list.map((item) => String(item?.name || item?.title || item?.label || '').trim()).filter(Boolean).slice(0, 20),
+            confirmCount: list.filter((item) => item?.requiresUserConfirm).length,
+            blockedCount: list.filter((item) => item?.policy?.blocked).length,
+            policySources
+        };
+    };
+    const summarizePlanAiPlansForDebug = (plans = []) => (Array.isArray(plans) ? plans : []).map((plan) => {
+        const items = Array.isArray(plan?.items) ? plan.items : collectPlanAiRawItems(plan);
+        return {
+            date: String(plan?.date || plan?.day || plan?.dayKey || ''),
+            type: String(plan?.type || plan?.planType || ''),
+            ...summarizePlanAiItemsForDebug(items)
+        };
+    });
     const planAiDebug = (type, meta = {}) => { try { window.errorBus?.event?.('plan-ai', type, meta); } catch {} };
 
     function setText(id, text) {

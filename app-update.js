@@ -4,7 +4,7 @@ const appUpdate = {
     waitingWorker: null,
     checking: false,
     swUrl: 'sw.js',
-    version: '288',
+    version: '289',
 
     async registerServiceWorker() {
         if (!('serviceWorker' in navigator)) return;

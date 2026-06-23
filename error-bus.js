@@ -4,6 +4,8 @@
     let debugMode = false;
     const debugQueue = [];
     const MAX_DEBUG_EVENTS = 500;
+    const priorityDebugQueue = [];
+    const MAX_PRIORITY_DEBUG_EVENTS = 200;
     let consolePatched = false;
     let originalConsole = null;
     let fetchPatched = false;
@@ -97,16 +99,23 @@
     function pushDebug(level, scope, args, extra) {
         if (!debugMode) return;
         try {
+            const priority = /^plan-ai$|^plan-auto-adjust$|^ai[\w:-]*/.test(String(scope || ''));
             const entry = {
                 t: Date.now(),
                 level: level || 'log',
                 scope: scope || 'global',
                 args: Array.isArray(args) ? args.map(safeStringify) : [safeStringify(args)],
-                extra: extra || null
+                extra: extra || null,
+                priority: priority || undefined
             };
             debugQueue.push(entry);
             while (debugQueue.length > MAX_DEBUG_EVENTS) debugQueue.shift();
+            if (priority) {
+                priorityDebugQueue.push(entry);
+                while (priorityDebugQueue.length > MAX_PRIORITY_DEBUG_EVENTS) priorityDebugQueue.shift();
+            }
             try { sessionStorage.setItem('rehabDebugBus', JSON.stringify(debugQueue.slice(-MAX_DEBUG_EVENTS))); } catch {}
+            try { sessionStorage.setItem('rehabPriorityDebugBus', JSON.stringify(priorityDebugQueue.slice(-MAX_PRIORITY_DEBUG_EVENTS))); } catch {}
         } catch {}
     }
 
@@ -330,12 +339,14 @@
             return queue.slice();
         },
         listDebug() {
-            return debugQueue.slice();
+            return Array.from(new Set([...debugQueue, ...priorityDebugQueue])).sort((a, b) => (a.t || 0) - (b.t || 0));
         },
         clear() {
             queue.length = 0;
             debugQueue.length = 0;
+            priorityDebugQueue.length = 0;
             try { sessionStorage.removeItem('rehabDebugBus'); } catch {}
+            try { sessionStorage.removeItem('rehabPriorityDebugBus'); } catch {}
         },
         isDebugEnabled() {
             return debugMode;
@@ -355,7 +366,9 @@
             unpatchFetch();
             stopLayoutWatcher();
             debugQueue.length = 0;
+            priorityDebugQueue.length = 0;
             try { sessionStorage.removeItem('rehabDebugBus'); } catch {}
+            try { sessionStorage.removeItem('rehabPriorityDebugBus'); } catch {}
         }
     };
 

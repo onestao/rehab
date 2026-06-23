@@ -506,7 +506,9 @@ const advicePanel = {
                     stack: null
                 }))
             ].sort((a, b) => a.t - b.t);
+            const planAiRecords = records.filter(r => r.scope === 'plan-ai');
             const ndjson = records.map(r => JSON.stringify(r)).join('\n');
+            const planAiNdjson = planAiRecords.map(r => JSON.stringify(r)).join('\n');
 
             const wrap = document.createElement('div');
             wrap.id = 'adviceDebugOverlay';
@@ -516,7 +518,7 @@ const advicePanel = {
             bar.style.cssText = 'position:sticky;top:-10px;margin:-10px -10px 8px;padding:8px;background:#111;border-bottom:1px solid #333;display:flex;flex-wrap:wrap;gap:6px;align-items:center';
             const status = document.createElement('span');
             status.style.cssText = 'flex:1;min-width:120px;color:#0f0';
-            status.textContent = '共 ' + records.length + ' 条 · 仅会话级元数据，已脱敏';
+            status.textContent = '共 ' + records.length + ' 条 · AI计划 ' + planAiRecords.length + ' 条 · 仅会话级元数据，已脱敏';
             const mkBtn = (label, bg, fn) => {
                 const b = document.createElement('button');
                 b.textContent = label;
@@ -549,7 +551,12 @@ const advicePanel = {
             bar.appendChild(mkBtn('文本', '#08f', () => {
                 copy(records.map((r, i) => '#' + i + ' ' + new Date(r.t).toLocaleTimeString() + ' [' + r.level + '] ' + r.scope + '\nmsg: ' + r.message + (r.meta ? '\nmeta: ' + (typeof r.meta === 'string' ? r.meta : JSON.stringify(r.meta)) : '')).join('\n\n'), '已复制 (' + records.length + ')');
             }));
+            bar.appendChild(mkBtn('AI计划', '#097', () => {
+                const text = planAiRecords.map((r, i) => '#' + i + ' ' + new Date(r.t).toLocaleTimeString() + ' [' + r.level + '] ' + r.scope + '\nmsg: ' + r.message + (r.meta ? '\nmeta: ' + (typeof r.meta === 'string' ? r.meta : JSON.stringify(r.meta)) : '')).join('\n\n');
+                copy(text || '(没有 AI 计划调试记录，请先启用调试工具后重新生成计划)', '已复制 AI计划 (' + planAiRecords.length + ')');
+            }));
             bar.appendChild(mkBtn('NDJSON', '#0a8', () => copy(ndjson, '已复制 NDJSON (' + records.length + ')')));
+            bar.appendChild(mkBtn('AI NDJSON', '#068', () => copy(planAiNdjson || '', '已复制 AI NDJSON (' + planAiRecords.length + ')')));
             bar.appendChild(mkBtn('下载', '#a08', () => {
                 try {
                     const url = URL.createObjectURL(new Blob([ndjson], { type: 'application/x-ndjson;charset=utf-8' }));
