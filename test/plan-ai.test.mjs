@@ -205,6 +205,45 @@ test('plan AI parser accepts suffixed plan and action container names', () => {
   assert.deepEqual(JSON.parse(JSON.stringify(parsed.plans[0].items.map((item) => item.name))), ['猫牛式', '弹力带侧向行走', '髋屈肌拉伸']);
 });
 
+test('plan AI parser keeps exercise items that include instruction steps', () => {
+  const api = loadPlanAi();
+  const ctx = createContext(api);
+  const raw = JSON.stringify({
+    date: '2026-06-23',
+    type: 'rehab',
+    items: [
+      {
+        name: '站姿髋环绕',
+        category: 'warmup',
+        sets: 1,
+        reps: 8,
+        work: 2,
+        steps: ['扶墙站稳', '小幅度画圈']
+      },
+      {
+        name: '侧卧髋外展',
+        category: 'main',
+        prescription: { sets: 2, reps: 10, work: 3 },
+        steps: ['侧卧垫软垫', '脚尖微向前']
+      },
+      {
+        name: '臀中肌拉伸',
+        category: 'cooldown',
+        duration: 40,
+        steps: ['仰卧抱膝', '疼痛超过阈值停止']
+      }
+    ]
+  });
+  const parsed = api.parsePlanAiPayload.call(ctx, raw, ['rehab']);
+  const validated = api.validatePlanAiPayload.call(ctx, raw, ['rehab']);
+
+  assert.equal(validated.ok, true);
+  assert.equal(parsed.ok, true);
+  assert.equal(parsed.plans[0].items.length, 3);
+  assert.deepEqual(JSON.parse(JSON.stringify(parsed.plans[0].items.map((item) => item.name))), ['站姿髋环绕', '侧卧髋外展', '臀中肌拉伸']);
+  assert.deepEqual(JSON.parse(JSON.stringify(parsed.plans[0].items.map((item) => item.category))), ['warmup', 'main', 'cooldown']);
+});
+
 test('plan AI parser extracts fenced JSON with phase sections', () => {
   const api = loadPlanAi();
   const ctx = createContext(api);

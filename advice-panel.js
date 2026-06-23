@@ -507,6 +507,7 @@ const advicePanel = {
                 }))
             ].sort((a, b) => a.t - b.t);
             const planAiRecords = records.filter(r => r.scope === 'plan-ai');
+            const scopeFilter = window.errorBus?.getDebugScopeFilter?.() || '';
             const ndjson = records.map(r => JSON.stringify(r)).join('\n');
             const planAiNdjson = planAiRecords.map(r => JSON.stringify(r)).join('\n');
 
@@ -518,7 +519,7 @@ const advicePanel = {
             bar.style.cssText = 'position:sticky;top:-10px;margin:-10px -10px 8px;padding:8px;background:#111;border-bottom:1px solid #333;display:flex;flex-wrap:wrap;gap:6px;align-items:center';
             const status = document.createElement('span');
             status.style.cssText = 'flex:1;min-width:120px;color:#0f0';
-            status.textContent = '共 ' + records.length + ' 条 · AI计划 ' + planAiRecords.length + ' 条 · 仅会话级元数据，已脱敏';
+            status.textContent = '共 ' + records.length + ' 条 · AI计划 ' + planAiRecords.length + ' 条 · 收集 ' + (scopeFilter || '全部') + ' · 仅会话级元数据，已脱敏';
             const mkBtn = (label, bg, fn) => {
                 const b = document.createElement('button');
                 b.textContent = label;
@@ -543,6 +544,11 @@ const advicePanel = {
                     done();
                 }
             };
+            const setScope = (scope, label) => {
+                window.errorBus?.setDebugScopeFilter?.(scope);
+                if (typeof toast?.show === 'function') toast.show(label);
+                wrap.remove();
+            };
             bar.appendChild(status);
             const note = document.createElement('div');
             note.style.cssText = 'width:100%;color:#9f9;font-size:11px;opacity:.85';
@@ -555,6 +561,8 @@ const advicePanel = {
                 const text = planAiRecords.map((r, i) => '#' + i + ' ' + new Date(r.t).toLocaleTimeString() + ' [' + r.level + '] ' + r.scope + '\nmsg: ' + r.message + (r.meta ? '\nmeta: ' + (typeof r.meta === 'string' ? r.meta : JSON.stringify(r.meta)) : '')).join('\n\n');
                 copy(text || '(没有 AI 计划调试记录，请先启用调试工具后重新生成计划)', '已复制 AI计划 (' + planAiRecords.length + ')');
             }));
+            bar.appendChild(mkBtn('只收AI', '#750', () => setScope('plan-ai', '调试日志已切换为只收 AI 计划，请重新生成计划')));
+            bar.appendChild(mkBtn('收全部', '#555', () => setScope('', '调试日志已切换为收集全部')));
             bar.appendChild(mkBtn('NDJSON', '#0a8', () => copy(ndjson, '已复制 NDJSON (' + records.length + ')')));
             bar.appendChild(mkBtn('AI NDJSON', '#068', () => copy(planAiNdjson || '', '已复制 AI NDJSON (' + planAiRecords.length + ')')));
             bar.appendChild(mkBtn('下载', '#a08', () => {
@@ -616,7 +624,8 @@ const advicePanel = {
                 document.getElementById('adviceDebugFab')?.remove();
             }
             if (typeof toast?.show === 'function') {
-                toast.show('调试工具' + (this._debugToolsEnabled ? '已启用，将记录全局错误、控制台、网络与导航事件' : '已关闭'));
+                const scope = window.errorBus?.getDebugScopeFilter?.() || '';
+                toast.show('调试工具' + (this._debugToolsEnabled ? '已启用，将记录' + (scope ? scope + ' 日志' : '全局错误、控制台、网络与导航事件') : '已关闭'));
             }
             this.rerenderAdvicePanel?.();
             this.renderProfilePage?.();

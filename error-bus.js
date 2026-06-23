@@ -6,6 +6,8 @@
     const MAX_DEBUG_EVENTS = 500;
     const priorityDebugQueue = [];
     const MAX_PRIORITY_DEBUG_EVENTS = 200;
+    let debugScopeFilter = '';
+    let debugScopePatterns = [];
     let consolePatched = false;
     let originalConsole = null;
     let fetchPatched = false;
@@ -96,14 +98,40 @@
         return out;
     }
 
+    function normalizeDebugScopeFilter(value = '') {
+        return String(value || '').split(/[\s,，]+/).map(item => item.trim()).filter(Boolean).slice(0, 12);
+    }
+
+    function setDebugScopeFilterValue(value = '', persist = true) {
+        debugScopePatterns = normalizeDebugScopeFilter(value);
+        debugScopeFilter = debugScopePatterns.join(',');
+        if (persist) {
+            try {
+                if (debugScopeFilter) localStorage.setItem('rehab_debug_scope_filter', debugScopeFilter);
+                else localStorage.removeItem('rehab_debug_scope_filter');
+            } catch {}
+        }
+        return debugScopeFilter;
+    }
+
+    function debugScopeAllowed(scope = 'global') {
+        if (!debugScopePatterns.length) return true;
+        const value = String(scope || 'global');
+        return debugScopePatterns.some((pattern) => pattern.endsWith('*') ? value.startsWith(pattern.slice(0, -1)) : value === pattern);
+    }
+
+    try { setDebugScopeFilterValue(localStorage.getItem('rehab_debug_scope_filter') || '', false); } catch {}
+
     function pushDebug(level, scope, args, extra) {
         if (!debugMode) return;
         try {
-            const priority = /^plan-ai$|^plan-auto-adjust$|^ai[\w:-]*/.test(String(scope || ''));
+            const scopeName = String(scope || 'global');
+            if (!debugScopeAllowed(scopeName)) return;
+            const priority = /^plan-ai$|^plan-auto-adjust$|^ai[\w:-]*/.test(scopeName);
             const entry = {
                 t: Date.now(),
                 level: level || 'log',
-                scope: scope || 'global',
+                scope: scopeName,
                 args: Array.isArray(args) ? args.map(safeStringify) : [safeStringify(args)],
                 extra: extra || null,
                 priority: priority || undefined
@@ -350,6 +378,18 @@
         },
         isDebugEnabled() {
             return debugMode;
+        },
+        getDebugScopeFilter() {
+            return debugScopeFilter;
+        },
+        setDebugScopeFilter(value = '') {
+            const next = setDebugScopeFilterValue(value);
+            debugQueue.length = 0;
+            priorityDebugQueue.length = 0;
+            try { sessionStorage.removeItem('rehabDebugBus'); } catch {}
+            try { sessionStorage.removeItem('rehabPriorityDebugBus'); } catch {}
+            pushDebug('info', 'debug', [next ? `debug scope filter=${next}` : 'debug scope filter cleared']);
+            return next;
         },
         enableDebug() {
             if (debugMode) return;
