@@ -14,11 +14,51 @@ Object.assign(advicePanel, {
         return '';
     },
 
+    detectAdviceFocus(prompt = '') {
+        const text = String(prompt || '').toLowerCase().replace(/\s+/g, '');
+        const has = (patterns) => patterns.some(pattern => pattern.test(text));
+        const diet = has([/饮食|早餐|午餐|晚餐|加餐|吃|摄入|食物|蛋白|碳水|脂肪|营养|热量|卡路里|膳食|补剂|钠|糖|纤维/]);
+        const weight = has([/体重|体脂|bmi|腰围|围度|秤|公斤|kg|减重|减肥|增重|称重|掉秤|平台期|体重.*趋势|趋势.*体重|体重.*停滞|停滞.*体重|减重.*停滞|增肌.*停滞/]);
+        const training = has([/训练|运动|动作|组数|次数|强度|频率|rpe|疼|痛|康复|处方|恢复|拉伸|力量|有氧|跑步|骑行|游泳|训练计划|运动计划|训练日程|我的计划|计划和目标|今日计划|今天.*计划|计划.*今天|日程|deload|降载|肩|膝|腰|髋|踝|腕|肘/]);
+        const goal = has([/目标|达标|够不够|是否够|计划|调整|建议|减脂|增肌|维持|热量控制|热量目标|体重目标/]) || diet || weight;
+        const broad = has([/综合|整体|全部|全面|总结合并|今天.*记录|记录.*今天|周总结|月总结|饮食.*训练.*体重|体重.*饮食.*训练/]);
+        const contexts = broad
+            ? { diet: true, training: true, weight: true, goal: true }
+            : { diet, training, weight, goal: goal || diet || weight };
+        const active = ['diet', 'training', 'weight', 'goal'].filter(key => contexts[key]);
+        const labels = { diet: '饮食', training: '训练', weight: '体重', goal: '目标' };
+        return {
+            contexts,
+            active,
+            broad,
+            hasFocus: broad || active.some(key => key !== 'goal'),
+            label: active.map(key => labels[key]).join('、') || '综合',
+            profileMode: training ? 'full' : (diet || weight || goal ? 'basic' : 'none')
+        };
+    },
+
+    resolveAdviceContexts(prompt = '', mode = 'auto') {
+        const enabled = mode === 'none'
+            ? { diet: false, training: false, weight: false, goal: false }
+            : { diet: true, training: true, weight: true, goal: true, ...(this.adviceContexts || {}) };
+        if (mode === 'none') {
+            const focus = this.detectAdviceFocus(prompt);
+            focus.profileMode = 'none';
+            return { contexts: enabled, focus };
+        }
+        const focus = this.detectAdviceFocus(prompt);
+        const requested = focus.hasFocus ? focus.contexts : { diet: true, training: true, weight: true, goal: true };
+        const contexts = {};
+        ['diet', 'training', 'weight', 'goal'].forEach(key => { contexts[key] = !!enabled[key] && !!requested[key]; });
+        focus.profileMode = contexts.training ? 'full' : (contexts.diet || contexts.weight || contexts.goal ? 'basic' : 'none');
+        return { contexts, focus };
+    },
+
     buildAdviceMessages(prompt, model, options = {}) {
         const rawMode = options.contextMode || this.adviceContextMode || 'auto';
         const requested = ['auto', 'light', 'none'].includes(rawMode) ? rawMode : 'auto';
         const build = (mode) => {
-            const contexts = mode === 'none' ? { diet: false, training: false, weight: false, goal: false } : { diet: true, training: true, weight: true, goal: true, ...(this.adviceContexts || {}) };
+            const { contexts, focus } = this.resolveAdviceContexts(prompt, mode);
             const range = mode === 'light' && /^(month|all)$/.test(this.adviceRange || '') ? 'week' : (this.adviceRange || 'today');
             const today = this.logicalDateKey();
             const trim = list => mode === 'light' ? list.slice(-10) : list;
@@ -42,7 +82,8 @@ Object.assign(advicePanel, {
             const rangeExerciseLogs = contexts.training ? rangeFilter(allExerciseLogs, e => e.date ? this.dateFromKey(e.date) : null) : [];
             const rangeWeights = contexts.weight ? rangeFilter(allWeights, w => w.date ? this.dateFromKey(w.date) : null) : [];
             const rangeDailyPlans = contexts.training ? rangeFilter(allDailyPlans, p => p.date ? this.dateFromKey(p.date) : null) : [];
-            const rangeReports = rangeFilter(allReports, r => this.dateFromKey(r.periodEnd || r.periodStart || r.generatedAt || this.logicalDateKey()));
+            const includeReports = !!(contexts.training || contexts.diet || focus.broad);
+            const rangeReports = includeReports ? rangeFilter(allReports, r => this.dateFromKey(r.periodEnd || r.periodStart || r.generatedAt || this.logicalDateKey())) : [];
             const trendWeights = contexts.weight ? allWeights.slice(mode === 'light' ? -10 : -30) : [];
             const todayHistory = contexts.training ? allHistory.filter(h => this.historyDayKey(h) === today) : [];
             const todayFoods = contexts.diet ? allFoods.filter(f => f.date === today) : [];
@@ -136,17 +177,18 @@ Object.assign(advicePanel, {
             const formatReports = list => list.slice(0, mode === 'light' ? 2 : 4).map(r => `- ${r.kind || 'report'}｜${r.periodStart || ''}-${r.periodEnd || ''}｜${r.ai?.summary || r.summary || ''}${r.ai?.highlights?.length ? '｜重点:' + r.ai.highlights.join('、') : ''}${r.ai?.suggestions?.length ? '｜建议:' + r.ai.suggestions.join('、') : ''}`).join('\n');
             const enabledLabels = [contexts.diet && '饮食', contexts.training && '训练', contexts.weight && '体重', contexts.goal && '目标'].filter(Boolean).join('、') || '无';
             const prefResult = window.dataAiTemplates?.buildPromptMessages('advice_general', {}, this.db) || {};
-            const sys = `当前启用的分析维度：${enabledLabels}。上下文模式：${mode === 'light' ? '轻量' : mode === 'none' ? '仅提问' : '自动'}。未启用的维度不会提供数据，请不要编造，也不要要求用户开启。\n` + (prefResult.messages?.[0]?.content || '');
+            const focusLine = focus.hasFocus ? `问题重点：${focus.label}。请优先回答这个重点；除非用户明确要求，不要主动展开非重点维度。\n` : '';
+            const sys = `当前启用的分析维度：${enabledLabels}。上下文模式：${mode === 'light' ? '轻量' : mode === 'none' ? '仅提问' : '自动'}。${focusLine}未启用的维度不会提供数据，请不要编造，也不要要求用户开启。\n` + (prefResult.messages?.[0]?.content || '');
             const blocks = [`分析范围：${rangeLabel}`, `用户提问：${prompt}`];
             const profile = this.db.health?.profile || {}, profileLines = [];
             const _typeMap = { injury: '运动损伤', chronic: '慢性病', allergy: '过敏', surgery: '手术史', medication: '用药', other: '其他' };
             if (profile.gender || profile.age) profileLines.push(`基础：${profile.gender === 'female' ? '女' : '男'} · ${profile.age || '?'} 岁${this.db.health?.height ? ' · 身高 ' + this.db.health.height + ' cm' : ''}`);
-            if (profile.conditions?.length) { profileLines.push('诊断结果：'); profile.conditions.forEach(c => profileLines.push(`  - [${_typeMap[c.type] || c.type}] ${c.label}${c.severity ? '（' + c.severity + '）' : ''}${c.bodyPart ? '；部位：' + c.bodyPart : ''}${c.avoid?.length ? '；避免：' + c.avoid.join('、') : ''}${c.note ? '；备注：' + c.note : ''}`)); }
-            if (profile.examResults?.length) { profileLines.push('检查结果：'); profile.examResults.forEach(exam => profileLines.push(`  - ${exam.item || '检查'}${exam.date ? '（' + exam.date + '）' : ''}${exam.bodyPart ? '；部位：' + exam.bodyPart : ''}${exam.conditionLabel ? '；关联诊断：' + exam.conditionLabel : ''}${exam.result ? '；结果：' + exam.result : ''}${exam.note ? '；备注：' + exam.note : ''}`)); }
-            if (profile.allergies?.length) profileLines.push(`过敏/不耐受：${profile.allergies.join('、')}`);
-            if (profile.preferences?.equipment?.length) profileLines.push(`可用器材：${profile.preferences.equipment.join('、')}`);
-            if (profile.preferences?.sports?.length) profileLines.push(`偏好运动：${profile.preferences.sports.join('、')}`);
-            if (profile.vitals?.restingHR) profileLines.push(`静息心率：${profile.vitals.restingHR} bpm`);
+            if (focus.profileMode === 'full' && profile.conditions?.length) { profileLines.push('诊断结果：'); profile.conditions.forEach(c => profileLines.push(`  - [${_typeMap[c.type] || c.type}] ${c.label}${c.severity ? '（' + c.severity + '）' : ''}${c.bodyPart ? '；部位：' + c.bodyPart : ''}${c.avoid?.length ? '；避免：' + c.avoid.join('、') : ''}${c.note ? '；备注：' + c.note : ''}`)); }
+            if (focus.profileMode === 'full' && profile.examResults?.length) { profileLines.push('检查结果：'); profile.examResults.forEach(exam => profileLines.push(`  - ${exam.item || '检查'}${exam.date ? '（' + exam.date + '）' : ''}${exam.bodyPart ? '；部位：' + exam.bodyPart : ''}${exam.conditionLabel ? '；关联诊断：' + exam.conditionLabel : ''}${exam.result ? '；结果：' + exam.result : ''}${exam.note ? '；备注：' + exam.note : ''}`)); }
+            if (contexts.diet && profile.allergies?.length) profileLines.push(`过敏/不耐受：${profile.allergies.join('、')}`);
+            if (contexts.training && profile.preferences?.equipment?.length) profileLines.push(`可用器材：${profile.preferences.equipment.join('、')}`);
+            if (contexts.training && profile.preferences?.sports?.length) profileLines.push(`偏好运动：${profile.preferences.sports.join('、')}`);
+            if (contexts.training && profile.vitals?.restingHR) profileLines.push(`静息心率：${profile.vitals.restingHR} bpm`);
             if (profileLines.length) blocks.unshift(`【健康档案（必须遵守）】\n${profileLines.join('\n')}`);
             if (mode === 'none') blocks.push('【上下文说明】\n本次仅发送用户问题，不附带训练、饮食、体重或目标记录。');
             if (targetDate && mode !== 'none') blocks.push(`【优先分析日期】\n${targetDate}`);

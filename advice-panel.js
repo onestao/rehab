@@ -133,6 +133,8 @@ const advicePanel = {
             detectAdviceModelProvider: this.detectAdviceModelProvider,
             adviceModelVisual: this.adviceModelVisual,
             adviceConversationContext: this.adviceConversationContext,
+            detectAdviceFocus: this.detectAdviceFocus,
+            resolveAdviceContexts: this.resolveAdviceContexts,
             buildAdviceMessages: this.buildAdviceMessages,
             parsePromptTargetDate: this.parsePromptTargetDate,
             classifyAdviceFailure: this.classifyAdviceFailure,
@@ -1139,14 +1141,46 @@ const advicePanel = {
             requestAnimationFrame(() => this.refreshAdviceSearchResults?.());
             return;
         }
-        const previousTop = list.scrollTop || 0;
+        const measureScroll = (targetList = list) => {
+            let scroller = targetList;
+            try { scroller = this._adviceScrollContainer?.() || targetList; } catch { scroller = targetList; }
+            const top = Number(this._adviceCurrentScrollY?.(scroller));
+            const max = Number(this._adviceMaxScrollY?.(scroller));
+            if (Number.isFinite(top) && Number.isFinite(max)) return { scroller, top, max };
+            return {
+                scroller: targetList,
+                top: targetList?.scrollTop || 0,
+                max: Math.max(0, (targetList?.scrollHeight || 0) - (targetList?.clientHeight || 0))
+            };
+        };
+        const previousScroll = measureScroll(list);
+        const shouldStickToBottom = !!this._adviceFollowStream || (previousScroll.max - previousScroll.top) < 180;
+        const restoreScrollAfterRefresh = () => {
+            const currentList = this._adviceMessageList?.() || list;
+            if (!currentList) return;
+            const currentScroll = measureScroll(currentList);
+            const target = shouldStickToBottom
+                ? currentScroll.max
+                : Math.max(0, Math.min(previousScroll.top, currentScroll.max));
+            try {
+                if (currentScroll.scroller && typeof this._adviceSetScrollY === 'function') {
+                    this._adviceSetScrollY(currentScroll.scroller, target, false);
+                } else if (currentScroll.scroller) {
+                    currentScroll.scroller.scrollTop = target;
+                }
+            } catch {
+                if (currentList) currentList.scrollTop = target;
+            }
+            this.syncAdviceTopChromeToScroll?.(currentList);
+        };
         chromeInner.innerHTML = this.renderAdviceTopChromeInner();
         const filterBar = document.querySelector('.advice-v6-filter-bar');
         if (filterBar) filterBar.innerHTML = this.renderAdviceFilterControls();
         this.refreshAdviceModelChip?.();
         if (refreshMessages) {
-            this.refreshAdviceSearchResults();
-            list.scrollTop = Math.max(0, Math.min(previousTop, list.scrollHeight - list.clientHeight));
+            const refreshResult = this.refreshAdviceSearchResults();
+            const scheduleRestore = () => requestAnimationFrame(restoreScrollAfterRefresh);
+            Promise.resolve(refreshResult).then(scheduleRestore, scheduleRestore);
         }
         requestAnimationFrame(() => {
             this.autoResizeAdvicePrompt?.();
@@ -2940,7 +2974,7 @@ const advicePanel = {
                     <small>数据维度</small>
                 <div class="advice-context-toggles">${[['diet','饮食','restaurant'],['training','训练','fitness_center'],['weight','体重','monitor_weight'],['goal','目标','flag']].map(([key, label, icon]) => `<button class="advice-pill ${contexts[key] ? 'active' : ''}" onclick="data.toggleAdviceContext('${key}')" type="button"><span class="material-symbols-rounded">${icon}</span>${label}</button>`).join('')}</div>
                 </div>
-                <small class="advice-context-hint">自动会按模型预算裁剪；轻量适合网页转 API；仅提问不附带记录。</small>
+                <small class="advice-context-hint">自动会按问题重点和模型预算裁剪；维度开关是可使用数据上限。</small>
             </div>` : ''}
         `;
     },

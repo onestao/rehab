@@ -346,6 +346,54 @@ test('AI advice prompt includes manual exercise records without health-exercise 
     assert.match(userContent, /右肩无痛/);
 });
 
+test('AI advice auto context keeps plain weight questions focused', () => {
+    const { data } = loadCoachContextHarness({
+        adviceRange: 'month',
+        adviceContexts: { diet: true, training: true, weight: true, goal: true },
+        sortedWeights() {
+            return [
+                { date: '2026-05-10', weight: 72.3 },
+                { date: '2026-05-30', weight: 71.8 }
+            ];
+        }
+    });
+    data.db.health.profile = {
+        gender: 'male',
+        age: 35,
+        conditions: [{ type: 'injury', label: '肩袖损伤', avoid: ['推举'] }]
+    };
+
+    const messages = data.buildAdviceMessages('请分析我最近体重趋势，判断减重是否正常', 'test-model');
+    const systemContent = messages.find(message => message.role === 'system')?.content || '';
+    const userContent = messages.find(message => message.role === 'user')?.content || '';
+
+    assert.match(systemContent, /问题重点：体重、目标/);
+    assert.match(userContent, /【最近30天体重记录】/);
+    assert.match(userContent, /72\.30 kg/);
+    assert.match(userContent, /71\.80 kg/);
+    assert.match(userContent, /【目标与计划】/);
+    assert.doesNotMatch(userContent, /【最近30天训练记录】|【最近30天训练计划】|【近6周康复中心处方】/);
+    assert.doesNotMatch(userContent, /肩袖损伤|推举/);
+});
+
+test('AI advice auto context includes training and diet only when weight question asks for them', () => {
+    const { data } = loadCoachContextHarness({
+        adviceRange: 'month',
+        adviceContexts: { diet: true, training: true, weight: true, goal: true },
+        sortedWeights() { return [{ date: '2026-05-30', weight: 71.8 }]; }
+    });
+
+    const messages = data.buildAdviceMessages('如果我最近减重停滞，请结合饮食和训练记录分析原因', 'test-model');
+    const systemContent = messages.find(message => message.role === 'system')?.content || '';
+    const userContent = messages.find(message => message.role === 'user')?.content || '';
+
+    assert.match(systemContent, /问题重点：饮食、训练、体重、目标/);
+    assert.match(userContent, /【最近30天饮食记录】/);
+    assert.match(userContent, /【最近30天训练记录】/);
+    assert.match(userContent, /【最近30天体重记录】/);
+    assert.match(userContent, /【近6周康复中心处方】/);
+});
+
 test('AI advice prompt includes plans goals libraries and reports', () => {
     const { data } = loadCoachContextHarness({
         adviceContexts: { diet: true, training: true, weight: true, goal: true }
@@ -665,6 +713,87 @@ test('rerenderAdvicePanel refreshes range controls as well as messages', () => {
     assert.equal(chromeInner.innerHTML, '<div>top</div>');
     assert.equal(filterBar.innerHTML, '<button class="advice-pill active">7天</button>');
     assert.equal(refreshed, true);
+});
+
+test('rerenderAdvicePanel restores scroll after async message refresh', async () => {
+    const data = loadAdvicePanelHarness();
+    data.rerenderAdvicePanel = data.__context.__advicePanel.rerenderAdvicePanel;
+    data.renderAdviceTopChromeInner = () => '<div>top</div>';
+    data.renderAdviceFilterControls = () => '';
+    data.refreshAdviceModelChip = () => {};
+    data.autoResizeAdvicePrompt = () => {};
+    data.bindAdviceAttachmentControls = () => {};
+    data.updateAdviceSendState = () => {};
+    data.holdAdviceTopChrome = () => {};
+    data.syncAdviceTopChromeToScroll = () => {};
+
+    const list = { scrollTop: 300, scrollHeight: 800, clientHeight: 300 };
+    const chromeInner = { innerHTML: '' };
+    data._adviceMessageList = () => list;
+    data._adviceScrollContainer = () => list;
+    data._adviceCurrentScrollY = target => target.scrollTop || 0;
+    data._adviceMaxScrollY = target => Math.max(0, (target.scrollHeight || 0) - (target.clientHeight || 0));
+    data._adviceSetScrollY = (target, y) => { target.scrollTop = y; };
+    data.__context.document = {
+        getElementById: () => null,
+        querySelector(selector) { return selector === '.advice-top-chrome-inner' ? chromeInner : null; }
+    };
+
+    let releaseRefresh = () => {};
+    data.refreshAdviceSearchResults = () => new Promise(resolve => {
+        releaseRefresh = () => {
+            list.scrollTop = 0;
+            list.scrollHeight = 1200;
+            resolve(undefined);
+        };
+    });
+
+    data.rerenderAdvicePanel();
+    releaseRefresh();
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    assert.equal(list.scrollTop, 300);
+});
+
+test('rerenderAdvicePanel keeps streaming answers pinned to latest after async refresh', async () => {
+    const data = loadAdvicePanelHarness();
+    data.rerenderAdvicePanel = data.__context.__advicePanel.rerenderAdvicePanel;
+    data.renderAdviceTopChromeInner = () => '<div>top</div>';
+    data.renderAdviceFilterControls = () => '';
+    data.refreshAdviceModelChip = () => {};
+    data.autoResizeAdvicePrompt = () => {};
+    data.bindAdviceAttachmentControls = () => {};
+    data.updateAdviceSendState = () => {};
+    data.holdAdviceTopChrome = () => {};
+    data.syncAdviceTopChromeToScroll = () => {};
+    data._adviceFollowStream = true;
+
+    const list = { scrollTop: 500, scrollHeight: 800, clientHeight: 300 };
+    const chromeInner = { innerHTML: '' };
+    data._adviceMessageList = () => list;
+    data._adviceScrollContainer = () => list;
+    data._adviceCurrentScrollY = target => target.scrollTop || 0;
+    data._adviceMaxScrollY = target => Math.max(0, (target.scrollHeight || 0) - (target.clientHeight || 0));
+    data._adviceSetScrollY = (target, y) => { target.scrollTop = y; };
+    data.__context.document = {
+        getElementById: () => null,
+        querySelector(selector) { return selector === '.advice-top-chrome-inner' ? chromeInner : null; }
+    };
+
+    let releaseRefresh = () => {};
+    data.refreshAdviceSearchResults = () => new Promise(resolve => {
+        releaseRefresh = () => {
+            list.scrollTop = 0;
+            list.scrollHeight = 1300;
+            resolve(undefined);
+        };
+    });
+
+    data.rerenderAdvicePanel();
+    releaseRefresh();
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    assert.equal(list.scrollTop, 1000);
 });
 
 test('advice history search requires two characters before cold scan', async () => {
