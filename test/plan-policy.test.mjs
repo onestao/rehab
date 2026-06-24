@@ -188,3 +188,32 @@ test('plan policy sanitizes oral prescription plans without losing legacy contex
     assert.equal(nonPrescription.userConfirmed, false);
     assert.match(nonPrescription.aiReasoning, /非医嘱新增动作/);
 });
+
+test('plan policy does not replace user-edited preview actions', () => {
+    const policy = loadPlanPolicy();
+    const db = {
+        dailyPlans: [],
+        health: {
+            rehabWeekly: [{
+                weekStart: '2026-06-24',
+                actions: [{ name: '夹砖臀桥', status: 'continued', spec: { sets: 1, reps: 12, work: 5 } }]
+            }]
+        }
+    };
+
+    const plans = policy.sanitizeGeneratedPlans([{
+        date: '2026-06-24',
+        type: 'rehab',
+        items: [{ name: '基础臀桥', category: 'main', userOverride: true, spec: { sets: 1, reps: 12, work: 5 } }]
+    }], {
+        db,
+        targetDate: '2026-06-24',
+        types: ['rehab'],
+        ensureTaskShape: (item) => item,
+        respectUserOverride: true
+    });
+
+    const items = plans[0].items;
+    assert.ok(items.find((item) => item.name === '基础臀桥' && item.userOverride));
+    assert.ok(items.find((item) => item.name === '夹砖臀桥'));
+});

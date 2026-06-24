@@ -5,6 +5,7 @@ import vm from 'node:vm';
 
 function loadPlanAi() {
   const pureCode = readFileSync(new URL('../plan-ai-pure.js', import.meta.url), 'utf8');
+  const policyCode = readFileSync(new URL('../rehab-policy.js', import.meta.url), 'utf8');
   const code = readFileSync(new URL('../plan-ai.js', import.meta.url), 'utf8');
   const sandbox = {
     window: { toast: { show() {} } },
@@ -12,7 +13,9 @@ function loadPlanAi() {
     console
   };
   vm.runInNewContext(pureCode, sandbox);
+  vm.runInNewContext(policyCode, sandbox);
   vm.runInNewContext(code, sandbox);
+  sandbox.window.dataPlanAi.__testDocument = sandbox.document;
   return sandbox.window.dataPlanAi;
 }
 
@@ -83,6 +86,91 @@ test('plan AI type chips render all plan types with selected chips active', () =
   assert.match(html, /onclick="data\.togglePlanAiType\('bulk'\)"/);
   assert.match(html, /plan-ai-type-chip active[\s\S]*?aria-pressed="true"[\s\S]*?增肌日程/);
   assert.match(html, /plan-ai-type-chip active[\s\S]*?aria-pressed="true"[\s\S]*?减脂日程/);
+});
+
+test('plan action search includes rehab prescriptions and action library', () => {
+  const api = loadPlanAi();
+  const ctx = createContext(api);
+  ctx.db.health.rehabWeekly = [{
+    weekStart: '2026-06-23',
+    actions: [{ actionId: 'rx-hip-abduction', name: '侧卧髋外展', rawDescription: '臀中肌轻量激活', spec: { sets: 2, reps: 10, work: 3 } }]
+  }];
+  ctx.db.actions = [{ id: 'lib-bridge', libOnly: true, name: '夹砖臀桥', tags: ['髋'], spec: { sets: 1, reps: 12, work: 5 } }];
+
+  const prescription = api.searchPlanActionChoices.call(ctx, '外展', 4)[0];
+  const library = api.searchPlanActionChoices.call(ctx, '夹砖', 4)[0];
+
+  assert.equal(prescription.source, 'prescription');
+  assert.equal(prescription.prescriptionActionId, 'rx-hip-abduction');
+  assert.equal(prescription.actionKey, 'side-lying-hip-abduction');
+  assert.equal(library.source, 'action-library');
+  assert.equal(library.sourceActionId, 'lib-bridge');
+});
+
+test('plan preview collection treats edited action name as user override with new identity', () => {
+  const api = loadPlanAi();
+  const ctx = createContext(api);
+  const input = (value, attrs = {}) => ({
+    value,
+    checked: !!attrs.checked,
+    hasAttribute(name) { return Boolean(attrs[name]); },
+    querySelector() { return null; }
+  });
+  const itemAttrs = {
+    'data-original-name': '基础臀桥',
+    'data-original-category': 'main',
+    'data-original-spec': 'sets:2|reps:12|work:3|repRest:0|actionRest:30|isAlt:false|mode:reps',
+    'data-original-reason': 'AI 生成',
+    'data-original-user-override': 'false',
+    'data-preview-action-key': 'bridge-basic',
+    'data-preview-canonical-name': '基础臀桥',
+    'data-preview-progression-group': 'bridge-adduction',
+    'data-preview-progression-level': '1',
+    'data-preview-chain-id': 'plan-chain-bridge'
+  };
+  const itemEl = {
+    getAttribute(name) { return itemAttrs[name] || ''; },
+    querySelector(selector) {
+      const map = {
+        '[data-preview-name]': input('侧卧髋外展'),
+        '[data-preview-category]': input('main'),
+        '[data-preview-work]': input('3'),
+        '[data-preview-reps]': input('10'),
+        '[data-preview-is-alt]': input('', { checked: false }),
+        '[data-preview-mode]': input('reps'),
+        '[data-preview-sets]': input('2'),
+        '[data-preview-rep-rest]': input('0'),
+        '[data-preview-rest]': input('30'),
+        '[data-preview-reason]': input('用户改成处方动作'),
+        '[data-preview-user-confirm]': null
+      };
+      return map[selector] || null;
+    },
+    querySelectorAll(selector) {
+      return selector === '[data-auto-filled]' ? [] : [];
+    }
+  };
+  const planEl = {
+    querySelector(selector) {
+      if (selector === '[data-preview-date]') return input('2026-05-25');
+      if (selector === '[data-preview-notes]') return input('');
+      if (selector === '.plan-ai-preview-type') return { textContent: '康复计划' };
+      return null;
+    },
+    querySelectorAll(selector) {
+      return selector === '.plan-ai-preview-item' ? [itemEl] : [];
+    }
+  };
+  api.__testDocument.querySelectorAll = (selector) => selector === '.plan-ai-preview-plan' ? [planEl] : [];
+
+  const plans = api.collectPlanAiPreviewPlans.call(ctx);
+  const item = plans[0].items[0];
+
+  assert.equal(item.name, '侧卧髋外展');
+  assert.equal(item.userOverride, true);
+  assert.equal(item.actionKey, 'side-lying-hip-abduction');
+  assert.equal(item.canonicalName, '侧卧髋外展');
+  assert.notEqual(item.actionKey, 'bridge-basic');
 });
 
 test('plan AI parser fills usable spec defaults and preserves alternation', () => {
@@ -668,7 +756,7 @@ test('plan AI confirmation preserves completed and locked tasks while replacing 
     type: 'rehab',
     title: 'AI 康复计划',
     notes: 'AI notes',
-    items: [{ name: 'AI 新动作', category: 'main', spec: { sets: 2, reps: 12, work: 3, repRest: 0, actionRest: 30, isAlt: false, mode: 'reps' } }]
+    items: [{ name: 'AI 新动作', category: 'main', requiresUserConfirm: true, userConfirmed: true, spec: { sets: 2, reps: 12, work: 3, repRest: 0, actionRest: 30, isAlt: false, mode: 'reps' } }]
   }];
   ctx.collectPlanAiPreviewPlans = () => ctx._pendingPlanAiPlans;
   ctx.ensureTaskShape = (item) => ({ id: item.id || `task-${item.name}`, status: item.status || 'todo', deleted: false, ...item });

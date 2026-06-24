@@ -401,7 +401,8 @@
     const prescription = matchAction(context?.prescriptionActions, item);
     const sourceItem = matchAction(sourceItems, item);
     const stableLegacy = context?.legacyContinueAllowed && matchAction(context?.stableLegacyItems, item);
-    const nonPrescriptionNew = type === 'main' && !prescription && !sourceItem && !stableLegacy;
+    const userChosen = Boolean(item?.userOverride) || ['action-library', 'routine-library', 'user-preview', 'user-edit'].includes(String(item?.policy?.source || item?.source || ''));
+    const nonPrescriptionNew = type === 'main' && !prescription && !sourceItem && !stableLegacy && !userChosen;
     const requiresUserConfirm = Boolean(item?.requiresUserConfirm)
       || Boolean(blocked)
       || Boolean(cautious)
@@ -411,7 +412,8 @@
       : prescription ? 'prescription'
         : sourceItem ? 'current-plan'
           : stableLegacy ? 'legacy-continue'
-            : 'non-prescription';
+            : userChosen && (item?.policy?.source || item?.source) ? String(item.policy?.source || item.source)
+              : 'non-prescription';
     const annotated = {
       ...item,
       type,
@@ -478,6 +480,8 @@
     const ensureTaskShape = typeof options.ensureTaskShape === 'function' ? options.ensureTaskShape : (item) => item;
     const emitDebug = typeof options.onDebug === 'function' ? options.onDebug : null;
     const keepBlockedAsConfirm = options.keepBlockedAsConfirm === true;
+    const respectUserOverride = options.respectUserOverride === true;
+    const canReplaceItem = (item) => !(respectUserOverride && item?.userOverride);
     return activeRecords(plans).map((plan) => {
       const policyDebug = {
         date: plan.date || options.targetDate || '',
@@ -522,7 +526,8 @@
       });
       missingMustKeep.forEach((action) => {
         const task = annotatePlanItem(prescriptionTask(action), context, sourceItems);
-        const chainReplaceIndex = items.findIndex((item) => inferCategory(item.type, item.name) === inferCategory(task.type, task.name)
+        const chainReplaceIndex = items.findIndex((item) => canReplaceItem(item)
+          && inferCategory(item.type, item.name) === inferCategory(task.type, task.name)
           && item.progressionGroup
           && item.progressionGroup === task.progressionGroup
           && Number(item.progressionLevel || 0) < Number(task.progressionLevel || 0));
@@ -537,7 +542,7 @@
           return;
         }
         if (mainCount() >= 6 && inferCategory(task.type, task.name) === 'main') {
-          const replaceIndex = items.findIndex((item) => inferCategory(item.type, item.name) === 'main' && item.policy?.source === 'non-prescription');
+          const replaceIndex = items.findIndex((item) => canReplaceItem(item) && inferCategory(item.type, item.name) === 'main' && item.policy?.source === 'non-prescription');
           if (replaceIndex >= 0) {
             policyDebug.mustKeep.push({
               action: action.canonicalName || action.name || '',

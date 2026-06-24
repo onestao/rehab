@@ -473,7 +473,8 @@
                 icon: 'edit',
                 bodyHtml: `
                     <div class="md-grid modal-grid" style="gap:10px">
-                        <div class="md-field span-full"><input id="planEditName" type="text" placeholder=" " value="${this.escapeHtml(task.name || '')}"><label>动作名称</label></div>
+                        <div class="md-field span-full"><input id="planEditName" type="text" placeholder=" " autocomplete="off" value="${this.escapeHtml(task.name || '')}" oninput="data.renderPlanEditActionSuggestions?.(this)" onfocus="data.renderPlanEditActionSuggestions?.(this)"><label>动作名称</label></div>
+                        <div id="planEditActionSuggestions" class="plan-action-suggestions span-full"></div>
                         <div class="md-field"><select id="planEditCategory"><option value="warmup" ${category === 'warmup' ? 'selected' : ''}>热身</option><option value="main" ${category === 'main' ? 'selected' : ''}>主训练</option><option value="cooldown" ${category === 'cooldown' ? 'selected' : ''}>拉伸/放松</option></select><label>阶段</label></div>
                         <div class="md-field"><input id="planEditSets" type="number" placeholder=" " value="${Number(current.sets || 1)}"><label>组数</label></div>
                         <div class="md-field"><input id="planEditReps" type="number" placeholder=" " value="${Number(current.reps || 0)}"><label>次数</label></div>
@@ -493,7 +494,9 @@
         savePlanTaskEdit(planId, taskId) {
             const { plan, task } = this.findTask?.(planId, taskId) || {};
             if (!plan || !task) return;
-            const name = String(document.getElementById('planEditName')?.value || '').trim();
+            const nameInput = document.getElementById('planEditName');
+            const previousName = String(task.name || '').trim();
+            const name = String(nameInput?.value || '').trim();
             const category = String(document.getElementById('planEditCategory')?.value || task.category || 'main');
             task.name = name || task.name || '未命名任务';
             task.category = ['warmup', 'main', 'cooldown'].includes(category) ? category : 'main';
@@ -508,10 +511,22 @@
             };
             task.aiReasoning = String(document.getElementById('planEditReason')?.value || '').trim();
             task.invalidSpec = (task.spec.reps <= 0 && task.spec.work <= 0);
+            const choice = this.findPlanActionChoiceById?.(nameInput?.getAttribute?.('data-plan-edit-choice-id') || '');
+            const meta = choice || window.planPolicy?.actionMetaForName?.([task.name, task.aiReasoning].filter(Boolean).join(' ')) || {};
+            task.actionKey = choice?.actionKey || meta.actionKey || '';
+            task.canonicalName = choice?.canonicalName || meta.canonicalName || task.name || '';
+            task.progressionGroup = choice?.progressionGroup || meta.progressionGroup || '';
+            task.progressionLevel = Number(choice?.progressionLevel ?? meta.progressionLevel ?? 0);
+            task.chainId = choice?.chainId || meta.chainId || '';
+            if (choice?.sourceActionId) task.sourceActionId = choice.sourceActionId;
+            else if (task.name !== previousName) delete task.sourceActionId;
+            if (choice?.prescriptionActionId) task.prescriptionActionId = choice.prescriptionActionId;
+            else if (task.name !== previousName) delete task.prescriptionActionId;
+            if (choice || task.name !== previousName) task.policy = { ...(task.policy || {}), source: choice?.source || 'user-edit', choiceLabel: choice?.sourceLabel || '' };
             const prefs = this.ensurePlanPrefs?.() || {};
-            if (prefs.askOnEdit === 'lock_default') task.userOverride = true;
+            if (prefs.askOnEdit !== 'pass_default') task.userOverride = true;
             if (prefs.askOnEdit === 'pass_default') task.userOverride = false;
-            this.touchRecord(task, ['name', 'category', 'spec', 'aiReasoning', 'userOverride']);
+            this.touchRecord(task, ['name', 'category', 'spec', 'aiReasoning', 'userOverride', 'actionKey', 'canonicalName', 'progressionGroup', 'progressionLevel', 'chainId', 'sourceActionId', 'prescriptionActionId', 'policy']);
             this.touchRecord(plan, ['items']);
             this.save();
             this._closeActiveModal?.();

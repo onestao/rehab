@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 
 function loadPlanUi() {
+  const policyCode = readFileSync(new URL('../rehab-policy.js', import.meta.url), 'utf8');
   const code = readFileSync(new URL('../plan-ui.js', import.meta.url), 'utf8');
   const sandbox = {
     window: {},
@@ -14,7 +15,9 @@ function loadPlanUi() {
       }
     }
   };
+  vm.runInNewContext(policyCode, sandbox);
   vm.runInNewContext(code, sandbox);
+  sandbox.window.dataPlanUi.__testDocument = sandbox.document;
   return sandbox.window.dataPlanUi;
 }
 
@@ -116,4 +119,38 @@ test('task drawer exposes compact cancel daily plan action', () => {
   assert.match(html, /data-cancel-plan-id="rehab"/);
   assert.match(html, /plan-cancel-day-btn/);
   assert.match(html, /取消计划/);
+});
+
+test('editing a saved plan task updates action identity and locks the task', () => {
+  const api = loadPlanUi();
+  const task = { id: 'task-1', name: '基础臀桥', category: 'main', spec: { sets: 1, reps: 12, work: 3 }, userOverride: false, actionKey: 'bridge-basic' };
+  const plans = [{ id: 'rehab', type: 'rehab', items: [task] }];
+  const ctx = {
+    ...createContext(api, plans),
+    findTask() { return { plan: plans[0], task }; },
+    save() { this.saved = true; },
+    _closeActiveModal() { this.closed = true; },
+    touchRecord(record) { record.updatedAt = 456; }
+  };
+  const fields = {
+    planEditName: { value: '侧卧髋外展', getAttribute() { return ''; } },
+    planEditCategory: { value: 'main' },
+    planEditSets: { value: '2' },
+    planEditReps: { value: '10' },
+    planEditWork: { value: '3' },
+    planEditRest: { value: '30' },
+    planEditRepRest: { value: '0' },
+    planEditIsAlt: { checked: false },
+    planEditReason: { value: '用户改为处方动作' }
+  };
+  api.__testDocument.getElementById = (id) => fields[id] || null;
+
+  api.savePlanTaskEdit.call(ctx, 'rehab', 'task-1');
+
+  assert.equal(task.name, '侧卧髋外展');
+  assert.equal(task.userOverride, true);
+  assert.equal(task.actionKey, 'side-lying-hip-abduction');
+  assert.equal(task.canonicalName, '侧卧髋外展');
+  assert.notEqual(task.actionKey, 'bridge-basic');
+  assert.equal(ctx.saved, true);
 });

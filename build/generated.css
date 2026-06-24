@@ -9559,10 +9559,70 @@ body.is-training .fab-pip.active {
 }
 
 .plan-ai-preview-name,
+.plan-action-suggestions,
 .plan-ai-preview-category,
 .plan-ai-preview-reason,
 .plan-ai-preview-spec {
     grid-column: 1 / 2;
+}
+
+.plan-action-suggestions {
+    display: grid;
+    gap: 6px;
+    min-width: 0;
+}
+
+.plan-action-suggestions:empty {
+    display: none;
+}
+
+.plan-action-choice,
+.plan-action-choice-empty {
+    width: 100%;
+    min-width: 0;
+    border: 1px solid color-mix(in srgb, var(--md-sys-outline-variant) 70%, transparent);
+    border-radius: var(--md-sys-shape-md);
+    background: var(--md-sys-surface-container-low);
+    padding: 8px 10px;
+}
+
+.plan-action-choice {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+    color: var(--md-sys-on-surface);
+    text-align: left;
+    cursor: pointer;
+}
+
+.plan-action-choice:hover {
+    border-color: color-mix(in srgb, var(--md-sys-primary) 44%, var(--md-sys-outline-variant));
+    background: var(--md-sys-primary-container);
+}
+
+.plan-action-choice span {
+    min-width: 0;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.plan-action-choice strong,
+.plan-action-choice em {
+    overflow-wrap: anywhere;
+}
+
+.plan-action-choice small,
+.plan-action-choice em,
+.plan-action-choice-empty {
+    color: var(--md-sys-on-surface-variant);
+    font-size: 12px;
+    font-style: normal;
+}
+
+.plan-action-choice strong {
+    font-size: 13px;
 }
 
 .plan-ai-preview-spec {

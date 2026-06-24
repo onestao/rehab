@@ -501,6 +501,173 @@
             }));
     }
 
+    const normalizePlanActionSearchText = (value = '') => String(value || '')
+        .trim()
+        .replace(/[\s·•、，。；;:：()（）【】\[\]_-]+/g, '')
+        .toLowerCase();
+
+    function planActionSpecFingerprint(spec = {}) {
+        const normalized = coerceAiSpec({ spec }).spec || {};
+        return ['sets', 'reps', 'work', 'repRest', 'actionRest', 'isAlt', 'mode']
+            .map((key) => `${key}:${normalized[key] ?? ''}`)
+            .join('|');
+    }
+
+    function planActionSpecFromSource(source = {}, category = 'main') {
+        const spec = isPlainObject(source.spec) ? source.spec
+            : isPlainObject(source.suggestedSpec) ? source.suggestedSpec
+                : isPlainObject(source.prescription) ? source.prescription
+                    : {};
+        const merged = {
+            ...spec,
+            sets: spec.sets ?? source.sets,
+            reps: spec.reps ?? source.reps ?? source.repsPerSet,
+            work: spec.work ?? source.work ?? source.duration,
+            repRest: spec.repRest ?? source.repRest,
+            actionRest: spec.actionRest ?? source.actionRest ?? source.rest,
+            isAlt: spec.isAlt ?? source.isAlt,
+            mode: spec.mode ?? source.mode
+        };
+        return coerceAiSpec({ name: source.name || source.title || source.actionName || '', category, spec: merged }).spec;
+    }
+
+    function planActionChoiceCategory(source = {}, fallback = 'main') {
+        const text = source.category || source.phase || source.type || source.section || '';
+        return normalizeAiCategory(text || window.planPolicy?.inferCategory?.(text, source.name || source.title || source.actionName || '') || fallback);
+    }
+
+    function planActionChoiceMeta(choice = {}) {
+        const meta = window.planPolicy?.actionMetaForName?.([choice.name, choice.rawDescription, choice.description, choice.note].filter(Boolean).join(' ')) || {};
+        return {
+            ...choice,
+            actionKey: choice.actionKey || meta.actionKey || '',
+            canonicalName: choice.canonicalName || meta.canonicalName || choice.name || '',
+            progressionGroup: choice.progressionGroup || meta.progressionGroup || '',
+            progressionLevel: Number(choice.progressionLevel ?? meta.progressionLevel ?? 0),
+            chainId: choice.chainId || meta.chainId || ''
+        };
+    }
+
+    function buildPlanActionChoiceCatalog(ctx) {
+        const choices = [];
+        const seen = new Set();
+        const active = (list) => ctx.activeRecords?.(list || []) || (Array.isArray(list) ? list.filter((item) => item && !item.deleted && !item.deletedAt) : []);
+        const addChoice = (choice = {}) => {
+            const name = String(choice.name || '').trim();
+            if (!name) return;
+            const source = choice.source || 'action-library';
+            const sourceId = String(choice.refId || choice.sourceActionId || choice.prescriptionActionId || choice.routineId || name);
+            const key = `${source}:${sourceId}:${normalizePlanActionSearchText(name)}`;
+            if (seen.has(key)) return;
+            seen.add(key);
+            const category = planActionChoiceCategory(choice, 'main');
+            const enriched = planActionChoiceMeta({
+                ...choice,
+                id: choice.id || key,
+                name,
+                category,
+                spec: planActionSpecFromSource(choice, category)
+            });
+            enriched.searchText = [
+                enriched.name,
+                enriched.canonicalName,
+                enriched.sourceLabel,
+                enriched.routineName,
+                enriched.rawDescription,
+                enriched.description,
+                enriched.note,
+                Array.isArray(enriched.tags) ? enriched.tags.join(' ') : ''
+            ].filter(Boolean).join(' ');
+            choices.push(enriched);
+        };
+        summarizeRehabWeekly(ctx, 8).forEach((week, weekIndex) => {
+            (week.actions || []).forEach((action, actionIndex) => addChoice({
+                ...action,
+                source: 'prescription',
+                sourceLabel: '处方',
+                refId: action.actionId || `${week.weekStart || week.visitDate || weekIndex}:${actionIndex}`,
+                prescriptionActionId: action.actionId || '',
+                weekStart: week.weekStart || '',
+                rawDescription: action.rawDescription || action.coachNote || ''
+            }));
+        });
+        active(ctx.db?.actions || []).forEach((action) => {
+            if (action.libOnly !== true) return;
+            addChoice({
+                ...action,
+                source: 'action-library',
+                sourceLabel: '动作库',
+                refId: action.id || action.name,
+                sourceActionId: action.id || action.sourceActionId || '',
+                description: action.description || action.note || ''
+            });
+        });
+        active(ctx.db?.routines || []).forEach((routine) => {
+            (routine.actions || []).forEach((action, actionIndex) => addChoice({
+                ...action,
+                source: 'routine-library',
+                sourceLabel: '方案库',
+                routineId: routine.id || '',
+                routineName: routine.name || routine.title || '',
+                refId: `${routine.id || routine.name || 'routine'}:${action.sourceActionId || action.id || actionIndex}`,
+                sourceActionId: action.sourceActionId || action.id || '',
+                description: [routine.name || routine.title, action.description || action.note].filter(Boolean).join(' ')
+            }));
+        });
+        return choices;
+    }
+
+    function renderPlanActionChoiceHtml(ctx, choices = [], applyMethod = 'applyPlanActionChoiceToPreview') {
+        const esc = ctx.escapeHtml ? ctx.escapeHtml.bind(ctx) : (value) => String(value ?? '');
+        if (!choices.length) return '<div class="plan-action-choice-empty">没有匹配的处方或动作库动作</div>';
+        return choices.map((choice) => {
+            const meta = [choice.sourceLabel, choice.routineName, choice.weekStart].filter(Boolean).join(' · ');
+            const detail = choice.rawDescription || choice.description || choice.note || '';
+            return `<button class="plan-action-choice" type="button" data-plan-action-choice-id="${esc(choice.id)}" onclick="data.${applyMethod}(this)"><span><strong>${esc(choice.name)}</strong><small>${esc(meta || '动作')}</small></span>${detail ? `<em>${esc(truncate(detail, 60))}</em>` : ''}</button>`;
+        }).join('');
+    }
+
+    function setPlanActionChoiceAttrs(el, choice = {}, prefix = 'data-preview') {
+        if (!el) return;
+        const attrs = {
+            [`${prefix}-choice-id`]: choice.id || '',
+            [`${prefix}-choice-source`]: choice.source || '',
+            [`${prefix}-choice-source-label`]: choice.sourceLabel || '',
+            [`${prefix}-action-key`]: choice.actionKey || '',
+            [`${prefix}-canonical-name`]: choice.canonicalName || choice.name || '',
+            [`${prefix}-progression-group`]: choice.progressionGroup || '',
+            [`${prefix}-progression-level`]: choice.progressionLevel ?? '',
+            [`${prefix}-chain-id`]: choice.chainId || '',
+            [`${prefix}-source-action-id`]: choice.sourceActionId || '',
+            [`${prefix}-prescription-action-id`]: choice.prescriptionActionId || ''
+        };
+        Object.entries(attrs).forEach(([key, value]) => el.setAttribute(key, String(value || '')));
+    }
+
+    function applyPlanActionChoiceToFields(root, choice = {}) {
+        if (!root) return;
+        const setValue = (selector, value) => {
+            const el = root.querySelector?.(selector);
+            if (el && value !== undefined && value !== null && value !== '') el.value = value;
+        };
+        const setChecked = (selector, value) => {
+            const el = root.querySelector?.(selector);
+            if (el) el.checked = !!value;
+        };
+        const spec = choice.spec || planActionSpecFromSource(choice, choice.category || 'main');
+        setValue('[data-preview-name], #planEditName', choice.name || '');
+        setValue('[data-preview-category], #planEditCategory', choice.category || 'main');
+        setValue('[data-preview-mode]', spec.mode || 'reps');
+        setValue('[data-preview-sets], #planEditSets', Number(spec.sets || 1));
+        setValue('[data-preview-reps], #planEditReps', Number(spec.reps || 0));
+        setValue('[data-preview-work], #planEditWork', Number(spec.work || 0));
+        setValue('[data-preview-rep-rest], #planEditRepRest', Number(spec.repRest || 0));
+        setValue('[data-preview-rest], #planEditRest', Number(spec.actionRest || 45));
+        setChecked('[data-preview-is-alt], #planEditIsAlt', !!spec.isAlt);
+        const reason = root.querySelector?.('[data-preview-reason], #planEditReason');
+        if (reason && !String(reason.value || '').trim()) reason.value = `${choice.sourceLabel || '已选动作'}：${choice.name || ''}`;
+    }
+
     window.dataPlanAi = {
         planAiQuickPrompts() {
             return [
@@ -512,6 +679,68 @@
 
         planAiTypeOptions() {
             return ['rehab', 'cut', 'bulk', 'maintenance', 'custom'];
+        },
+
+        planActionChoiceCatalog() {
+            return buildPlanActionChoiceCatalog(this);
+        },
+
+        searchPlanActionChoices(query = '', limit = 8) {
+            const needle = normalizePlanActionSearchText(query);
+            const ranked = (this.planActionChoiceCatalog?.() || []).map((choice, index) => {
+                const name = normalizePlanActionSearchText(choice.name);
+                const canonical = normalizePlanActionSearchText(choice.canonicalName);
+                const haystack = normalizePlanActionSearchText(choice.searchText || '');
+                let score = 0;
+                if (!needle) score = choice.source === 'prescription' ? 40 : 20;
+                else if (name === needle || canonical === needle) score = 100;
+                else if (name.startsWith(needle) || canonical.startsWith(needle)) score = 80;
+                else if (name.includes(needle) || canonical.includes(needle)) score = 65;
+                else if (haystack.includes(needle)) score = 45;
+                if (choice.source === 'prescription') score += 12;
+                if (choice.source === 'action-library') score += 6;
+                return { choice, score, index };
+            }).filter((entry) => entry.score > 0);
+            return ranked.sort((a, b) => b.score - a.score || a.index - b.index).slice(0, limit).map((entry) => entry.choice);
+        },
+
+        findPlanActionChoiceById(choiceId = '') {
+            const id = String(choiceId || '');
+            if (!id) return null;
+            return (this.planActionChoiceCatalog?.() || []).find((choice) => String(choice.id || '') === id) || null;
+        },
+
+        renderPlanActionSuggestions(input) {
+            const itemEl = input?.closest?.('.plan-ai-preview-item');
+            const box = itemEl?.querySelector?.('[data-plan-action-suggestions]');
+            if (!box) return;
+            box.innerHTML = renderPlanActionChoiceHtml(this, this.searchPlanActionChoices(input?.value || '', 6), 'applyPlanActionChoiceToPreview');
+        },
+
+        applyPlanActionChoiceToPreview(button) {
+            const itemEl = button?.closest?.('.plan-ai-preview-item');
+            const choice = this.findPlanActionChoiceById?.(button?.getAttribute?.('data-plan-action-choice-id') || '');
+            if (!itemEl || !choice) return;
+            applyPlanActionChoiceToFields(itemEl, choice);
+            setPlanActionChoiceAttrs(itemEl, choice, 'data-preview');
+            const box = itemEl.querySelector?.('[data-plan-action-suggestions]');
+            if (box) box.innerHTML = '';
+        },
+
+        renderPlanEditActionSuggestions(input) {
+            const box = document.getElementById?.('planEditActionSuggestions');
+            if (!box) return;
+            box.innerHTML = renderPlanActionChoiceHtml(this, this.searchPlanActionChoices(input?.value || '', 6), 'applyPlanActionChoiceToEdit');
+        },
+
+        applyPlanActionChoiceToEdit(button) {
+            const choice = this.findPlanActionChoiceById?.(button?.getAttribute?.('data-plan-action-choice-id') || '');
+            const modal = document.getElementById?.('planEditName')?.closest?.('.modal-body') || document;
+            if (!choice) return;
+            applyPlanActionChoiceToFields(modal, choice);
+            setPlanActionChoiceAttrs(document.getElementById?.('planEditName'), choice, 'data-plan-edit');
+            const box = document.getElementById?.('planEditActionSuggestions');
+            if (box) box.innerHTML = '';
         },
 
         renderPlanAiTypeChips(typesInput = 'rehab') {
@@ -1075,6 +1304,7 @@
                     types: normalizePlanTypes(this._planAiTypes || plans.map((plan) => plan.type || 'rehab')),
                     ensureTaskShape: (item) => item,
                     keepBlockedAsConfirm: true,
+                    respectUserOverride: true,
                     onDebug: (entry) => policyDebug.push(entry)
                 });
                 planAiDebug('sanitize:preview', {
@@ -1124,14 +1354,31 @@
             const autoSet = new Set(item.autoFilled || []);
             const af = (field) => autoSet.has(field) ? ' data-auto-filled' : '';
             const category = normalizeAiCategory(item.category || item.phase);
+            const itemMeta = planActionChoiceMeta(item);
+            const originalReason = item.aiReasoning || '';
+            const metaAttrs = [
+                ['data-original-name', item.name || ''],
+                ['data-original-category', category],
+                ['data-original-spec', planActionSpecFingerprint(spec)],
+                ['data-original-reason', originalReason],
+                ['data-original-user-override', item.userOverride ? 'true' : 'false'],
+                ['data-preview-action-key', itemMeta.actionKey || ''],
+                ['data-preview-canonical-name', itemMeta.canonicalName || item.name || ''],
+                ['data-preview-progression-group', itemMeta.progressionGroup || ''],
+                ['data-preview-progression-level', itemMeta.progressionLevel || ''],
+                ['data-preview-chain-id', itemMeta.chainId || ''],
+                ['data-preview-source-action-id', item.sourceActionId || ''],
+                ['data-preview-prescription-action-id', item.prescriptionActionId || '']
+            ].map(([key, value]) => `${key}="${this.escapeHtml(value)}"`).join(' ');
             const confirmLabel = item.policy?.blocked || item.policy?.source === 'blocked'
                 ? '我确认了解此动作与暂停/避免记录冲突，仍保留为候选'
                 : '我确认接受此非处方/中低风险建议';
-            return `<div class="plan-ai-preview-item" data-item-index="${itemIndex}">
+            return `<div class="plan-ai-preview-item" data-item-index="${itemIndex}" ${metaAttrs}>
                 <div class="md-field plan-ai-preview-name">
-                    <input type="text" data-preview-name value="${this.escapeHtml(item.name || '')}" placeholder=" ">
+                    <input type="text" data-preview-name value="${this.escapeHtml(item.name || '')}" placeholder=" " autocomplete="off" oninput="data.renderPlanActionSuggestions(this)" onfocus="data.renderPlanActionSuggestions(this)">
                     <label>动作</label>
                 </div>
+                <div class="plan-action-suggestions" data-plan-action-suggestions></div>
                 <div class="md-field plan-ai-preview-category">
                     <select data-preview-category>
                         ${[
@@ -1235,19 +1482,48 @@
                             mode
                         }
                     });
+                    const reason = String(itemEl.querySelector('[data-preview-reason]')?.value || '').trim();
+                    const originalSpec = itemEl.getAttribute('data-original-spec') || '';
+                    const originalName = itemEl.getAttribute('data-original-name') || '';
+                    const originalCategory = itemEl.getAttribute('data-original-category') || '';
+                    const originalReason = itemEl.getAttribute('data-original-reason') || '';
+                    const specChanged = originalSpec && planActionSpecFingerprint(coerced.spec) !== originalSpec;
+                    const textChanged = name !== originalName || category !== originalCategory || reason !== originalReason;
+                    const choiceId = itemEl.getAttribute('data-preview-choice-id') || '';
+                    const choice = this.findPlanActionChoiceById?.(choiceId);
+                    const userOverride = itemEl.getAttribute('data-original-user-override') === 'true' || Boolean(choiceId) || textChanged || specChanged;
+                    const inferredMeta = planActionChoiceMeta({
+                        name,
+                        rawDescription: reason,
+                        actionKey: userOverride && !choice ? '' : itemEl.getAttribute('data-preview-action-key') || '',
+                        canonicalName: userOverride && !choice ? '' : itemEl.getAttribute('data-preview-canonical-name') || '',
+                        progressionGroup: userOverride && !choice ? '' : itemEl.getAttribute('data-preview-progression-group') || '',
+                        progressionLevel: userOverride && !choice ? 0 : readNumber(itemEl.getAttribute('data-preview-progression-level') || 0, 0),
+                        chainId: userOverride && !choice ? '' : itemEl.getAttribute('data-preview-chain-id') || ''
+                    });
+                    const selectedMeta = choice || inferredMeta;
+                    const sourceLabel = choice?.sourceLabel || itemEl.getAttribute('data-preview-choice-source-label') || '';
                     items.push({
                         name,
                         category,
                         spec: coerced.spec,
                         cooldownRefs: [],
-                        aiReasoning: String(itemEl.querySelector('[data-preview-reason]')?.value || '').trim(),
+                        aiReasoning: reason,
                         durationEstHint: '',
                         requiresUserConfirm: !!itemEl.querySelector('[data-preview-user-confirm]'),
                         userConfirmed: itemEl.querySelector('[data-preview-user-confirm]')?.checked !== false,
                         status: 'todo',
                         doneSets: 0,
-                        userOverride: false,
+                        userOverride,
                         excludeFromPr: true,
+                        actionKey: selectedMeta.actionKey || '',
+                        canonicalName: selectedMeta.canonicalName || name,
+                        progressionGroup: selectedMeta.progressionGroup || '',
+                        progressionLevel: Number(selectedMeta.progressionLevel || 0),
+                        chainId: selectedMeta.chainId || '',
+                        sourceActionId: choice?.sourceActionId || itemEl.getAttribute('data-preview-source-action-id') || '',
+                        prescriptionActionId: choice?.prescriptionActionId || itemEl.getAttribute('data-preview-prescription-action-id') || '',
+                        ...(choice || userOverride ? { policy: { source: choice?.source || 'user-preview', choiceLabel: sourceLabel, prescriptionName: choice?.source === 'prescription' ? choice.name : '' } } : {}),
                         ...((autoFilled.length || coerced.autoFilled.length) ? { autoFilled: [...new Set([...autoFilled, ...coerced.autoFilled])] } : {})
                     });
                 });
@@ -1306,6 +1582,7 @@
                     types: normalizePlanTypes(this._planAiTypes || plans.map((plan) => plan.type || 'rehab')),
                     ensureTaskShape: (item) => item,
                     keepBlockedAsConfirm: true,
+                    respectUserOverride: true,
                     onDebug: (entry) => policyDebug.push(entry)
                 });
                 planAiDebug('sanitize:confirm', {
