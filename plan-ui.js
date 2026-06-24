@@ -463,7 +463,11 @@
             }
         },
 
-        openPlanTaskEdit(planId, taskId) {
+        async openPlanTaskEdit(planId, taskId) {
+            if (typeof window.loadAppScript === 'function' && !window.dataPlanAi?.searchPlanActionChoices) {
+                await window.loadAppScript('plan-ai');
+                this.refreshModules?.();
+            }
             const { task } = this.findTask?.(planId, taskId) || {};
             if (!task) return;
             const current = task.spec || {};
@@ -497,8 +501,10 @@
             const nameInput = document.getElementById('planEditName');
             const previousName = String(task.name || '').trim();
             const name = String(nameInput?.value || '').trim();
+            const nextName = name || task.name || '未命名任务';
+            const nameChanged = nextName !== previousName;
             const category = String(document.getElementById('planEditCategory')?.value || task.category || 'main');
-            task.name = name || task.name || '未命名任务';
+            task.name = nextName;
             task.category = ['warmup', 'main', 'cooldown'].includes(category) ? category : 'main';
             task.spec = {
                 ...task.spec,
@@ -511,18 +517,26 @@
             };
             task.aiReasoning = String(document.getElementById('planEditReason')?.value || '').trim();
             task.invalidSpec = (task.spec.reps <= 0 && task.spec.work <= 0);
-            const choice = this.findPlanActionChoiceById?.(nameInput?.getAttribute?.('data-plan-edit-choice-id') || '');
-            const meta = choice || window.planPolicy?.actionMetaForName?.([task.name, task.aiReasoning].filter(Boolean).join(' ')) || {};
-            task.actionKey = choice?.actionKey || meta.actionKey || '';
-            task.canonicalName = choice?.canonicalName || meta.canonicalName || task.name || '';
-            task.progressionGroup = choice?.progressionGroup || meta.progressionGroup || '';
-            task.progressionLevel = Number(choice?.progressionLevel ?? meta.progressionLevel ?? 0);
-            task.chainId = choice?.chainId || meta.chainId || '';
-            if (choice?.sourceActionId) task.sourceActionId = choice.sourceActionId;
-            else if (task.name !== previousName) delete task.sourceActionId;
-            if (choice?.prescriptionActionId) task.prescriptionActionId = choice.prescriptionActionId;
-            else if (task.name !== previousName) delete task.prescriptionActionId;
-            if (choice || task.name !== previousName) task.policy = { ...(task.policy || {}), source: choice?.source || 'user-edit', choiceLabel: choice?.sourceLabel || '' };
+            const choiceId = nameInput?.getAttribute?.('data-plan-edit-choice-id') || '';
+            const choice = this.resolvePlanActionChoiceForText?.(task.name, choiceId) || null;
+            if (choice || nameChanged) {
+                const meta = choice || window.planPolicy?.actionMetaForName?.([task.name, task.aiReasoning].filter(Boolean).join(' ')) || {};
+                task.actionKey = choice?.actionKey || meta.actionKey || '';
+                task.canonicalName = choice?.canonicalName || meta.canonicalName || task.name || '';
+                task.progressionGroup = choice?.progressionGroup || meta.progressionGroup || '';
+                task.progressionLevel = Number(choice?.progressionLevel ?? meta.progressionLevel ?? 0);
+                task.chainId = choice?.chainId || meta.chainId || '';
+                if (choice?.sourceActionId) task.sourceActionId = choice.sourceActionId;
+                else delete task.sourceActionId;
+                if (choice?.prescriptionActionId) task.prescriptionActionId = choice.prescriptionActionId;
+                else delete task.prescriptionActionId;
+                task.policy = {
+                    ...(task.policy || {}),
+                    source: choice?.source || 'user-edit',
+                    choiceLabel: choice?.sourceLabel || '',
+                    prescriptionName: choice?.source === 'prescription' ? choice.name : ''
+                };
+            }
             const prefs = this.ensurePlanPrefs?.() || {};
             if (prefs.askOnEdit !== 'pass_default') task.userOverride = true;
             if (prefs.askOnEdit === 'pass_default') task.userOverride = false;

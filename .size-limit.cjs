@@ -39,7 +39,7 @@ module.exports = [
   { name: 'ai-bundle', path: ['ai-*.js', 'ai-*.mjs', 'advice-*.js', 'coach-context.js', 'lib/virtual-core.umd.js', 'lib/flexsearch.light.js'], limit: '120 KB' },
   { name: 'rehab-policy', path: 'rehab-policy.js', limit: '12 KB' },
   { name: 'rehab-progression-pure', path: 'rehab-progression-pure.js', limit: '4 KB' },
-  { name: 'plan-bundle', path: 'plan-*.js', limit: '64 KB' },
+  { name: 'plan-bundle', path: 'plan-*.js', limit: '68 KB' },
   {
     name: 'records-bundle',
     path: [

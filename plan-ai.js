@@ -563,7 +563,7 @@
             const category = planActionChoiceCategory(choice, 'main');
             const enriched = planActionChoiceMeta({
                 ...choice,
-                id: choice.id || key,
+                id: key,
                 name,
                 category,
                 spec: planActionSpecFromSource(choice, category)
@@ -625,6 +625,19 @@
             const detail = choice.rawDescription || choice.description || choice.note || '';
             return `<button class="plan-action-choice" type="button" data-plan-action-choice-id="${esc(choice.id)}" onclick="data.${applyMethod}(this)"><span><strong>${esc(choice.name)}</strong><small>${esc(meta || '动作')}</small></span>${detail ? `<em>${esc(truncate(detail, 60))}</em>` : ''}</button>`;
         }).join('');
+    }
+
+    function planActionChoiceMatchesText(choice = {}, text = '') {
+        const needle = normalizePlanActionSearchText(text);
+        if (!needle || !choice) return false;
+        return [choice.name, choice.canonicalName].some((value) => normalizePlanActionSearchText(value) === needle);
+    }
+
+    function resolvePlanActionChoiceForText(ctx, text = '', preferredChoiceId = '') {
+        const preferred = preferredChoiceId ? ctx.findPlanActionChoiceById?.(preferredChoiceId) : null;
+        if (preferred && planActionChoiceMatchesText(preferred, text)) return preferred;
+        const exact = (ctx.searchPlanActionChoices?.(text, 12) || []).find((choice) => planActionChoiceMatchesText(choice, text));
+        return exact || null;
     }
 
     function setPlanActionChoiceAttrs(el, choice = {}, prefix = 'data-preview') {
@@ -708,6 +721,10 @@
             const id = String(choiceId || '');
             if (!id) return null;
             return (this.planActionChoiceCatalog?.() || []).find((choice) => String(choice.id || '') === id) || null;
+        },
+
+        resolvePlanActionChoiceForText(text = '', preferredChoiceId = '') {
+            return resolvePlanActionChoiceForText(this, text, preferredChoiceId);
         },
 
         renderPlanActionSuggestions(input) {
@@ -1490,8 +1507,8 @@
                     const specChanged = originalSpec && planActionSpecFingerprint(coerced.spec) !== originalSpec;
                     const textChanged = name !== originalName || category !== originalCategory || reason !== originalReason;
                     const choiceId = itemEl.getAttribute('data-preview-choice-id') || '';
-                    const choice = this.findPlanActionChoiceById?.(choiceId);
-                    const userOverride = itemEl.getAttribute('data-original-user-override') === 'true' || Boolean(choiceId) || textChanged || specChanged;
+                    const choice = resolvePlanActionChoiceForText(this, name, choiceId);
+                    const userOverride = itemEl.getAttribute('data-original-user-override') === 'true' || Boolean(choice) || textChanged || specChanged;
                     const inferredMeta = planActionChoiceMeta({
                         name,
                         rawDescription: reason,
@@ -1502,7 +1519,7 @@
                         chainId: userOverride && !choice ? '' : itemEl.getAttribute('data-preview-chain-id') || ''
                     });
                     const selectedMeta = choice || inferredMeta;
-                    const sourceLabel = choice?.sourceLabel || itemEl.getAttribute('data-preview-choice-source-label') || '';
+                    const sourceLabel = choice?.sourceLabel || (!userOverride ? itemEl.getAttribute('data-preview-choice-source-label') : '') || '';
                     items.push({
                         name,
                         category,
@@ -1521,8 +1538,8 @@
                         progressionGroup: selectedMeta.progressionGroup || '',
                         progressionLevel: Number(selectedMeta.progressionLevel || 0),
                         chainId: selectedMeta.chainId || '',
-                        sourceActionId: choice?.sourceActionId || itemEl.getAttribute('data-preview-source-action-id') || '',
-                        prescriptionActionId: choice?.prescriptionActionId || itemEl.getAttribute('data-preview-prescription-action-id') || '',
+                        sourceActionId: choice?.sourceActionId || (!userOverride ? itemEl.getAttribute('data-preview-source-action-id') : '') || '',
+                        prescriptionActionId: choice?.prescriptionActionId || (!userOverride ? itemEl.getAttribute('data-preview-prescription-action-id') : '') || '',
                         ...(choice || userOverride ? { policy: { source: choice?.source || 'user-preview', choiceLabel: sourceLabel, prescriptionName: choice?.source === 'prescription' ? choice.name : '' } } : {}),
                         ...((autoFilled.length || coerced.autoFilled.length) ? { autoFilled: [...new Set([...autoFilled, ...coerced.autoFilled])] } : {})
                     });
