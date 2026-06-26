@@ -1109,6 +1109,7 @@
             Object.assign(record, draft);
             this.touchRecord(record, ['weekStart', 'visitDate', 'actions', 'therapistAssessment', 'homework', 'rawText']);
             if (!existing) this.db.health.rehabWeekly.unshift(record);
+            window.actionIdentity?.ensurePrescriptionActionCatalog?.(this.db);
             this.saveAndBackup?.() || this.save?.();
             this.closeRehabWeeklySheet();
             this.renderHistory?.();

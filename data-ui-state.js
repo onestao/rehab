@@ -83,7 +83,7 @@
         },
 
         libraryViewOrder() {
-            return ['actions', 'routines'];
+            return ['actions', 'prescriptionActions', 'routines'];
         },
 
         normalizeLibraryView(view) {
@@ -103,7 +103,7 @@
             this.updateLibraryTabActive?.();
             this.syncLibraryDeckPosition?.(opts.smooth !== false);
             if (next !== prev) {
-                this._libraryViewDirection = next === 'routines' ? 'next' : 'prev';
+                this._libraryViewDirection = this.libraryViewOrder().indexOf(next) > this.libraryViewOrder().indexOf(prev) ? 'next' : 'prev';
                 this.renderRoutines();
             }
         },
@@ -177,6 +177,7 @@
             const indicator = document.querySelector('.library-segment-indicator');
             if (indicator) {
                 indicator.classList.toggle('is-actions', current === 'actions');
+                indicator.classList.toggle('is-prescription-actions', current === 'prescriptionActions');
                 indicator.classList.toggle('is-routines', current === 'routines');
             }
         },

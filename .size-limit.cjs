@@ -24,6 +24,7 @@ module.exports = [
       'nav-stack.js',
       'app-route.js',
       'data-utils-pure.js',
+      'action-identity.js',
       'data-records.js',
       'data-schema.js',
       'advice-virtual-list.js',

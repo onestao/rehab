@@ -25,9 +25,11 @@ test('mergeLibraryTags merges and sorts unique tags', () => {
 });
 
 test('nextLibraryView shifts with boundaries', () => {
-    assert.equal(nextLibraryView('actions', 1), 'routines');
+    assert.equal(nextLibraryView('actions', 1), 'prescriptionActions');
+    assert.equal(nextLibraryView('prescriptionActions', 1), 'routines');
     assert.equal(nextLibraryView('routines', 1), 'routines');
-    assert.equal(nextLibraryView('routines', -1), 'actions');
+    assert.equal(nextLibraryView('routines', -1), 'prescriptionActions');
+    assert.equal(nextLibraryView('prescriptionActions', -1), 'actions');
     assert.equal(nextLibraryView('actions', -1), 'actions');
 });
 

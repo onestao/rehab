@@ -104,6 +104,7 @@ function backupCounts(dbObj = {}) {
         exercise: health.exerciseLogs?.length || 0,
         weight: health.weights?.length || 0,
         rehabWeekly: health.rehabWeekly?.length || 0,
+        prescriptionActions: health.prescriptionActions?.length || 0,
         advice: health.aiAdviceChat?.length || 0
     };
 }
@@ -121,6 +122,7 @@ function backupPreviewText(label, dbObj, meta = {}) {
         `手动运动：${counts.exercise}`,
         `体重：${counts.weight}`,
         `康复周处方：${counts.rehabWeekly}`,
+        `处方动作：${counts.prescriptionActions}`,
         `AI 对话：${counts.advice}`,
         meta.checksum ? `checksum：${String(meta.checksum).slice(0, 16)}...` : ''
     ].filter(Boolean).join('\n');
@@ -170,6 +172,7 @@ const backup = {
                 food: dbToExport.health?.foodLogs?.length || 0,
                 exercise: dbToExport.health?.exerciseLogs?.length || 0,
                 weight: dbToExport.health?.weights?.length || 0,
+                prescriptionActions: dbToExport.health?.prescriptionActions?.length || 0,
                 advice: dbToExport.health?.aiAdviceChat?.length || 0
             },
             checksum,

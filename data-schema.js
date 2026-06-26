@@ -11,7 +11,7 @@
             // health.reports item shape:
             // { id, kind:'weekly'|'monthly', periodStart, periodEnd, generatedAt, updatedAt, deleted,
             //   metrics:{ weight, training, diet, cardio }, ai:{ summary, highlights, suggestions, model, prompt_id } }
-            this.db.health = { weights: [], foodLogs: [], exerciseLogs: [], reports: [], rehabWeekly: [], goalType: 'loss', bodyPlan: null, weightPlan: null, dietGoal: null, aiAdviceChat: [], aiInsightCache: null, trainingLabelClassifications: {}, foodAliasGroups: [], weeklyGoalSessions: 5, ...(this.db.health || {}) };
+            this.db.health = { weights: [], foodLogs: [], exerciseLogs: [], reports: [], rehabWeekly: [], prescriptionActions: [], goalType: 'loss', bodyPlan: null, weightPlan: null, dietGoal: null, aiAdviceChat: [], aiInsightCache: null, trainingLabelClassifications: {}, foodAliasGroups: [], weeklyGoalSessions: 5, ...(this.db.health || {}) };
             this.db.actions = (this.db.actions || []).map(a => this.ensureRecordMeta(a, 'action', nowTs));
             this.db.routines = (this.db.routines || []).map(r => {
                 this.ensureRecordMeta(r, 'routine', nowTs);
@@ -32,6 +32,8 @@
             this.db.health.exerciseLogs = (this.db.health.exerciseLogs || []).map(item => this.ensureRecordMeta(item, 'exercise', nowTs));
             this.db.health.reports = (this.db.health.reports || []).map(item => this.ensureRecordMeta(item, 'health-report', nowTs));
             this.db.health.rehabWeekly = (this.db.health.rehabWeekly || []).map(item => this.ensureRecordMeta(item, 'rehab-week', nowTs));
+            this.db.health.prescriptionActions = (this.db.health.prescriptionActions || []).map(item => this.ensureRecordMeta(item, 'prescription-action', nowTs));
+            window.actionIdentity?.ensurePrescriptionActionCatalog?.(this.db, { nowTs });
             this.db.health.aiAdviceChat = (this.db.health.aiAdviceChat || []).map(item => this.ensureRecordMeta(item, 'advice', nowTs));
             this.db.health.aiInsightCache = this.db.health.aiInsightCache && typeof this.db.health.aiInsightCache === 'object' ? this.ensureRecordMeta(this.db.health.aiInsightCache, 'ai-insight-cache', nowTs) : null;
             this.db.health.trainingLabelClassifications = this.db.health.trainingLabelClassifications && typeof this.db.health.trainingLabelClassifications === 'object' ? this.db.health.trainingLabelClassifications : {};
@@ -88,7 +90,7 @@
             this.db.aiProfiles = this.db.aiProfiles || [];
             this.db.aiActiveId = this.db.aiActiveId || '';
             this.db.aiModels = this.db.aiModels || [];
-            this.db.libraryView = ['actions', 'routines'].includes(this.db.libraryView) ? this.db.libraryView : 'actions';
+            this.db.libraryView = ['actions', 'prescriptionActions', 'routines'].includes(this.db.libraryView) ? this.db.libraryView : 'actions';
             this.db.libraryFilterTag = typeof this.db.libraryFilterTag === 'string' ? this.db.libraryFilterTag : '';
             this.db.syncMeta = this.db.syncMeta || {};
             this.db.syncMeta.lastSyncAt = Number(this.db.syncMeta.lastSyncAt || 0);

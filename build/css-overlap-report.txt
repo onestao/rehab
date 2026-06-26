@@ -1321,7 +1321,7 @@ mark.ai-hit
   files: 49-plan.css, 49-plan-ai.css
     color: var(--md-sys-on-surface-variant) (49-plan.css / 49-plan-ai.css)
 
-## COMPLEMENTS (same selector, disjoint properties): 111
+## COMPLEMENTS (same selector, disjoint properties): 114
 .bar-leading
   files: 04-layout-appbar.css, 50-v6-ui.css
 
@@ -1432,6 +1432,15 @@ body.is-paused .fab-play
 
 .profile-view-back
   files: 43-identity-card.css
+
+.prescription-action-main small
+  files: 45-library-segment.css
+
+.prescription-relation-choice small
+  files: 45-library-segment.css
+
+.prescription-relation-empty
+  files: 45-library-segment.css
 
 #ai-coach.page
   files: 46-advice-ai.css

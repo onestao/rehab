@@ -187,6 +187,7 @@ const sync = {
             history: db.history || [],
             dailyPlans: db.dailyPlans || [],
             progressionChains: db.progressionChains || [],
+            prescriptionActions: health.prescriptionActions || [],
             weights: health.weights || [],
             foodLogs: health.foodLogs || [],
             exerciseLogs: health.exerciseLogs || [],
@@ -320,6 +321,14 @@ const sync = {
                 return {
                     get: () => db.progressionChains || [],
                     set: (value) => { db.progressionChains = value; }
+                };
+            case 'prescriptionActions':
+                return {
+                    get: () => (db.health || {}).prescriptionActions || [],
+                    set: (value) => {
+                        db.health = db.health || {};
+                        db.health.prescriptionActions = value;
+                    }
                 };
             case 'weights':
                 return {
@@ -487,6 +496,7 @@ const sync = {
                         exercise: () => localDb?.health?.exerciseLogs?.length || 0,
                         weight:   () => localDb?.health?.weights?.length || 0,
                         rehabWeekly: () => localDb?.health?.rehabWeekly?.length || 0,
+                        prescriptionActions: () => localDb?.health?.prescriptionActions?.length || 0,
                         aiInsightCache: () => localDb?.health?.aiInsightCache ? 1 : 0
                     };
                     for (const k of Object.keys(remoteCounts)) {

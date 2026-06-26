@@ -71,10 +71,10 @@ function mergeLibraryTags(actions = [], routines = []) {
         .sort((a, b) => a.localeCompare(b, 'zh-CN'));
 }
 
-/** @returns {'actions'|'routines'} */
+/** @returns {'actions'|'prescriptionActions'|'routines'} */
 function nextLibraryView(current, dir) {
-    /** @type {('actions'|'routines')[]} */
-    const order = ['actions', 'routines'];
+    /** @type {('actions'|'prescriptionActions'|'routines')[]} */
+    const order = ['actions', 'prescriptionActions', 'routines'];
     const idx = Math.max(0, order.indexOf(order.includes(current) ? current : 'actions'));
     const next = Math.max(0, Math.min(order.length - 1, idx + (dir > 0 ? 1 : -1)));
     return order[next];

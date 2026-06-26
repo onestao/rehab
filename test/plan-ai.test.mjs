@@ -2,13 +2,14 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
+import * as actionIdentity from '../action-identity.js';
 
 function loadPlanAi() {
   const pureCode = readFileSync(new URL('../plan-ai-pure.js', import.meta.url), 'utf8');
   const policyCode = readFileSync(new URL('../rehab-policy.js', import.meta.url), 'utf8');
   const code = readFileSync(new URL('../plan-ai.js', import.meta.url), 'utf8');
   const sandbox = {
-    window: { toast: { show() {} } },
+    window: { toast: { show() {} }, actionIdentity },
     document: {},
     console
   };
@@ -25,7 +26,7 @@ function createContext(api) {
     db: {
       dailyPlans: [],
       history: [],
-      health: { exerciseLogs: [], profile: {}, dietGoal: null, rehabWeekly: [] }
+      health: { exerciseLogs: [], profile: {}, dietGoal: null, rehabWeekly: [], prescriptionActions: [] }
     },
     logicalDateKey() {
       return '2026-05-25';
@@ -101,7 +102,8 @@ test('plan action search includes rehab prescriptions and action library', () =>
   const library = api.searchPlanActionChoices.call(ctx, '夹砖', 4)[0];
 
   assert.equal(prescription.source, 'prescription');
-  assert.equal(prescription.prescriptionActionId, 'rx-hip-abduction');
+  assert.ok(prescription.prescriptionActionId);
+  assert.equal(prescription.name, '侧卧髋外展');
   assert.equal(prescription.actionKey, 'side-lying-hip-abduction');
   assert.equal(library.source, 'action-library');
   assert.equal(library.sourceActionId, 'lib-bridge');

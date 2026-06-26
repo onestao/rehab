@@ -9,7 +9,7 @@ const data = {
         rate: 1.1,
         voice: { priority: 'online-first', engines: [], cache: true, timeoutMs: 4000 },
         cardio: { weight: 70, target: 30, type: 'walk' },
-        health: { weights: [], foodLogs: [], exerciseLogs: [], reports: [], rehabWeekly: [], goalType: 'loss', bodyPlan: null, weightPlan: null, dietGoal: null, aiAdviceChat: [], weeklyGoalSessions: 5 },
+        health: { weights: [], foodLogs: [], exerciseLogs: [], reports: [], rehabWeekly: [], prescriptionActions: [], goalType: 'loss', bodyPlan: null, weightPlan: null, dietGoal: null, aiAdviceChat: [], weeklyGoalSessions: 5 },
         aiProfiles: [],
         aiActiveId: '',
         aiModels: [],

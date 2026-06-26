@@ -1,0 +1,413 @@
+// @ts-check
+
+function activeRecords(records) {
+    return Array.isArray(records)
+        ? records.filter((record) => record && !record.deleted && !record.deletedAt)
+        : [];
+}
+
+function uniqueList(values = []) {
+    return [
+        ...new Set(
+            (Array.isArray(values) ? values : [])
+                .map((item) => String(item || '').trim())
+                .filter(Boolean),
+        ),
+    ];
+}
+
+export function normalizePrescriptionActionName(value = '') {
+    return String(value || '')
+        .trim()
+        .replace(/[\s·•、，。；;:：()（）【】\[\]{}"'_-]+/g, '')
+        .toLowerCase();
+}
+
+function hashText(value = '') {
+    let hash = 2166136261;
+    const text = String(value || '');
+    for (let i = 0; i < text.length; i += 1) {
+        hash ^= text.charCodeAt(i);
+        hash = Math.imul(hash, 16777619);
+    }
+    return (hash >>> 0).toString(36);
+}
+
+export function createPrescriptionActionId(name = '', nowTs = Date.now()) {
+    const key = normalizePrescriptionActionName(name);
+    return key
+        ? `pa-${hashText(key)}`
+        : `pa-${Math.round(Number(nowTs) || Date.now()).toString(36)}`;
+}
+
+function normalizeRelationIds(values = [], selfId = '') {
+    return uniqueList(values).filter((id) => id && id !== selfId);
+}
+
+export function normalizePrescriptionAction(record = {}, options = {}) {
+    const nowTs = Number(options.nowTs || Date.now());
+    const displayName = String(record.displayName || record.name || '').trim();
+    const id = String(record.id || createPrescriptionActionId(displayName, nowTs)).trim();
+    const aliases = uniqueList([displayName, record.name, ...(record.aliases || [])]);
+    return {
+        id,
+        displayName: displayName || aliases[0] || '未命名处方动作',
+        aliases,
+        sourceActionIds: uniqueList(record.sourceActionIds),
+        linkedActionId: String(record.linkedActionId || '').trim(),
+        regressionIds: normalizeRelationIds(record.regressionIds, id),
+        progressionIds: normalizeRelationIds(record.progressionIds, id),
+        category: String(record.category || record.actionCategory || record.type || '').trim(),
+        bodyPart: String(record.bodyPart || '').trim(),
+        conditionId: String(record.conditionId || '').trim(),
+        conditionLabel: String(record.conditionLabel || '').trim(),
+        defaultSpec:
+            record.defaultSpec && typeof record.defaultSpec === 'object'
+                ? record.defaultSpec
+                : null,
+        latestStatus: String(record.latestStatus || '').trim(),
+        latestPainLevel: Math.max(0, Number(record.latestPainLevel || 0)),
+        progressionGroup: String(record.progressionGroup || '').trim(),
+        progressionLevel: Number(record.progressionLevel || 0),
+        notes: String(record.notes || '').trim(),
+        createdAt: Number(record.createdAt || nowTs),
+        updatedAt: Number(record.updatedAt || nowTs),
+        deleted: !!record.deleted,
+        __fieldUpdatedAt:
+            record.__fieldUpdatedAt && typeof record.__fieldUpdatedAt === 'object'
+                ? record.__fieldUpdatedAt
+                : {},
+    };
+}
+
+function chooseDisplayName(current = '', candidate = '') {
+    const oldName = String(current || '').trim();
+    const nextName = String(candidate || '').trim();
+    if (!oldName) return nextName;
+    return oldName;
+}
+
+function addAlias(record, name) {
+    const text = String(name || '').trim();
+    if (!text) return;
+    record.aliases = uniqueList([...(record.aliases || []), text]);
+}
+
+function buildIndex(catalog = []) {
+    const byId = new Map();
+    const byName = new Map();
+    activeRecords(catalog).forEach((item) => {
+        const record = normalizePrescriptionAction(item);
+        byId.set(record.id, record);
+        [record.displayName, ...(record.aliases || [])].forEach((name) => {
+            const key = normalizePrescriptionActionName(name);
+            if (key && !byName.has(key)) byName.set(key, record.id);
+        });
+    });
+    return { byId, byName };
+}
+
+function addRelation(records, fromId, toId, relation) {
+    if (!fromId || !toId || fromId === toId) return;
+    const from = records.get(fromId);
+    const to = records.get(toId);
+    if (!from || !to || from.deleted || to.deleted) return;
+    if (relation === 'progression') {
+        from.progressionIds = normalizeRelationIds([...(from.progressionIds || []), toId], fromId);
+        to.regressionIds = normalizeRelationIds([...(to.regressionIds || []), fromId], toId);
+    } else if (relation === 'regression') {
+        from.regressionIds = normalizeRelationIds([...(from.regressionIds || []), toId], fromId);
+        to.progressionIds = normalizeRelationIds([...(to.progressionIds || []), fromId], toId);
+    }
+}
+
+function sortWeeks(weeks = []) {
+    return activeRecords(weeks)
+        .slice()
+        .sort(
+            (a, b) =>
+                String(a.weekStart || a.visitDate || a.date || '').localeCompare(
+                    String(b.weekStart || b.visitDate || b.date || ''),
+                ) || Number(a.updatedAt || 0) - Number(b.updatedAt || 0),
+        );
+}
+
+export function ensurePrescriptionActionCatalog(db = {}, options = {}) {
+    const nowTs = Number(options.nowTs || Date.now());
+    db.health = db.health || {};
+    const existing = activeRecords(db.health.prescriptionActions || []).map((item) =>
+        normalizePrescriptionAction(item, { nowTs }),
+    );
+    const { byId: records, byName } = buildIndex(existing);
+    const rawActionToPrescription = new Map();
+    const weeks = sortWeeks(db.health.rehabWeekly || []);
+
+    const ensureRecord = (action = {}) => {
+        const name = String(action.name || '').trim();
+        if (!name) return null;
+        const explicitId = String(
+            action.prescriptionActionId || action.canonicalPrescriptionActionId || '',
+        ).trim();
+        const key = normalizePrescriptionActionName(name);
+        let id = explicitId && records.has(explicitId) ? explicitId : key ? byName.get(key) : '';
+        if (!id) {
+            id = explicitId || createPrescriptionActionId(name, nowTs);
+            records.set(
+                id,
+                normalizePrescriptionAction(
+                    {
+                        id,
+                        displayName: name,
+                        aliases: [name],
+                        createdAt: nowTs,
+                        updatedAt: nowTs,
+                    },
+                    { nowTs },
+                ),
+            );
+        }
+        const record = records.get(id);
+        record.displayName = chooseDisplayName(record.displayName, name);
+        addAlias(record, name);
+        if (action.actionId)
+            record.sourceActionIds = uniqueList([
+                ...(record.sourceActionIds || []),
+                action.actionId,
+            ]);
+        if (!record.category && (action.category || action.actionCategory || action.type))
+            record.category = String(
+                action.category || action.actionCategory || action.type || '',
+            ).trim();
+        if (!record.bodyPart && action.bodyPart)
+            record.bodyPart = String(action.bodyPart || '').trim();
+        if (!record.conditionId && action.conditionId)
+            record.conditionId = String(action.conditionId || '').trim();
+        if (!record.conditionLabel && action.conditionLabel)
+            record.conditionLabel = String(action.conditionLabel || '').trim();
+        if (!record.defaultSpec && action.spec && typeof action.spec === 'object')
+            record.defaultSpec = action.spec;
+        record.latestStatus = String(action.status || record.latestStatus || '').trim();
+        record.latestPainLevel = Math.max(
+            Number(record.latestPainLevel || 0),
+            Number(action.painLevel || 0),
+        );
+        record.progressionGroup = String(
+            action.progressionGroup || record.progressionGroup || '',
+        ).trim();
+        record.progressionLevel = Number(action.progressionLevel || record.progressionLevel || 0);
+        record.updatedAt = Math.max(
+            Number(record.updatedAt || 0),
+            Number(action.updatedAt || nowTs),
+            nowTs,
+        );
+        [record.displayName, ...(record.aliases || [])].forEach((alias) => {
+            const aliasKey = normalizePrescriptionActionName(alias);
+            if (aliasKey && !byName.has(aliasKey)) byName.set(aliasKey, id);
+        });
+        action.prescriptionActionId = id;
+        delete action.canonicalPrescriptionActionId;
+        if (action.actionId) rawActionToPrescription.set(String(action.actionId), id);
+        return record;
+    };
+
+    weeks.forEach((week) => {
+        (Array.isArray(week.actions) ? week.actions : []).forEach((action) => ensureRecord(action));
+    });
+
+    weeks.forEach((week) => {
+        (Array.isArray(week.actions) ? week.actions : []).forEach((action) => {
+            const fromRaw =
+                action.progressesFrom !== undefined && action.progressesFrom !== null
+                    ? String(action.progressesFrom)
+                    : '';
+            const fromId =
+                rawActionToPrescription.get(fromRaw) || (records.has(fromRaw) ? fromRaw : '');
+            const toId = String(action.prescriptionActionId || '');
+            addRelation(records, fromId, toId, 'progression');
+        });
+    });
+
+    records.forEach((record) => {
+        record.progressionIds.forEach((id) => addRelation(records, record.id, id, 'progression'));
+        record.regressionIds.forEach((id) => addRelation(records, record.id, id, 'regression'));
+    });
+
+    db.health.prescriptionActions = [...records.values()]
+        .map((item) => normalizePrescriptionAction(item, { nowTs }))
+        .sort((a, b) =>
+            String(a.displayName || '').localeCompare(String(b.displayName || ''), 'zh-CN'),
+        );
+    return db.health.prescriptionActions;
+}
+
+export function getPrescriptionActionCatalog(db = {}) {
+    return activeRecords(db?.health?.prescriptionActions || []).map((item) =>
+        normalizePrescriptionAction(item),
+    );
+}
+
+export function findPrescriptionAction(db = {}, id = '') {
+    const key = String(id || '').trim();
+    if (!key) return null;
+    return getPrescriptionActionCatalog(db).find((item) => item.id === key) || null;
+}
+
+function replaceRelationId(list = [], sourceIds = new Set(), targetId = '') {
+    return normalizeRelationIds(
+        (Array.isArray(list) ? list : []).map((id) => (sourceIds.has(id) ? targetId : id)),
+        targetId,
+    );
+}
+
+export function mergePrescriptionActions(db = {}, targetId = '', sourceIds = [], options = {}) {
+    db.health = db.health || {};
+    const targetKey = String(targetId || '').trim();
+    const sources = new Set(uniqueList(sourceIds).filter((id) => id !== targetKey));
+    if (!targetKey || !sources.size) return null;
+    ensurePrescriptionActionCatalog(db, options);
+    const records = new Map(getPrescriptionActionCatalog(db).map((item) => [item.id, item]));
+    const target = records.get(targetKey);
+    if (!target) return null;
+    const nowTs = Number(options.nowTs || Date.now());
+    target.displayName =
+        String(options.displayName || target.displayName || target.aliases?.[0] || '').trim() ||
+        target.displayName;
+    sources.forEach((sourceId) => {
+        const source = records.get(sourceId);
+        if (!source) return;
+        target.aliases = uniqueList([
+            ...(target.aliases || []),
+            source.displayName,
+            ...(source.aliases || []),
+        ]);
+        target.sourceActionIds = uniqueList([
+            ...(target.sourceActionIds || []),
+            ...(source.sourceActionIds || []),
+        ]);
+        target.regressionIds = normalizeRelationIds(
+            [...(target.regressionIds || []), ...(source.regressionIds || [])],
+            target.id,
+        );
+        target.progressionIds = normalizeRelationIds(
+            [...(target.progressionIds || []), ...(source.progressionIds || [])],
+            target.id,
+        );
+        if (!target.linkedActionId && source.linkedActionId)
+            target.linkedActionId = source.linkedActionId;
+        if (!target.defaultSpec && source.defaultSpec) target.defaultSpec = source.defaultSpec;
+        if (!target.category && source.category) target.category = source.category;
+        if (!target.bodyPart && source.bodyPart) target.bodyPart = source.bodyPart;
+        source.deleted = true;
+        source.updatedAt = nowTs;
+    });
+    target.updatedAt = nowTs;
+    activeRecords(db.health.rehabWeekly || []).forEach((week) => {
+        (week.actions || []).forEach((action) => {
+            if (sources.has(action.prescriptionActionId)) action.prescriptionActionId = target.id;
+        });
+    });
+    records.forEach((record) => {
+        if (record.id === target.id || record.deleted) return;
+        record.regressionIds = replaceRelationId(record.regressionIds, sources, target.id);
+        record.progressionIds = replaceRelationId(record.progressionIds, sources, target.id);
+    });
+    db.health.prescriptionActions = [...records.values()].map((item) =>
+        normalizePrescriptionAction(item, { nowTs }),
+    );
+    ensurePrescriptionActionCatalog(db, { nowTs });
+    return findPrescriptionAction(db, target.id);
+}
+
+export function setPrescriptionActionLinkedAction(
+    db = {},
+    prescriptionActionId = '',
+    linkedActionId = '',
+    options = {},
+) {
+    ensurePrescriptionActionCatalog(db, options);
+    const item = (db.health?.prescriptionActions || []).find(
+        (record) => record && record.id === prescriptionActionId && !record.deleted,
+    );
+    if (!item) return null;
+    item.linkedActionId = String(linkedActionId || '').trim();
+    item.updatedAt = Number(options.nowTs || Date.now());
+    return normalizePrescriptionAction(item, options);
+}
+
+export function addPrescriptionActionRelation(
+    db = {},
+    fromId = '',
+    toId = '',
+    relation = 'progression',
+    options = {},
+) {
+    ensurePrescriptionActionCatalog(db, options);
+    const records = new Map(getPrescriptionActionCatalog(db).map((item) => [item.id, item]));
+    addRelation(
+        records,
+        String(fromId || ''),
+        String(toId || ''),
+        relation === 'regression' ? 'regression' : 'progression',
+    );
+    db.health.prescriptionActions = [...records.values()];
+    return findPrescriptionAction(db, fromId);
+}
+
+export function removePrescriptionActionRelation(
+    db = {},
+    fromId = '',
+    toId = '',
+    relation = 'progression',
+    options = {},
+) {
+    ensurePrescriptionActionCatalog(db, options);
+    const from = (db.health?.prescriptionActions || []).find(
+        (item) => item && item.id === fromId && !item.deleted,
+    );
+    const to = (db.health?.prescriptionActions || []).find(
+        (item) => item && item.id === toId && !item.deleted,
+    );
+    if (!from || !to) return null;
+    if (relation === 'regression') {
+        from.regressionIds = normalizeRelationIds(
+            (from.regressionIds || []).filter((id) => id !== toId),
+            from.id,
+        );
+        to.progressionIds = normalizeRelationIds(
+            (to.progressionIds || []).filter((id) => id !== fromId),
+            to.id,
+        );
+    } else {
+        from.progressionIds = normalizeRelationIds(
+            (from.progressionIds || []).filter((id) => id !== toId),
+            from.id,
+        );
+        to.regressionIds = normalizeRelationIds(
+            (to.regressionIds || []).filter((id) => id !== fromId),
+            to.id,
+        );
+    }
+    const nowTs = Number(options.nowTs || Date.now());
+    from.updatedAt = nowTs;
+    to.updatedAt = nowTs;
+    return normalizePrescriptionAction(from, options);
+}
+
+const api = {
+    normalizePrescriptionActionName,
+    createPrescriptionActionId,
+    normalizePrescriptionAction,
+    ensurePrescriptionActionCatalog,
+    getPrescriptionActionCatalog,
+    findPrescriptionAction,
+    mergePrescriptionActions,
+    setPrescriptionActionLinkedAction,
+    addPrescriptionActionRelation,
+    removePrescriptionActionRelation,
+};
+
+if (typeof window !== 'undefined') {
+    window['actionIdentity'] = api;
+}
+
+export default api;

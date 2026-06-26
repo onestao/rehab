@@ -272,6 +272,9 @@
   }
 
   function itemsMatch(a, b) {
+    const leftPrescriptionId = typeof a === 'object' ? String(a?.prescriptionActionId || '') : '';
+    const rightPrescriptionId = typeof b === 'object' ? String(b?.prescriptionActionId || '') : '';
+    if (leftPrescriptionId && rightPrescriptionId && leftPrescriptionId === rightPrescriptionId) return true;
     const left = typeof a === 'string' ? actionMetaForName(a) : (a?.actionKey ? a : actionMetaForName(sourceText(a)));
     const right = typeof b === 'string' ? actionMetaForName(b) : (b?.actionKey ? b : actionMetaForName(sourceText(b)));
     if (!left || !right) return false;
@@ -283,6 +286,9 @@
   }
 
   function itemsExactMatch(a, b) {
+    const leftPrescriptionId = typeof a === 'object' ? String(a?.prescriptionActionId || '') : '';
+    const rightPrescriptionId = typeof b === 'object' ? String(b?.prescriptionActionId || '') : '';
+    if (leftPrescriptionId && rightPrescriptionId && leftPrescriptionId === rightPrescriptionId) return true;
     const left = typeof a === 'string' ? actionMetaForName(a) : (a?.actionKey ? a : actionMetaForName(sourceText(a)));
     const right = typeof b === 'string' ? actionMetaForName(b) : (b?.actionKey ? b : actionMetaForName(sourceText(b)));
     if (!left || !right) return false;
@@ -340,13 +346,24 @@
 
   function buildPlanPolicyContext({ db, activeRecords: activeRecordsFn, sourcePlans, types } = {}) {
     const getActive = typeof activeRecordsFn === 'function' ? activeRecordsFn : activeRecords;
+    if (window.actionIdentity?.ensurePrescriptionActionCatalog) {
+      window.actionIdentity.ensurePrescriptionActionCatalog(db || {});
+    }
+    const prescriptionById = new Map((window.actionIdentity?.getPrescriptionActionCatalog?.(db || {}) || []).map((item) => [item.id, item]));
     const weeks = latestRehabWeeks(db, 4);
     const latestWeek = weeks[0] || {};
-    const actions = weeks.flatMap((week, weekIndex) => activeRecords(week.actions || []).map((action) => ({
-      ...classifyPrescriptionAction(action),
+    const actions = weeks.flatMap((week, weekIndex) => activeRecords(week.actions || []).map((action) => {
+      const identity = prescriptionById.get(action.prescriptionActionId);
+      return {
+      ...classifyPrescriptionAction({
+        ...action,
+        name: identity?.displayName || action.name,
+        canonicalName: identity?.displayName || action.canonicalName || action.name,
+        prescriptionActionId: identity?.id || action.prescriptionActionId || ''
+      }),
       weekIndex,
       weekDate: week.date || week.weekStart || week.createdAt || ''
-    })));
+    }; }));
     const latestText = [latestWeek.rawText, latestWeek.notes, latestWeek.homework, latestWeek.therapistAssessment].filter(Boolean).join('\n');
     const legacyContinueAllowed = Boolean(latestWeek.legacyContinueAllowed) || hasLegacyContinueIntent(latestText);
     const hardBlocks = actions.filter((action) => action.policyType === 'blocked');
@@ -452,6 +469,7 @@
       spec,
       status: 'todo',
       source: 'prescription',
+      prescriptionActionId: action.prescriptionActionId || '',
       actionKey: action.actionKey || meta.actionKey || '',
       canonicalName: name,
       progressionGroup: action.progressionGroup || meta.progressionGroup || '',

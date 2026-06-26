@@ -21,7 +21,7 @@ module.exports = {
     },
     overrides: [
         {
-            files: ['*-pure.js', 'sync-pure.js', 'workout-*-pure.js', 'error-bus-pure.js', 'voice-engine.js'],
+            files: ['*-pure.js', 'sync-pure.js', 'workout-*-pure.js', 'error-bus-pure.js', 'voice-engine.js', 'action-identity.js'],
             parserOptions: { sourceType: 'module' },
             env: { node: true }
         },

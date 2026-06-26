@@ -476,6 +476,10 @@
     }
 
     function summarizeRehabWeekly(ctx, limit = 3) {
+        if (window.actionIdentity?.ensurePrescriptionActionCatalog) {
+            window.actionIdentity.ensurePrescriptionActionCatalog(ctx.db || {});
+        }
+        const prescriptionMap = new Map((window.actionIdentity?.getPrescriptionActionCatalog?.(ctx.db || {}) || []).map((item) => [item.id, item]));
         const weeks = ctx.activeRecords?.(ctx.db?.health?.rehabWeekly || []) || [];
         return weeks.slice()
             .sort((a, b) => String(b.weekStart || '').localeCompare(String(a.weekStart || '')) || Number(b.updatedAt || 0) - Number(a.updatedAt || 0))
@@ -487,7 +491,14 @@
                 homework: week.homework || '',
                 actions: (week.actions || []).map((action) => ({
                     actionId: action.actionId || '',
-                    name: action.name || '',
+                    prescriptionActionId: action.prescriptionActionId || '',
+                    name: prescriptionMap.get(action.prescriptionActionId)?.displayName || action.name || '',
+                    rawName: action.name || '',
+                    standardName: prescriptionMap.get(action.prescriptionActionId)?.displayName || action.name || '',
+                    aliases: prescriptionMap.get(action.prescriptionActionId)?.aliases || [],
+                    linkedActionId: prescriptionMap.get(action.prescriptionActionId)?.linkedActionId || '',
+                    regressionIds: prescriptionMap.get(action.prescriptionActionId)?.regressionIds || [],
+                    progressionIds: prescriptionMap.get(action.prescriptionActionId)?.progressionIds || [],
                     status: action.status || 'continued',
                     rawDescription: action.rawDescription || '',
                     bodyPart: action.bodyPart || '',
@@ -499,6 +510,32 @@
                     progressesFrom: action.progressesFrom || null
                 }))
             }));
+    }
+
+    function summarizePrescriptionActionCatalog(ctx, rehabWeekly = null) {
+        if (window.actionIdentity?.ensurePrescriptionActionCatalog) {
+            window.actionIdentity.ensurePrescriptionActionCatalog(ctx.db || {});
+        }
+        const scopedIds = Array.isArray(rehabWeekly)
+            ? new Set(rehabWeekly.flatMap((week) => (week.actions || []).map((action) => action.prescriptionActionId).filter(Boolean)))
+            : null;
+        const catalog = (window.actionIdentity?.getPrescriptionActionCatalog?.(ctx.db || {}) || [])
+            .filter((item) => !scopedIds || scopedIds.has(item.id));
+        const byId = new Map(catalog.map((item) => [item.id, item]));
+        return catalog.map((item) => ({
+            id: item.id,
+            displayName: item.displayName,
+            aliases: item.aliases || [],
+            linkedActionId: item.linkedActionId || '',
+            linkedActionName: item.linkedActionId ? (ctx.db?.actions || []).find((action) => action.id === item.linkedActionId)?.name || '' : '',
+            regression: (item.regressionIds || []).map((id) => byId.get(id)?.displayName || id),
+            progression: (item.progressionIds || []).map((id) => byId.get(id)?.displayName || id),
+            bodyPart: item.bodyPart || '',
+            conditionLabel: item.conditionLabel || '',
+            latestStatus: item.latestStatus || '',
+            latestPainLevel: Number(item.latestPainLevel || 0),
+            defaultSpec: item.defaultSpec || null
+        }));
     }
 
     const normalizePlanActionSearchText = (value = '') => String(value || '')
@@ -576,18 +613,39 @@
                 enriched.rawDescription,
                 enriched.description,
                 enriched.note,
+                Array.isArray(enriched.aliases) ? enriched.aliases.join(' ') : '',
                 Array.isArray(enriched.tags) ? enriched.tags.join(' ') : ''
             ].filter(Boolean).join(' ');
             choices.push(enriched);
         };
+        if (window.actionIdentity?.ensurePrescriptionActionCatalog) {
+            window.actionIdentity.ensurePrescriptionActionCatalog(ctx.db || {});
+        }
+        (window.actionIdentity?.getPrescriptionActionCatalog?.(ctx.db || {}) || []).forEach((action) => addChoice({
+            ...action,
+            name: action.displayName || action.name || '',
+            source: 'prescription',
+            sourceLabel: '处方动作',
+            refId: action.id,
+            prescriptionActionId: action.id,
+            sourceActionId: action.linkedActionId || '',
+            rawDescription: [
+                (action.aliases || []).filter((name) => name !== action.displayName).join('、'),
+                action.bodyPart,
+                action.conditionLabel
+            ].filter(Boolean).join(' · '),
+            spec: action.defaultSpec || null
+        }));
         summarizeRehabWeekly(ctx, 8).forEach((week, weekIndex) => {
             (week.actions || []).forEach((action, actionIndex) => addChoice({
                 ...action,
                 source: 'prescription',
-                sourceLabel: '处方',
-                refId: action.actionId || `${week.weekStart || week.visitDate || weekIndex}:${actionIndex}`,
-                prescriptionActionId: action.actionId || '',
+                sourceLabel: '处方动作',
+                refId: action.prescriptionActionId || action.actionId || `${week.weekStart || week.visitDate || weekIndex}:${actionIndex}`,
+                prescriptionActionId: action.prescriptionActionId || action.actionId || '',
                 weekStart: week.weekStart || '',
+                name: action.standardName || action.name || '',
+                aliases: action.aliases || [],
                 rawDescription: action.rawDescription || action.coachNote || ''
             }));
         });
@@ -837,6 +895,7 @@
                 manualExercises: summarizeManualExercises(this, today)
             };
             const rehabWeekly = summarizeRehabWeekly(this, 6);
+            const prescriptionCatalog = summarizePrescriptionActionCatalog(this, rehabWeekly);
             const rehabByCondition = partitionRehabWeeklyByConditions(rehabWeekly, selectedConditionIds, temporaryConditions, profile);
             const bodyPartConstraints = summarizeBodyPartConstraints(profile, rehabWeekly, selectedConditionIds, temporaryConditions);
             const recentPlans = this.activeRecords(this.db.dailyPlans || [])
@@ -988,6 +1047,8 @@
                 `目标当前计划完整摘要: ${JSON.stringify(currentTargetPlans)}`,
                 `今日已完成运动摘要: ${JSON.stringify(todayCompleted)}`,
                 `近6周康复中心处方: ${JSON.stringify(rehabWeekly)}`,
+                `处方动作标准库: ${JSON.stringify(prescriptionCatalog)}`,
+                '处方动作标准库规则: 生成动作时优先使用 displayName；aliases 只是识别同一动作的历史写法；linkedActionId 表示可参考普通动作库参数；regression/progression 表示退阶/进阶，只能按疼痛、RPE 和用户反馈选择。不要把关联动作当成合并动作。',
                 `选中病症相关处方强规则: ${JSON.stringify(rehabByCondition.target)}`,
                 `其他病症处方安全限制: ${JSON.stringify(rehabByCondition.safetyOnly)}`,
                 `诊断/处方部位约束: ${JSON.stringify(bodyPartConstraints)}`,
@@ -1144,15 +1205,16 @@
                     const category = normalizeAiCategory(item.category || item.phase || item.section);
                     const progressionAllowed = category === 'main';
                     const meta = window.planPolicy?.actionMetaForName?.(`${name} ${item.aiReasoning || item.reason || item.note || ''}`) || {};
+                    const choice = resolvePlanActionChoiceForText(this, name, item.choiceId || item.prescriptionActionId || '');
                     const coerced = coerceAiSpec({ ...item, category }, { planType });
                     return {
                         name,
                         category,
-                        actionKey: item.actionKey || meta.actionKey || '',
-                        canonicalName: item.canonicalName || meta.canonicalName || name,
-                        progressionGroup: item.progressionGroup || meta.progressionGroup || '',
-                        progressionLevel: Number(item.progressionLevel ?? meta.progressionLevel ?? 0),
-                        chainId: progressionAllowed ? String(item.chainId || item.chainHint || meta.chainId || '') : '',
+                        actionKey: item.actionKey || choice?.actionKey || meta.actionKey || '',
+                        canonicalName: item.canonicalName || choice?.canonicalName || meta.canonicalName || name,
+                        progressionGroup: item.progressionGroup || choice?.progressionGroup || meta.progressionGroup || '',
+                        progressionLevel: Number(item.progressionLevel ?? choice?.progressionLevel ?? meta.progressionLevel ?? 0),
+                        chainId: progressionAllowed ? String(item.chainId || item.chainHint || choice?.chainId || meta.chainId || '') : '',
                         currentLevel: progressionAllowed && item.currentLevel != null ? Number(item.currentLevel) : null,
                         spec: coerced.spec,
                         cooldownRefs: Array.isArray(item.cooldownRefs) ? item.cooldownRefs.map((value) => String(value || '')) : [],
@@ -1165,6 +1227,9 @@
                         doneSets: 0,
                         userOverride: false,
                         excludeFromPr: true,
+                        sourceActionId: choice?.sourceActionId || item.sourceActionId || '',
+                        prescriptionActionId: choice?.prescriptionActionId || item.prescriptionActionId || '',
+                        ...(choice ? { policy: { ...(item.policy && typeof item.policy === 'object' ? item.policy : {}), source: choice.source || 'prescription', choiceLabel: choice.sourceLabel || '', prescriptionName: choice.source === 'prescription' ? choice.name : '' } } : {}),
                         autoFilled: coerced.autoFilled.length ? coerced.autoFilled : undefined
                     };
                 }).filter(Boolean);
