@@ -254,6 +254,23 @@
     return Array.isArray(records) ? records.filter((record) => !record?.deletedAt && !record?.deleted) : [];
   }
 
+  function parseJson(text) {
+    try { return JSON.parse(text); } catch { return null; }
+  }
+
+  function repairPlanAiJson(rawText = '') {
+    const source = String(rawText || '').trim();
+    const marker = source.match(/"items"\s*:\s*\[/);
+    if (!marker) return null;
+    const itemRe = /\{(?:[^{}"\\]|\\.|"(?:\\.|[^"\\])*"|\{(?:[^{}"\\]|\\.|"(?:\\.|[^"\\])*")*\})*\}/g;
+    const items = [...source.slice(marker.index + marker[0].length).matchAll(itemRe)]
+      .map((match) => parseJson(match[0]))
+      .filter(Boolean);
+    if (!items.length) return null;
+    const read = (key) => source.match(new RegExp(`"${key}"\\s*:\\s*"((?:\\\\.|[^"\\\\])*)"`))?.[1] || '';
+    return { date: read('date'), type: read('type'), title: read('title'), notes: read('notes'), items };
+  }
+
   function latestRehabWeeks(db, limit = 3) {
     const weeks = activeRecords(db?.health?.rehabWeekly || db?.rehabWeekly || db?.rehabWeeklies || []);
     return weeks
@@ -349,7 +366,8 @@
     if (window.actionIdentity?.ensurePrescriptionActionCatalog) {
       window.actionIdentity.ensurePrescriptionActionCatalog(db || {});
     }
-    const prescriptionById = new Map((window.actionIdentity?.getPrescriptionActionCatalog?.(db || {}) || []).map((item) => [item.id, item]));
+    const prescriptionCatalog = window.actionIdentity?.getPrescriptionActionCatalog?.(db || {}) || activeRecords(db?.health?.prescriptionActions || []);
+    const prescriptionById = new Map(prescriptionCatalog.map((item) => [item.id, item]));
     const weeks = latestRehabWeeks(db, 4);
     const latestWeek = weeks[0] || {};
     const actions = weeks.flatMap((week, weekIndex) => activeRecords(week.actions || []).map((action) => {
@@ -364,11 +382,24 @@
       weekIndex,
       weekDate: week.date || week.weekStart || week.createdAt || ''
     }; }));
+    const catalogActions = [...prescriptionById.values()]
+      .filter((item) => item && !actions.some((action) => action.prescriptionActionId && action.prescriptionActionId === item.id))
+      .map((item) => classifyPrescriptionAction({
+        name: item.displayName,
+        aliases: item.aliases || [],
+        rawDescription: [item.notes, item.bodyPart, item.conditionLabel].filter(Boolean).join(' '),
+        status: item.latestStatus || '',
+        painLevel: item.latestPainLevel || 0,
+        spec: item.defaultSpec || null,
+        prescriptionActionId: item.id,
+        progressionGroup: item.progressionGroup || '',
+        progressionLevel: item.progressionLevel || 0
+      }));
     const latestText = [latestWeek.rawText, latestWeek.notes, latestWeek.homework, latestWeek.therapistAssessment].filter(Boolean).join('\n');
     const legacyContinueAllowed = Boolean(latestWeek.legacyContinueAllowed) || hasLegacyContinueIntent(latestText);
     const hardBlocks = actions.filter((action) => action.policyType === 'blocked');
     const cautiousActions = actions.filter((action) => action.policyType === 'cautious');
-    const prescriptionActions = actions.filter((action) => action.policyType !== 'blocked');
+    const prescriptionActions = [...actions, ...catalogActions].filter((action) => action.policyType !== 'blocked');
     const preferredActions = prescriptionActions.filter((action) => action.weekIndex === 0 && action.policyType === 'preferred');
     const dailyPlans = getActive(db?.dailyPlans || []);
     const historicalPlans = activeRecords([...(Array.isArray(sourcePlans) ? sourcePlans : []), ...dailyPlans]);
@@ -604,6 +635,7 @@
     buildPlanPolicyContext,
     annotatePlanItem,
     sanitizeGeneratedPlans,
+    repairPlanAiJson,
     itemsMatch,
     itemsExactMatch,
     inferCategory,

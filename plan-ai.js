@@ -139,7 +139,9 @@
         const start = text.search(/[\[{]/);
         const end = Math.max(text.lastIndexOf('}'), text.lastIndexOf(']'));
         value = start >= 0 && end > start ? safeJsonParse(text.slice(start, end + 1)) : null;
-        return { value, source: value ? 'sliced' : 'none' };
+        if (value) return { value, source: 'sliced' };
+        value = window.planPolicy?.repairPlanAiJson?.(text);
+        return { value, source: value ? 'repair' : 'none' };
     }
     function extractPlanAiPlanCandidates(parsed) {
         if (Array.isArray(parsed)) return [{ sections: parsed }];
@@ -475,10 +477,16 @@
             }));
     }
 
+    function ensurePlanAiPrescriptionCatalog(ctx) {
+        if (!window.actionIdentity?.ensurePrescriptionActionCatalog) return;
+        const before = JSON.stringify((ctx.db?.health?.rehabWeekly || []).flatMap((week) => (week.actions || []).map((action) => action.prescriptionActionId || '')));
+        window.actionIdentity.ensurePrescriptionActionCatalog(ctx.db || {});
+        const after = JSON.stringify((ctx.db?.health?.rehabWeekly || []).flatMap((week) => (week.actions || []).map((action) => action.prescriptionActionId || '')));
+        if (before !== after) ctx.save?.({ render: false });
+    }
+
     function summarizeRehabWeekly(ctx, limit = 3) {
-        if (window.actionIdentity?.ensurePrescriptionActionCatalog) {
-            window.actionIdentity.ensurePrescriptionActionCatalog(ctx.db || {});
-        }
+        ensurePlanAiPrescriptionCatalog(ctx);
         const prescriptionMap = new Map((window.actionIdentity?.getPrescriptionActionCatalog?.(ctx.db || {}) || []).map((item) => [item.id, item]));
         const weeks = ctx.activeRecords?.(ctx.db?.health?.rehabWeekly || []) || [];
         return weeks.slice()
@@ -513,9 +521,7 @@
     }
 
     function summarizePrescriptionActionCatalog(ctx, rehabWeekly = null) {
-        if (window.actionIdentity?.ensurePrescriptionActionCatalog) {
-            window.actionIdentity.ensurePrescriptionActionCatalog(ctx.db || {});
-        }
+        ensurePlanAiPrescriptionCatalog(ctx);
         const scopedIds = Array.isArray(rehabWeekly)
             ? new Set(rehabWeekly.flatMap((week) => (week.actions || []).map((action) => action.prescriptionActionId).filter(Boolean)))
             : null;
@@ -688,13 +694,24 @@
     function planActionChoiceMatchesText(choice = {}, text = '') {
         const needle = normalizePlanActionSearchText(text);
         if (!needle || !choice) return false;
-        return [choice.name, choice.canonicalName].some((value) => normalizePlanActionSearchText(value) === needle);
+        const values = [choice.name, choice.canonicalName, ...(Array.isArray(choice.aliases) ? choice.aliases : [])]
+            .map((value) => normalizePlanActionSearchText(value))
+            .filter(Boolean);
+        if (values.some((value) => value === needle)) return true;
+        const textMeta = window.planPolicy?.actionMetaForName?.(text) || {};
+        if (textMeta.actionKey && choice.actionKey && textMeta.actionKey === choice.actionKey) return true;
+        return choice.source === 'prescription'
+            && values.some((value) => value.length >= 3 && (needle.includes(value) || value.includes(needle)));
     }
 
     function resolvePlanActionChoiceForText(ctx, text = '', preferredChoiceId = '') {
         const preferred = preferredChoiceId ? ctx.findPlanActionChoiceById?.(preferredChoiceId) : null;
-        if (preferred && planActionChoiceMatchesText(preferred, text)) return preferred;
-        const exact = (ctx.searchPlanActionChoices?.(text, 12) || []).find((choice) => planActionChoiceMatchesText(choice, text));
+        if (preferred) return preferred;
+        const meta = window.planPolicy?.actionMetaForName?.(text) || {};
+        const queries = [...new Set([text, meta.canonicalName].filter(Boolean))];
+        const exact = queries
+            .flatMap((query) => ctx.searchPlanActionChoices?.(query, 12) || [])
+            .find((choice) => planActionChoiceMatchesText(choice, text));
         return exact || null;
     }
 
@@ -778,7 +795,7 @@
         findPlanActionChoiceById(choiceId = '') {
             const id = String(choiceId || '');
             if (!id) return null;
-            return (this.planActionChoiceCatalog?.() || []).find((choice) => String(choice.id || '') === id) || null;
+            return (this.planActionChoiceCatalog?.() || []).find((choice) => [choice.id, choice.prescriptionActionId, choice.sourceActionId].some((value) => String(value || '') === id)) || null;
         },
 
         resolvePlanActionChoiceForText(text = '', preferredChoiceId = '') {
@@ -970,8 +987,8 @@
                 types
             });
             const promptMode = mode === 'week'
-                ? '请为接下来 7 天输出严格 JSON，结构为：{"plans":[{"date":"YYYY-MM-DD","type":"<rehab|cut|bulk|maintenance|custom>","title":"...","notes":"...","items":[{"name":"...","category":"<warmup|main|cooldown>","chainHint":"","spec":{"sets":<int>,"reps":<int>,"work":<int>,"repRest":<int>,"actionRest":<int>,"isAlt":<bool>,"mode":"<reps|hold|alt-reps|alt-hold>"},"cooldownRefs":[],"aiReasoning":"...","durationEstHint":"","requiresUserConfirm":false}]}]}'
-                : '请输出严格 JSON，结构为：{"date":"YYYY-MM-DD","type":"<rehab|cut|bulk|maintenance|custom>","title":"...","notes":"...","items":[{"name":"...","category":"<warmup|main|cooldown>","chainHint":"","spec":{"sets":<int>,"reps":<int>,"work":<int>,"repRest":<int>,"actionRest":<int>,"isAlt":<bool>,"mode":"<reps|hold|alt-reps|alt-hold>"},"cooldownRefs":[],"aiReasoning":"...","durationEstHint":"","requiresUserConfirm":false}]}';
+                ? '请为接下来 7 天输出严格 JSON，结构为：{"plans":[{"date":"YYYY-MM-DD","type":"<rehab|cut|bulk|maintenance|custom>","title":"...","notes":"...","items":[{"name":"...","prescriptionActionId":"","category":"<warmup|main|cooldown>","chainHint":"","spec":{"sets":<int>,"reps":<int>,"work":<int>,"repRest":<int>,"actionRest":<int>,"isAlt":<bool>,"mode":"<reps|hold|alt-reps|alt-hold>"},"cooldownRefs":[],"aiReasoning":"...","durationEstHint":"","requiresUserConfirm":false}]}]}'
+                : '请输出严格 JSON，结构为：{"date":"YYYY-MM-DD","type":"<rehab|cut|bulk|maintenance|custom>","title":"...","notes":"...","items":[{"name":"...","prescriptionActionId":"","category":"<warmup|main|cooldown>","chainHint":"","spec":{"sets":<int>,"reps":<int>,"work":<int>,"repRest":<int>,"actionRest":<int>,"isAlt":<bool>,"mode":"<reps|hold|alt-reps|alt-hold>"},"cooldownRefs":[],"aiReasoning":"...","durationEstHint":"","requiresUserConfirm":false}]}';
             const specRules = [
                 '只输出 JSON 本体，不要使用 Markdown 代码块、不要前后加自然语言、不要注释。所有数值字段必须是 number 类型，布尔字段必须是 true/false，禁止用字符串如 "3"、"true"。',
                 '每个 item 必须填齐：name(string)、category(枚举 warmup/main/cooldown)、spec.sets(int≥1)、spec.reps(int≥0)、spec.work(int>0)、spec.repRest(int 0..30)、spec.actionRest(int 0..90)、spec.isAlt(bool)、spec.mode(枚举 reps/hold/alt-reps/alt-hold)。任一字段缺失或为 0/空都视为不合规，必须重填。',
@@ -1048,7 +1065,7 @@
                 `今日已完成运动摘要: ${JSON.stringify(todayCompleted)}`,
                 `近6周康复中心处方: ${JSON.stringify(rehabWeekly)}`,
                 `处方动作标准库: ${JSON.stringify(prescriptionCatalog)}`,
-                '处方动作标准库规则: 生成动作时优先使用 displayName；aliases 只是识别同一动作的历史写法；linkedActionId 表示可参考普通动作库参数；regression/progression 表示退阶/进阶，只能按疼痛、RPE 和用户反馈选择。不要把关联动作当成合并动作。',
+                '处方动作标准库规则: 生成动作时优先使用 displayName；来自处方动作标准库或近6周处方的动作必须原样回填 prescriptionActionId，非处方动作留空；aliases 只是识别同一动作的历史写法；linkedActionId 表示可参考普通动作库参数；regression/progression 表示退阶/进阶，只能按疼痛、RPE 和用户反馈选择。不要把关联动作当成合并动作。',
                 `选中病症相关处方强规则: ${JSON.stringify(rehabByCondition.target)}`,
                 `其他病症处方安全限制: ${JSON.stringify(rehabByCondition.safetyOnly)}`,
                 `诊断/处方部位约束: ${JSON.stringify(bodyPartConstraints)}`,
@@ -1314,6 +1331,7 @@
             }
             const types = normalizePlanTypes(this._planAiTypes);
             const prompt = bodyValue('planAiPrompt').trim();
+            const outputTokenBudget = mode === 'week' ? 5200 : 3600;
             const messages = [
                 { role: 'system', content: '你是训练排程助手，只输出 JSON。' },
                 { role: 'user', content: this.buildPlanAiContext(mode, prompt, types) }
@@ -1330,12 +1348,12 @@
                         this.setPlanAiStatus?.(`第 ${attempt + 1} 次尝试：AI 正在修正 spec 字段…`, 'busy');
                     }
                     if (typeof window.ai.callStream === 'function') {
-                        text = await window.ai.callStream(messages, 1800, (_delta, accumulated) => {
+                        text = await window.ai.callStream(messages, outputTokenBudget, (_delta, accumulated) => {
                             const length = String(accumulated || '').length;
                             this.setPlanAiStatus?.(length ? `正在接收计划草稿：${length} 字` : 'AI 已响应，正在等待内容…', 'busy');
                         });
                     } else {
-                        text = await window.ai.call(messages, 1800);
+                        text = await window.ai.call(messages, outputTokenBudget);
                     }
                     this.setPlanAiStatus?.('已收到计划草稿，正在校验 JSON…', 'busy');
                     const validation = this.validatePlanAiPayload(text, types);

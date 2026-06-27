@@ -413,6 +413,73 @@ test('plan AI parser extracts fenced JSON with phase sections', () => {
   assert.deepEqual(JSON.parse(JSON.stringify(parsed.plans[0].items.map((item) => item.name))), ['站姿髋屈伸', '弹力带侧步', '髂胫束放松']);
 });
 
+test('plan AI parser recovers complete items from truncated JSON', () => {
+  const api = loadPlanAi();
+  const ctx = createContext(api);
+  const raw = '{"date":"2026-06-27","type":"rehab","title":"康复计划","notes":"根据用户要求增加髋部锻炼。","items":[{"name":"轻柔髋关节活动","category":"warmup","spec":{"sets":2,"reps":0,"work":30,"repRest":0,"actionRest":20,"isAlt":false,"mode":"hold"},"aiReasoning":"热身活动","requiresUserConfirm":false},{"name":"弹力带侧卧髋部外展","category":"main","spec":{"sets":4,"reps":12,"work":3,"repRest":0,"actionRest":45,"isAlt":true,"mode":"alt-reps"},"aiReasoning":"处方动作强化臀中肌","requiresUserConfirm":false},{"name":"新增内收肌训练","cate';
+
+  const parsed = api.parsePlanAiPayload.call(ctx, raw, ['rehab']);
+
+  assert.equal(parsed.ok, true);
+  assert.equal(parsed.plans[0].date, '2026-06-27');
+  assert.deepEqual(JSON.parse(JSON.stringify(parsed.plans[0].items.map((item) => item.name))), ['轻柔髋关节活动', '弹力带侧卧髋部外展']);
+});
+
+test('plan AI parser links AI prescription wording to existing prescription action', () => {
+  const api = loadPlanAi();
+  const ctx = createContext(api);
+  ctx.db.health.rehabWeekly = [{
+    weekStart: '2026-06-27',
+    actions: [{ name: '侧卧髋外展', status: 'continued', spec: { sets: 3, reps: 12, work: 3 } }]
+  }];
+
+  const parsed = api.parsePlanAiPayload.call(ctx, JSON.stringify({
+    date: '2026-06-27',
+    type: 'rehab',
+    items: [{
+      name: '弹力带侧卧髋部外展',
+      category: 'main',
+      spec: { sets: 4, reps: 12, work: 3, repRest: 0, actionRest: 45, isAlt: true, mode: 'alt-reps' },
+      aiReasoning: '处方动作强化臀中肌'
+    }]
+  }), ['rehab']);
+
+  const item = parsed.plans[0].items[0];
+  assert.equal(parsed.ok, true);
+  assert.equal(item.actionKey, 'side-lying-hip-abduction');
+  assert.equal(item.canonicalName, '侧卧髋外展');
+  assert.ok(item.prescriptionActionId);
+  assert.equal(item.policy.source, 'prescription');
+});
+
+test('plan AI parser trusts returned prescription action ids', () => {
+  const api = loadPlanAi();
+  const ctx = createContext(api);
+  ctx.db.health.prescriptionActions = [{
+    id: 'pa-hip-abduction',
+    displayName: '侧卧髋外展',
+    aliases: ['侧卧髋外展'],
+    defaultSpec: { sets: 3, reps: 12, work: 3 }
+  }];
+
+  const parsed = api.parsePlanAiPayload.call(ctx, JSON.stringify({
+    date: '2026-06-27',
+    type: 'rehab',
+    items: [{
+      name: '髋部外展训练',
+      prescriptionActionId: 'pa-hip-abduction',
+      category: 'main',
+      spec: { sets: 3, reps: 12, work: 3, repRest: 0, actionRest: 45, isAlt: true, mode: 'alt-reps' }
+    }]
+  }), ['rehab']);
+
+  const item = parsed.plans[0].items[0];
+  assert.equal(parsed.ok, true);
+  assert.equal(item.prescriptionActionId, 'pa-hip-abduction');
+  assert.equal(item.canonicalName, '侧卧髋外展');
+  assert.equal(item.policy.source, 'prescription');
+});
+
 test('plan AI parser supplies hold duration and caps very long rests', () => {
   const api = loadPlanAi();
   const ctx = createContext(api);
@@ -583,10 +650,30 @@ test('plan AI context includes six recent rehab prescriptions', () => {
   const prompt = api.buildPlanAiContext.call(ctx, 'today', '安排康复训练', ['rehab']);
 
   assert.match(prompt, /近6周康复中心处方/);
+  assert.match(prompt, /prescriptionActionId/);
+  assert.match(prompt, /必须原样回填 prescriptionActionId/);
   assert.match(prompt, /康复动作1/);
   assert.match(prompt, /康复动作6/);
   assert.doesNotMatch(prompt, /康复动作7/);
   assert.match(prompt, /第4-6周处方仅用于理解长期禁忌/);
+});
+
+test('plan AI context binds unlinked weekly prescriptions into the prescription library', () => {
+  const api = loadPlanAi();
+  const ctx = createContext(api);
+  ctx.save = () => { ctx.saved = true; };
+  ctx.db.health.rehabWeekly = [{
+    weekStart: '2026-06-27',
+    actions: [{ actionId: 'rx-hip-abduction', name: '侧卧髋外展', status: 'continued' }]
+  }];
+
+  const prompt = api.buildPlanAiContext.call(ctx, 'today', '安排康复训练', ['rehab']);
+  const action = ctx.db.health.rehabWeekly[0].actions[0];
+
+  assert.ok(action.prescriptionActionId);
+  assert.ok(ctx.db.health.prescriptionActions.find((item) => item.id === action.prescriptionActionId));
+  assert.equal(ctx.saved, true);
+  assert.match(prompt, new RegExp(action.prescriptionActionId));
 });
 
 test('plan AI context includes current target plan and body part constraints', () => {

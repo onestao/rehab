@@ -138,6 +138,44 @@ test('plan policy can keep blocked AI candidates for user confirmation', () => {
     assert.equal(policyDebug[0].keptBlockedForConfirm.length, 1);
 });
 
+test('plan policy treats prescription library matches as prescription actions', () => {
+    const policy = loadPlanPolicy();
+    const db = {
+        dailyPlans: [],
+        health: {
+            rehabWeekly: [],
+            prescriptionActions: [{
+                id: 'pa-hip-abduction',
+                displayName: '侧卧髋外展',
+                aliases: ['侧卧髋外展', '弹力带侧卧髋部外展'],
+                latestStatus: 'continued',
+                defaultSpec: { sets: 3, reps: 12, work: 3 }
+            }]
+        }
+    };
+
+    const plans = policy.sanitizeGeneratedPlans([{
+        date: '2026-06-27',
+        type: 'rehab',
+        items: [{
+            name: '弹力带侧卧髋部外展',
+            category: 'main',
+            spec: { sets: 4, reps: 12, work: 3 },
+            aiReasoning: '处方动作强化臀中肌'
+        }]
+    }], {
+        db,
+        targetDate: '2026-06-27',
+        types: ['rehab'],
+        ensureTaskShape: (item) => item
+    });
+
+    const item = plans[0].items[0];
+    assert.equal(item.policy.source, 'prescription');
+    assert.equal(item.requiresUserConfirm, false);
+    assert.doesNotMatch(item.aiReasoning, /非医嘱新增动作/);
+});
+
 test('plan policy sanitizes oral prescription plans without losing legacy context', () => {
     const policy = loadPlanPolicy();
     const db = {
