@@ -3,17 +3,16 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import * as actionIdentity from '../action-identity.js';
+import * as planAiPure from '../plan-ai-pure.mjs';
 
 function loadPlanAi() {
-  const pureCode = readFileSync(new URL('../plan-ai-pure.js', import.meta.url), 'utf8');
   const policyCode = readFileSync(new URL('../rehab-policy.js', import.meta.url), 'utf8');
   const code = readFileSync(new URL('../plan-ai.js', import.meta.url), 'utf8');
   const sandbox = {
-    window: { toast: { show() {} }, actionIdentity },
+    window: { toast: { show() {} }, actionIdentity, planAiPure },
     document: {},
     console
   };
-  vm.runInNewContext(pureCode, sandbox);
   vm.runInNewContext(policyCode, sandbox);
   vm.runInNewContext(code, sandbox);
   sandbox.window.dataPlanAi.__testDocument = sandbox.document;
@@ -74,6 +73,36 @@ function createContext(api) {
     }
   };
 }
+
+test('plan-ai-pure exposes direct import API for parser and spec logic', () => {
+  const parsed = planAiPure.parsePlanAiJson('```json\n{"items":["猫牛式"]}\n```');
+  assert.equal(parsed.source, 'fenced');
+  assert.deepEqual(parsed.value, { items: ['猫牛式'] });
+
+  const coerced = planAiPure.coerceAiSpec({ name: '侧卧髋外展', reps: '10', isAlt: '左右' }, { planType: 'rehab' });
+  assert.deepEqual(JSON.parse(JSON.stringify(coerced.spec)), {
+    sets: 1,
+    reps: 10,
+    work: 3,
+    repRest: 0,
+    actionRest: 20,
+    isAlt: true,
+    mode: 'alt-reps'
+  });
+  assert.match(coerced.warnings.join('\n'), /work/);
+});
+
+test('plan-ai-pure remains loadable as a browser global script', () => {
+  const code = readFileSync(new URL('../plan-ai-pure.js', import.meta.url), 'utf8');
+  const sandbox = { window: {} };
+
+  assert.match(code, /^\s*\/\/ @ts-nocheck\s*\r?\n\(function \(\) \{/);
+  assert.doesNotMatch(code, /\nexport\s/);
+  vm.runInNewContext(code, sandbox);
+
+  assert.equal(typeof sandbox.window.planAiPure.parsePlanAiJson, 'function');
+  assert.equal(typeof sandbox.window.planAiPure.coerceAiSpec, 'function');
+});
 
 test('plan AI type chips render all plan types with selected chips active', () => {
   const api = loadPlanAi();

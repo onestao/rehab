@@ -61,4 +61,9 @@ export const cssSections = [
   { file: '40-a11y.css', marker: { type: 'exact', value: '/* --- A11y --- */' } },
 ];
 
+export const lazyCssSections = [
+  { file: '42-health-profile.css', marker: { type: 'pair', line: '/* ============================================', nextIncludes: 'Health Profile Card' } },
+];
+
 export const cssFiles = [...cssSections.map(section => section.file), '99-custom-overrides.css'];
+export const lazyCssFiles = lazyCssSections.map(section => section.file);

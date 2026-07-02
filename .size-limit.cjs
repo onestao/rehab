@@ -40,6 +40,7 @@ module.exports = [
   { name: 'ai-bundle', path: ['ai-*.js', 'ai-*.mjs', 'advice-*.js', 'coach-context.js', 'lib/virtual-core.umd.js', 'lib/flexsearch.light.js'], limit: '120 KB' },
   { name: 'rehab-policy', path: 'rehab-policy.js', limit: '12 KB' },
   { name: 'rehab-progression-pure', path: 'rehab-progression-pure.js', limit: '4 KB' },
+  // Plan is intentionally tight; keep UI growth lazy and move parser/spec logic into exported pure modules.
   { name: 'plan-bundle', path: 'plan-*.js', limit: '71 KB' },
   {
     name: 'records-bundle',
@@ -57,7 +58,7 @@ module.exports = [
     limit: '90 KB'
   },
   { name: 'routine-bundle', path: 'routine-*.js', limit: '25 KB' },
-  { name: 'sync-bundle', path: ['backup.js', 'sync.js', 'sync-pure.js', 'sync-ui.js', 'sync-adapters.js'], limit: '30 KB' },
+  { name: 'sync-bundle', path: ['backup.js', 'backup-import-pure.js', 'backup-ring-pure.js', 'sync.js', 'sync-pure.js', 'sync-ui.js', 'sync-adapters.js'], limit: '30 KB' },
   { name: 'voice-bundle', path: 'voice-*.js', limit: '12 KB' },
   { name: 'device-bundle', path: 'mi-scale-*.js', limit: '8 KB' }
 ];

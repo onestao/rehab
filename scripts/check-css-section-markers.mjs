@@ -8,29 +8,36 @@
 
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
-import { cssSections } from './css-sections.mjs';
+import { cssSections, lazyCssSections } from './css-sections.mjs';
 
 const root = process.cwd();
 const errors = [];
 
-for (const section of cssSections) {
+async function checkSection(section, bucket) {
     const file = section.file;
     const marker = section.marker;
     const content = await readFile(path.join(root, 'css-src', file), 'utf8');
     const head = content.slice(0, 400);
     if (marker.type === 'exact') {
         if (!head.startsWith(marker.value)) {
-            errors.push(`${file}: missing marker "${marker.value.replace(/\n/g, '\\n')}" at file head`);
+            errors.push(`${bucket}/${file}: missing marker "${marker.value.replace(/\n/g, '\\n')}" at file head`);
         }
     } else if (marker.type === 'pair') {
         if (!head.startsWith(marker.line)) {
-            errors.push(`${file}: missing marker line "${marker.line}" at file head`);
+            errors.push(`${bucket}/${file}: missing marker line "${marker.line}" at file head`);
         } else if (!head.includes(marker.nextIncludes)) {
-            errors.push(`${file}: marker pair next-includes "${marker.nextIncludes}" not found near head`);
+            errors.push(`${bucket}/${file}: marker pair next-includes "${marker.nextIncludes}" not found near head`);
         }
     } else if (marker.type !== 'start') {
-        errors.push(`${file}: unsupported marker type "${marker.type}"`);
+        errors.push(`${bucket}/${file}: unsupported marker type "${marker.type}"`);
     }
+}
+
+for (const section of cssSections) {
+    await checkSection(section, 'eager');
+}
+for (const section of lazyCssSections) {
+    await checkSection(section, 'lazy');
 }
 
 if (errors.length) {
@@ -38,4 +45,4 @@ if (errors.length) {
     for (const err of errors) console.error('  ' + err);
     process.exit(1);
 }
-console.log(`check-css-section-markers: OK (${cssSections.length} files)`);
+console.log(`check-css-section-markers: OK (${cssSections.length} eager, ${lazyCssSections.length} lazy files)`);

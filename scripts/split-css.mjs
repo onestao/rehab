@@ -1,7 +1,7 @@
 // @ts-nocheck
 import { readFile, mkdir, writeFile, rm, access } from 'node:fs/promises';
 import path from 'node:path';
-import { cssSections } from './css-sections.mjs';
+import { cssSections, lazyCssSections } from './css-sections.mjs';
 
 const root = process.cwd();
 const srcText = await readFile(path.join(root, 'styles.css'), 'utf8');
@@ -36,7 +36,8 @@ function findMarkerIndex(marker) {
   throw new Error(`Unknown marker type: ${marker.type}`);
 }
 
-const resolved = cssSections.map(section => ({
+const sourceSections = [...cssSections, ...lazyCssSections];
+const resolved = sourceSections.map(section => ({
   ...section,
   startIndex: findMarkerIndex(section.marker),
 })).sort((a, b) => a.startIndex - b.startIndex);

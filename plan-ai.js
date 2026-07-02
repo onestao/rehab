@@ -12,12 +12,12 @@
 
     const {
         VALID_MODES,
-        safeJsonParse,
         readNumber,
         inferSpecMode,
         validateAiSpec,
         coerceAiSpec,
-        normalizeAiCategory
+        normalizeAiCategory,
+        parsePlanAiJson: parsePlanAiJsonPure
     } = window.planAiPure || {};
 
     function truncate(text, max = 160) {
@@ -137,17 +137,9 @@
         return items;
     }
     function parsePlanAiJson(rawText = '') {
-        const text = String(rawText || '').trim();
-        let value = safeJsonParse(text);
-        if (value) return { value, source: 'direct' };
-        const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
-        if (fenced?.[1] && (value = safeJsonParse(fenced[1].trim()))) return { value, source: 'fenced' };
-        const start = text.search(/[\[{]/);
-        const end = Math.max(text.lastIndexOf('}'), text.lastIndexOf(']'));
-        value = start >= 0 && end > start ? safeJsonParse(text.slice(start, end + 1)) : null;
-        if (value) return { value, source: 'sliced' };
-        value = window.planPolicy?.repairPlanAiJson?.(text);
-        return { value, source: value ? 'repair' : 'none' };
+        return parsePlanAiJsonPure(rawText, {
+            repairJson: (text) => window.planPolicy?.repairPlanAiJson?.(text)
+        });
     }
     function extractPlanAiPlanCandidates(parsed) {
         if (Array.isArray(parsed)) return [{ sections: parsed }];

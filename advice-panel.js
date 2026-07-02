@@ -190,6 +190,8 @@ const advicePanel = {
             pinAdviceVersion: this.pinAdviceVersion,
             deleteAdviceVersion: this.deleteAdviceVersion
         });
+        // New callers should use this narrow facade; the flat attach list above stays for legacy compatibility.
+        target.adviceApi = this.createAdviceFacade(target);
         Object.assign(target, window.adviceTemplateManager || {});
         Object.assign(target, window.adviceAttachments || {});
 
@@ -202,6 +204,34 @@ const advicePanel = {
             if (retry) retry.value = this.db?.aiRetryMode || 'versioned';
         });
         target.bindAdviceRequestLifecycle?.();
+    },
+
+    createAdviceFacade(target) {
+        return {
+            send: (...args) => target.sendAiAdvice?.(...args),
+            cancel: (...args) => target.cancelAiAdvice?.(...args),
+            render: (...args) => target.renderAdvicePanel?.(...args),
+            search: {
+                toggle: (...args) => target.toggleAdviceSearch?.(...args),
+                clear: (...args) => target.clearAdviceSearch?.(...args),
+                refresh: (...args) => target.refreshAdviceSearchResults?.(...args),
+                workingSet: (...args) => target.searchAdviceWorkingSet?.(...args)
+            },
+            modelPicker: {
+                open: (...args) => target.openAdviceModelPicker?.(...args),
+                close: (...args) => target.closeAdviceModelPicker?.(...args),
+                choose: (...args) => target.chooseAdviceModel?.(...args),
+                render: (...args) => target.renderAdviceModelPicker?.(...args),
+                refresh: (...args) => target.refreshAdviceModelPicker?.(...args)
+            },
+            version: {
+                getGroup: (...args) => target.getAdviceVersionGroup?.(...args),
+                setActive: (...args) => target.setActiveAdviceVersion?.(...args),
+                cycle: (...args) => target.cycleAdviceVersion?.(...args),
+                pin: (...args) => target.pinAdviceVersion?.(...args),
+                delete: (...args) => target.deleteAdviceVersion?.(...args)
+            }
+        };
     },
 
     bindAdviceRequestLifecycle() {

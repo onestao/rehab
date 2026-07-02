@@ -89,7 +89,7 @@ function extractScriptArrayObject(html, objectName, endMarker) {
 }
 
 function extractPageDeps(html) {
-    return extractScriptArrayObject(html, 'PAGE_DEPS', 'const _loaded');
+    return extractScriptArrayObject(html, 'PAGE_DEPS', 'const CSS_DEPS');
 }
 
 function extractScriptPrerequisites(html) {

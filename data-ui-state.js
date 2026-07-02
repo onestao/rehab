@@ -40,6 +40,14 @@
             this.scrollToHealthView(view || 'diet');
         },
 
+        ensureHealthViewCss(view) {
+            if (view !== 'training') return;
+            const promise = window.loadAppCss?.('42-health-profile');
+            promise?.catch?.((e) => {
+                window.errorBus?.report?.('records.healthProfileCss', e, { view });
+            });
+        },
+
         setRoutineView(view) {
             this.captureAdviceDraft?.();
             if (view === 'advice') {
@@ -528,6 +536,7 @@
             if (index < 0) return;
             this.captureAdviceDraft?.();
             this.healthView = view;
+            this.ensureHealthViewCss(view);
             this.syncHealthSubtabNav(view);
             this.updateHealthTabActive();
             const deck = document.getElementById('healthSwipeDeck');
@@ -579,6 +588,7 @@
                 const nextView = order[index];
                 if (!nextView || nextView === this.healthView) return;
                 this.healthView = nextView;
+                this.ensureHealthViewCss(nextView);
                 this.syncHealthSubtabNav(nextView);
                 this.updateHealthTabActive();
                 if (nextView === 'diet') requestAnimationFrame(() => this.autoResizeDietInput?.());

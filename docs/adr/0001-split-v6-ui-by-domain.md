@@ -81,12 +81,12 @@ The split is enforced by:
   different values), duplicates (same property, same value),
   complements (disjoint properties on the same selector).
   CI fails when real conflicts exceed `CSS_REAL_CONFLICT_MAX`
-  (default 220, current count 209).
+  (default 220, current count 220 as of 2026-07-02).
 - `scripts/check-99-targets.mjs` — every rule block in
   `99-custom-overrides.css` must be preceded by a
   `/* TARGET: <host>.css */` comment.
 - `npm run ci` runs lint + typecheck + test + `check:css` +
-  size-limit.
+  `check:html-safety` + size-limit.
 
 ## Consequences
 
@@ -110,10 +110,13 @@ Negative:
 - Source file count grew from 51 to 61. Mitigated by the marker
   check and by section-aware tooling already understanding the
   ordered list.
-- The 209-conflict baseline includes `:root` light-vs-dark token
-  pairs that look like conflicts to the analyser but are
-  intentional. Future scripts may want to ignore `:root` or
-  emit a separate "expected" bucket.
+- The 220-conflict baseline is reviewed rather than raised. It
+  includes expected buckets that the analyser cannot yet separate:
+  `:root` light-vs-dark token pairs, reduced-motion overrides,
+  responsive/mobile overrides, and V6 migration selectors that
+  intentionally supersede older component defaults. Future scripts
+  may want to emit an explicit "expected conflict" bucket before
+  lowering the threshold.
 
 ## References
 

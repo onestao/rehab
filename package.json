@@ -14,11 +14,13 @@
     "typecheck": "tsc -p tsconfig.check.json",
     "test": "node --test test/*.test.mjs",
     "check:css-markers": "node scripts/check-css-section-markers.mjs",
+    "check:css-sources": "node scripts/check-css-source-registry.mjs",
     "check:css-overlap": "node scripts/css-overlap-report.mjs",
     "check:99-targets": "node scripts/check-99-targets.mjs",
+    "check:html-safety": "node scripts/check-html-safety.mjs",
     "check:size-limit-coverage": "node scripts/check-size-limit-coverage.mjs",
-    "check:css": "npm run check:css-markers && npm run check:99-targets && npm run check:css-overlap",
-    "ci": "npm run lint && npm run typecheck && npm run test && npm run check:css && npm run check:size-limit-coverage && npx --yes size-limit"
+    "check:css": "npm run check:css-markers && npm run check:css-sources && npm run check:99-targets && npm run check:css-overlap",
+    "ci": "npm run lint && npm run typecheck && npm run test && npm run check:css && npm run check:html-safety && npm run check:size-limit-coverage && npx --yes size-limit"
   },
   "devDependencies": {
     "@size-limit/file": "^11.0.0",

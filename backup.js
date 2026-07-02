@@ -195,9 +195,6 @@ const backup = {
     async snapshotToRing(blob, filename, source) {
         const started = Date.now();
         window.errorBus?.event?.('backup', 'ring:start', { source, blobBytes: blob?.size || 0 });
-        const MAX_RING_COUNT = 10;
-        const MAX_RING_BYTES = 50 * 1024 * 1024;
-        const CRITICAL_SOURCES = new Set(['pre-pull', 'pre-import']);
 
         if (navigator.storage?.persist) {
             navigator.storage.persist().catch(() => {});
@@ -226,7 +223,6 @@ const backup = {
                 });
                 tx.oncomplete = () => {
                     const doPrune = async () => {
-                        let totalBytes = 0;
                         const allItems = await new Promise((res, rej) => {
                             const readTx = db.transaction('snapshots', 'readonly');
                             const readStore = readTx.objectStore('snapshots');
@@ -243,39 +239,9 @@ const backup = {
                             } catch {}
                         }
 
-                        const targetCount = quotaLow ? 3 : MAX_RING_COUNT;
-                        allItems.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
-
-                        const toDelete = [];
-                        const keptSources = new Set();
-
-                        for (const item of allItems) {
-                            if (toDelete.length >= allItems.length - targetCount) {
-                                toDelete.push(item);
-                                continue;
-                            }
-                            totalBytes += item.size || 0;
-                            if (totalBytes > MAX_RING_BYTES && toDelete.length < allItems.length - 3) {
-                                toDelete.push(item);
-                                continue;
-                            }
-                            if (CRITICAL_SOURCES.has(item.source)) {
-                                keptSources.add(item.source);
-                            }
-                        }
-
-                        const protectedItems = [];
-                        const deletable = [];
-                        for (const item of toDelete) {
-                            if (CRITICAL_SOURCES.has(item.source) && !keptSources.has(item.source)) {
-                                keptSources.add(item.source);
-                                protectedItems.push(item);
-                            } else {
-                                deletable.push(item);
-                            }
-                        }
-
-                        const finalDelete = [...protectedItems.length ? [] : toDelete.filter(i => !CRITICAL_SOURCES.has(i.source)), ...deletable];
+                        const finalDelete = window.backupRingPure?.planBackupRingPrune
+                            ? window.backupRingPure.planBackupRingPrune(allItems, { quotaLow }).deleteItems
+                            : [];
 
                         if (finalDelete.length > 0) {
                             const delTx = db.transaction('snapshots', 'readwrite');
@@ -330,9 +296,10 @@ const backup = {
                             filename: r.filename,
                             size: r.size,
                             checksum: r.checksum
-                        }))
-                        .sort((a, b) => b.createdAt - a.createdAt);
-                    resolve(items);
+                        }));
+                    const sortNewest = window.backupRingPure?.sortSnapshotsNewestFirst;
+                    const sorted = sortNewest ? sortNewest(items) : items.sort((a, b) => b.createdAt - a.createdAt);
+                    resolve(sorted);
                 };
                 allReq.onerror = () => { db.close(); reject(allReq.error); };
             };
@@ -476,39 +443,37 @@ const backup = {
             const nextDb = json?.db && typeof json.db === 'object' ? json.db : json;
             if (!nextDb || typeof nextDb !== 'object') throw new Error('文件格式不正确');
 
-            const preview = backupPreviewText(`即将导入：${file.name || '备份文件'}`, nextDb, json || {});
-            if (!confirm(`${preview}\n\n导入前已自动创建本地回滚快照。是否继续？`)) return;
-
+            let checksumStatus = 'missing';
             if (json.checksum && typeof json.checksum === 'string') {
                 const nextDbStr = JSON.stringify(nextDb);
                 const recomputed = await sha256Hex(nextDbStr);
                 if (recomputed !== json.checksum) {
                     throw new Error('备份文件校验失败：checksum 不匹配');
                 }
+                checksumStatus = 'verified';
             }
 
-            if (json.schemaVersion && json.schemaVersion > (data.SCHEMA_VERSION || 1)) {
-                if (!confirm(`备份文件 schemaVersion(${json.schemaVersion}) 高于本地(${data.SCHEMA_VERSION || 1})，导入可能导致兼容问题，是否继续？`)) {
+            const importPlan = window.backupImportPure?.buildBackupImportPlan?.({
+                fileName: file.name || '备份文件',
+                nextDb,
+                meta: json || {},
+                localDb: data.db || {},
+                localSchemaVersion: data.SCHEMA_VERSION || 1,
+                checksumStatus
+            }) || { schemaRisk: null, countRisks: [] };
+
+            const preview = backupPreviewText(`即将导入：${file.name || '备份文件'}`, nextDb, json || {});
+            if (!confirm(`${preview}\n\n导入前已自动创建本地回滚快照。是否继续？`)) return;
+
+            if (importPlan.schemaRisk) {
+                if (!confirm(importPlan.schemaRisk.message)) {
                     return;
                 }
             }
 
-            if (json.itemCounts && typeof json.itemCounts === 'object') {
-                const localCounts = {
-                    actions: data.db.actions?.length || 0,
-                    routines: data.db.routines?.length || 0,
-                    history: data.db.history?.length || 0,
-                    food: data.db.health?.foodLogs?.length || 0,
-                    exercise: data.db.health?.exerciseLogs?.length || 0,
-                    weight: data.db.health?.weights?.length || 0
-                };
-                for (const [k, v] of Object.entries(json.itemCounts)) {
-                    const local = localCounts[k] || 0;
-                    if (local > 0 && Number(v || 0) < local * 0.5) {
-                        if (!confirm(`远端 ${k} 数量(${v})远小于本地(${local})，导入后将丢失大量数据，是否继续？`)) {
-                            return;
-                        }
-                    }
+            for (const risk of importPlan.countRisks || []) {
+                if (!confirm(risk.message)) {
+                    return;
                 }
             }
 

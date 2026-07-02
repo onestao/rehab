@@ -10399,6 +10399,52 @@ body.is-training .fab-pip.active {
     max-width: 100%;
 }
 
+.health-swipe-page[data-health-page="training"] .health-profile-card {
+    display: block;
+    padding: 16px;
+    margin-bottom: 12px;
+    overflow: hidden;
+}
+
+.health-swipe-page[data-health-page="training"] .profile-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.health-swipe-page[data-health-page="training"] .profile-head-main {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.health-swipe-page[data-health-page="training"] .profile-card-icon {
+    width: 48px;
+    height: 48px;
+    flex: 0 0 auto;
+    display: inline-grid;
+    place-items: center;
+}
+
+.health-swipe-page[data-health-page="training"] .profile-head-actions {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    flex: 0 0 auto;
+}
+
+.health-swipe-page[data-health-page="training"] .profile-summary-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 4px;
+    width: 100%;
+}
+
 }
 @layer components {
 /* --- V6 AI Coach (ai-insight / ai-msg / ai-input / advice-v6 / today quick actions tweaks) --- */

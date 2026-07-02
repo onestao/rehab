@@ -53,7 +53,8 @@
 - Run `node scripts/bump-version.js --check` after asset or script loading changes.
 - Run `npm run ci` before considering implementation work complete. `ci` covers:
   - `lint` (eslint), `typecheck` (tsc), `test` (`node --test test/*.test.mjs`).
-  - `check:css` = `check:css-markers` + `check:99-targets` + `check:css-overlap`. The overlap report is written to `build/css-overlap-report.txt` and CI fails when real conflicts exceed `CSS_REAL_CONFLICT_MAX` (default 220).
+  - `check:css` = `check:css-markers` + `check:css-sources` + `check:99-targets` + `check:css-overlap`. The overlap report is written to `build/css-overlap-report.txt` and CI fails when real conflicts exceed `CSS_REAL_CONFLICT_MAX` (default 220).
+  - `check:html-safety` reviews `innerHTML` / `insertAdjacentHTML` sink counts so new HTML insertion points must be explicitly audited.
   - `size-limit` against `.size-limit.cjs`.
 - Generated artefacts under `build/` are committed (`generated.css`, `css-dedup-report.txt`, `css-overlap-report.txt`, `icons.csv`, `icons.txt`).
 
