@@ -1047,6 +1047,47 @@ test('plan AI confirmation preserves completed and locked tasks while replacing 
   assert.equal(ctx.rendered, true);
 });
 
+test('plan AI confirmation can replace an empty manual placeholder plan', () => {
+  const api = loadPlanAi();
+  const ctx = createContext(api);
+  ctx.db.dailyPlans = [{
+    id: 'manual-empty',
+    date: '2026-05-25',
+    type: 'rehab',
+    source: 'manual',
+    title: '康复计划',
+    items: []
+  }];
+  ctx._pendingPlanAiPlans = [{
+    date: '2026-05-25',
+    type: 'rehab',
+    title: 'AI 康复计划',
+    notes: 'AI notes',
+    items: [{ name: 'AI 新动作', category: 'main', requiresUserConfirm: true, userConfirmed: true, spec: { sets: 2, reps: 12, work: 3, repRest: 0, actionRest: 30, isAlt: false, mode: 'reps' } }]
+  }];
+  ctx.collectPlanAiPreviewPlans = () => ctx._pendingPlanAiPlans;
+  ctx.ensureTaskShape = (item) => ({ id: item.id || `task-${item.name}`, status: item.status || 'todo', deleted: false, ...item });
+  ctx.ensureDailyPlanShape = (plan) => ({ id: plan.id || 'manual-empty', deleted: false, ...plan });
+  ctx.getDailyPlans = (date) => ctx.db.dailyPlans.filter((plan) => plan.date === date && !plan.deleted);
+  ctx.saveDailyPlan = (plan) => {
+    const index = ctx.db.dailyPlans.findIndex((item) => item.id === plan.id || (!item.deleted && item.date === plan.date && item.type === plan.type));
+    if (index >= 0) ctx.db.dailyPlans[index] = plan;
+    else ctx.db.dailyPlans.unshift(plan);
+  };
+  ctx.cleanupEmptyUnselectedPlanTypes = () => {};
+  ctx.save = () => { ctx.saved = true; };
+  ctx.closePlanAiSheet = () => {};
+  ctx._closeActiveModal = () => {};
+  ctx.render = () => {};
+
+  api.confirmPlanAiPlans.call(ctx);
+
+  assert.equal(ctx.saved, true);
+  assert.equal(ctx.db.dailyPlans[0].id, 'manual-empty');
+  assert.equal(ctx.db.dailyPlans[0].source, 'ai');
+  assert.deepEqual(JSON.parse(JSON.stringify(ctx.db.dailyPlans[0].items.map((item) => item.name))), ['AI 新动作']);
+});
+
 test('plan AI confirmation does not soft delete protected plans from other types', () => {
   const api = loadPlanAi();
   const ctx = createContext(api);
@@ -1135,6 +1176,7 @@ test('plan AI confirmation blocks replacing same-type manual plans', () => {
   assert.equal(ctx.savedPlan, undefined);
   assert.equal(ctx.saved, undefined);
   assert.match(ctx.previewIssue, /训练计划未保存：手工\/导入计划不能被自动改写/);
+  assert.match(ctx.previewIssue, /删掉或改日期\/类型重试/);
   assert.deepEqual(JSON.parse(JSON.stringify(ctx.db.dailyPlans[0].items.map((item) => item.name))), ['手工动作']);
 });
 

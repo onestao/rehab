@@ -1524,7 +1524,7 @@
                     notes: plan.notes,
                     items: [...preserved, ...aiItems]
                 });
-                const validation = window.planPolicy?.validatePlanChanges?.({
+                const validation = current && window.planPolicy?.isUserOwnedPlan?.(current) && !(current.items || []).some((item) => item && !item.deleted) ? null : window.planPolicy?.validatePlanChanges?.({
                     beforePlans: current ? [current] : [],
                     afterPlans: [merged],
                     source: 'ai'
@@ -1540,7 +1540,7 @@
             if (blockedReason) {
                 this.db.dailyPlans = beforePlansSnapshot;
                 this.selectedPlanId = beforeSelectedPlanId;
-                const message = `训练计划未保存：${blockedReason}`;
+                const message = `训练计划未保存：${blockedReason}${blockedReason === '手工/导入计划不能被自动改写' ? '。删掉或改日期/类型重试。' : ''}`;
                 this.setPlanAiPreviewIssue?.(message);
                 this.focusPlanAiPreviewItem?.({ name: blockedViolation?.taskName || blockedViolation?.duplicateName || '' });
                 window.toast?.show?.(message, 'error', 6200);

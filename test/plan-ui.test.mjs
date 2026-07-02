@@ -122,6 +122,39 @@ test('today AI types use selected plan first and include other daily plan types'
   assert.deepEqual(Array.from(api.todayPlanAiTypes.call(ctx)), ['bulk', 'rehab', 'cut']);
 });
 
+test('new plan AI entry opens generator without creating a manual placeholder', () => {
+  const api = loadPlanUi();
+  const ctx = {
+    ...createContext(api, []),
+    _newPlanTypes: ['rehab', 'bulk'],
+    createDailyPlan() {
+      this.createdPlan = true;
+      return { id: 'created', type: 'rehab' };
+    },
+    save() {
+      this.saved = true;
+    },
+    _closeActiveModal() {
+      this.closedModal = true;
+    },
+    openPlanAiSheet(mode, types) {
+      this.openedPlanAi = { mode, types };
+    },
+    renderTodayPage() {
+      this.renderedToday = true;
+    }
+  };
+
+  const result = api.createSelectedPlans.call(ctx, true);
+
+  assert.equal(result, undefined);
+  assert.equal(ctx.createdPlan, undefined);
+  assert.equal(ctx.saved, undefined);
+  assert.equal(ctx.renderedToday, undefined);
+  assert.equal(ctx.closedModal, true);
+  assert.deepEqual(JSON.parse(JSON.stringify(ctx.openedPlanAi)), { mode: 'today', types: ['rehab', 'bulk'] });
+});
+
 test('task drawer exposes compact cancel daily plan action', () => {
   const api = loadPlanUi();
   const plans = [{

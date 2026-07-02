@@ -276,6 +276,11 @@
         createSelectedPlans(openAi = true) {
             const types = normalizePlanTypes(this._newPlanTypes || ['rehab']);
             const today = this.logicalDateKey?.() || this.dateKey(new Date());
+            if (openAi) {
+                this._closeActiveModal?.();
+                this.openPlanAiSheet?.('today', types);
+                return;
+            }
             const created = types.map((type) => {
                 const meta = this.planTypeMeta?.(type) || { label: '训练计划' };
                 const existing = this.getDailyPlans?.(today)?.find((plan) => (plan.type || 'rehab') === type);
@@ -290,7 +295,6 @@
             this.selectedPlanId = created[0]?.id || '';
             this.save?.({ render: false });
             this._closeActiveModal?.();
-            if (openAi) this.openPlanAiSheet?.('today', types);
             this.renderTodayPage?.();
         },
 
