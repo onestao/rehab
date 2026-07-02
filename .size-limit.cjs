@@ -42,6 +42,7 @@ module.exports = [
   { name: 'rehab-progression-pure', path: 'rehab-progression-pure.js', limit: '4 KB' },
   // Plan is intentionally tight; keep UI growth lazy and move parser/spec logic into exported pure modules.
   { name: 'plan-bundle', path: 'plan-*.js', limit: '71 KB' },
+  { name: 'debug-bundle', path: 'debug-*.js', limit: '10 KB' },
   {
     name: 'records-bundle',
     path: [

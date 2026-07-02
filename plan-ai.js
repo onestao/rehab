@@ -10,15 +10,16 @@
         return JSON.parse(JSON.stringify(value));
     }
 
+    const planAiPure = window.planAiPure;
     const {
         VALID_MODES,
         readNumber,
-        inferSpecMode,
-        validateAiSpec,
         coerceAiSpec,
         normalizeAiCategory,
-        parsePlanAiJson: parsePlanAiJsonPure
-    } = window.planAiPure || {};
+        normalizePlanTypes,
+        parsePlanAiPayload: parsePlanAiPayloadPure,
+        validatePlanAiPayload: validatePlanAiPayloadPure
+    } = planAiPure;
 
     function truncate(text, max = 160) {
         const raw = String(text || '').trim();
@@ -28,183 +29,43 @@
     const protectedPlanTask = window.planPolicy.isProtectedPlanTask;
 
     const isPlainObject = (value) => value && typeof value === 'object' && !Array.isArray(value);
-    const normalizeAiKey = (key = '') => String(key || '').trim().replace(/[\s_-]+/g, '').toLowerCase();
-    const PLAN_AI_TYPES = ['rehab', 'cut', 'bulk', 'maintenance', 'custom'];
-    const AI_ITEM_KEYS = ['items', 'exercises', 'exercise', 'actions', 'tasks', 'movements', 'drills', 'stretches', 'stretching', 'activities', 'list', 'mainExercises', 'warmupExercises', 'cooldownExercises'];
-    const AI_ITEM_KEY_SET = new Set(AI_ITEM_KEYS.map(normalizeAiKey));
-    const AI_INSTRUCTION_ARRAY_KEYS = new Set(['steps', 'step', 'instructions', 'instruction', 'cues', 'tips'].map(normalizeAiKey));
-    const PLAN_AI_SECTION_KEYS = new Set(['sections', 'phases', 'blocks', 'parts', 'groups', 'segments', 'schedule', 'program', 'routine', 'session', 'plan', 'dayplan', 'dailyplan', 'trainingplan', 'workoutplan', 'rehabplan', 'exerciseplan', 'movementplan', 'actionplan', 'workout', 'workouts', 'training']);
-    const isPlanAiInstructionArrayKey = (key = '') => AI_INSTRUCTION_ARRAY_KEYS.has(normalizeAiKey(key));
-    const isPlanAiItemArrayKey = (key = '') => {
-        const text = normalizeAiKey(key);
-        return AI_ITEM_KEY_SET.has(text) || /(?:items|exercises?|actions?|tasks?|movements?|drills?|stretches?|stretching|activities|list)$/.test(text);
-    };
-    const isPlanAiSectionContainerKey = (key = '') => {
-        const text = normalizeAiKey(key);
-        return PLAN_AI_SECTION_KEYS.has(text) || /(?:sections?|phases?|blocks?|parts?|groups?|segments?|schedule|program|routine|session|plan)$/.test(text);
-    };
-    const aiCategoryFromLabel = (value = '') => {
-        const text = normalizeAiKey(value);
-        return /warm|prep|activation|mobility|热身|准备|激活|活动度|动态活动/.test(text) ? 'warmup'
-            : /cool|stretch|relax|recovery|breath|拉伸|放松|冷身|收操|恢复|呼吸/.test(text) ? 'cooldown'
-                : /main|workout|training|strength|主训|主训练|主体|训练动作|处方动作/.test(text) ? 'main' : '';
-    };
-    function firstStringValue(source = {}, keys = ['name', 'title', 'label', 'actionName', 'exerciseName', 'movement', 'exercise', 'action', 'task', 'drill']) {
-        for (const key of keys) {
-            const value = source?.[key];
-            if (typeof value === 'string' || typeof value === 'number') return String(value).trim();
-            if (isPlainObject(value)) { const nested = firstStringValue(value, ['name', 'title', 'label', 'actionName', 'exerciseName']); if (nested) return nested; }
-        }
-        return '';
+    function stripPlanAiMeta(result) {
+        if (!result || typeof result !== 'object') return result;
+        const { meta, ...publicResult } = result;
+        return publicResult;
     }
-    function normalizePlanAiRawItem(rawItem, categoryHint = '') {
-        if (typeof rawItem === 'string') { const name = rawItem.trim(); return name ? { name, category: normalizeAiCategory(categoryHint || 'main') } : null; }
-        if (!isPlainObject(rawItem)) return null;
-        const nestedKey = ['exercise', 'action', 'movement', 'task', 'drill'].find((key) => isPlainObject(rawItem[key]));
-        const item = nestedKey ? { ...rawItem[nestedKey], ...rawItem } : rawItem;
-        const name = firstStringValue(item);
-        if (!name) return null;
-        const spec = isPlainObject(item.spec) ? item.spec : (isPlainObject(item.prescription) ? item.prescription : (isPlainObject(item.dosage) ? item.dosage : {}));
-        const explicitCategory = aiCategoryFromLabel(item.category || item.phase || item.section || item.type || '') || item.category || item.phase || item.section || item.type || '';
-        return { ...item, name, category: normalizeAiCategory(explicitCategory || categoryHint || 'main'), spec };
+
+    function queryPlanAiPreview(selector) {
+        if (typeof document === 'undefined' || typeof document.querySelector !== 'function') return null;
+        return document.querySelector(selector);
     }
-    function arrayLooksLikePlanAiItems(list = []) {
-        return (Array.isArray(list) ? list : []).some((entry) => {
-            if (typeof entry === 'string') return !!entry.trim();
-            if (!isPlainObject(entry)) return false;
-            if (normalizePlanAiRawItem(entry)) return true;
-            return Object.entries(entry).some(([key, value]) => Array.isArray(value) && !isPlanAiInstructionArrayKey(key) && isPlanAiItemArrayKey(key));
-        });
+
+    function queryPlanAiPreviewAll(selector) {
+        if (typeof document === 'undefined' || typeof document.querySelectorAll !== 'function') return [];
+        return Array.from(document.querySelectorAll(selector));
     }
-    function collectPlanAiRawItems(plan = {}) {
-        const items = [];
-        const pushItem = (entry, categoryHint = '') => { const item = normalizePlanAiRawItem(entry, categoryHint); if (item) items.push(item); };
-        const containerCategory = (key, fallback = '') => aiCategoryFromLabel(key) || fallback;
-        const shouldReadArrayContainer = (key, value, parentHasOwnItem = false) => {
-            if (isPlanAiInstructionArrayKey(key)) return !parentHasOwnItem && arrayLooksLikePlanAiItems(value);
-            return isPlanAiItemArrayKey(key) || isPlanAiSectionContainerKey(key) || !!aiCategoryFromLabel(key);
-        };
-        const shouldReadObjectContainer = (key) => isPlanAiSectionContainerKey(key) || !!aiCategoryFromLabel(key);
-        const collectFromContainer = (value, categoryHint = '') => {
-            if (Array.isArray(value)) { eachItem(value, categoryHint); return; }
-            if (!isPlainObject(value)) { pushItem(value, categoryHint); return; }
-            let consumed = false;
-            Object.entries(value).forEach(([key, child]) => {
-                const nextCategory = containerCategory(key, categoryHint);
-                if (Array.isArray(child) && shouldReadArrayContainer(key, child)) {
-                    eachItem(child, nextCategory);
-                    consumed = true;
-                } else if (isPlainObject(child) && shouldReadObjectContainer(key)) {
-                    collectFromContainer(child, nextCategory);
-                    consumed = true;
-                }
-            });
-            if (!consumed) pushItem(value, categoryHint);
-        };
-        const eachItem = (list, categoryHint = '') => (Array.isArray(list) ? list : []).forEach((entry) => {
-            if (!isPlainObject(entry)) { pushItem(entry, categoryHint); return; }
-            const sectionCategory = aiCategoryFromLabel(entry.category || entry.phase || entry.section || entry.title || entry.name) || categoryHint;
-            const ownItem = normalizePlanAiRawItem(entry, sectionCategory);
-            const nestedEntries = Object.entries(entry).filter(([key, value]) => {
-                if (Array.isArray(value)) return shouldReadArrayContainer(key, value, !!ownItem);
-                if (isPlainObject(value)) return shouldReadObjectContainer(key);
-                return false;
-            });
-            nestedEntries.length
-                ? nestedEntries.forEach(([key, value]) => collectFromContainer(value, containerCategory(key, sectionCategory)))
-                : pushItem(entry, sectionCategory);
-        });
-        if (Array.isArray(plan)) eachItem(plan, 'main');
-        else if (isPlainObject(plan)) Object.entries(plan).forEach(([key, value]) => {
-            const keyCategory = aiCategoryFromLabel(key) || (isPlanAiItemArrayKey(key) ? 'main' : '');
-            if (Array.isArray(value) && shouldReadArrayContainer(key, value)) eachItem(value, keyCategory);
-            else if (isPlainObject(value) && shouldReadObjectContainer(key)) collectFromContainer(value, keyCategory);
-        });
-        if (!items.length) pushItem(plan, 'main');
-        return items;
+
+    function planAiPreviewItemName(item = {}) {
+        return String(item?.name || item?.canonicalName || item?.title || '').trim();
     }
-    function collectPlanAiDirectArrayItems(plan = {}) {
-        if (!isPlainObject(plan)) return [];
-        const items = [];
-        Object.entries(plan).forEach(([key, value]) => {
-            const keyCategory = aiCategoryFromLabel(key) || (isPlanAiItemArrayKey(key) ? 'main' : '');
-            if (!keyCategory || !Array.isArray(value)) return;
-            value.forEach((entry) => {
-                const item = normalizePlanAiRawItem(entry, keyCategory);
-                if (item) items.push(item);
-            });
-        });
-        return items;
+
+    function planAiPreviewElementName(itemEl) {
+        return String(itemEl?.querySelector?.('[data-preview-name]')?.value
+            || itemEl?.getAttribute?.('data-original-name')
+            || itemEl?.getAttribute?.('data-preview-canonical-name')
+            || '').trim();
     }
-    function parsePlanAiJson(rawText = '') {
-        return parsePlanAiJsonPure(rawText, {
-            repairJson: (text) => window.planPolicy?.repairPlanAiJson?.(text)
-        });
-    }
-    function extractPlanAiPlanCandidates(parsed) {
-        if (Array.isArray(parsed)) return [{ sections: parsed }];
-        if (!isPlainObject(parsed)) return [];
-        for (const [key, value] of Object.entries(parsed)) if (/^(plans|dailyplans|days|schedule|week|weeklyplan|weeklyplans|planlist)$/.test(normalizeAiKey(key)) && Array.isArray(value)) return value;
-        for (const [key, value] of Object.entries(parsed)) if (/^(plan|dailyplan|trainingplan|workoutplan|rehabplan|program|routine|session|result|data|payload)$/.test(normalizeAiKey(key)) && isPlainObject(value)) return extractPlanAiPlanCandidates(value);
-        return [parsed];
-    }
-    const normalizePlanAiPlanCandidate = (plan) => Array.isArray(plan) ? { sections: plan } : (isPlainObject(plan) ? plan : {});
-    const planAiPlanType = (plan = {}, allowedTypes = [], index = 0) => PLAN_AI_TYPES.includes(String(plan.type || plan.planType || plan.goal || '').trim().toLowerCase()) ? String(plan.type || plan.planType || plan.goal).trim().toLowerCase() : (allowedTypes[index] || allowedTypes[0] || 'rehab');
-    const planAiNotes = (plan = {}) => ['notes', 'note', 'overview', 'intro', 'description', 'summary', 'safety', 'advice'].map((key) => typeof plan[key] === 'string' ? plan[key].trim() : '').filter(Boolean).join('；');
-    const summarizePlanAiItemsForDebug = (items = []) => {
-        const list = (Array.isArray(items) ? items : []).filter(Boolean);
-        const categories = list.reduce((acc, item) => {
-            const category = normalizeAiCategory(item?.category || item?.type || item?.phase || item?.section || 'main');
-            acc[category] = (acc[category] || 0) + 1;
-            return acc;
-        }, {});
-        const policySources = list.reduce((acc, item) => {
-            const source = String(item?.policy?.source || '').trim();
-            if (source) acc[source] = (acc[source] || 0) + 1;
-            return acc;
-        }, {});
-        const names = list.map((item) => String(item?.name || item?.title || item?.label || '').trim()).filter(Boolean).slice(0, 20);
-        const categoryText = Object.entries(categories).map(([key, value]) => `${key}:${value}`).join(', ');
+
+    function buildPlanAiPayloadOptions(ctx, fallbackTypes = 'rehab') {
         return {
-            itemCount: list.length,
-            categories,
-            categoryText,
-            names,
-            namesText: names.join(' | '),
-            confirmCount: list.filter((item) => item?.requiresUserConfirm).length,
-            blockedCount: list.filter((item) => item?.policy?.blocked).length,
-            policySources
+            types: fallbackTypes,
+            repairJson: (text) => window.planPolicy?.repairPlanAiJson?.(text),
+            today: ctx.logicalDateKey?.() || ctx.dateKey?.(new Date()) || '',
+            titleForType: (type) => ctx.planTypeMeta?.(type)?.label || '训练计划',
+            actionMetaForText: (text) => window.planPolicy?.actionMetaForName?.(text) || {},
+            resolveActionChoice: ({ name, item, preferredChoiceId }) => resolvePlanActionChoiceForText(ctx, name, preferredChoiceId || item?.choiceId || item?.prescriptionActionId || '')
         };
-    };
-    const summarizePlanAiPlansForDebug = (plans = []) => (Array.isArray(plans) ? plans : []).map((plan) => {
-        const items = Array.isArray(plan?.items) ? plan.items : collectPlanAiRawItems(plan);
-        return {
-            date: String(plan?.date || plan?.day || plan?.dayKey || ''),
-            type: String(plan?.type || plan?.planType || ''),
-            ...summarizePlanAiItemsForDebug(items)
-        };
-    });
-    const summarizePlanAiSanitizeChanges = (beforePlans = [], afterPlans = []) => (Array.isArray(beforePlans) ? beforePlans : []).map((beforePlan, index) => {
-        const afterPlan = (Array.isArray(afterPlans) ? afterPlans : []).find((plan) => String(plan?.date || '') === String(beforePlan?.date || '') && String(plan?.type || '') === String(beforePlan?.type || '')) || (Array.isArray(afterPlans) ? afterPlans[index] : null) || {};
-        const beforeItems = Array.isArray(beforePlan?.items) ? beforePlan.items : collectPlanAiRawItems(beforePlan);
-        const afterItems = Array.isArray(afterPlan?.items) ? afterPlan.items : collectPlanAiRawItems(afterPlan);
-        const afterNames = afterItems.map((item) => String(item?.name || item?.title || item?.label || '').trim()).filter(Boolean);
-        const beforeNames = beforeItems.map((item) => String(item?.name || item?.title || item?.label || '').trim()).filter(Boolean);
-        const removed = beforeNames.filter((name) => !afterNames.includes(name));
-        const added = afterNames.filter((name) => !beforeNames.includes(name));
-        return {
-            index,
-            date: String(beforePlan?.date || afterPlan?.date || ''),
-            type: String(beforePlan?.type || afterPlan?.type || ''),
-            beforeCount: beforeNames.length,
-            afterCount: afterNames.length,
-            removedCount: removed.length,
-            addedCount: added.length,
-            removedText: removed.slice(0, 12).join(' | '),
-            addedText: added.slice(0, 12).join(' | ')
-        };
-    }).filter((entry) => entry.removedCount || entry.addedCount || entry.beforeCount !== entry.afterCount);
-    const planAiDebug = (type, meta = {}) => { try { window.errorBus?.event?.('plan-ai', type, meta); } catch {} };
+    }
 
     function setText(id, text) {
         const el = document.getElementById(id);
@@ -215,12 +76,6 @@
         const custom = new Map((prefs.customEquipment || []).map((item) => [item.id, item.label]));
         const optionMap = new Map((options || []).map((item) => [item.id, item.label]));
         return (prefs.equipment || []).map((id) => optionMap.get(id) || custom.get(id) || id).filter(Boolean);
-    }
-
-    function normalizePlanTypes(input) {
-        const list = Array.isArray(input) ? input : [input];
-        const normalized = list.map((item) => String(item || '').trim()).filter((item) => PLAN_AI_TYPES.includes(item));
-        return normalized.length ? [...new Set(normalized)] : ['rehab'];
     }
 
     function splitTags(value = '') {
@@ -1192,139 +1047,66 @@
                 : '生成计划';
         },
 
-        parsePlanAiPayload(rawText, fallbackTypes = 'rehab') {
-            const allowedTypes = normalizePlanTypes(fallbackTypes);
-            const parsedResult = parsePlanAiJson(rawText);
-            const parsed = parsedResult.value;
-            if (!parsed || typeof parsed !== 'object') {
-                planAiDebug('parse:failed', {
-                    reason: 'invalid-json',
-                    parseSource: parsedResult.source,
-                    rawChars: String(rawText || '').length
-                });
-                return { ok: false, reason: 'AI 返回不是有效 JSON', rawText };
-            }
-            const rawPlans = extractPlanAiPlanCandidates(parsed);
-            const conversionSummaries = [];
-            const validPlans = rawPlans.map((rawPlan, index) => {
-                const plan = normalizePlanAiPlanCandidate(rawPlan);
-                const planType = planAiPlanType(plan, allowedTypes, index);
-                const collectedItems = collectPlanAiRawItems(plan);
-                const directItems = collectPlanAiDirectArrayItems(plan);
-                const rawItems = directItems.length > collectedItems.length ? directItems : collectedItems;
-                conversionSummaries.push({
-                    index,
-                    source: directItems.length > collectedItems.length ? 'direct-arrays' : 'recursive',
-                    collectedCount: collectedItems.length,
-                    directCount: directItems.length,
-                    chosenCount: rawItems.length,
-                    chosenNames: rawItems.map((item) => item.name).filter(Boolean).slice(0, 12).join(' | ')
-                });
-                const items = rawItems.map((item) => {
-                    const name = String(item.name || '');
-                    if (!name) return null;
-                    const category = normalizeAiCategory(item.category || item.phase || item.section);
-                    const progressionAllowed = category === 'main';
-                    const meta = window.planPolicy?.actionMetaForName?.(`${name} ${item.aiReasoning || item.reason || item.note || ''}`) || {};
-                    const choice = resolvePlanActionChoiceForText(this, name, item.choiceId || item.prescriptionActionId || '');
-                    const coerced = coerceAiSpec({ ...item, category }, { planType });
-                    return {
-                        name,
-                        category,
-                        actionKey: item.actionKey || choice?.actionKey || meta.actionKey || '',
-                        canonicalName: item.canonicalName || choice?.canonicalName || meta.canonicalName || name,
-                        progressionGroup: item.progressionGroup || choice?.progressionGroup || meta.progressionGroup || '',
-                        progressionLevel: Number(item.progressionLevel ?? choice?.progressionLevel ?? meta.progressionLevel ?? 0),
-                        chainId: progressionAllowed ? String(item.chainId || item.chainHint || choice?.chainId || meta.chainId || '') : '',
-                        currentLevel: progressionAllowed && item.currentLevel != null ? Number(item.currentLevel) : null,
-                        spec: coerced.spec,
-                        cooldownRefs: Array.isArray(item.cooldownRefs) ? item.cooldownRefs.map((value) => String(value || '')) : [],
-                        aiReasoning: String(item.aiReasoning || item.reason || item.rationale || item.note || ''),
-                        durationEstHint: String(item.durationEstHint || item.durationHint || item.estimatedDuration || ''),
-                        requiresUserConfirm: !!(item.requiresUserConfirm || item.requiresConfirmation || item.needsReview),
-                        userConfirmed: item.userConfirmed === true,
-                        policy: item.policy && typeof item.policy === 'object' ? item.policy : null,
-                        status: 'todo',
-                        doneSets: 0,
-                        userOverride: false,
-                        excludeFromPr: true,
-                        sourceActionId: choice?.sourceActionId || item.sourceActionId || '',
-                        prescriptionActionId: choice?.prescriptionActionId || item.prescriptionActionId || '',
-                        ...(choice ? { policy: { ...(item.policy && typeof item.policy === 'object' ? item.policy : {}), source: choice.source || 'prescription', choiceLabel: choice.sourceLabel || '', prescriptionName: choice.source === 'prescription' ? choice.name : '' } } : {}),
-                        autoFilled: coerced.autoFilled.length ? coerced.autoFilled : undefined
-                    };
-                }).filter(Boolean);
-                return {
-                    date: String(plan.date || plan.day || plan.dayKey || plan.targetDate || this.logicalDateKey?.() || this.dateKey(new Date())),
-                    type: planType,
-                    title: String(plan.title || plan.name || this.planTypeMeta?.(planType)?.label || '训练计划'),
-                    notes: planAiNotes(plan),
-                    source: 'ai',
-                    items
-                };
-            }).filter((plan) => plan.items.length > 0);
-            if (!validPlans.length) {
-                planAiDebug('parse:failed', {
-                    reason: 'no-usable-items',
-                    parseSource: parsedResult.source,
-                    rawChars: String(rawText || '').length,
-                    rawPlans: summarizePlanAiPlansForDebug(rawPlans)
-                });
-                return { ok: false, reason: 'JSON 缺少可用 items', rawText };
-            }
-            const warnings = validPlans.flatMap((plan) => plan.items).flatMap((item) => item.autoFilled?.length ? [`${item.name} 字段已自动补全: ${item.autoFilled.join(', ')}`] : []);
-            planAiDebug('parse:success', {
-                parseSource: parsedResult.source,
-                rawChars: String(rawText || '').length,
-                rawPlans: summarizePlanAiPlansForDebug(rawPlans),
-                conversion: conversionSummaries,
-                parsedPlans: summarizePlanAiPlansForDebug(validPlans),
-                warningCount: warnings.length
+        setPlanAiPreviewIssue(message = '') {
+            const alert = queryPlanAiPreview('[data-plan-ai-preview-error]');
+            if (!alert) return;
+            const text = String(message || '').trim();
+            alert.hidden = !text;
+            alert.textContent = text;
+        },
+
+        syncPlanAiConfirmAllState() {
+            const boxes = queryPlanAiPreviewAll('[data-preview-user-confirm]');
+            const allBox = queryPlanAiPreview('[data-plan-ai-confirm-all]');
+            if (!allBox) return;
+            const checkedCount = boxes.filter((box) => box.checked).length;
+            allBox.checked = boxes.length > 0 && checkedCount === boxes.length;
+            allBox.indeterminate = checkedCount > 0 && checkedCount < boxes.length;
+        },
+
+        togglePlanAiConfirmAll(checked) {
+            queryPlanAiPreviewAll('[data-preview-user-confirm]').forEach((box) => {
+                box.checked = !!checked;
+                box.closest?.('.plan-ai-preview-item')?.classList.remove('needs-confirmation');
             });
-            return { ok: true, plans: validPlans, warnings };
+            this.setPlanAiPreviewIssue?.('');
+            this.syncPlanAiConfirmAllState?.();
+        },
+
+        clearPlanAiPreviewItemIssue(source) {
+            const input = source?.closest ? source : null;
+            const itemEl = input?.closest?.('.plan-ai-preview-item');
+            if (itemEl && input?.checked) itemEl.classList.remove('needs-confirmation');
+            const missing = queryPlanAiPreviewAll('.plan-ai-preview-item.needs-confirmation');
+            if (!missing.length) this.setPlanAiPreviewIssue?.('');
+            this.syncPlanAiConfirmAllState?.();
+        },
+
+        focusPlanAiPreviewItem(target = {}) {
+            const targetName = planAiPreviewItemName(target);
+            const items = queryPlanAiPreviewAll('.plan-ai-preview-item');
+            const itemEl = items.find((el) => {
+                if (!targetName) return false;
+                const name = planAiPreviewElementName(el);
+                if (!name) return false;
+                return name === targetName || name.includes(targetName) || targetName.includes(name);
+            }) || items.find((el) => el.querySelector?.('[data-preview-user-confirm]:not(:checked)')) || null;
+            if (!itemEl) return null;
+            itemEl.classList.add('needs-confirmation');
+            itemEl.scrollIntoView?.({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+            const focusTarget = itemEl.querySelector?.('[data-preview-user-confirm]') || itemEl.querySelector?.('[data-preview-name]');
+            focusTarget?.focus?.({ preventScroll: true });
+            return itemEl;
+        },
+
+        parsePlanAiPayload(rawText, fallbackTypes = 'rehab') {
+            const parsed = parsePlanAiPayloadPure(rawText, buildPlanAiPayloadOptions(this, fallbackTypes));
+            return stripPlanAiMeta(parsed);
         },
 
         validatePlanAiPayload(rawText, fallbackTypes = 'rehab') {
-            const allowedTypes = normalizePlanTypes(fallbackTypes);
-            const parsedResult = parsePlanAiJson(rawText);
-            const parsed = parsedResult.value;
-            if (!parsed || typeof parsed !== 'object') {
-                planAiDebug('validate', {
-                    ok: false,
-                    reason: 'invalid-json',
-                    parseSource: parsedResult.source,
-                    rawChars: String(rawText || '').length
-                });
-                return { ok: false, errors: ['AI 返回不是有效 JSON'] };
-            }
-            const plans = extractPlanAiPlanCandidates(parsed);
-            const allErrors = [];
-            if (!plans.length) allErrors.push('JSON 缺少 plans/items');
-            plans.forEach((rawPlan, index) => {
-                const plan = normalizePlanAiPlanCandidate(rawPlan);
-                const planType = planAiPlanType(plan, allowedTypes, index);
-                const items = collectPlanAiRawItems(plan);
-                if (!items.length) {
-                    allErrors.push(`第 ${index + 1} 个计划缺少可用动作 items/main/warmup/cooldown`);
-                    return;
-                }
-                items.forEach((item) => {
-                    const name = String(item.name || '');
-                    if (!name) return;
-                    const category = normalizeAiCategory(item.category || item.phase || item.section);
-                    const coerced = coerceAiSpec({ ...item, category }, { planType });
-                    const mode = inferSpecMode(coerced.spec, item);
-                    const itemErrors = validateAiSpec({ ...coerced.spec, mode }, name);
-                    if (itemErrors.length) allErrors.push(...itemErrors);
-                });
-            });
-            planAiDebug('validate', {
-                ok: allErrors.length === 0,
-                parseSource: parsedResult.source,
-                errorCount: allErrors.length,
-                rawPlans: summarizePlanAiPlansForDebug(plans)
-            });
-            return { ok: allErrors.length === 0, errors: allErrors };
+            const validation = validatePlanAiPayloadPure(rawText, buildPlanAiPayloadOptions(this, fallbackTypes));
+            return stripPlanAiMeta(validation);
         },
 
         async submitPlanAi(mode = 'today') {
@@ -1396,11 +1178,8 @@
             }
         },
 
-        previewPlanAiPlans(plans = []) {
-            const beforeSanitize = summarizePlanAiPlansForDebug(plans);
-            const beforeSanitizePlans = Array.isArray(plans) ? plans : [];
-            if (window.planPolicy?.sanitizeGeneratedPlans) {
-                const policyDebug = [];
+        previewPlanAiPlans(plans = [], options = {}) {
+            if (!options.skipSanitize && window.planPolicy?.sanitizeGeneratedPlans) {
                 plans = window.planPolicy.sanitizeGeneratedPlans(plans, {
                     db: this.db || {},
                     activeRecords: this.activeRecords?.bind(this),
@@ -1408,23 +1187,22 @@
                     types: normalizePlanTypes(this._planAiTypes || plans.map((plan) => plan.type || 'rehab')),
                     ensureTaskShape: (item) => item,
                     keepBlockedAsConfirm: true,
-                    respectUserOverride: true,
-                    onDebug: (entry) => policyDebug.push(entry)
+                    respectUserOverride: true
                 });
-                planAiDebug('sanitize:preview', {
-                    before: beforeSanitize,
-                    after: summarizePlanAiPlansForDebug(plans),
-                    changes: summarizePlanAiSanitizeChanges(beforeSanitizePlans, plans),
-                    policy: policyDebug
-                });
-            } else {
-                planAiDebug('sanitize:preview:skipped', { before: beforeSanitize });
             }
             this._pendingPlanAiPlans = plans;
+            const confirmItems = plans.flatMap((plan) => Array.isArray(plan.items) ? plan.items : []).filter((item) => item.requiresUserConfirm);
+            const confirmCount = confirmItems.length;
+            const allConfirmed = confirmCount > 0 && confirmItems.every((item) => item.userConfirmed === true);
             this._openModal?.({
                 title: '确认训练计划',
                 icon: 'auto_awesome',
                 bodyHtml: `<div class="plan-ai-preview">
+                    <div class="plan-ai-preview-error" data-plan-ai-preview-error hidden></div>
+                    ${confirmCount ? `<label class="plan-ai-confirm-all">
+                        <input type="checkbox" data-plan-ai-confirm-all onchange="data.togglePlanAiConfirmAll(this.checked)" ${allConfirmed ? 'checked' : ''}>
+                        <span><strong>确认所有风险一次性落库</strong><small>共 ${confirmCount} 个动作需要确认；勾选后会同步勾选下方所有风险项。</small></span>
+                    </label>` : ''}
                     ${plans.map((plan, planIndex) => `
                         <section class="plan-ai-preview-plan" data-plan-index="${planIndex}">
                             <div class="plan-ai-preview-type">${this.escapeHtml(this.planTypeMeta?.(plan.type)?.label || plan.type || '训练计划')}</div>
@@ -1450,6 +1228,11 @@
                     <button class="md-btn md-btn-filled" type="button" onclick="data.confirmPlanAiPlans()">确认落库</button>
                 `
             });
+            this.syncPlanAiConfirmAllState?.();
+            if (options.issue?.message) {
+                this.setPlanAiPreviewIssue?.(options.issue.message);
+                this.focusPlanAiPreviewItem?.(options.issue.item || { name: options.issue.itemName || '' });
+            }
         },
 
         renderPlanAiPreviewItem(planIndex, itemIndex, item = {}) {
@@ -1511,7 +1294,7 @@
                     <input type="text" data-preview-reason value="${this.escapeHtml(item.aiReasoning || '')}" placeholder=" ">
                     <label>理由</label>
                 </div>
-                ${item.requiresUserConfirm ? `<label class="plan-ai-preview-confirm"><input type="checkbox" data-preview-user-confirm ${item.userConfirmed ? 'checked' : ''}><span>${this.escapeHtml(confirmLabel)}</span></label>` : ''}
+                ${item.requiresUserConfirm ? `<label class="plan-ai-preview-confirm"><input type="checkbox" data-preview-user-confirm onchange="data.clearPlanAiPreviewItemIssue?.(this)" ${item.userConfirmed ? 'checked' : ''}><span>${this.escapeHtml(confirmLabel)}</span></label>` : ''}
                 <button class="md-icon-btn" type="button" onclick="data.deletePlanAiPreviewItem(${planIndex}, ${itemIndex})" aria-label="删除动作"><span class="material-symbols-rounded">delete</span></button>
             </div>`;
         },
@@ -1607,6 +1390,7 @@
                     });
                     const selectedMeta = choice || inferredMeta;
                     const sourceLabel = choice?.sourceLabel || (!userOverride ? itemEl.getAttribute('data-preview-choice-source-label') : '') || '';
+                    const confirmInput = itemEl.querySelector('[data-preview-user-confirm]');
                     items.push({
                         name,
                         category,
@@ -1614,8 +1398,8 @@
                         cooldownRefs: [],
                         aiReasoning: reason,
                         durationEstHint: '',
-                        requiresUserConfirm: !!itemEl.querySelector('[data-preview-user-confirm]'),
-                        userConfirmed: itemEl.querySelector('[data-preview-user-confirm]')?.checked !== false,
+                        requiresUserConfirm: !!confirmInput,
+                        userConfirmed: confirmInput ? confirmInput.checked === true : false,
                         status: 'todo',
                         doneSets: 0,
                         userOverride,
@@ -1671,14 +1455,11 @@
         confirmPlanAiPlans() {
             let plans = this.collectPlanAiPreviewPlans?.() || [];
             if (!plans.length) {
+                this.setPlanAiPreviewIssue?.('预览里没有可保存的训练动作');
                 window.toast?.show?.('预览里没有可保存的训练动作', 'error');
                 return;
             }
-            planAiDebug('confirm:collected', { plans: summarizePlanAiPlansForDebug(plans) });
-            const beforeSanitize = summarizePlanAiPlansForDebug(plans);
-            const beforeSanitizePlans = Array.isArray(plans) ? plans : [];
             if (window.planPolicy?.sanitizeGeneratedPlans) {
-                const policyDebug = [];
                 plans = window.planPolicy.sanitizeGeneratedPlans(plans, {
                     db: this.db || {},
                     activeRecords: this.activeRecords?.bind(this),
@@ -1686,35 +1467,25 @@
                     types: normalizePlanTypes(this._planAiTypes || plans.map((plan) => plan.type || 'rehab')),
                     ensureTaskShape: (item) => item,
                     keepBlockedAsConfirm: true,
-                    respectUserOverride: true,
-                    onDebug: (entry) => policyDebug.push(entry)
+                    respectUserOverride: true
                 });
-                planAiDebug('sanitize:confirm', {
-                    before: beforeSanitize,
-                    after: summarizePlanAiPlansForDebug(plans),
-                    changes: summarizePlanAiSanitizeChanges(beforeSanitizePlans, plans),
-                    policy: policyDebug
-                });
-            } else {
-                planAiDebug('sanitize:confirm:skipped', { before: beforeSanitize });
             }
             const unconfirmed = plans.flatMap((plan) => plan.items || []).filter((item) => item.requiresUserConfirm && !item.userConfirmed);
             if (unconfirmed.length) {
-                planAiDebug('confirm:blocked-unconfirmed', {
-                    count: unconfirmed.length,
-                    plans: summarizePlanAiPlansForDebug(plans)
-                });
-                window.toast?.show?.(`有 ${unconfirmed.length} 个需要确认的动作尚未确认`, 'error');
+                const firstUnconfirmed = unconfirmed[0] || {};
+                const message = `还有 ${unconfirmed.length} 个风险确认未勾选，已定位到第一个：${firstUnconfirmed.name || '未命名动作'}`;
+                this.previewPlanAiPlans(plans, { skipSanitize: true, issue: { message, item: firstUnconfirmed } });
+                window.toast?.show?.(message, 'error', 5200);
                 return;
             }
             const hasAutoFilled = plans.some((plan) => plan.items.some((item) => item.autoFilled?.length));
-            const savedSummaries = [];
             const beforePlansSnapshot = clone(this.db.dailyPlans || []);
             const beforeSelectedPlanId = this.selectedPlanId;
             const batchBeforePlans = [];
             const batchAfterPlans = [];
             const prepared = [];
             let blockedReason = '';
+            let blockedViolation = null;
             plans.forEach((plan) => {
                 if (blockedReason) return;
                 const sameDay = this.activeRecords(this.db.dailyPlans || []).filter((p) => p.date === plan.date && !p.deleted);
@@ -1759,23 +1530,20 @@
                     source: 'ai'
                 });
                 if (validation && !validation.ok) {
-                    blockedReason = validation.violations[0]?.reason || '存在受保护任务变更';
+                    blockedViolation = validation.violations[0] || null;
+                    blockedReason = blockedViolation?.reason || '存在受保护任务变更';
                     return;
                 }
                 if (current) batchBeforePlans.push(current);
                 prepared.push({ current, merged, sourcePlan: plan });
-                savedSummaries.push({
-                    date: plan.date,
-                    type: plan.type || 'rehab',
-                    preservedCount: preserved.length,
-                    aiItemCount: aiItems.length,
-                    totalCount: merged.items?.length || 0
-                });
             });
             if (blockedReason) {
                 this.db.dailyPlans = beforePlansSnapshot;
                 this.selectedPlanId = beforeSelectedPlanId;
-                window.toast?.show?.(`训练计划未保存：${blockedReason}`, 'error');
+                const message = `训练计划未保存：${blockedReason}`;
+                this.setPlanAiPreviewIssue?.(message);
+                this.focusPlanAiPreviewItem?.({ name: blockedViolation?.taskName || blockedViolation?.duplicateName || '' });
+                window.toast?.show?.(message, 'error', 6200);
                 return;
             }
             const changes = [];
@@ -1807,10 +1575,6 @@
             this.closePlanAiSheet();
             this._closeActiveModal?.();
             this.render?.();
-            planAiDebug('confirm:saved', {
-                autoFilled: hasAutoFilled,
-                plans: savedSummaries
-            });
             if (hasAutoFilled) {
                 window.toast?.show?.('训练计划已落库（部分字段由默认值补全，可进入「调整任务参数」修正）', 'info', 5000);
             } else {

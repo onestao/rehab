@@ -16,6 +16,7 @@ function loadPlanAi() {
   vm.runInNewContext(policyCode, sandbox);
   vm.runInNewContext(code, sandbox);
   sandbox.window.dataPlanAi.__testDocument = sandbox.document;
+  sandbox.window.dataPlanAi.__testWindow = sandbox.window;
   return sandbox.window.dataPlanAi;
 }
 
@@ -72,6 +73,37 @@ function createContext(api) {
       record.updatedAt = 123;
     }
   };
+}
+
+/**
+ * @param {string|string[]} [types]
+ */
+function purePayloadOptions(api, ctx, types = 'rehab') {
+  const planPolicy = api.__testWindow?.planPolicy || {};
+  return {
+    types,
+    repairJson: (text) => planPolicy.repairPlanAiJson?.(text),
+    today: ctx.logicalDateKey?.() || ctx.dateKey?.(new Date()) || '',
+    titleForType: (type) => ctx.planTypeMeta?.(type)?.label || '训练计划',
+    actionMetaForText: (text) => planPolicy.actionMetaForName?.(text) || {},
+    resolveActionChoice: ({ name, item, preferredChoiceId }) => (
+      api.resolvePlanActionChoiceForText.call(ctx, name, preferredChoiceId || item?.choiceId || item?.prescriptionActionId || '')
+    )
+  };
+}
+
+/**
+ * @param {string|string[]} [types]
+ */
+function parsePlanAiPayloadPure(api, ctx, rawText, types = 'rehab') {
+  return planAiPure.parsePlanAiPayload(rawText, purePayloadOptions(api, ctx, types));
+}
+
+/**
+ * @param {string|string[]} [types]
+ */
+function validatePlanAiPayloadPure(api, ctx, rawText, types = 'rehab') {
+  return planAiPure.validatePlanAiPayload(rawText, purePayloadOptions(api, ctx, types));
 }
 
 test('plan-ai-pure exposes direct import API for parser and spec logic', () => {
@@ -136,6 +168,32 @@ test('plan action search includes rehab prescriptions and action library', () =>
   assert.equal(prescription.actionKey, 'side-lying-hip-abduction');
   assert.equal(library.source, 'action-library');
   assert.equal(library.sourceActionId, 'lib-bridge');
+});
+
+test('plan AI parser adapter injects runtime action matching and hides debug meta', () => {
+  const api = loadPlanAi();
+  const ctx = createContext(api);
+  ctx.db.health.rehabWeekly = [{
+    weekStart: '2026-06-27',
+    actions: [{ name: '侧卧髋外展', status: 'continued', spec: { sets: 3, reps: 12, work: 3 } }]
+  }];
+
+  const parsed = api.parsePlanAiPayload.call(ctx, JSON.stringify({
+    date: '2026-06-27',
+    type: 'rehab',
+    items: [{
+      name: '弹力带侧卧髋部外展',
+      category: 'main',
+      spec: { sets: 4, reps: 12, work: 3, repRest: 0, actionRest: 45, isAlt: true, mode: 'alt-reps' },
+      aiReasoning: '处方动作强化臀中肌'
+    }]
+  }), ['rehab']);
+
+  const item = parsed.plans[0].items[0];
+  assert.equal(parsed.ok, true);
+  assert.equal(parsed.meta, undefined);
+  assert.equal(item.actionKey, 'side-lying-hip-abduction');
+  assert.equal(item.policy.source, 'prescription');
 });
 
 test('plan preview collection treats edited action name as user override with new identity', () => {
@@ -207,7 +265,7 @@ test('plan preview collection treats edited action name as user override with ne
 test('plan AI parser fills usable spec defaults and preserves alternation', () => {
   const api = loadPlanAi();
   const ctx = createContext(api);
-  const parsed = api.parsePlanAiPayload.call(ctx, JSON.stringify({
+  const parsed = parsePlanAiPayloadPure(api, ctx, JSON.stringify({
     date: '2026-05-25',
     type: 'bulk',
     items: [
@@ -242,7 +300,7 @@ test('plan AI parser fills usable spec defaults and preserves alternation', () =
 test('plan AI parser accepts grouped warmup main and stretching structures', () => {
   const api = loadPlanAi();
   const ctx = createContext(api);
-  const parsed = api.parsePlanAiPayload.call(ctx, JSON.stringify({
+  const parsed = parsePlanAiPayloadPure(api, ctx, JSON.stringify({
     date: '2026-05-25',
     type: 'rehab',
     title: '左髋康复',
@@ -264,7 +322,7 @@ test('plan AI parser accepts grouped warmup main and stretching structures', () 
   assert.deepEqual(JSON.parse(JSON.stringify(parsed.plans[0].items.map((item) => item.category))), ['warmup', 'main', 'main', 'cooldown']);
   assert.deepEqual(JSON.parse(JSON.stringify(parsed.plans[0].items.map((item) => item.name))), ['踝泵', '侧卧髋外展', '基础臀桥', '臀中肌拉伸']);
   assert.match(parsed.plans[0].notes, /疼痛达到4\/10/);
-  assert.equal(api.validatePlanAiPayload.call(ctx, JSON.stringify({
+  assert.equal(validatePlanAiPayloadPure(api, ctx, JSON.stringify({
     date: '2026-05-25',
     type: 'rehab',
     warmup: [{ name: '踝泵', sets: 1, reps: 15, work: 1 }],
@@ -276,7 +334,7 @@ test('plan AI parser accepts grouped warmup main and stretching structures', () 
 test('plan AI parser descends into object phase containers', () => {
   const api = loadPlanAi();
   const ctx = createContext(api);
-  const parsed = api.parsePlanAiPayload.call(ctx, JSON.stringify({
+  const parsed = parsePlanAiPayloadPure(api, ctx, JSON.stringify({
     plan: {
       date: '2026-05-25',
       type: 'rehab',
@@ -304,7 +362,7 @@ test('plan AI parser descends into object phase containers', () => {
 test('plan AI parser accepts suffixed plan and action container names', () => {
   const api = loadPlanAi();
   const ctx = createContext(api);
-  const parsed = api.parsePlanAiPayload.call(ctx, JSON.stringify({
+  const parsed = parsePlanAiPayloadPure(api, ctx, JSON.stringify({
     dayPlan: {
       date: '2026-05-25',
       type: 'rehab',
@@ -354,8 +412,8 @@ test('plan AI parser keeps exercise items that include instruction steps', () =>
       }
     ]
   });
-  const parsed = api.parsePlanAiPayload.call(ctx, raw, ['rehab']);
-  const validated = api.validatePlanAiPayload.call(ctx, raw, ['rehab']);
+  const parsed = parsePlanAiPayloadPure(api, ctx, raw, ['rehab']);
+  const validated = validatePlanAiPayloadPure(api, ctx, raw, ['rehab']);
 
   assert.equal(validated.ok, true);
   assert.equal(parsed.ok, true);
@@ -368,7 +426,7 @@ test('plan AI parser keeps exercise items that include instruction steps', () =>
 test('plan AI parser prefers direct action arrays over whole-plan fallback item', () => {
   const api = loadPlanAi();
   const ctx = createContext(api);
-  const parsed = api.parsePlanAiPayload.call(ctx, JSON.stringify({
+  const parsed = parsePlanAiPayloadPure(api, ctx, JSON.stringify({
     date: '2026-06-23',
     type: 'rehab',
     name: '康复计划',
@@ -393,7 +451,7 @@ test('plan AI parser prefers direct action arrays over whole-plan fallback item'
 test('plan AI parser keeps explicit item categories when direct items array is chosen', () => {
   const api = loadPlanAi();
   const ctx = createContext(api);
-  const parsed = api.parsePlanAiPayload.call(ctx, JSON.stringify({
+  const parsed = parsePlanAiPayloadPure(api, ctx, JSON.stringify({
     date: '2026-06-24',
     type: 'rehab',
     name: '康复计划',
@@ -434,7 +492,7 @@ test('plan AI parser extracts fenced JSON with phase sections', () => {
 }
 \`\`\`
 请按疼痛阈值执行。`;
-  const parsed = api.parsePlanAiPayload.call(ctx, raw, ['rehab']);
+  const parsed = parsePlanAiPayloadPure(api, ctx, raw, ['rehab']);
 
   assert.equal(parsed.ok, true);
   assert.equal(parsed.plans[0].items.length, 3);
@@ -447,7 +505,7 @@ test('plan AI parser recovers complete items from truncated JSON', () => {
   const ctx = createContext(api);
   const raw = '{"date":"2026-06-27","type":"rehab","title":"康复计划","notes":"根据用户要求增加髋部锻炼。","items":[{"name":"轻柔髋关节活动","category":"warmup","spec":{"sets":2,"reps":0,"work":30,"repRest":0,"actionRest":20,"isAlt":false,"mode":"hold"},"aiReasoning":"热身活动","requiresUserConfirm":false},{"name":"弹力带侧卧髋部外展","category":"main","spec":{"sets":4,"reps":12,"work":3,"repRest":0,"actionRest":45,"isAlt":true,"mode":"alt-reps"},"aiReasoning":"处方动作强化臀中肌","requiresUserConfirm":false},{"name":"新增内收肌训练","cate';
 
-  const parsed = api.parsePlanAiPayload.call(ctx, raw, ['rehab']);
+  const parsed = parsePlanAiPayloadPure(api, ctx, raw, ['rehab']);
 
   assert.equal(parsed.ok, true);
   assert.equal(parsed.plans[0].date, '2026-06-27');
@@ -462,7 +520,7 @@ test('plan AI parser links AI prescription wording to existing prescription acti
     actions: [{ name: '侧卧髋外展', status: 'continued', spec: { sets: 3, reps: 12, work: 3 } }]
   }];
 
-  const parsed = api.parsePlanAiPayload.call(ctx, JSON.stringify({
+  const parsed = parsePlanAiPayloadPure(api, ctx, JSON.stringify({
     date: '2026-06-27',
     type: 'rehab',
     items: [{
@@ -491,7 +549,7 @@ test('plan AI parser trusts returned prescription action ids', () => {
     defaultSpec: { sets: 3, reps: 12, work: 3 }
   }];
 
-  const parsed = api.parsePlanAiPayload.call(ctx, JSON.stringify({
+  const parsed = parsePlanAiPayloadPure(api, ctx, JSON.stringify({
     date: '2026-06-27',
     type: 'rehab',
     items: [{
@@ -512,7 +570,7 @@ test('plan AI parser trusts returned prescription action ids', () => {
 test('plan AI parser supplies hold duration and caps very long rests', () => {
   const api = loadPlanAi();
   const ctx = createContext(api);
-  const parsed = api.parsePlanAiPayload.call(ctx, JSON.stringify({
+  const parsed = parsePlanAiPayloadPure(api, ctx, JSON.stringify({
     date: '2026-05-25',
     type: 'rehab',
     items: [
@@ -529,7 +587,7 @@ test('plan AI parser supplies hold duration and caps very long rests', () => {
 test('plan AI parser supplies fallback work seconds for rep actions missing work', () => {
   const api = loadPlanAi();
   const ctx = createContext(api);
-  const parsed = api.parsePlanAiPayload.call(ctx, JSON.stringify({
+  const parsed = parsePlanAiPayloadPure(api, ctx, JSON.stringify({
     date: '2026-05-25',
     type: 'bulk',
     items: [{ name: '俯卧撑', category: 'main', spec: { sets: 3, reps: 10, repRest: 0, actionRest: 60 } }]
@@ -545,7 +603,7 @@ test('plan AI parser supplies fallback work seconds for rep actions missing work
 test('plan AI parser warns when AI omits rest fields entirely', () => {
   const api = loadPlanAi();
   const ctx = createContext(api);
-  const parsed = api.parsePlanAiPayload.call(ctx, JSON.stringify({
+  const parsed = parsePlanAiPayloadPure(api, ctx, JSON.stringify({
     date: '2026-05-25',
     type: 'bulk',
     items: [{ name: '哑铃肩推', category: 'main', spec: { sets: 3, reps: 10, work: 3 } }]
@@ -559,7 +617,7 @@ test('plan AI parser warns when AI omits rest fields entirely', () => {
 test('plan AI parser allows short rests for low-level rehab actions', () => {
   const api = loadPlanAi();
   const ctx = createContext(api);
-  const parsed = api.parsePlanAiPayload.call(ctx, JSON.stringify({
+  const parsed = parsePlanAiPayloadPure(api, ctx, JSON.stringify({
     date: '2026-05-25',
     type: 'rehab',
     items: [
@@ -627,7 +685,7 @@ test('plan AI context tells the model to keep warmup and cooldown below main tra
 test('plan AI parser caps warmup and cooldown intensity even when model copies main training load', () => {
   const api = loadPlanAi();
   const ctx = createContext(api);
-  const parsed = api.parsePlanAiPayload.call(ctx, JSON.stringify({
+  const parsed = parsePlanAiPayloadPure(api, ctx, JSON.stringify({
     date: '2026-05-25',
     type: 'bulk',
     items: [
@@ -851,6 +909,78 @@ test('plan AI preview labels prescription confirmations as prescription', () => 
   assert.doesNotMatch(html, /非处方|非医嘱/);
 });
 
+test('plan AI preview exposes one-click confirmation for all risk items', () => {
+  const api = loadPlanAi();
+  const ctx = createContext(api);
+  ctx._openModal = (config) => { ctx.modal = config; };
+
+  api.previewPlanAiPlans.call(ctx, [{
+    date: '2026-05-25',
+    type: 'rehab',
+    title: 'AI 康复计划',
+    items: [
+      { name: '低风险膝关节控制练习', category: 'main', requiresUserConfirm: true, userConfirmed: false, spec: { sets: 2, reps: 8, work: 3, repRest: 0, actionRest: 30, isAlt: false, mode: 'reps' } },
+      { name: '侧卧髋外展', category: 'main', requiresUserConfirm: true, userConfirmed: false, prescriptionActionId: 'rx-hip', policy: { source: 'prescription' }, spec: { sets: 2, reps: 10, work: 3, repRest: 0, actionRest: 30, isAlt: false, mode: 'reps' } }
+    ]
+  }], { skipSanitize: true });
+
+  assert.match(ctx.modal.bodyHtml, /data-plan-ai-confirm-all/);
+  assert.match(ctx.modal.bodyHtml, /确认所有风险一次性落库/);
+  assert.match(ctx.modal.bodyHtml, /共 2 个动作需要确认/);
+});
+
+test('plan AI preview collection does not auto-confirm items without a visible confirmation checkbox', () => {
+  const api = loadPlanAi();
+  const ctx = createContext(api);
+  const itemEl = {
+    querySelector(selector) {
+      const fields = {
+        '[data-preview-name]': { value: '用户改成的新动作' },
+        '[data-preview-category]': { value: 'main' },
+        '[data-preview-mode]': { value: 'reps' },
+        '[data-preview-sets]': { value: '2' },
+        '[data-preview-reps]': { value: '10' },
+        '[data-preview-work]': { value: '3' },
+        '[data-preview-rep-rest]': { value: '0' },
+        '[data-preview-rest]': { value: '30' },
+        '[data-preview-reason]': { value: '用户编辑后的非医嘱动作' },
+        '[data-preview-is-alt]': { checked: false }
+      };
+      return fields[selector] || null;
+    },
+    querySelectorAll() { return []; },
+    getAttribute(attr) {
+      const attrs = {
+        'data-original-name': '原医嘱动作',
+        'data-original-category': 'main',
+        'data-original-spec': 'sets:2|reps:10|work:3|repRest:0|actionRest:30|isAlt:false|mode:reps',
+        'data-original-reason': '原理由',
+        'data-original-user-override': 'false'
+      };
+      return attrs[attr] || '';
+    }
+  };
+  const planEl = {
+    querySelector(selector) {
+      const fields = {
+        '[data-preview-date]': { value: '2026-05-25' },
+        '[data-preview-notes]': { value: '' },
+        '.plan-ai-preview-type': { textContent: '康复计划' }
+      };
+      return fields[selector] || null;
+    },
+    querySelectorAll(selector) {
+      return selector === '.plan-ai-preview-item' ? [itemEl] : [];
+    }
+  };
+  api.__testDocument.querySelectorAll = (selector) => selector === '.plan-ai-preview-plan' ? [planEl] : [];
+
+  const plans = api.collectPlanAiPreviewPlans.call(ctx);
+
+  assert.equal(plans[0].items[0].requiresUserConfirm, false);
+  assert.equal(plans[0].items[0].userConfirmed, false);
+});
+
 test('plan AI cleanup deletes stale empty unselected plan types only', () => {
   const api = loadPlanAi();
   const ctx = createContext(api);
@@ -998,11 +1128,13 @@ test('plan AI confirmation blocks replacing same-type manual plans', () => {
   ctx.saveDailyPlan = () => { ctx.savedPlan = true; };
   ctx.cleanupEmptyUnselectedPlanTypes = () => {};
   ctx.save = () => { ctx.saved = true; };
+  ctx.setPlanAiPreviewIssue = (message) => { ctx.previewIssue = message; };
 
   api.confirmPlanAiPlans.call(ctx);
 
   assert.equal(ctx.savedPlan, undefined);
   assert.equal(ctx.saved, undefined);
+  assert.match(ctx.previewIssue, /训练计划未保存：手工\/导入计划不能被自动改写/);
   assert.deepEqual(JSON.parse(JSON.stringify(ctx.db.dailyPlans[0].items.map((item) => item.name))), ['手工动作']);
 });
 
@@ -1108,13 +1240,18 @@ test('plan AI confirmation blocks unconfirmed non-prescription suggestions', () 
   ctx.ensureTaskShape = (item) => item;
   ctx.ensureDailyPlanShape = (plan) => plan;
   ctx.getDailyPlans = () => [];
+  ctx.previewPlanAiPlans = (plans, options) => { ctx.reopenedPreview = { plans, options }; };
   api.confirmPlanAiPlans.call({
     ...ctx,
     activeRecords: ctx.activeRecords,
     cleanupEmptyUnselectedPlanTypes: () => {},
-    saveDailyPlan: () => { ctx.savedPlan = true; }
+    saveDailyPlan: () => { ctx.savedPlan = true; },
+    previewPlanAiPlans: ctx.previewPlanAiPlans
   });
 
   assert.equal(ctx.saved, undefined);
   assert.equal(ctx.savedPlan, undefined);
+  assert.equal(ctx.reopenedPreview.options.skipSanitize, true);
+  assert.match(ctx.reopenedPreview.options.issue.message, /还有 1 个风险确认未勾选/);
+  assert.equal(ctx.reopenedPreview.options.issue.item.name, '低风险膝关节控制练习');
 });

@@ -89,6 +89,44 @@ function attachPlanAliases() {
 
 attachPlanAliases();
 
+data.loadDebugTools = async function () {
+    if (window.debugTools) return window.debugTools;
+    if (typeof window.loadAppScript !== 'function') {
+        window.toast?.show?.('调试工具加载器尚未就绪，请稍后重试。', 'error');
+        return null;
+    }
+    try {
+        await window.loadAppScript('debug-tools');
+        return window.debugTools || null;
+    } catch (e) {
+        window.errorBus?.report?.('debug.tools', e);
+        window.toast?.show?.('调试工具加载失败，请稍后重试。', 'error');
+        return null;
+    }
+};
+
+data.toggleDebugTools = async function () {
+    const tools = await data.loadDebugTools?.();
+    return tools?.toggle?.(data);
+};
+
+data.showAdviceDebugOverlay = async function () {
+    const tools = await data.loadDebugTools?.();
+    return tools?.showOverlay?.(data);
+};
+
+data.initDebugTools = function () {
+    try {
+        data._debugToolsEnabled = localStorage.getItem('rehab_debug_tools') === '1';
+    } catch {
+        data._debugToolsEnabled = false;
+    }
+    if (!data._debugToolsEnabled) return Promise.resolve(false);
+    return data.loadDebugTools?.()
+        .then((tools) => tools?.enable?.(data, { silent: true }))
+        .catch((e) => window.errorBus?.report?.('debug.tools.init', e));
+};
+
 data.refreshModules = function () {
     Object.assign(data,
         window.dataRecords || {},
@@ -120,6 +158,7 @@ data.refreshModules = function () {
     );
     attachPlanAliases();
     window.advicePanel?.attach?.(data);
+    window['planAiDebug']?.install?.();
 };
 
 if (typeof window !== 'undefined') window.data = data;

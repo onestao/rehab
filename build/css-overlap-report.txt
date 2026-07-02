@@ -1321,7 +1321,7 @@ mark.ai-hit
   files: 49-plan.css, 49-plan-ai.css
     color: var(--md-sys-on-surface-variant) (49-plan.css / 49-plan-ai.css)
 
-## COMPLEMENTS (same selector, disjoint properties): 114
+## COMPLEMENTS (same selector, disjoint properties): 115
 .bar-leading
   files: 04-layout-appbar.css, 50-v6-ui.css
 
@@ -1515,6 +1515,9 @@ body.is-paused .fab-play
   files: 49-plan.css, 49-plan-ai.css
 
 .plan-weekly-day small
+  files: 49-plan-ai.css
+
+.plan-ai-confirm-all small
   files: 49-plan-ai.css
 
 .plan-action-suggestions

@@ -23,7 +23,10 @@ export const isTimedAiAction = api.isTimedAiAction;
 export const phaseIntensityCaps = (...args) => toHostValue(api.phaseIntensityCaps(...args));
 export const coerceAiSpec = (...args) => toHostValue(api.coerceAiSpec(...args));
 export const normalizeAiCategory = api.normalizeAiCategory;
+export const normalizePlanTypes = (...args) => toHostValue(api.normalizePlanTypes(...args));
 export const parsePlanAiJson = (...args) => toHostValue(api.parsePlanAiJson(...args));
+export const parsePlanAiPayload = (...args) => toHostValue(api.parsePlanAiPayload(...args));
+export const validatePlanAiPayload = (...args) => toHostValue(api.validatePlanAiPayload(...args));
 export const planAiPure = api;
 
 export default api;

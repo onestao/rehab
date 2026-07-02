@@ -74,6 +74,7 @@ interface Window {
   volumeHeatmap: any;
   dataPlanAi: any;
   planAiPure: any;
+  debugTools: any;
   backupRingPure: any;
   backupImportPure: any;
   loadAppScript: (name: string) => Promise<void>;

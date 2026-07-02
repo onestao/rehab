@@ -4134,7 +4134,7 @@ body.is-training .fab-pip.active {
     opacity: 0;
     pointer-events: none;
     box-shadow: var(--md-sys-elevation-3);
-    z-index: 200;
+    z-index: 1200;
     transition: opacity var(--md-sys-motion-duration-short), transform var(--md-sys-motion-duration-short);
 }
 .md-toast.show {
@@ -4163,7 +4163,7 @@ body.is-training .fab-pip.active {
     text-align: center;
     opacity: 0;
     pointer-events: none;
-    z-index: 200;
+    z-index: 1200;
     transition: opacity var(--md-sys-motion-duration-short), transform var(--md-sys-motion-duration-short);
     display: flex;
     align-items: center;
@@ -9709,6 +9709,59 @@ body.is-training .fab-pip.active {
     max-width: 100%;
 }
 
+.plan-ai-preview-error {
+    padding: 10px 12px;
+    border: 1px solid color-mix(in srgb, var(--md-sys-error) 46%, transparent);
+    border-radius: var(--md-sys-shape-md);
+    background: color-mix(in srgb, var(--md-sys-error-container) 72%, var(--md-sys-surface-container-low));
+    color: var(--md-sys-on-error-container);
+    font-size: 13px;
+    font-weight: 800;
+    line-height: 1.45;
+}
+
+.plan-ai-preview-error[hidden] {
+    display: none;
+}
+
+.plan-ai-confirm-all {
+    min-width: 0;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 12px;
+    border: 1px solid color-mix(in srgb, var(--md-sys-primary) 34%, var(--md-sys-outline-variant));
+    border-radius: var(--md-sys-shape-lg);
+    background: color-mix(in srgb, var(--md-sys-primary-container) 54%, var(--md-sys-surface-container-low));
+    color: var(--md-sys-on-primary-container);
+}
+
+.plan-ai-confirm-all input {
+    flex: none;
+    width: 18px;
+    height: 18px;
+    margin-top: 2px;
+    accent-color: var(--md-sys-primary);
+}
+
+.plan-ai-confirm-all span {
+    min-width: 0;
+    display: grid;
+    gap: 2px;
+}
+
+.plan-ai-confirm-all strong,
+.plan-ai-confirm-all small {
+    overflow-wrap: anywhere;
+}
+
+.plan-ai-confirm-all small {
+    color: inherit;
+    opacity: .76;
+    font-size: 12px;
+    line-height: 1.35;
+}
+
 .plan-ai-preview-plan-head {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 44px;
@@ -9728,6 +9781,22 @@ body.is-training .fab-pip.active {
     background: var(--md-sys-surface-container-lowest);
     min-width: 0;
     max-width: 100%;
+    scroll-margin-block: 96px;
+    transition:
+        border-color var(--md-sys-motion-duration-short) var(--md-sys-motion-emphasized),
+        background var(--md-sys-motion-duration-short) var(--md-sys-motion-emphasized),
+        box-shadow var(--md-sys-motion-duration-short) var(--md-sys-motion-emphasized);
+}
+
+.plan-ai-preview-item.needs-confirmation {
+    border-color: color-mix(in srgb, var(--md-sys-error) 64%, var(--md-sys-outline-variant));
+    background: color-mix(in srgb, var(--md-sys-error-container) 36%, var(--md-sys-surface-container-lowest));
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--md-sys-error) 18%, transparent);
+}
+
+.plan-ai-preview-item.needs-confirmation .plan-ai-preview-confirm {
+    color: var(--md-sys-error);
+    font-weight: 800;
 }
 
 .plan-ai-preview-name,
