@@ -8,7 +8,11 @@ import {
     hasMeaningfulHealthProfile,
     mergeHealthProfileRecord,
     prepareRemoteSnapshotDb,
-    backupCounts
+    backupCounts,
+    countSnapshotItems,
+    compareSnapshotCountDrop,
+    hasRemoteSourceData,
+    shouldSkipRemoteReadSource
 } from '../sync-pure.js';
 
 test('mergeIncremental applies LWW by updatedAt', () => {
@@ -44,6 +48,38 @@ test('buildS3ObjectKey scopes sync and backup files under rehab prefix', () => {
 test('buildS3ObjectKey does not duplicate existing rehab prefix', () => {
     assert.equal(buildS3ObjectKey('/rehab/manifest.json'), 'rehab/manifest.json');
     assert.equal(buildS3ObjectKey('manifest.json', '/rehab/'), 'rehab/manifest.json');
+});
+
+test('S3 source policy treats prefixed data as primary over legacy root', () => {
+    assert.equal(hasRemoteSourceData({}, { entities: {} }), false);
+    assert.equal(hasRemoteSourceData({ schemaVersion: 3 }, { entities: {} }), true);
+    assert.equal(hasRemoteSourceData(null, { lastIncrementalTs: 1000, entities: {} }), true);
+    assert.equal(shouldSkipRemoteReadSource('s3', 's3:root', true), true);
+    assert.equal(shouldSkipRemoteReadSource('s3', 's3:root', false), false);
+    assert.equal(shouldSkipRemoteReadSource('webdav', 's3:root', true), false);
+});
+
+test('snapshot count safety detects local snapshots much smaller than remote', () => {
+    const localCounts = countSnapshotItems({
+        actions: [{ id: 'new-action' }],
+        routines: [],
+        history: [],
+        health: { weights: [], foodLogs: [], exerciseLogs: [], aiAdviceChat: [] }
+    });
+    const remoteCounts = countSnapshotItems({
+        itemCounts: {
+            actions: 10,
+            routines: 3,
+            history: 20,
+            food: 0,
+            exercise: 0,
+            weight: 2,
+            advice: 0
+        }
+    });
+    const warns = compareSnapshotCountDrop(localCounts, remoteCounts, 0.5);
+
+    assert.deepEqual(warns.map(item => item.entity).sort(), ['actions', 'history', 'routines', 'weight']);
 });
 
 test('health profile merge keeps meaningful profile over newer empty default', () => {

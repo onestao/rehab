@@ -48,8 +48,9 @@ function clone(value) {
     return value == null ? null : JSON.parse(JSON.stringify(value));
 }
 
-function loadStorageMigrate() {
+function loadStorageMigrate(options = {}) {
     const code = readFileSync(new URL('../storage/migrate.js', import.meta.url), 'utf8');
+    const hasIndexedDb = options.hasIndexedDb !== false;
     const localStorage = createLocalStorage();
     const store = new Map();
     const storageIdb = {
@@ -68,8 +69,8 @@ function loadStorageMigrate() {
         }
     };
     const sandbox = {
-        window: { storageIdb },
-        indexedDB: {},
+        window: hasIndexedDb ? { storageIdb } : {},
+        indexedDB: hasIndexedDb ? {} : undefined,
         localStorage,
         console
     };
@@ -182,4 +183,63 @@ test('idb adapter merges working-set advice into collection store without cleari
 
     assert.equal(clearCount, 0);
     assert.deepEqual(Array.from(byId.keys()).sort(), ['cold-old', 'recent-new']);
+});
+
+test('idb adapter recovers current-version empty idb from legacy full snapshot', async () => {
+    const { localStorage, storageIdb, storageMigrate } = loadStorageMigrate();
+    const db = {
+        schemaVersion: 3,
+        actions: [{ id: 'action-1', updatedAt: 1 }],
+        history: [{ id: 'history-1', updatedAt: 2 }],
+        health: {
+            weights: [{ id: 'weight-1', updatedAt: 3 }],
+            aiAdviceChat: [{ id: 'advice-1', updatedAt: 4 }]
+        }
+    };
+    localStorage.setItem('storageVersion', '4');
+    localStorage.setItem('rehab.db:legacy-full', JSON.stringify(db));
+    localStorage.setItem('rehab.cfg', JSON.stringify({ mode: 's3' }));
+
+    const result = await storageMigrate.createAdapter({
+        dbKey: 'rehab.db',
+        cfgKey: 'rehab.cfg',
+        storageVersionKey: 'storageVersion',
+        migrationFailedKey: 'migration.failed',
+        targetVersion: 4
+    });
+    const restored = await result.adapter.read('rehab.db');
+
+    assert.equal(result.mode, 'idb');
+    assert.deepEqual(clone(restored.actions), db.actions);
+    assert.deepEqual(clone(restored.history), db.history);
+    assert.deepEqual(clone(restored.health.aiAdviceChat), db.health.aiAdviceChat);
+    assert.deepEqual(await storageIdb.get('rehab.db:history'), db.history);
+    assert.deepEqual(await storageIdb.get('rehab.db:advice'), db.health.aiAdviceChat);
+});
+
+test('local fallback adapter hydrates db from legacy full snapshot when idb is unavailable', async () => {
+    const { localStorage, storageMigrate } = loadStorageMigrate({ hasIndexedDb: false });
+    const db = {
+        schemaVersion: 3,
+        actions: [{ id: 'action-1', updatedAt: 1 }],
+        history: [{ id: 'history-1', updatedAt: 2 }],
+        health: { aiAdviceChat: [{ id: 'advice-1', updatedAt: 3 }] }
+    };
+    localStorage.setItem('storageVersion', '4');
+    localStorage.setItem('rehab.db:legacy-full', JSON.stringify(db));
+    localStorage.setItem('rehab.cfg', JSON.stringify({ mode: 's3' }));
+
+    const result = await storageMigrate.createAdapter({
+        dbKey: 'rehab.db',
+        cfgKey: 'rehab.cfg',
+        storageVersionKey: 'storageVersion',
+        migrationFailedKey: 'migration.failed',
+        targetVersion: 4
+    });
+    const restored = await result.adapter.read('rehab.db');
+
+    assert.equal(result.mode, 'localStorage');
+    assert.deepEqual(clone(restored.actions), db.actions);
+    assert.deepEqual(clone(restored.history), db.history);
+    assert.deepEqual(clone(restored.health.aiAdviceChat), db.health.aiAdviceChat);
 });

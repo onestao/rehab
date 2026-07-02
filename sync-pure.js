@@ -230,6 +230,49 @@ function backupCounts(dbObj = {}) {
     };
 }
 
+function countSnapshotItems(snapshotData = {}) {
+    if (snapshotData?.itemCounts && typeof snapshotData.itemCounts === 'object') {
+        return { ...snapshotData.itemCounts };
+    }
+    const dbObj = snapshotData?.db && typeof snapshotData.db === 'object' && !Array.isArray(snapshotData.db)
+        ? snapshotData.db
+        : snapshotData;
+    return backupCounts(dbObj || {});
+}
+
+function compareSnapshotCountDrop(localCounts = {}, remoteCounts = {}, dropRatio = 0.5) {
+    const warns = [];
+    const keys = new Set([...Object.keys(localCounts || {}), ...Object.keys(remoteCounts || {})]);
+    for (const key of keys) {
+        const remote = Number(remoteCounts?.[key] || 0);
+        const local = Number(localCounts?.[key] || 0);
+        if (remote > 0 && local < remote * dropRatio) {
+            warns.push({ entity: key, remote, local });
+        }
+    }
+    return warns;
+}
+
+function hasRemoteSourceData(snapshotData, manifest) {
+    const snapshotHasData = !!(
+        snapshotData &&
+        typeof snapshotData === 'object' &&
+        !Array.isArray(snapshotData) &&
+        Object.keys(snapshotData).length > 0
+    );
+    const sourceManifest = manifest && typeof manifest === 'object' ? manifest : {};
+    return !!(
+        snapshotHasData ||
+        Number(sourceManifest.snapshotTs || 0) > 0 ||
+        Number(sourceManifest.lastIncrementalTs || 0) > 0 ||
+        Object.keys(sourceManifest.entities || {}).length > 0
+    );
+}
+
+function shouldSkipRemoteReadSource(mode, sourceKey, primaryHasData) {
+    return mode === 's3' && sourceKey === 's3:root' && !!primaryHasData;
+}
+
 export {
     mergeIncremental,
     computeRetryDelay,
@@ -244,7 +287,11 @@ export {
     validatePayload,
     compareCounts,
     prepareRemoteSnapshotDb,
-    backupCounts
+    backupCounts,
+    countSnapshotItems,
+    compareSnapshotCountDrop,
+    hasRemoteSourceData,
+    shouldSkipRemoteReadSource
 };
 
 if (typeof window !== 'undefined') {
@@ -255,6 +302,8 @@ if (typeof window !== 'undefined') {
         buildS3ObjectKey, hasMeaningfulHealthProfile, mergeHealthProfileRecord,
         mergeRecordsFieldwise, takeQueueBatch,
         mergeAdviceVersions, mergeAdviceRecord,
-        validatePayload, compareCounts, prepareRemoteSnapshotDb, backupCounts
+        validatePayload, compareCounts, prepareRemoteSnapshotDb, backupCounts,
+        countSnapshotItems, compareSnapshotCountDrop,
+        hasRemoteSourceData, shouldSkipRemoteReadSource
     });
 }

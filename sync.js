@@ -597,8 +597,8 @@ const sync = {
     remoteReadSources() {
         if (data.cfg.mode === 's3') {
             return [
-                { key: 's3:root', label: '根目录', options: { s3Root: true } },
-                { key: 's3:prefixed', label: 'rehab目录', options: { s3Root: false } }
+                { key: 's3:prefixed', label: 'rehab目录', options: { s3Root: false } },
+                { key: 's3:root', label: '根目录', options: { s3Root: true } }
             ];
         }
         return [{ key: data.cfg.mode || 'local', label: '默认目录', options: {} }];
@@ -748,6 +748,81 @@ const sync = {
         return Object.values(entities).reduce((sum, meta) => sum + Number(meta?.count || 0), 0);
     },
 
+    snapshotItemCounts(snapshotData = {}) {
+        const pure = window.syncPure || {};
+        if (typeof pure.countSnapshotItems === 'function') return pure.countSnapshotItems(snapshotData);
+        if (snapshotData?.itemCounts && typeof snapshotData.itemCounts === 'object') return { ...snapshotData.itemCounts };
+        const dbObj = snapshotData?.db && typeof snapshotData.db === 'object' && !Array.isArray(snapshotData.db)
+            ? snapshotData.db
+            : snapshotData;
+        const health = dbObj?.health || {};
+        return {
+            actions: dbObj?.actions?.length || 0,
+            routines: dbObj?.routines?.length || 0,
+            history: dbObj?.history?.length || 0,
+            dailyPlans: dbObj?.dailyPlans?.length || 0,
+            prescriptionActions: health.prescriptionActions?.length || 0,
+            food: health.foodLogs?.length || 0,
+            exercise: health.exerciseLogs?.length || 0,
+            weight: health.weights?.length || 0,
+            rehabWeekly: health.rehabWeekly?.length || 0,
+            advice: health.aiAdviceChat?.length || 0,
+            aiInsightCache: health.aiInsightCache ? 1 : 0
+        };
+    },
+
+    compareSnapshotCountDrop(localCounts = {}, remoteCounts = {}, dropRatio = 0.5) {
+        const pure = window.syncPure || {};
+        if (typeof pure.compareSnapshotCountDrop === 'function') {
+            return pure.compareSnapshotCountDrop(localCounts, remoteCounts, dropRatio);
+        }
+        const warns = [];
+        const keys = new Set([...Object.keys(localCounts || {}), ...Object.keys(remoteCounts || {})]);
+        for (const key of keys) {
+            const remote = Number(remoteCounts?.[key] || 0);
+            const local = Number(localCounts?.[key] || 0);
+            if (remote > 0 && local < remote * dropRatio) warns.push({ entity: key, remote, local });
+        }
+        return warns;
+    },
+
+    formatSnapshotDropWarning(warns) {
+        return (warns || []).map(w => `${w.entity}: 本地 ${w.local} / 云端 ${w.remote}`).join('；');
+    },
+
+    async assertSafeFullBackup(snapshotDb, options = {}) {
+        if (options.skipSafetyCheck) return;
+        let remoteData = null;
+        try {
+            remoteData = (await this.fetchJson(this.REMOTE_SNAPSHOT, true)).data;
+        } catch (e) {
+            const message = `无法验证云端快照，已阻止自动全量覆盖: ${e.message || e}`;
+            this.debugEvent('fullBackup:safetyCheckFailed', { quiet: !!options.quiet, error: e });
+            if (options.quiet) throw new Error(message);
+            if (!confirm(`${message}\n\n仍要继续上传全量快照吗？`)) throw new Error('用户取消全量覆盖');
+            return;
+        }
+        if (!remoteData || (typeof remoteData === 'object' && !Array.isArray(remoteData) && Object.keys(remoteData).length === 0)) return;
+
+        const localCounts = this.snapshotItemCounts(snapshotDb);
+        const remoteCounts = this.snapshotItemCounts(remoteData);
+        const warns = this.compareSnapshotCountDrop(localCounts, remoteCounts, 0.5);
+        if (!warns.length) return;
+
+        const detail = this.formatSnapshotDropWarning(warns);
+        const message = `检测到当前本地数据明显少于云端快照（${detail}）。为避免空库或不完整本地数据覆盖云端，已阻止自动全量覆盖。请先拉取远端合并后再重建快照。`;
+        this.debugEvent('fullBackup:blockedBySafety', {
+            quiet: !!options.quiet,
+            warns,
+            localCounts,
+            remoteCounts
+        });
+        if (options.quiet) throw new Error(message);
+        if (!confirm(`${message}\n\n确定仍要上传全量快照并覆盖云端吗？`)) {
+            throw new Error('用户取消全量覆盖');
+        }
+    },
+
     async fullBackup(options = {}) {
         const started = Date.now();
         this.debugEvent('fullBackup:start', { quiet: !!options.quiet });
@@ -758,6 +833,7 @@ const sync = {
         if (snapshotDb.health && window.adviceCollections) {
             snapshotDb.health.aiAdviceChat = await window.adviceCollections.getAll();
         }
+        await this.assertSafeFullBackup(snapshotDb, options);
         const snapshotBody = JSON.stringify(snapshotDb);
         const snapshotHash = await this.sha256(snapshotBody);
         await this.withRetry(() => this.writeJson(this.REMOTE_SNAPSHOT, snapshotDb, this.REMOTE_SNAPSHOT));
@@ -789,7 +865,10 @@ const sync = {
             this.setStatus('syncing', '正在上传增量变更');
             const remoteManifest = this.ensureManifestShape((await this.fetchJson(this.REMOTE_MANIFEST, true)).data);
             const localMeta = this.getSyncMeta();
-            const sinceTs = Math.max(Number(localMeta.lastIncrementalTs || 0), Number(remoteManifest.lastIncrementalTs || 0));
+            const localBaseIncrementalTs = Number(localMeta.lastIncrementalTs || 0);
+            const remoteBaseIncrementalTs = Number(remoteManifest.lastIncrementalTs || 0);
+            const localWasCaughtUp = localBaseIncrementalTs >= remoteBaseIncrementalTs;
+            const sinceTs = Math.max(localBaseIncrementalTs, remoteBaseIncrementalTs);
             const changes = await this.diffChangesSince(sinceTs);
             const changedEntities = Object.keys(changes).filter(entity => (changes[entity] || []).length > 0);
             if (!changedEntities.length) {
@@ -834,6 +913,16 @@ const sync = {
             this.saveSyncMeta();
 
             if (this.manifestIncrementalCount(remoteManifest) >= this.COMPACTION_THRESHOLD) {
+                if (!localWasCaughtUp) {
+                    this.setStatus('cloud', '增量上传完成；本地尚未拉取远端，已跳过自动快照重建');
+                    this.debugEvent('push:compactionSkipped', {
+                        reason: 'local-behind-remote',
+                        localLastIncrementalTs: localBaseIncrementalTs,
+                        remoteLastIncrementalTs: remoteBaseIncrementalTs,
+                        manifestWindows: this.manifestIncrementalCount(remoteManifest)
+                    });
+                    return;
+                }
                 await this.fullBackup({ quiet: true, baseManifest: remoteManifest });
                 return;
             }
@@ -883,10 +972,31 @@ const sync = {
             const initialMeta = this.getSyncMeta();
             const sourceLastByKey = { ...(initialMeta.sourceLastIncrementalTs || {}) };
             let latestPrefixedTs = Number(initialMeta.lastIncrementalTs || 0);
+            let primaryS3HasData = false;
+            const pure = window.syncPure || {};
 
             for (const source of this.remoteReadSources()) {
+                const shouldSkip = pure.shouldSkipRemoteReadSource
+                    ? pure.shouldSkipRemoteReadSource(data.cfg.mode, source.key, primaryS3HasData)
+                    : (data.cfg.mode === 's3' && source.key === 's3:root' && primaryS3HasData);
+                if (shouldSkip) {
+                    this.debugEvent('pull:sourceSkipped', { source: source.key, reason: 'primary-s3-source-present' });
+                    continue;
+                }
                 this.setStatus('syncing', `正在拉取${source.label}`);
                 const snapshotRes = await this.withRetry(() => this.fetchJson(this.REMOTE_SNAPSHOT, true, source.options));
+                const manifest = this.ensureManifestShape((await this.withRetry(() => this.fetchJson(this.REMOTE_MANIFEST, true, source.options))).data);
+                const sourceHasData = pure.hasRemoteSourceData
+                    ? pure.hasRemoteSourceData(snapshotRes.data, manifest)
+                    : !!(
+                        (snapshotRes.data && typeof snapshotRes.data === 'object' && Object.keys(snapshotRes.data).length > 0) ||
+                        Number(manifest.snapshotTs || 0) ||
+                        Number(manifest.lastIncrementalTs || 0) ||
+                        Object.keys(manifest.entities || {}).length
+                    );
+                if (data.cfg.mode === 's3' && source.key === 's3:prefixed' && sourceHasData) {
+                    primaryS3HasData = true;
+                }
                 if (snapshotRes.data) {
                     if (typeof snapshotRes.data === 'object' && Object.keys(snapshotRes.data).length === 0) {
                         console.warn('远端快照为空对象，跳过覆盖', source.label);
@@ -895,7 +1005,6 @@ const sync = {
                         appliedSources += 1;
                     }
                 }
-                const manifest = this.ensureManifestShape((await this.withRetry(() => this.fetchJson(this.REMOTE_MANIFEST, true, source.options))).data);
                 const sourceLast = Number(sourceLastByKey[source.key] || 0);
                 const startTs = Math.max(sourceLast, Number(manifest.snapshotTs || 0));
 

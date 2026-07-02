@@ -112,11 +112,36 @@
         }
     }
 
-    function createLocalAdapter() {
+    function readLocalSnapshot(key) {
+        try {
+            return safeParse(localStorage.getItem(key), key);
+        } catch (_) {
+            return null;
+        }
+    }
+
+    function readLegacyFullSnapshot(dbKey) {
+        return dbKey ? readLocalSnapshot(dbKey + ':legacy-full') : null;
+    }
+
+    function recoverLocalDbSnapshot(dbKey, localSnapshot) {
+        const legacyFull = readLegacyFullSnapshot(dbKey);
+        if (!localSnapshot && legacyFull) return legacyFull;
+        if (!localSnapshot) return null;
+        return recoverLargeCollections(localSnapshot, {
+            legacyHistory: legacyFull?.history,
+            legacyAdvice: legacyFull?.health?.aiAdviceChat
+        });
+    }
+
+    function createLocalAdapter(options = {}) {
+        const dbKey = options?.dbKey || '';
         return {
             mode: 'localStorage',
             read(key) {
-                return safeParse(localStorage.getItem(key), key);
+                const value = safeParse(localStorage.getItem(key), key);
+                if (dbKey && key === dbKey) return recoverLocalDbSnapshot(dbKey, value);
+                return value;
             },
             write(key, value) {
                 safeSet(key, JSON.stringify(value));
@@ -181,18 +206,6 @@
     function createIdbAdapter(options) {
         const dbKey = options?.dbKey;
         const keys = dbKey ? largeKeys(dbKey) : null;
-
-        function readLocalSnapshot(key) {
-            try {
-                return safeParse(localStorage.getItem(key), key);
-            } catch (_) {
-                return null;
-            }
-        }
-
-        function readLegacyFullSnapshot() {
-            return dbKey ? readLocalSnapshot(dbKey + ':legacy-full') : null;
-        }
 
         function isNewerSnapshot(localValue, idbValue) {
             if (!localValue || Object.prototype.toString.call(localValue) !== '[object Object]') return false;
@@ -302,7 +315,7 @@
                     const idbHistory = storeOrKvHistory || await window.storageIdb.get(keys.history);
                     const storeOrKvAdvice = await readAdviceHybrid();
                     const idbAdvice = storeOrKvAdvice || await window.storageIdb.get(keys.advice);
-                    const legacyFull = readLegacyFullSnapshot();
+                    const legacyFull = readLegacyFullSnapshot(dbKey);
                     const hydrated = recoverLargeCollections(idbValue, {
                         idbHistory,
                         idbAdvice,
@@ -330,8 +343,18 @@
                     }
                     return hydrated;
                 }
+                if (key === dbKey && !idbValue && !localSnapshot) {
+                    const legacyFull = readLegacyFullSnapshot(dbKey);
+                    if (legacyFull) {
+                        const split = splitLargeCollections(legacyFull);
+                        await window.storageIdb.set(key, split.meta);
+                        await writeHistoryToStore(split.history);
+                        await writeAdviceToStore(split.advice, { replace: true });
+                        return legacyFull;
+                    }
+                }
                 if (isNewerSnapshot(localSnapshot, idbValue)) {
-                    const legacyFull = readLegacyFullSnapshot();
+                    const legacyFull = readLegacyFullSnapshot(dbKey);
                     const value = key === dbKey
                         ? recoverLargeCollections(localSnapshot, {
                             legacyHistory: legacyFull?.history,
@@ -390,7 +413,7 @@
         createLocalAdapter: createLocalAdapter,
 
         async createAdapter(options) {
-            const localAdapter = createLocalAdapter();
+            const localAdapter = createLocalAdapter({ dbKey: options?.dbKey });
             const hasIdb = typeof indexedDB !== 'undefined' && window.storageIdb;
             if (!hasIdb) {
                 window.errorBus?.event?.('storage.migration', 'idb:unavailable');
