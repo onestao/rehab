@@ -6,6 +6,10 @@
         return document.getElementById?.(id)?.value || '';
     }
 
+    function clone(value) {
+        return JSON.parse(JSON.stringify(value));
+    }
+
     const {
         VALID_MODES,
         safeJsonParse,
@@ -20,6 +24,8 @@
         const raw = String(text || '').trim();
         return raw.length > max ? `${raw.slice(0, max)}…` : raw;
     }
+
+    const protectedPlanTask = window.planPolicy.isProtectedPlanTask;
 
     const isPlainObject = (value) => value && typeof value === 'object' && !Array.isArray(value);
     const normalizeAiKey = (key = '') => String(key || '').trim().replace(/[\s_-]+/g, '').toLowerCase();
@@ -980,6 +986,10 @@
                         };
                     })
                 }));
+            const missedCandidates = typeof this.detectMissedPlanCandidates === 'function'
+                ? this.detectMissedPlanCandidates({ targetDate: today, types, lookbackDays: 3 }).slice(0, 12)
+                : [];
+            const adjustmentPrefs = this.db.planAdjustmentPrefs || {};
             const policyContext = window.planPolicy?.buildPlanPolicyContext?.({
                 db: this.db || {},
                 activeRecords: this.activeRecords?.bind(this),
@@ -1062,6 +1072,8 @@
                 `检查结果证据/安全背景: ${JSON.stringify(conditionTargets.examEvidence || [])}`,
                 `训练计划策略上下文: ${JSON.stringify(policyContext?.summary || policyContext || {})}`,
                 `目标当前计划完整摘要: ${JSON.stringify(currentTargetPlans)}`,
+                `漏练补偿候选: ${JSON.stringify(missedCandidates)}`,
+                `计划调整偏好约束: ${JSON.stringify(adjustmentPrefs)}`,
                 `今日已完成运动摘要: ${JSON.stringify(todayCompleted)}`,
                 `近6周康复中心处方: ${JSON.stringify(rehabWeekly)}`,
                 `处方动作标准库: ${JSON.stringify(prescriptionCatalog)}`,
@@ -1471,8 +1483,8 @@
                 ['data-preview-prescription-action-id', item.prescriptionActionId || '']
             ].map(([key, value]) => `${key}="${this.escapeHtml(value)}"`).join(' ');
             const confirmLabel = item.policy?.blocked || item.policy?.source === 'blocked'
-                ? '我确认了解此动作与暂停/避免记录冲突，仍保留为候选'
-                : '我确认接受此非处方/中低风险建议';
+                ? '确认冲突候选'
+                : (item.policy?.source === 'prescription' || item.prescriptionActionId ? '确认医嘱' : '确认非医嘱建议');
             return `<div class="plan-ai-preview-item" data-item-index="${itemIndex}" ${metaAttrs}>
                 <div class="md-field plan-ai-preview-name">
                     <input type="text" data-preview-name value="${this.escapeHtml(item.name || '')}" placeholder=" " autocomplete="off" oninput="data.renderPlanActionSuggestions(this)" onfocus="data.renderPlanActionSuggestions(this)">
@@ -1705,18 +1717,28 @@
             }
             const hasAutoFilled = plans.some((plan) => plan.items.some((item) => item.autoFilled?.length));
             const savedSummaries = [];
+            const beforePlansSnapshot = clone(this.db.dailyPlans || []);
+            const beforeSelectedPlanId = this.selectedPlanId;
+            const batchBeforePlans = [];
+            const batchAfterPlans = [];
+            const prepared = [];
+            let blockedReason = '';
             plans.forEach((plan) => {
+                if (blockedReason) return;
                 const sameDay = this.activeRecords(this.db.dailyPlans || []).filter((p) => p.date === plan.date && !p.deleted);
                 sameDay.forEach((old) => {
                     const sameType = (old.type || 'rehab') === (plan.type || 'rehab');
-                    const hasLocked = (old.items || []).some((it) => it.userOverride && !it.deleted);
-                    if (sameType || hasLocked) return;
+                    const hasProtected = window.planPolicy?.isUserOwnedPlan?.(old)
+                        || (old.items || []).some((it) => protectedPlanTask(it, old) && !it.deleted);
+                    if (sameType || hasProtected) return;
+                    batchBeforePlans.push(clone(old));
                     old.deleted = true;
                     this.touchRecord?.(old, ['deleted']);
+                    batchAfterPlans.push(old);
                     if (this.selectedPlanId === old.id) this.selectedPlanId = '';
                 });
                 const current = this.getDailyPlans?.(plan.date)?.find((item) => (item.type || 'rehab') === (plan.type || 'rehab'));
-                const preserved = (current?.items || []).filter((item) => item && !item.deleted && (item.userOverride || item.status === 'done'));
+                const preserved = (current?.items || []).filter((item) => item && !item.deleted && protectedPlanTask(item, current));
                 const aiItems = plan.items.map((item) => {
                     const meta = window.planPolicy?.actionMetaForName?.(item.name || '') || {};
                     const chain = this.activeRecords(this.db.progressionChains || []).find((entry) => entry.id === item.chainId || entry.group === item.chainId)
@@ -1729,7 +1751,7 @@
                         progressionLevel: Number(item.progressionLevel ?? meta.progressionLevel ?? 0),
                         chainId: chain?.id || item.chainId || meta.chainId || ''
                     });
-                });
+                }).filter((item) => !preserved.some((protectedItem) => window.planPolicy?.tasksShareIdentity?.(item, protectedItem)));
                 const merged = this.ensureDailyPlanShape({
                     ...(current || {}),
                     date: plan.date,
@@ -1739,7 +1761,17 @@
                     notes: plan.notes,
                     items: [...preserved, ...aiItems]
                 });
-                this.saveDailyPlan?.(merged, { save: false });
+                const validation = window.planPolicy?.validatePlanChanges?.({
+                    beforePlans: current ? [current] : [],
+                    afterPlans: [merged],
+                    source: 'ai'
+                });
+                if (validation && !validation.ok) {
+                    blockedReason = validation.violations[0]?.reason || '存在受保护任务变更';
+                    return;
+                }
+                if (current) batchBeforePlans.push(current);
+                prepared.push({ current, merged, sourcePlan: plan });
                 savedSummaries.push({
                     date: plan.date,
                     type: plan.type || 'rehab',
@@ -1748,11 +1780,37 @@
                     totalCount: merged.items?.length || 0
                 });
             });
+            if (blockedReason) {
+                this.db.dailyPlans = beforePlansSnapshot;
+                this.selectedPlanId = beforeSelectedPlanId;
+                window.toast?.show?.(`训练计划未保存：${blockedReason}`, 'error');
+                return;
+            }
+            const changes = [];
+            prepared.forEach(({ current, merged, sourcePlan }) => {
+                changes.push(...(window.planPolicy?.buildPlanAdjustmentChanges?.(current || {}, merged, sourcePlan) || []));
+                this.saveDailyPlan?.(merged, { save: false });
+                batchAfterPlans.push(merged);
+            });
             this.cleanupEmptyUnselectedPlanTypes(plans);
             if (!this.selectedPlanId && plans[0]) {
                 const selected = this.getDailyPlans?.(plans[0].date)?.find((item) => (item.type || 'rehab') === (plans[0].type || 'rehab'));
                 this.selectedPlanId = selected?.id || '';
             }
+            this.createPlanAdjustmentBatch?.({
+                source: 'ai',
+                status: 'applied',
+                createdAt: Date.now(),
+                appliedAt: Date.now(),
+                sourceDate: this.logicalDateKey?.() || this.dateKey?.(new Date()) || '',
+                targetDates: [...new Set(plans.map((plan) => plan.date).filter(Boolean))],
+                trigger: { type: 'ai-regenerate' },
+                summary: 'AI 生成/重排训练计划',
+                beforePlans: batchBeforePlans,
+                afterPlans: batchAfterPlans,
+                changes,
+                undo: { beforePlansRef: 'inline', canUndo: true }
+            }, { save: false });
             this.save();
             this.closePlanAiSheet();
             this._closeActiveModal?.();

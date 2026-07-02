@@ -61,6 +61,13 @@
                 delete this.db.prefs.rehab;
             }
             this.db.dailyPlans = Array.isArray(this.db.dailyPlans) ? this.db.dailyPlans.map(plan => this.ensureDailyPlanShape ? this.ensureDailyPlanShape(plan) : this.ensureRecordMeta(plan, 'daily-plan', nowTs)) : [];
+            this.db.planAdjustments = Array.isArray(this.db.planAdjustments) ? this.db.planAdjustments.map(item => this.ensureRecordMeta(item, 'plan-adjustment', nowTs)) : [];
+            this.db.planAdjustmentPrefs = this.db.planAdjustmentPrefs && typeof this.db.planAdjustmentPrefs === 'object'
+                ? {
+                    shortTermRejects: Array.isArray(this.db.planAdjustmentPrefs.shortTermRejects) ? this.db.planAdjustmentPrefs.shortTermRejects : [],
+                    longTermPrefs: Array.isArray(this.db.planAdjustmentPrefs.longTermPrefs) ? this.db.planAdjustmentPrefs.longTermPrefs : []
+                }
+                : { shortTermRejects: [], longTermPrefs: [] };
             this.db.progressionChains = Array.isArray(this.db.progressionChains) ? this.db.progressionChains.map(chain => this.ensureRecordMeta(chain, 'plan-chain', nowTs)) : [];
             this.db.weeklyPlan = this.db.weeklyPlan && typeof this.db.weeklyPlan === 'object' ? this.db.weeklyPlan : {};
             this.db.aiCipher = this.db.aiCipher && typeof this.db.aiCipher === 'object' ? this.db.aiCipher : null;

@@ -806,6 +806,22 @@ test('plan AI preview exposes rest and alternation controls', () => {
   assert.match(html, /双侧交替/);
 });
 
+test('plan AI preview labels prescription confirmations as prescription', () => {
+  const api = loadPlanAi();
+  const html = api.renderPlanAiPreviewItem.call(createContext(api), 0, 0, {
+    name: '侧卧髋外展',
+    category: 'main',
+    requiresUserConfirm: true,
+    userConfirmed: false,
+    prescriptionActionId: 'pa-hip-abduction',
+    policy: { source: 'prescription' },
+    spec: { sets: 2, reps: 10, work: 3, repRest: 0, actionRest: 30, isAlt: false, mode: 'reps' }
+  });
+
+  assert.match(html, /确认医嘱/);
+  assert.doesNotMatch(html, /非处方|非医嘱/);
+});
+
 test('plan AI cleanup deletes stale empty unselected plan types only', () => {
   const api = loadPlanAi();
   const ctx = createContext(api);
@@ -870,6 +886,181 @@ test('plan AI confirmation preserves completed and locked tasks while replacing 
   assert.equal(ctx.closedSheet, true);
   assert.equal(ctx.closedModal, true);
   assert.equal(ctx.rendered, true);
+});
+
+test('plan AI confirmation does not soft delete protected plans from other types', () => {
+  const api = loadPlanAi();
+  const ctx = createContext(api);
+  ctx.selectedPlanId = 'bulk-done';
+  ctx.db.dailyPlans = [
+    {
+      id: 'bulk-done',
+      date: '2026-05-25',
+      type: 'bulk',
+      source: 'ai',
+      title: '增肌计划',
+      items: [{ id: 'b1', name: '已完成深蹲', status: 'done', category: 'main', spec: { sets: 3, reps: 8, work: 4 }, userOverride: false }]
+    },
+    {
+      id: 'custom-manual',
+      date: '2026-05-25',
+      type: 'custom',
+      source: 'manual',
+      title: '手工计划',
+      items: [{ id: 'c1', name: '手工安排', status: 'todo', category: 'main', spec: { sets: 2, reps: 10, work: 3 }, userOverride: false }]
+    }
+  ];
+  ctx._pendingPlanAiPlans = [{
+    date: '2026-05-25',
+    type: 'rehab',
+    title: 'AI 康复计划',
+    notes: 'AI notes',
+    items: [{ name: 'AI 康复动作', category: 'main', requiresUserConfirm: true, userConfirmed: true, spec: { sets: 2, reps: 12, work: 3, repRest: 0, actionRest: 30, isAlt: false, mode: 'reps' } }]
+  }];
+  ctx.collectPlanAiPreviewPlans = () => ctx._pendingPlanAiPlans;
+  ctx.ensureTaskShape = (item) => ({ id: item.id || `task-${item.name}`, status: item.status || 'todo', deleted: false, ...item });
+  ctx.ensureDailyPlanShape = (plan) => ({ id: plan.id || `plan-${plan.type}`, deleted: false, ...plan });
+  ctx.getDailyPlans = (date) => ctx.db.dailyPlans.filter((plan) => plan.date === date && !plan.deleted);
+  ctx.saveDailyPlan = (plan) => {
+    const index = ctx.db.dailyPlans.findIndex((item) => item.id === plan.id || (!item.deleted && item.date === plan.date && item.type === plan.type));
+    if (index >= 0) ctx.db.dailyPlans[index] = plan;
+    else ctx.db.dailyPlans.unshift(plan);
+  };
+  ctx.cleanupEmptyUnselectedPlanTypes = () => {};
+  ctx.createPlanAdjustmentBatch = (input) => {
+    ctx.adjustmentBatch = input;
+    return input;
+  };
+  ctx.save = () => { ctx.saved = true; };
+  ctx.closePlanAiSheet = () => {};
+  ctx._closeActiveModal = () => {};
+  ctx.render = () => {};
+
+  api.confirmPlanAiPlans.call(ctx);
+
+  assert.equal(ctx.db.dailyPlans.find((plan) => plan.id === 'bulk-done').deleted, undefined);
+  assert.equal(ctx.db.dailyPlans.find((plan) => plan.id === 'custom-manual').deleted, undefined);
+  assert.equal(ctx.selectedPlanId, 'bulk-done');
+  assert.ok(ctx.db.dailyPlans.find((plan) => plan.type === 'rehab' && !plan.deleted));
+});
+
+test('plan AI confirmation blocks replacing same-type manual plans', () => {
+  const api = loadPlanAi();
+  const ctx = createContext(api);
+  ctx.db.dailyPlans = [{
+    id: 'manual-rehab',
+    date: '2026-05-25',
+    type: 'rehab',
+    source: 'manual',
+    title: '手工康复计划',
+    items: [{ id: 'manual-task', name: '手工动作', status: 'todo', category: 'main', spec: { sets: 2, reps: 10, work: 3 }, userOverride: false }]
+  }];
+  ctx._pendingPlanAiPlans = [{
+    date: '2026-05-25',
+    type: 'rehab',
+    title: 'AI 康复计划',
+    notes: 'AI notes',
+    items: [{ name: 'AI 替换动作', category: 'main', requiresUserConfirm: true, userConfirmed: true, spec: { sets: 3, reps: 12, work: 3, repRest: 0, actionRest: 30, isAlt: false, mode: 'reps' } }]
+  }];
+  ctx.collectPlanAiPreviewPlans = () => ctx._pendingPlanAiPlans;
+  ctx.ensureTaskShape = (item) => ({ id: item.id || `task-${item.name}`, status: item.status || 'todo', deleted: false, ...item });
+  ctx.ensureDailyPlanShape = (plan) => ({ id: plan.id || 'manual-rehab', deleted: false, ...plan });
+  ctx.getDailyPlans = (date) => ctx.db.dailyPlans.filter((plan) => plan.date === date && !plan.deleted);
+  ctx.saveDailyPlan = () => { ctx.savedPlan = true; };
+  ctx.cleanupEmptyUnselectedPlanTypes = () => {};
+  ctx.save = () => { ctx.saved = true; };
+
+  api.confirmPlanAiPlans.call(ctx);
+
+  assert.equal(ctx.savedPlan, undefined);
+  assert.equal(ctx.saved, undefined);
+  assert.deepEqual(JSON.parse(JSON.stringify(ctx.db.dailyPlans[0].items.map((item) => item.name))), ['手工动作']);
+});
+
+test('plan AI confirmation restores selected plan id after blocked save rollback', () => {
+  const api = loadPlanAi();
+  const ctx = createContext(api);
+  ctx.selectedPlanId = 'bulk-ai';
+  ctx.db.dailyPlans = [
+    {
+      id: 'bulk-ai',
+      date: '2026-05-25',
+      type: 'bulk',
+      source: 'ai',
+      title: 'AI 增肌计划',
+      items: [{ id: 'bulk-task', name: '未完成深蹲', status: 'todo', category: 'main', spec: { sets: 3, reps: 8, work: 4 }, userOverride: false }]
+    },
+    {
+      id: 'manual-rehab',
+      date: '2026-05-25',
+      type: 'rehab',
+      source: 'manual',
+      title: '手工康复计划',
+      items: [{ id: 'manual-task', name: '手工动作', status: 'todo', category: 'main', spec: { sets: 2, reps: 10, work: 3 }, userOverride: false }]
+    }
+  ];
+  ctx._pendingPlanAiPlans = [{
+    date: '2026-05-25',
+    type: 'rehab',
+    title: 'AI 康复计划',
+    notes: 'AI notes',
+    items: [{ name: 'AI 替换动作', category: 'main', requiresUserConfirm: true, userConfirmed: true, spec: { sets: 3, reps: 12, work: 3, repRest: 0, actionRest: 30, isAlt: false, mode: 'reps' } }]
+  }];
+  ctx.collectPlanAiPreviewPlans = () => ctx._pendingPlanAiPlans;
+  ctx.ensureTaskShape = (item) => ({ id: item.id || `task-${item.name}`, status: item.status || 'todo', deleted: false, ...item });
+  ctx.ensureDailyPlanShape = (plan) => ({ id: plan.id || `plan-${plan.type}`, deleted: false, ...plan });
+  ctx.getDailyPlans = (date) => ctx.db.dailyPlans.filter((plan) => plan.date === date && !plan.deleted);
+  ctx.saveDailyPlan = () => { ctx.savedPlan = true; };
+  ctx.cleanupEmptyUnselectedPlanTypes = () => {};
+  ctx.save = () => { ctx.saved = true; };
+
+  api.confirmPlanAiPlans.call(ctx);
+
+  assert.equal(ctx.savedPlan, undefined);
+  assert.equal(ctx.saved, undefined);
+  assert.equal(ctx.selectedPlanId, 'bulk-ai');
+  assert.equal(ctx.db.dailyPlans.find((plan) => plan.id === 'bulk-ai').deleted, undefined);
+});
+
+test('plan AI confirmation drops generated duplicates for protected completed tasks', () => {
+  const api = loadPlanAi();
+  const ctx = createContext(api);
+  ctx.db.dailyPlans = [{
+    id: 'existing-rehab',
+    date: '2026-05-25',
+    type: 'rehab',
+    source: 'ai',
+    title: '旧康复计划',
+    items: [
+      { id: 'done-task', name: '基础臀桥', status: 'done', category: 'main', actionKey: 'bridge-basic', progressionGroup: 'bridge-adduction', spec: { sets: 3, reps: 12, work: 3 }, userOverride: false }
+    ]
+  }];
+  ctx._pendingPlanAiPlans = [{
+    date: '2026-05-25',
+    type: 'rehab',
+    title: 'AI 康复计划',
+    notes: 'AI notes',
+    items: [{ name: '夹砖臀桥', category: 'main', actionKey: 'bridge-brick', progressionGroup: 'bridge-adduction', requiresUserConfirm: true, userConfirmed: true, spec: { sets: 3, reps: 12, work: 3, repRest: 0, actionRest: 30, isAlt: false, mode: 'reps' } }]
+  }];
+  ctx.collectPlanAiPreviewPlans = () => ctx._pendingPlanAiPlans;
+  ctx.ensureTaskShape = (item) => ({ id: item.id || `task-${item.name}`, status: item.status || 'todo', deleted: false, ...item });
+  ctx.ensureDailyPlanShape = (plan) => ({ id: plan.id || 'existing-rehab', deleted: false, ...plan });
+  ctx.getDailyPlans = (date) => ctx.db.dailyPlans.filter((plan) => plan.date === date && !plan.deleted);
+  ctx.saveDailyPlan = (plan) => {
+    const index = ctx.db.dailyPlans.findIndex((item) => item.id === plan.id || (!item.deleted && item.date === plan.date && item.type === plan.type));
+    if (index >= 0) ctx.db.dailyPlans[index] = plan;
+    else ctx.db.dailyPlans.unshift(plan);
+  };
+  ctx.cleanupEmptyUnselectedPlanTypes = () => {};
+  ctx.save = () => { ctx.saved = true; };
+  ctx.closePlanAiSheet = () => {};
+  ctx._closeActiveModal = () => {};
+  ctx.render = () => {};
+
+  api.confirmPlanAiPlans.call(ctx);
+
+  assert.deepEqual(JSON.parse(JSON.stringify(ctx.db.dailyPlans[0].items.map((item) => item.name))), ['基础臀桥']);
+  assert.equal(ctx.saved, true);
 });
 
 test('plan AI confirmation blocks unconfirmed non-prescription suggestions', () => {

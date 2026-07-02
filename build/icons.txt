@@ -139,7 +139,6 @@ trending_down
 trending_flat
 trending_up
 tune
-upgrade
 upload
 upload_file
 verified

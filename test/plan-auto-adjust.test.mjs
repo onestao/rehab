@@ -99,6 +99,11 @@ function createContext(api, db) {
         save() {
             this.saved = true;
         },
+        createPlanAdjustmentBatch(input = {}) {
+            const batch = { id: `adj-${(this.db.planAdjustments || []).length + 1}`, ...input };
+            this.db.planAdjustments = [batch, ...(this.db.planAdjustments || [])];
+            return batch;
+        },
         render() {
             this.rendered = true;
         },
@@ -157,6 +162,9 @@ test('auto-adjust fallback preserves recovery structure and respects prescriptio
     assert.equal(db.lastPlanAutoAdjust.fallback, true);
     assert.equal(db.lastPlanAutoAdjust.mode, 'local-fallback');
     assert.match(db.lastPlanAutoAdjust.fallbackReason, /AI parse failed/);
+    assert.equal(db.planAdjustments.length, 1);
+    assert.equal(db.planAdjustments[0].status, 'applied');
+    assert.equal(db.lastPlanAutoAdjust.batchId, db.planAdjustments[0].id);
 
     const names = Array.from(plan.items.map((item) => item.name));
     assert.deepEqual(names, ['髋部热身', '单腿站立外展', '靠墙深蹲', '夹砖臀桥', '臀中肌泡沫轴放松']);
@@ -230,4 +238,128 @@ test('auto-adjust sanitizer filters blocked actions and caps categories', () => 
     assert.equal(plans[0].items.filter((item) => item.category === 'main').length, 6);
     assert.equal(plans[0].items.filter((item) => item.category === 'cooldown').length, 2);
     assert.match(plans[0].items.find((item) => item.name === '单腿臀桥').aiReasoning, /观察|待确认|用户确认|条件性/);
+});
+
+test('auto-adjust applies future-only progression suggestion to cloned future task', async () => {
+    const api = loadPlanAutoAdjust();
+    const db = {
+        dailyPlans: [{
+            id: 'source-plan',
+            date: '2026-06-22',
+            type: 'rehab',
+            title: '康复计划',
+            items: [
+                doneItem({
+                    name: '基础臀桥',
+                    chainId: 'bridge-chain',
+                    currentLevel: 1,
+                    actionKey: 'bridge-basic',
+                    canonicalName: '基础臀桥',
+                    progressionGroup: 'bridge-adduction',
+                    progressionLevel: 1,
+                    spec: { sets: 3, reps: 12, work: 3 },
+                    rpe: 1,
+                    nextProgressionSuggestion: {
+                        appliesTo: 'future-only',
+                        decision: 'progress',
+                        phase: 'ready-to-progress',
+                        targetLevel: 2,
+                        targetName: '夹砖臀桥',
+                        suggestedSpec: { sets: 3, reps: 12, work: 3 },
+                        reason: '连续太轻，建议进入下一阶动作'
+                    }
+                })
+            ]
+        }],
+        progressionChains: [{
+            id: 'bridge-chain',
+            levels: [{ lv: 1, name: '基础臀桥' }, { lv: 2, name: '夹砖臀桥' }]
+        }],
+        health: { rehabWeekly: [] }
+    };
+    const ctx = createContext(api, db);
+
+    const applied = await api.autoAdjustNextDayPlans.call(ctx, { sourceDate: '2026-06-22', targetDate: '2026-06-23' });
+
+    assert.equal(applied, true);
+    assert.equal(db.dailyPlans.find((item) => item.id === 'source-plan').items[0].name, '基础臀桥');
+    const plan = db.dailyPlans.find((item) => item.date === '2026-06-23');
+    assert.equal(plan.items[0].name, '夹砖臀桥');
+    assert.equal(plan.items[0].actionKey, 'bridge-brick');
+    assert.equal(plan.items[0].canonicalName, '夹砖臀桥');
+    assert.equal(plan.items[0].progressionGroup, 'bridge-adduction');
+    assert.equal(plan.items[0].progressionLevel, 2);
+    assert.match(plan.items[0].aiReasoning, /下次建议/);
+});
+
+test('auto-adjust skips same-type manual target plans', () => {
+    const api = loadPlanAutoAdjust();
+    const db = {
+        dailyPlans: [{
+            id: 'manual-target',
+            date: '2026-06-23',
+            type: 'rehab',
+            source: 'manual',
+            title: '手工康复计划',
+            items: [{
+                id: 'manual-task',
+                name: '手工臀桥',
+                category: 'main',
+                status: 'todo',
+                actionKey: 'bridge-basic',
+                progressionGroup: 'bridge-adduction',
+                spec: { sets: 2, reps: 12, work: 3 }
+            }]
+        }],
+        health: { rehabWeekly: [] }
+    };
+    const ctx = createContext(api, db);
+
+    const applied = api.applyAutoAdjustedPlans.call(ctx, [{
+        date: '2026-06-23',
+        type: 'rehab',
+        title: 'AI 康复计划',
+        source: 'ai',
+        items: [{
+            name: 'AI 替换臀桥',
+            category: 'main',
+            status: 'todo',
+            actionKey: 'bridge-basic',
+            progressionGroup: 'bridge-adduction',
+            spec: { sets: 3, reps: 12, work: 3 }
+        }]
+    }], { sourceDate: '2026-06-22', targetDate: '2026-06-23' });
+
+    assert.equal(applied, false);
+    assert.equal(db.dailyPlans.length, 1);
+    assert.equal(db.dailyPlans[0].source, 'manual');
+    assert.deepEqual(JSON.parse(JSON.stringify(db.dailyPlans[0].items.map((item) => item.name))), ['手工臀桥']);
+});
+
+test('missed detection returns unfinished unlocked main tasks as carry-over candidates', () => {
+    const api = loadPlanAutoAdjust();
+    const db = {
+        dailyPlans: [{
+            id: 'missed-plan',
+            date: '2026-06-21',
+            type: 'rehab',
+            title: '康复计划',
+            items: [
+                { id: 'todo-1', name: '侧卧髋外展', category: 'main', status: 'todo', spec: { sets: 2, reps: 10, work: 3 }, prescriptionActionId: 'pa-1' },
+                { id: 'done-1', name: '基础臀桥', category: 'main', status: 'done', spec: { sets: 2, reps: 10, work: 3 } },
+                { id: 'locked-1', name: '锁定动作', category: 'main', status: 'todo', userOverride: true, spec: { sets: 2, reps: 10, work: 3 } },
+                { id: 'cooldown-1', name: '泡沫轴放松', category: 'cooldown', status: 'todo', spec: { sets: 1, reps: 1, work: 30 } }
+            ]
+        }],
+        health: { rehabWeekly: [] }
+    };
+    const ctx = createContext(api, db);
+
+    const candidates = api.detectMissedPlanCandidates.call(ctx, { targetDate: '2026-06-23', types: ['rehab'] });
+
+    assert.equal(candidates.length, 1);
+    assert.equal(candidates[0].type, 'carry-over');
+    assert.equal(candidates[0].risk, 'low');
+    assert.equal(candidates[0].sourceTask.taskId, 'todo-1');
+    assert.equal(candidates[0].targetTask.date, '2026-06-23');
 });

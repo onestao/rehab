@@ -59,6 +59,20 @@
         return '';
     }
 
+    function taskMeta(item = {}) {
+        return window.planPolicy?.actionMetaForName?.(`${item.name || ''} ${item.aiReasoning || ''}`) || {};
+    }
+
+    function findProgressionChain(ctx = {}, item = {}) {
+        const meta = taskMeta(item);
+        const chainId = item.chainId || meta.chainId || '';
+        if (!chainId) return null;
+        return (ctx.activeRecords?.(ctx.db?.progressionChains || []) || []).find((chain) => chain.id === chainId || chain.group === chainId)
+            || window.planChains?.find?.(chainId)
+            || window.planChains?.get?.(chainId)
+            || null;
+    }
+
     function feedbackStats(plans = []) {
         const rows = plans.flatMap((plan) => loadItems(plan).map((item) => ({ plan, item }))).filter(({ item }) => item.feedback?.rpe);
         const rpes = rows.map(({ item }) => Number(item.feedback?.rpe || 0)).filter(Boolean);
@@ -241,6 +255,7 @@
     function cloneForTomorrow(item = {}, stats = {}, options = {}) {
         const next = clone(item);
         delete next.id;
+        delete next.nextProgressionSuggestion;
         next.status = 'todo';
         next.doneSets = 0;
         next.feedback = null;
@@ -282,7 +297,7 @@
         } else {
             next.aiReasoning = next.aiReasoning || '本地保守调整：今日反馈可接受，保持稳定训练。';
         }
-        return next;
+        return window.planPolicy?.applyFutureProgressionSuggestion?.(next, item, options) || next;
     }
 
     function prescriptionTask(action = {}) {
@@ -322,7 +337,7 @@
                 .map((item) => cloneForTomorrow(item, stats, { preventProgression: true }));
             let main = sourceByCategory.main
                 .filter((item) => !itemMatchesAny(item, avoidNames))
-                .map((item) => cloneForTomorrow(item, stats, { policy: findPrescriptionForItem(item, prescription) }));
+                .map((item) => cloneForTomorrow(item, stats, { policy: findPrescriptionForItem(item, prescription), chain: findProgressionChain(ctx, item) }));
             const cooldown = sourceByCategory.cooldown
                 .filter((item) => !itemMatchesAny(item, avoidNames))
                 .map((item) => cloneForTomorrow(item, stats, { preventProgression: true }));
@@ -565,26 +580,68 @@
         applyAutoAdjustedPlans(plans = [], meta = {}) {
             if (!plans.length) return false;
             const beforePlans = meta.beforePlans || clone(this.db.dailyPlans || []);
+            const batchBeforePlans = [];
+            const afterPlans = [];
+            const source = meta.fallback ? 'local-rule' : 'ai';
+            const changes = [];
+            let blockedReason = '';
+            let appliedCount = 0;
             plans.forEach((plan) => {
+                if (blockedReason) return;
                 const current = (this.activeRecords?.(this.db.dailyPlans || []) || []).find((item) => item.date === plan.date && (item.type || 'rehab') === (plan.type || 'rehab'));
-                const preserved = activeItems(current).filter((item) => item.userOverride || item.status === 'done');
+                const preserved = activeItems(current).filter((item) => window.planPolicy?.isProtectedPlanTask?.(item, current));
+                const generatedItems = (plan.items || []).filter((item) => !preserved.some((protectedItem) => window.planPolicy?.tasksShareIdentity?.(item, protectedItem)));
                 const merged = this.ensureDailyPlanShape?.({
                     ...(current || {}),
                     date: plan.date,
                     type: plan.type || 'rehab',
                     title: plan.title || this.planTypeMeta?.(plan.type)?.label || '训练计划',
-                    source: 'ai',
+                    source,
                     notes: plan.notes,
-                    items: [...preserved, ...plan.items]
+                    items: [...preserved, ...generatedItems]
                 }) || plan;
+                const validation = window.planPolicy?.validatePlanChanges?.({
+                    beforePlans: current ? [current] : [],
+                    afterPlans: [merged],
+                    source
+                });
+                if (validation && !validation.ok) {
+                    blockedReason = validation.violations[0]?.reason || '存在受保护任务变更';
+                    return;
+                }
+                changes.push(...(window.planPolicy?.buildPlanAdjustmentChanges?.(current || {}, merged, plan) || []));
+                if (current) batchBeforePlans.push(current);
                 this.saveDailyPlan?.(merged, { save: false });
+                afterPlans.push(merged);
+                appliedCount += 1;
             });
+            if (blockedReason) {
+                this.db.dailyPlans = clone(beforePlans);
+                window.toast?.show?.(`自动调整被阻止：${blockedReason}`, 'error');
+                return false;
+            }
+            if (!appliedCount) return false;
+            const batch = this.createPlanAdjustmentBatch?.({
+                source,
+                status: 'applied',
+                createdAt: Date.now(),
+                appliedAt: Date.now(),
+                sourceDate: meta.sourceDate || '',
+                targetDates: [...new Set(plans.map((plan) => plan.date).filter(Boolean))],
+                trigger: { type: 'training-complete' },
+                summary: meta.fallback ? 'AI 调整失败后使用本地规则保守调整明天计划' : '根据今日反馈自动调整明天计划',
+                beforePlans: batchBeforePlans,
+                afterPlans,
+                changes,
+                undo: { beforePlansRef: 'inline', canUndo: true }
+            }, { save: false });
             this.db.lastPlanAutoAdjust = {
                 key: meta.key || '',
                 sourceDate: meta.sourceDate || '',
                 targetDate: meta.targetDate || '',
                 latestDoneAt: Number(meta.latestDoneAt || Date.now()),
-                beforePlans,
+                beforePlans: batchBeforePlans,
+                batchId: batch?.id || '',
                 appliedAt: Date.now(),
                 fallback: !!meta.fallback,
                 mode: meta.fallback ? 'local-fallback' : 'ai',
@@ -596,6 +653,12 @@
         },
 
         undoLastPlanAutoAdjust() {
+            const batchId = this.db?.lastPlanAutoAdjust?.batchId || '';
+            if (batchId && this.undoLastPlanAdjustment?.(batchId)) {
+                this.db.lastPlanAutoAdjust = null;
+                this.save?.();
+                return true;
+            }
             const snapshot = this.db?.lastPlanAutoAdjust?.beforePlans;
             if (!Array.isArray(snapshot)) {
                 window.toast?.show?.('没有可撤销的自动调整', 'info');
@@ -607,6 +670,14 @@
             this.render?.();
             window.toast?.show?.('已撤销上次自动调整', 'success');
             return true;
+        },
+
+        detectMissedPlanCandidates(options = {}) {
+            const targetDate = String(options.targetDate || this.logicalDateKey?.() || this.dateKey?.(new Date()) || new Date().toISOString().slice(0, 10));
+            return window.planPolicy?.detectMissedPlanCandidates?.(this.activeRecords?.(this.db.dailyPlans || []) || [], {
+                ...options,
+                targetDate
+            }) || [];
         }
     };
 })();

@@ -102,6 +102,13 @@
         };
     }
 
+    function normalizeAdjustmentPrefs(raw = {}) {
+        return {
+            shortTermRejects: Array.isArray(raw?.shortTermRejects) ? raw.shortTermRejects : [],
+            longTermPrefs: Array.isArray(raw?.longTermPrefs) ? raw.longTermPrefs : []
+        };
+    }
+
     const api = {
         planTodayExpanded: false,
         activeRun: null,
@@ -125,6 +132,7 @@
             this.ensurePlanPrefs();
             this.db.dailyPlans = Array.isArray(this.db.dailyPlans) ? this.db.dailyPlans : [];
             this.db.progressionChains = Array.isArray(this.db.progressionChains) ? this.db.progressionChains : [];
+            this.ensurePlanAdjustmentState();
             if (!this.db.progressionChains.length && window.planChains?.builtin?.length) {
                 this.db.progressionChains = window.planChains.builtin.map((chain) => ({
                     ...clone(chain),
@@ -133,6 +141,15 @@
                 }));
             }
             this.db.dailyPlans = this.db.dailyPlans.map((plan) => this.ensureDailyPlanShape(plan, { save: false }));
+        },
+
+        ensurePlanAdjustmentState() {
+            this.db.planAdjustments = Array.isArray(this.db.planAdjustments) ? this.db.planAdjustments : [];
+            this.db.planAdjustmentPrefs = normalizeAdjustmentPrefs(this.db.planAdjustmentPrefs || {});
+            return {
+                planAdjustments: this.db.planAdjustments,
+                planAdjustmentPrefs: this.db.planAdjustmentPrefs
+            };
         },
 
         ensureDailyPlanShape(plan = {}, options = {}) {
@@ -146,7 +163,7 @@
                 date: String(plan.date || todayKey()),
                 type,
                 title,
-                source: legacySource ? 'manual' : (['ai', 'manual', 'imported'].includes(plan.source) ? plan.source : 'manual'),
+                source: legacySource ? 'manual' : String(plan.source || 'manual'),
                 notes: String(plan.notes || ''),
                 items,
                 pendingCooldowns: uniq(plan.pendingCooldowns).filter((id) => items.some((item) => item.id === id)),
@@ -165,7 +182,6 @@
             const meta = window.planPolicy?.actionMetaForName?.(`${item.name || ''} ${item.aiReasoning || ''}`) || {};
             let reps = Math.max(0, Number(spec.reps || 0));
             const work = Math.max(0, Number(spec.work || 0));
-            // 计时/保持型动作（reps=0 但 work>0）需要至少 1 次循环，否则训练引擎会直接跳过
             if (reps <= 0 && work > 0) reps = 1;
             const invalidSpec = !item.deleted && (reps <= 0 && work <= 0);
             const next = {
@@ -188,6 +204,9 @@
                 canonicalName: String(item.canonicalName || meta.canonicalName || item.name || ''),
                 progressionGroup: String(item.progressionGroup || meta.progressionGroup || ''),
                 progressionLevel: Number(item.progressionLevel ?? meta.progressionLevel ?? 0),
+                nextProgressionSuggestion: item.nextProgressionSuggestion && typeof item.nextProgressionSuggestion === 'object'
+                    ? { ...item.nextProgressionSuggestion }
+                    : null,
                 invalidSpec,
                 currentLevel: item.currentLevel == null ? null : Math.max(1, Number(item.currentLevel || 1)),
                 status: ['todo', 'in-progress', 'done', 'skipped'].includes(item.status) ? item.status : 'todo',
@@ -198,6 +217,8 @@
                 requiresUserConfirm: !!item.requiresUserConfirm,
                 userConfirmed: item.requiresUserConfirm ? item.userConfirmed === true : item.userConfirmed !== false,
                 policy: item.policy && typeof item.policy === 'object' ? { ...item.policy } : null,
+                sourceActionId: item.sourceActionId || '',
+                prescriptionActionId: item.prescriptionActionId || '',
                 excludeFromPr: item.excludeFromPr !== false,
                 aiReasoning: String(item.aiReasoning || ''),
                 durationEstHint: String(item.durationEstHint || ''),
@@ -335,6 +356,39 @@
             return found.task;
         },
 
+        createPlanAdjustmentBatch(input = {}, options = {}) {
+            this.ensurePlanAdjustmentState();
+            const id = this.generateRecordId?.('adj') || `adj-${Date.now()}`;
+            const batch = window.planPolicy?.buildAdjustmentBatch?.(input, id) || { id, ...input, changes: input.changes || [], beforePlans: input.beforePlans || [], afterPlans: input.afterPlans || [] };
+            this.ensureRecordMeta?.(batch, 'plan-adjustment', batch.createdAt);
+            this.db.planAdjustments = [batch, ...this.db.planAdjustments.filter((item) => item.id !== batch.id)].slice(0, 50);
+            if (options.save !== false) this.save({ render: options.render !== false });
+            return batch;
+        },
+
+        undoLastPlanAdjustment(batchId = '') {
+            this.ensurePlanAdjustmentState();
+            const batch = (this.db.planAdjustments || []).find((item) => {
+                if (!item || item.deleted) return false;
+                return batchId ? item.id === batchId : item.undo?.canUndo && ['applied', 'partially-applied'].includes(item.status);
+            });
+            if (!batch || !Array.isArray(batch.beforePlans)) {
+                window.toast?.show?.('没有可撤销的计划调整', 'info');
+                return false;
+            }
+            this.db.dailyPlans = window.planPolicy.restorePlanAdjustmentPlans(this.db.dailyPlans, batch.beforePlans, batch.afterPlans, (plan) => this.ensureDailyPlanShape(plan, { save: false }));
+            if (this.selectedPlanId && !this.activeRecords(this.db.dailyPlans).some((plan) => plan.id === this.selectedPlanId)) {
+                this.selectedPlanId = this.activeRecords(this.db.dailyPlans)[0]?.id || '';
+            }
+            batch.status = 'reverted';
+            batch.revertedAt = Date.now();
+            this.touchRecord?.(batch, ['status', 'revertedAt']);
+            this.save?.();
+            this.render?.();
+            window.toast?.show?.('已撤销上次计划调整', 'success');
+            return true;
+        },
+
         completionRate(plan = this.getTodayDailyPlan()) {
             const items = (plan?.items || []).filter((item) => item && !item.deleted && item.category !== 'cooldown');
             if (!items.length) return { done: 0, total: 0, rate: 0 };
@@ -378,14 +432,23 @@
                 .map(({ item }) => item.feedback);
         },
 
-        maybeApplyProgression(planId, taskId) {
+        createProgressionAdjustmentSuggestion(planId, taskId, options = {}) {
             const { plan, task } = this.findTask(planId, taskId);
             if (!plan || !task) return null;
+            const clearSuggestion = (result = null) => {
+                this.lastProgressionSuggestion = null;
+                if (!task.nextProgressionSuggestion) return result;
+                task.nextProgressionSuggestion = null;
+                this.touchRecord(task, ['nextProgressionSuggestion']);
+                this.touchRecord(plan, ['items']);
+                if (options.save !== false) this.save();
+                return result;
+            };
             const meta = window.planPolicy?.actionMetaForName?.(`${task.name || ''} ${task.aiReasoning || ''}`) || {};
             const chainId = task.chainId || meta.chainId || '';
-            if (!chainId) return null;
+            if (!chainId) return clearSuggestion(null);
             const chain = this.activeRecords(this.db.progressionChains || []).find((item) => item.id === chainId) || window.planChains?.find?.(chainId);
-            if (!chain) return null;
+            if (!chain) return clearSuggestion(null);
             const result = window.planProgression?.evaluate?.({
                 taskItem: task,
                 chain,
@@ -393,37 +456,36 @@
                 userOverride: task.userOverride
             }) || null;
             const decision = result?.decision || result?.suggestion || 'hold';
-            if (!result || ['hold', 'maintain'].includes(decision)) return result;
-            this.lastProgressionSuggestion = { planId, taskId, result };
-            const apply = () => {
-                if (result.targetLevel && result.targetLevel !== task.currentLevel) {
-                    task.chainId = chainId;
-                    task.currentLevel = result.targetLevel;
-                    const target = (chain.levels || []).find((item) => Number(item.lv) === Number(result.targetLevel));
-                    if (target?.name) task.name = target.name;
-                }
-                const suggestedSpec = result.suggestedSpec || result.fallbackSpec;
-                if (suggestedSpec) {
-                    task.spec = { ...task.spec, ...suggestedSpec };
-                }
-                this.touchRecord(task, ['chainId', 'currentLevel', 'name', 'spec']);
-                this.touchRecord(plan, ['items']);
-                this.save();
-                window.toast?.show?.(result.reason, 'success');
+            if (!result || ['hold', 'maintain'].includes(decision)) return clearSuggestion(result);
+            const suggestion = window.planPolicy?.buildProgressionSuggestion?.(result, { plan, task, chain }) || {
+                createdAt: Date.now(),
+                decision,
+                targetLevel: result.targetLevel ?? task.currentLevel ?? null,
+                targetName: (chain.levels || []).find((item) => Number(item.lv) === Number(result.targetLevel))?.name || '',
+                suggestedSpec: result.suggestedSpec || {},
+                reason: String(result.reason || ''),
+                appliesTo: 'future-only',
+                status: 'pending'
             };
-            if (this.ensurePlanPrefs().askBeforeProgression) {
-                this._confirmModal?.({
-                    title: '进阶建议',
-                    icon: ['progress', 'volume-up', 'upgrade'].includes(decision) ? 'trending_up' : 'trending_down',
-                    message: result.reason,
-                    okText: '应用',
-                    cancelText: '稍后',
-                    onOk: apply
-                });
-            } else {
-                apply();
-            }
+            task.nextProgressionSuggestion = suggestion;
+            this.lastProgressionSuggestion = { planId, taskId, result, suggestion };
+            this.touchRecord(task, ['nextProgressionSuggestion']);
+            this.touchRecord(plan, ['items']);
+            this.createPlanAdjustmentBatch?.({
+                source: 'auto-after-feedback',
+                status: 'previewed',
+                sourceDate: plan.date || '',
+                trigger: { type: 'feedback-saved', planId, taskId },
+                summary: result.reason || '根据训练反馈生成下次调整建议',
+                changes: [{ id: `chg-${Date.now()}`, type: decision === 'progress' ? 'progress' : decision === 'deload' ? 'deload' : 'volume-up', risk: decision === 'progress' ? 'medium' : 'low', status: 'pending', reason: result.reason || '' }]
+            }, { save: false });
+            if (options.save !== false) this.save();
+            window.toast?.show?.('已记录下次训练调整建议，不会修改已完成任务', 'success');
             return result;
+        },
+
+        maybeApplyProgression(planId, taskId, options = {}) {
+            return this.createProgressionAdjustmentSuggestion(planId, taskId, options);
         },
 
         queueCooldown(planId, taskId, options = {}) {

@@ -6,6 +6,7 @@ import vm from 'node:vm';
 function loadPlanUi() {
   const policyCode = readFileSync(new URL('../rehab-policy.js', import.meta.url), 'utf8');
   const code = readFileSync(new URL('../plan-ui.js', import.meta.url), 'utf8');
+  const tabCalls = /** @type {{ page: string, nav: unknown }[]} */ ([]);
   const sandbox = {
     window: {},
     console,
@@ -13,11 +14,28 @@ function loadPlanUi() {
       querySelectorAll() {
         return [];
       }
+    },
+    __tabCalls: tabCalls,
+    requestAnimationFrame(fn) {
+      fn();
+      return 1;
+    }
+  };
+  sandbox.window.workout = {
+    isPlaying: false,
+    setMode() {},
+    toggle() {}
+  };
+  sandbox.ui = {
+    async tab(page, nav) {
+      sandbox.__tabCalls.push({ page, nav });
     }
   };
   vm.runInNewContext(policyCode, sandbox);
   vm.runInNewContext(code, sandbox);
   sandbox.window.dataPlanUi.__testDocument = sandbox.document;
+  sandbox.window.dataPlanUi.__testWindow = sandbox.window;
+  sandbox.window.dataPlanUi.__testTabCalls = sandbox.__tabCalls;
   return sandbox.window.dataPlanUi;
 }
 
@@ -119,6 +137,95 @@ test('task drawer exposes compact cancel daily plan action', () => {
   assert.match(html, /data-cancel-plan-id="rehab"/);
   assert.match(html, /plan-cancel-day-btn/);
   assert.match(html, /取消计划/);
+});
+
+test('prescription confirmation copy does not call cautious prescriptions non-prescription', async () => {
+  const api = loadPlanUi();
+  const task = {
+    id: 'task-1',
+    name: '侧卧髋外展',
+    status: 'todo',
+    category: 'main',
+    requiresUserConfirm: true,
+    userConfirmed: false,
+    prescriptionActionId: 'pa-hip-abduction',
+    policy: { source: 'prescription', cautious: true },
+    spec: { sets: 2, reps: 10, work: 3 }
+  };
+  const plans = [{ id: 'rehab', type: 'rehab', title: '康复计划', items: [task], pendingCooldowns: [] }];
+  const ctx = {
+    ...createContext(api, plans),
+    findTask() { return { plan: plans[0], task }; },
+    _confirmModal(config) { this.confirmModal = config; }
+  };
+
+  const html = api.renderPlanTaskDrawerBody.call(ctx, 'rehab');
+  await api.handlePlanTaskTap.call(ctx, 'rehab', 'task-1');
+
+  assert.match(html, /医嘱 · 待确认/);
+  assert.equal(ctx.confirmModal.title, '确认医嘱');
+  assert.match(ctx.confirmModal.message, /来自医嘱/);
+  assert.doesNotMatch(ctx.confirmModal.message, /非医嘱/);
+});
+
+test('running a plan task closes the task drawer before entering workout', async () => {
+  const api = loadPlanUi();
+  const task = {
+    id: 'task-1',
+    name: '基础臀桥',
+    status: 'todo',
+    category: 'main',
+    spec: { sets: 1, reps: 12, work: 0 }
+  };
+  const plans = [{ id: 'rehab', type: 'rehab', title: '康复计划', items: [task], pendingCooldowns: [] }];
+  const calls = [];
+  const ctx = {
+    ...createContext(api, plans),
+    findTask() { return { plan: plans[0], task }; },
+    updateItemStatus(_planId, _taskId, status) {
+      task.status = status;
+      calls.push(['status', status]);
+    },
+    _planActions() {
+      return [{ id: 'existing-action' }];
+    },
+    _replacePlanActions(actions) {
+      calls.push(['replace', actions.map((item) => item.id).join(',')]);
+    },
+    closePlanTaskDrawer() {
+      calls.push(['close-drawer']);
+      this.drawerClosed = true;
+    },
+    save() {
+      calls.push(['save']);
+    },
+    renderWorkoutPlanCard() {
+      calls.push(['render-workout-plan-card']);
+    },
+    renderActions() {
+      calls.push(['render-actions']);
+    },
+    updatePlanWorkoutBanner() {
+      calls.push(['update-banner']);
+    }
+  };
+  api.__testWindow.workout = {
+    isPlaying: false,
+    setMode(mode) {
+      calls.push(['mode', mode]);
+    },
+    toggle() {
+      calls.push(['toggle']);
+      this.isPlaying = true;
+    }
+  };
+
+  await api.runPlanTask.call(ctx, 'rehab', 'task-1');
+
+  assert.equal(ctx.drawerClosed, true);
+  assert.equal(task.status, 'in-progress');
+  assert.equal(ctx.activeRun.planId, 'rehab');
+  assert.deepEqual(api.__testTabCalls.map((item) => item.page), ['workout']);
 });
 
 test('editing a saved plan task updates action identity and locks the task', () => {

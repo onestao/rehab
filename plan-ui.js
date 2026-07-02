@@ -30,14 +30,14 @@
     }
 
     function taskConfirmMeta(task = {}) {
-        const blocked = Boolean(task.policy?.blocked || task.policy?.source === 'blocked');
-        const base = blocked ? '冲突候选' : '非医嘱新增';
+        const source = task.policy?.source;
+        const blocked = task.policy?.blocked || source === 'blocked';
+        const prescription = source === 'prescription' || task.prescriptionActionId;
+        const base = blocked ? '冲突候选' : prescription ? '医嘱' : '非医嘱';
         return {
             badge: `${base} · ${task.userConfirmed ? '已确认' : '待确认'}`,
-            title: blocked ? '确认冲突候选动作' : '确认非医嘱新增动作',
-            detail: blocked
-                ? '与最近暂停/避免记录冲突。'
-                : '不是当前医嘱中明确要求的动作。'
+            title: blocked ? '确认冲突候选动作' : prescription ? '确认医嘱' : '确认非医嘱动作',
+            detail: blocked ? '与最近暂停/避免记录冲突。' : prescription ? '来自医嘱，需确认。' : '不是当前明确医嘱动作。'
         };
     }
 
@@ -553,7 +553,7 @@
                 this._openModal?.({
                     title: confirmMeta.title,
                     icon: 'verified',
-                    bodyHtml: `<p class="md-muted">${this.escapeHtml(task.name || '此动作')} ${confirmMeta.detail}确认后才会标记完成并记录体验反馈。</p>`,
+                    bodyHtml: `<p class="md-muted">${this.escapeHtml(task.name || '此动作')} ${confirmMeta.detail}确认后标记完成并记录反馈。</p>`,
                     actionsHtml: `
                         <button class="md-btn" type="button" data-modal-close>取消</button>
                         <button class="md-btn md-btn-filled" type="button" onclick="data.confirmPlanTaskSuggestion('${planId}','${taskId}', { silent: true, keepModalOpen: true }); data.markPlanTaskDone('${planId}','${taskId}')">确认并完成</button>
@@ -577,7 +577,7 @@
                 title: this.escapeHtml(task.name || '任务'),
                 icon: 'more_vert',
                 bodyHtml: `<div class="weekly-plan-picker">
-                    ${task.requiresUserConfirm && !task.userConfirmed ? `<button class="model-picker-row plan-policy-confirm-row" type="button" onclick="data.confirmPlanTaskSuggestion('${planId}','${taskId}')"><span class="material-symbols-rounded">verified</span><span class="model-picker-main"><strong>${confirmMeta.title}</strong><small>${confirmMeta.detail}确认后才会作为你的训练动作执行</small></span></button>` : ''}
+                    ${task.requiresUserConfirm && !task.userConfirmed ? `<button class="model-picker-row plan-policy-confirm-row" type="button" onclick="data.confirmPlanTaskSuggestion('${planId}','${taskId}')"><span class="material-symbols-rounded">verified</span><span class="model-picker-main"><strong>${confirmMeta.title}</strong><small>${confirmMeta.detail}确认后执行</small></span></button>` : ''}
                     <button class="model-picker-row" type="button" onclick="data.openPlanTaskEdit('${planId}','${taskId}')"><span class="material-symbols-rounded">edit</span><span class="model-picker-main"><strong>编辑动作</strong><small>临时修改名称、阶段和训练参数</small></span></button>
                     <button class="model-picker-row" type="button" onclick="data.movePlanTaskTo('${planId}','${taskId}','${this.logicalDateKey?.() || this.dateKey(new Date())}')"><span class="material-symbols-rounded">today</span><span class="model-picker-main"><strong>移到今天</strong><small>回到当前日期执行</small></span></button>
                     <button class="model-picker-row" type="button" onclick="data.movePlanTaskTo('${planId}','${taskId}','${tomorrowKey}')"><span class="material-symbols-rounded">event</span><span class="model-picker-main"><strong>移到明天</strong><small>延后一天执行</small></span></button>
@@ -612,7 +612,7 @@
             if (options.save !== false) this.save?.();
             if (options.close !== false) this._closeActiveModal?.();
             if (options.render !== false) this.render?.();
-            window.toast?.show?.('已确认此非医嘱新增动作', 'success');
+            window.toast?.show?.(taskConfirmMeta(task).badge, 'success');
             return true;
         },
 
@@ -628,10 +628,11 @@
             const { task } = this.findTask?.(planId, taskId) || {};
             if (!task) return;
             if (task.requiresUserConfirm && !task.userConfirmed) {
+                const confirmMeta = taskConfirmMeta(task);
                 this._confirmModal?.({
-                    title: '确认非医嘱新增动作',
+                    title: confirmMeta.title,
                     icon: 'verified',
-                    message: '这个动作不是最新医嘱中明确要求的动作。确认后才会开始训练。',
+                    message: `${confirmMeta.detail}确认后开始训练。`,
                     okText: '确认并开始',
                     cancelText: '先不做',
                     onOk: async () => {
@@ -679,7 +680,7 @@
             const { plan, task } = this.findTask?.(planId, taskId) || {};
             if (!plan || !task) return;
             if (task.requiresUserConfirm && !task.userConfirmed && !options.confirmedSuggestion) {
-                window.toast?.show?.('这个非医嘱新增动作需要先确认', 'error');
+                window.toast?.show?.('需先确认', 'error');
                 return;
             }
             this.updateItemStatus?.(planId, taskId, 'in-progress', {}, { save: false });
@@ -691,6 +692,7 @@
                 queueFollowup: !!options.queueFollowup,
                 asCooldown: !!options.asCooldown
             };
+            this.closePlanTaskDrawer?.();
             this._replacePlanActions?.([this.buildWorkoutActionFromPlanTask(task, options)]);
             this.save();
             await ui.tab('workout', navButton('workout'));

@@ -176,6 +176,266 @@ test('plan policy treats prescription library matches as prescription actions', 
     assert.doesNotMatch(item.aiReasoning, /非医嘱新增动作/);
 });
 
+test('plan policy matches prescription aliases and backfills prescription ids', () => {
+    const policy = loadPlanPolicy();
+    const db = {
+        dailyPlans: [],
+        health: {
+            rehabWeekly: [],
+            prescriptionActions: [{
+                id: 'pa-custom-move',
+                displayName: '治疗师命名动作',
+                aliases: ['AI命名动作'],
+                latestStatus: 'continued',
+                defaultSpec: { sets: 2, reps: 10, work: 3 }
+            }]
+        }
+    };
+
+    const plans = policy.sanitizeGeneratedPlans([{
+        date: '2026-06-27',
+        type: 'rehab',
+        items: [{
+            name: 'AI命名动作',
+            category: 'main',
+            spec: { sets: 2, reps: 10, work: 3 }
+        }]
+    }], {
+        db,
+        targetDate: '2026-06-27',
+        types: ['rehab'],
+        ensureTaskShape: (item) => item
+    });
+
+    const item = plans[0].items[0];
+    assert.equal(item.policy.source, 'prescription');
+    assert.equal(item.prescriptionActionId, 'pa-custom-move');
+    assert.equal(item.requiresUserConfirm, false);
+});
+
+test('plan policy validator blocks protected task duplicate addition', () => {
+    const policy = loadPlanPolicy();
+    const beforePlans = [{
+        id: 'plan-1',
+        date: '2026-06-27',
+        type: 'rehab',
+        items: [{
+            id: 'done-bridge',
+            name: '基础臀桥',
+            category: 'main',
+            status: 'done',
+            actionKey: 'bridge-basic',
+            progressionGroup: 'bridge-adduction',
+            spec: { sets: 3, reps: 12, work: 3 }
+        }]
+    }];
+    const afterPlans = [{
+        id: 'plan-1',
+        date: '2026-06-27',
+        type: 'rehab',
+        items: [
+            {
+                id: 'done-bridge',
+                name: '基础臀桥',
+                category: 'main',
+                status: 'done',
+                actionKey: 'bridge-basic',
+                progressionGroup: 'bridge-adduction',
+                spec: { sets: 3, reps: 12, work: 3 }
+            },
+            {
+                id: 'ai-bridge',
+                name: '夹砖臀桥',
+                category: 'main',
+                status: 'todo',
+                actionKey: 'bridge-brick',
+                progressionGroup: 'bridge-adduction',
+                spec: { sets: 3, reps: 12, work: 3 }
+            }
+        ]
+    }];
+
+    const result = policy.validatePlanChanges({ beforePlans, afterPlans, source: 'ai' });
+
+    assert.equal(result.ok, false);
+    assert.equal(result.violations[0].type, 'protected-task-duplicated');
+});
+
+test('plan policy treats manual plan tasks as protected for automatic changes', () => {
+    const policy = loadPlanPolicy();
+    const beforePlans = [{
+        id: 'manual-plan',
+        date: '2026-06-27',
+        type: 'rehab',
+        source: 'manual',
+        items: [{
+            id: 'manual-task',
+            name: '手工动作',
+            category: 'main',
+            status: 'todo',
+            actionKey: 'manual-action',
+            spec: { sets: 2, reps: 10, work: 3 }
+        }]
+    }];
+    const afterPlans = [{
+        id: 'manual-plan',
+        date: '2026-06-27',
+        type: 'rehab',
+        source: 'ai',
+        items: [{
+            id: 'ai-task',
+            name: 'AI 替换动作',
+            category: 'main',
+            status: 'todo',
+            actionKey: 'manual-action',
+            spec: { sets: 3, reps: 12, work: 3 }
+        }]
+    }];
+
+    const result = policy.validatePlanChanges({ beforePlans, afterPlans, source: 'ai' });
+
+    assert.equal(policy.isProtectedPlanTask(beforePlans[0].items[0], beforePlans[0]), true);
+    assert.equal(result.ok, false);
+    assert.ok(['protected-plan-mutated', 'protected-task-removed', 'protected-task-mutated'].includes(result.violations[0].type));
+});
+
+test('plan policy validator catches protected result and weight mutations', () => {
+    const policy = loadPlanPolicy();
+    const beforePlans = [{
+        id: 'plan-1',
+        date: '2026-06-27',
+        type: 'rehab',
+        source: 'ai',
+        items: [{
+            id: 'done-press',
+            name: '哑铃推举',
+            category: 'main',
+            status: 'done',
+            doneSets: 2,
+            feedback: { rpe: 3, painScore: 0, note: '完成', doneAt: 100 },
+            spec: { sets: 2, reps: 8, work: 3, weight: 10 }
+        }]
+    }];
+    const afterPlans = [{
+        id: 'plan-1',
+        date: '2026-06-27',
+        type: 'rehab',
+        source: 'ai',
+        items: [{
+            id: 'done-press',
+            name: '哑铃推举',
+            category: 'main',
+            status: 'todo',
+            doneSets: 0,
+            feedback: null,
+            spec: { sets: 2, reps: 8, work: 3, weight: 12 }
+        }]
+    }];
+
+    const result = policy.validatePlanChanges({ beforePlans, afterPlans, source: 'ai' });
+
+    assert.equal(result.ok, false);
+    assert.equal(result.violations[0].type, 'protected-task-mutated');
+});
+
+test('plan policy restore does not remove later same-day same-type plan when adjusted id differs', () => {
+    const policy = loadPlanPolicy();
+    const restored = policy.restorePlanAdjustmentPlans(
+        [{
+            id: 'manual-new',
+            date: '2026-06-28',
+            type: 'rehab',
+            source: 'manual',
+            items: [{ id: 'manual-task', name: '用户后来新建计划' }]
+        }],
+        [],
+        [{
+            id: 'ai-generated',
+            date: '2026-06-28',
+            type: 'rehab',
+            source: 'ai',
+            items: [{ id: 'ai-task', name: '撤销目标 AI 计划' }]
+        }],
+        (plan) => plan
+    );
+
+    assert.deepEqual(restored.map((plan) => plan.id), ['manual-new']);
+});
+
+test('plan policy restore does not overwrite later same-day same-type plan when before id differs', () => {
+    const policy = loadPlanPolicy();
+    const restored = policy.restorePlanAdjustmentPlans(
+        [{
+            id: 'manual-new',
+            date: '2026-06-28',
+            type: 'rehab',
+            source: 'manual',
+            items: [{ id: 'manual-task', name: '用户后来替换的新计划' }]
+        }],
+        [{
+            id: 'target-plan',
+            date: '2026-06-28',
+            type: 'rehab',
+            source: 'ai',
+            items: [{ id: 'old-task', name: '调整前旧计划' }]
+        }],
+        [{
+            id: 'target-plan',
+            date: '2026-06-28',
+            type: 'rehab',
+            source: 'ai',
+            items: [{ id: 'new-task', name: '调整后计划' }]
+        }],
+        (plan) => plan
+    );
+
+    assert.deepEqual(restored.map((plan) => plan.id), ['manual-new']);
+    assert.deepEqual(JSON.parse(JSON.stringify(restored[0].items.map((item) => item.name))), ['用户后来替换的新计划']);
+});
+
+test('plan policy adjustment changes records same-identity spec changes', () => {
+    const policy = loadPlanPolicy();
+    const current = {
+        id: 'plan-1',
+        date: '2026-06-27',
+        type: 'rehab',
+        items: [{
+            id: 'bridge',
+            name: '基础臀桥',
+            category: 'main',
+            status: 'todo',
+            actionKey: 'bridge-basic',
+            progressionGroup: 'bridge-adduction',
+            progressionLevel: 1,
+            spec: { sets: 2, reps: 12, work: 3 }
+        }]
+    };
+    const merged = {
+        id: 'plan-1',
+        date: '2026-06-27',
+        type: 'rehab',
+        items: [{
+            id: 'bridge-next',
+            name: '基础臀桥',
+            category: 'main',
+            status: 'todo',
+            actionKey: 'bridge-basic',
+            progressionGroup: 'bridge-adduction',
+            progressionLevel: 1,
+            spec: { sets: 3, reps: 12, work: 3 },
+            aiReasoning: '自动小幅加量'
+        }]
+    };
+
+    const changes = policy.buildPlanAdjustmentChanges(current, merged, { notes: '根据反馈调整' });
+
+    assert.equal(changes.length, 1);
+    assert.equal(changes[0].type, 'volume-up');
+    assert.equal(changes[0].sourceTask.name, '基础臀桥');
+    assert.equal(changes[0].targetTask.name, '基础臀桥');
+    assert.equal(changes[0].loadDelta.sets, 1);
+});
+
 test('plan policy sanitizes oral prescription plans without losing legacy context', () => {
     const policy = loadPlanPolicy();
     const db = {

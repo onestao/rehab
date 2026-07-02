@@ -309,7 +309,32 @@ Object.assign(workout, {
         workout._nextActionName = ''; workout._totalSetsAll = 0; workout._doneSetsAll = 0;
         const bar = document.getElementById('globalTrainingBar');
         if (bar) { bar.classList.add('hidden'); bar.querySelector('span').style.width = '0%'; }
+        const buildHistoryRecord = () => ({
+            id: data.generateRecordId('history'),
+            date: new Date().toLocaleString(), dayKey: data.logicalDateKey(), duration,
+            actions: [...(data._planActions ? data._planActions() : data.activeRecords(data.db.actions || []).filter(a => !a.libOnly))],
+            actualSets: data.db.actualSetsBuffer || [],
+            manualStop,
+            updatedAt: Date.now(),
+            deleted: false
+        });
+        const attachPlanContext = (historyRecord) => {
+            if (window.data?.activeRun) {
+                historyRecord.__planCtx = JSON.parse(JSON.stringify(window.data.activeRun));
+            }
+            return historyRecord;
+        };
         if (duration < 20) {
+            if (window.data?.activeRun && !manualStop) {
+                const historyRecord = attachPlanContext(buildHistoryRecord());
+                historyRecord.planShortRun = true;
+                window.data?.handlePlanWorkoutFinished?.(historyRecord);
+                data.db.actualSetsBuffer = [];
+                data.saveAndBackup();
+                this.resetMainPanel();
+                window.toast?.show?.('计划动作已完成，未保存过短训练记录', 'success');
+                return;
+            }
             window.errorBus?.event?.('workout', 'finish:tooShort', { duration, manualStop });
             if (window.data?.activeRun) {
                 const ctx = window.data.activeRun;
@@ -324,18 +349,7 @@ Object.assign(workout, {
         }
         this.speak("训练完成");
         window.haptics?.success?.();
-        const historyRecord = {
-            id: data.generateRecordId('history'),
-            date: new Date().toLocaleString(), dayKey: data.logicalDateKey(), duration,
-            actions: [...(data._planActions ? data._planActions() : data.activeRecords(data.db.actions || []).filter(a => !a.libOnly))],
-            actualSets: data.db.actualSetsBuffer || [],
-            manualStop,
-            updatedAt: Date.now(),
-            deleted: false
-        };
-        if (window.data?.activeRun) {
-            historyRecord.__planCtx = JSON.parse(JSON.stringify(window.data.activeRun));
-        }
+        const historyRecord = attachPlanContext(buildHistoryRecord());
         if (data.history) {
             data.history.append(historyRecord);
         } else {

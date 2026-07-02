@@ -149,6 +149,9 @@ export function normalizeTaskItem(item = {}, options = {}) {
         specSource,
         progressionPhase,
         progressionHistory,
+        nextProgressionSuggestion: item.nextProgressionSuggestion && typeof item.nextProgressionSuggestion === 'object'
+            ? { ...item.nextProgressionSuggestion }
+            : null,
         chainId: item.chainId ? String(item.chainId) : '',
         invalidSpec,
         currentLevel: item.currentLevel == null ? null : Math.max(1, Number(item.currentLevel || 1)),
@@ -163,6 +166,8 @@ export function normalizeTaskItem(item = {}, options = {}) {
             : null,
         cooldownRefs: uniqueList(item.cooldownRefs),
         userOverride: !!item.userOverride,
+        sourceActionId: item.sourceActionId || '',
+        prescriptionActionId: item.prescriptionActionId || '',
         excludeFromPr: item.excludeFromPr !== false,
         aiReasoning: String(item.aiReasoning || ''),
         durationEstHint: String(item.durationEstHint || ''),
@@ -185,7 +190,7 @@ export function normalizeDailyPlan(plan = {}, options = {}) {
         date: String(plan.date || ''),
         type,
         title,
-        source: legacySource ? 'manual' : (['ai', 'manual', 'imported'].includes(plan.source) ? plan.source : 'manual'),
+        source: legacySource ? 'manual' : String(plan.source || 'manual'),
         notes: String(plan.notes || ''),
         items,
         pendingCooldowns: pending,

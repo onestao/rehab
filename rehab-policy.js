@@ -7,6 +7,8 @@
   const BLOCKED_STATUS = new Set(['dropped', 'avoid', 'stopped', 'paused', '禁止', '暂停', '停做', '不要做']);
   const PREFERRED_STATUS = new Set(['continued', 'progressed', 'new']);
   const CAUTIOUS_STATUS = new Set(['watch', 'cautious', 'review', 'conditional']);
+  const AUTO_PLAN_SOURCES = new Set(['ai', 'local-rule', 'system']);
+  const USER_PLAN_SOURCES = new Set(['manual', 'imported', 'user', 'rehab-center']);
 
   const ACTIONS = [
     {
@@ -167,6 +169,8 @@
       action.description,
       action.coachNote,
       action.note,
+      action.displayName,
+      action.aliases && Array.isArray(action.aliases) ? action.aliases.join(' ') : '',
       action.tags && Array.isArray(action.tags) ? action.tags.join(' ') : ''
     ].filter(Boolean).join(' ');
   }
@@ -231,7 +235,7 @@
 
   function classifyPrescriptionAction(action) {
     const name = action?.name || action?.title || action?.actionName || '';
-    const meta = actionMetaForName([name, action?.rawDescription].filter(Boolean).join(' '));
+    const meta = actionMetaForName(sourceText(action));
     const blocked = isBlockedAction(action);
     const cautious = !blocked && isCautiousAction(action);
     const status = String(action?.status || '').toLowerCase();
@@ -292,6 +296,9 @@
     const leftPrescriptionId = typeof a === 'object' ? String(a?.prescriptionActionId || '') : '';
     const rightPrescriptionId = typeof b === 'object' ? String(b?.prescriptionActionId || '') : '';
     if (leftPrescriptionId && rightPrescriptionId && leftPrescriptionId === rightPrescriptionId) return true;
+    const leftSourceIds = sourceIdsForMatch(a);
+    const rightSourceIds = sourceIdsForMatch(b);
+    if (leftSourceIds.some((id) => rightSourceIds.includes(id))) return true;
     const left = typeof a === 'string' ? actionMetaForName(a) : (a?.actionKey ? a : actionMetaForName(sourceText(a)));
     const right = typeof b === 'string' ? actionMetaForName(b) : (b?.actionKey ? b : actionMetaForName(sourceText(b)));
     if (!left || !right) return false;
@@ -302,10 +309,24 @@
     return leftName.length >= 3 && rightName.length >= 3 && (leftName.includes(rightName) || rightName.includes(leftName));
   }
 
+  function tasksShareIdentity(a = {}, b = {}) {
+    if (!a || !b) return false;
+    if (a.id && b.id && a.id === b.id) return true;
+    if (itemsMatch(a, b)) return true;
+    const left = { ...actionMetaForName(sourceText(a)), ...a };
+    const right = { ...actionMetaForName(sourceText(b)), ...b };
+    if (left.prescriptionActionId && right.prescriptionActionId && left.prescriptionActionId === right.prescriptionActionId) return true;
+    if (left.actionKey && right.actionKey && left.actionKey === right.actionKey) return true;
+    return Boolean(left.progressionGroup && right.progressionGroup && left.progressionGroup === right.progressionGroup);
+  }
+
   function itemsExactMatch(a, b) {
     const leftPrescriptionId = typeof a === 'object' ? String(a?.prescriptionActionId || '') : '';
     const rightPrescriptionId = typeof b === 'object' ? String(b?.prescriptionActionId || '') : '';
     if (leftPrescriptionId && rightPrescriptionId && leftPrescriptionId === rightPrescriptionId) return true;
+    const leftSourceIds = sourceIdsForMatch(a);
+    const rightSourceIds = sourceIdsForMatch(b);
+    if (leftSourceIds.some((id) => rightSourceIds.includes(id))) return true;
     const left = typeof a === 'string' ? actionMetaForName(a) : (a?.actionKey ? a : actionMetaForName(sourceText(a)));
     const right = typeof b === 'string' ? actionMetaForName(b) : (b?.actionKey ? b : actionMetaForName(sourceText(b)));
     if (!left || !right) return false;
@@ -328,6 +349,15 @@
       && leftLevel
       && rightLevel
       && leftLevel >= rightLevel);
+  }
+
+  function sourceIdsForMatch(value) {
+    if (!value || typeof value !== 'object') return [];
+    return [
+      value.sourceActionId,
+      value.linkedActionId,
+      ...(Array.isArray(value.sourceActionIds) ? value.sourceActionIds : [])
+    ].map((id) => String(id || '').trim()).filter(Boolean);
   }
 
   function summarizePolicyItemForDebug(item = {}) {
@@ -377,6 +407,9 @@
         ...action,
         name: identity?.displayName || action.name,
         canonicalName: identity?.displayName || action.canonicalName || action.name,
+        aliases: identity?.aliases || action.aliases || [],
+        sourceActionIds: identity?.sourceActionIds || action.sourceActionIds || [],
+        linkedActionId: identity?.linkedActionId || action.linkedActionId || '',
         prescriptionActionId: identity?.id || action.prescriptionActionId || ''
       }),
       weekIndex,
@@ -392,6 +425,8 @@
         painLevel: item.latestPainLevel || 0,
         spec: item.defaultSpec || null,
         prescriptionActionId: item.id,
+        sourceActionIds: item.sourceActionIds || [],
+        linkedActionId: item.linkedActionId || '',
         progressionGroup: item.progressionGroup || '',
         progressionLevel: item.progressionLevel || 0
       }));
@@ -471,6 +506,8 @@
       progressionGroup: item?.progressionGroup || meta?.progressionGroup || '',
       progressionLevel: Number(item?.progressionLevel || meta?.progressionLevel || 0),
       chainId: item?.chainId || meta?.chainId || '',
+      sourceActionId: item?.sourceActionId || '',
+      prescriptionActionId: item?.prescriptionActionId || prescription?.prescriptionActionId || '',
       requiresUserConfirm,
       userConfirmed: requiresUserConfirm ? item?.userConfirmed === true : item?.userConfirmed !== false,
       policy: {
@@ -625,6 +662,382 @@
     });
   }
 
+  function isUserOwnedPlan(plan = {}) {
+    const source = String(plan?.source || '').trim();
+    return USER_PLAN_SOURCES.has(source);
+  }
+
+  function isProtectedPlanTask(item = {}, plan = null) {
+    const source = String(item?.policy?.source || item?.source || '');
+    const planSource = String(plan?.source || '').trim();
+    return Boolean(item && !item.deleted && (
+      item.status === 'done'
+      || item.userOverride === true
+      || source === 'user-edit'
+      || USER_PLAN_SOURCES.has(source)
+      || (planSource && !AUTO_PLAN_SOURCES.has(planSource))
+    ));
+  }
+
+  function normalizedSpecFingerprint(spec = {}) {
+    return JSON.stringify({
+      sets: Number(spec.sets || 0),
+      reps: Number(spec.reps || 0),
+      work: Number(spec.work || 0),
+      weight: Number(spec.weight || 0),
+      repRest: Number(spec.repRest || 0),
+      actionRest: Number(spec.actionRest || 0),
+      isAlt: !!spec.isAlt,
+      mode: String(spec.mode || '')
+    });
+  }
+
+  function normalizedFeedbackFingerprint(feedback = null) {
+    if (!feedback || typeof feedback !== 'object') return '';
+    return JSON.stringify({
+      rpe: feedback.rpe == null ? null : Number(feedback.rpe),
+      painScore: feedback.painScore == null ? feedback.painLevel == null ? feedback.pain == null ? null : Number(feedback.pain) : Number(feedback.painLevel) : Number(feedback.painScore),
+      painPart: String(feedback.painPart || feedback.painBodyPart || feedback.painLocation || ''),
+      wantsContinue: feedback.wantsContinue === true ? true : feedback.wantsContinue === false ? false : null,
+      noIncrease: !!(feedback.noIncrease || feedback.dontIncrease),
+      keepNextTime: !!feedback.keepNextTime,
+      unsuitable: !!feedback.unsuitable,
+      note: String(feedback.note || ''),
+      doneAt: Number(feedback.doneAt || 0)
+    });
+  }
+
+  function protectedTaskShapeChanged(before = {}, after = {}) {
+    return String(before.name || '') !== String(after.name || '')
+      || inferCategory(before.type || before.category, before.name) !== inferCategory(after.type || after.category, after.name)
+      || normalizedSpecFingerprint(before.spec || {}) !== normalizedSpecFingerprint(after.spec || {})
+      || String(before.status || 'todo') !== String(after.status || 'todo')
+      || Number(before.doneSets || 0) !== Number(after.doneSets || 0)
+      || normalizedFeedbackFingerprint(before.feedback) !== normalizedFeedbackFingerprint(after.feedback);
+  }
+
+  function findMatchingTask(items = [], source = {}) {
+    return items.find((item) => item.id && source.id && item.id === source.id)
+      || items.find((item) => itemsExactMatch(item, source))
+      || items.find((item) => itemsMatch(item, source))
+      || null;
+  }
+
+  function validatePlanChanges({ beforePlans = [], afterPlans = [], source = '' } = {}) {
+    const violations = [];
+    activeRecords(beforePlans).forEach((beforePlan) => {
+      const beforeItems = activePlanItems(beforePlan);
+      const protectedItems = beforeItems.filter((item) => isProtectedPlanTask(item, beforePlan));
+      const afterPlan = activeRecords(afterPlans).find((plan) => String(plan.date || '') === String(beforePlan.date || '')
+        && String(plan.type || 'rehab') === String(beforePlan.type || 'rehab'));
+      const afterItems = activePlanItems(afterPlan || {});
+      if (isUserOwnedPlan(beforePlan) && (!afterPlan || String(afterPlan.source || '') !== String(beforePlan.source || '') || afterItems.length !== beforeItems.length)) {
+        violations.push({
+          type: afterPlan ? 'protected-plan-mutated' : 'protected-plan-removed',
+          source,
+          planId: beforePlan.id || '',
+          reason: '手工/导入计划不能被自动改写'
+        });
+      }
+      if (!protectedItems.length) return;
+      protectedItems.forEach((item) => {
+        const match = findMatchingTask(afterItems, item);
+        if (!match) {
+          violations.push({
+            type: 'protected-task-removed',
+            source,
+            planId: beforePlan.id || '',
+            taskId: item.id || '',
+            taskName: item.name || '',
+            reason: '已完成、锁定或用户编辑任务不能被自动删除'
+          });
+          return;
+        }
+        if (protectedTaskShapeChanged(item, match)) {
+          violations.push({
+            type: 'protected-task-mutated',
+            source,
+            planId: beforePlan.id || '',
+            taskId: item.id || '',
+            taskName: item.name || '',
+            reason: '已完成、锁定或用户编辑任务不能被自动改名或改参数'
+          });
+        }
+        const duplicate = afterItems.find((candidate) => candidate !== match
+          && (!candidate.id || candidate.id !== item.id)
+          && tasksShareIdentity(candidate, item));
+        if (duplicate) {
+          violations.push({
+            type: 'protected-task-duplicated',
+            source,
+            planId: beforePlan.id || '',
+            taskId: item.id || '',
+            taskName: item.name || '',
+            duplicateName: duplicate.name || '',
+            reason: '自动调整不能绕过保护任务追加同身份重复动作'
+          });
+        }
+      });
+    });
+    return { ok: violations.length === 0, violations };
+  }
+
+  function specLoad(spec = {}) {
+    return Math.max(0, Number(spec.sets || 0))
+      * Math.max(1, Number(spec.reps || 0) || 1)
+      * Math.max(1, Number(spec.work || 0) || 1);
+  }
+
+  function clone(value) {
+    return JSON.parse(JSON.stringify(value));
+  }
+
+  function uniq(values = []) {
+    return [...new Set((Array.isArray(values) ? values : []).map((value) => String(value || '').trim()).filter(Boolean))];
+  }
+
+  function buildAdjustmentBatch(input = {}, id = '') {
+    const nowTs = Number(input.createdAt || Date.now());
+    const changes = Array.isArray(input.changes) ? input.changes : [];
+    return {
+      id: input.id || id || `adj-${nowTs}`,
+      source: input.source || 'local-rule',
+      status: input.status || 'previewed',
+      createdAt: nowTs,
+      appliedAt: Number(input.appliedAt || 0),
+      sourceDate: String(input.sourceDate || ''),
+      targetDates: uniq(input.targetDates),
+      trigger: input.trigger || {},
+      summary: String(input.summary || ''),
+      beforePlans: Array.isArray(input.beforePlans) ? clone(input.beforePlans) : [],
+      afterPlans: Array.isArray(input.afterPlans) ? clone(input.afterPlans) : [],
+      changes,
+      rejectedChangeIds: uniq(input.rejectedChangeIds),
+      acceptedChangeIds: uniq(input.acceptedChangeIds || changes.filter((change) => ['accepted', 'auto-applied'].includes(change.status)).map((change) => change.id)),
+      undo: { beforePlansRef: 'inline', canUndo: input.undo?.canUndo !== false && Array.isArray(input.beforePlans) }
+    };
+  }
+
+  function samePlanIdentity(a = {}, b = {}) {
+    return Boolean((a.id && b.id && a.id === b.id)
+      || (String(a.date || '') === String(b.date || '') && String(a.type || 'rehab') === String(b.type || 'rehab')));
+  }
+
+  function samePlanForRemoval(current = {}, removed = {}) {
+    return removed.id ? current.id === removed.id : samePlanIdentity(current, removed);
+  }
+
+  function samePlanForRestore(current = {}, restored = {}) {
+    return restored.id ? current.id === restored.id : samePlanIdentity(current, restored);
+  }
+
+  function restorePlanAdjustmentPlans(current = [], before = [], after = [], ensurePlan = (plan) => plan) {
+    const beforePlans = (Array.isArray(before) ? before : []).map((plan) => ensurePlan(clone(plan)));
+    const afterPlans = (Array.isArray(after) ? after : []).map((plan) => ensurePlan(clone(plan)));
+    const next = (Array.isArray(current) ? current : []).map((plan) => ensurePlan(clone(plan)));
+    [...beforePlans, ...afterPlans]
+      .filter((plan, index, list) => list.findIndex((item) => samePlanIdentity(item, plan)) === index)
+      .forEach((ref) => {
+        const beforePlan = beforePlans.find((plan) => samePlanIdentity(plan, ref));
+        const index = next.findIndex((plan) => beforePlan ? samePlanForRestore(plan, ref) : samePlanForRemoval(plan, ref));
+        if (beforePlan) {
+          if (index >= 0) next[index] = beforePlan;
+          else if (!beforePlan.id) next.push(beforePlan);
+        } else if (index >= 0) {
+          next.splice(index, 1);
+        }
+      });
+    return next;
+  }
+
+  function buildProgressionSuggestion(result = {}, { plan = {}, task = {}, chain = {} } = {}) {
+    const targetLevel = result.targetLevel == null ? task.currentLevel ?? null : Number(result.targetLevel);
+    const target = (Array.isArray(chain.levels) ? chain.levels : []).find((item) => Number(item.lv) === Number(targetLevel));
+    return {
+      createdAt: Date.now(),
+      decision: result.decision || result.suggestion || 'hold',
+      phase: result.phase || '',
+      targetLevel,
+      targetName: target?.name || '',
+      suggestedSpec: result.suggestedSpec && typeof result.suggestedSpec === 'object' ? { ...result.suggestedSpec } : {},
+      fallbackSpec: result.fallbackSpec && typeof result.fallbackSpec === 'object' ? { ...result.fallbackSpec } : {},
+      reason: String(result.reason || ''),
+      appliesTo: 'future-only',
+      sourcePlanId: plan.id || '',
+      sourceTaskId: task.id || '',
+      sourceDate: plan.date || '',
+      chainId: task.chainId || chain.id || '',
+      status: 'pending',
+      chainAlternatives: Array.isArray(result.chainAlternatives) ? result.chainAlternatives.map((item) => ({ ...item })) : []
+    };
+  }
+
+  function applyFutureProgressionSuggestion(next = {}, source = {}, { chain = null } = {}) {
+    const suggestion = source.nextProgressionSuggestion;
+    const decision = suggestion?.decision || '';
+    delete next.nextProgressionSuggestion;
+    if (!suggestion || suggestion.appliesTo !== 'future-only' || !['progress', 'volume-up', 'deload'].includes(decision)) return next;
+      const targetLevel = Number(suggestion.targetLevel || 0);
+      if (targetLevel && chain?.levels?.length && targetLevel !== Number(source.currentLevel || 0)) {
+        const target = chain.levels.find((item) => Number(item.lv) === targetLevel);
+        if (target?.name) next.name = target.name;
+        next.currentLevel = targetLevel;
+        next.chainId = chain.id || source.chainId || '';
+      }
+      const targetMeta = actionMetaForName(suggestion.targetName || next.name || '');
+      if (targetMeta.actionKey) next.actionKey = targetMeta.actionKey;
+      if (targetMeta.canonicalName) next.canonicalName = targetMeta.canonicalName;
+      if (targetMeta.progressionGroup) next.progressionGroup = targetMeta.progressionGroup;
+      if (targetMeta.progressionLevel) next.progressionLevel = Number(targetMeta.progressionLevel || 0);
+      if (targetMeta.chainId) next.chainId = chain?.id || targetMeta.chainId || next.chainId || '';
+    const suggestedSpec = suggestion.suggestedSpec && Object.keys(suggestion.suggestedSpec).length ? suggestion.suggestedSpec : suggestion.fallbackSpec;
+    if (suggestedSpec && Object.keys(suggestedSpec).length) next.spec = { ...(next.spec || {}), ...suggestedSpec };
+    next.progressionPhase = suggestion.phase || next.progressionPhase || '';
+    next.aiReasoning = `${next.aiReasoning ? `${next.aiReasoning}；` : ''}应用上次反馈生成的下次建议：${suggestion.reason || decision}`;
+    return next;
+  }
+
+  function isoDateOffset(baseKey, days) {
+    const m = String(baseKey || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!m) return '';
+    const date = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+    date.setDate(date.getDate() + days);
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  }
+
+  function detectMissedPlanCandidates(plans = [], options = {}) {
+    const targetDate = String(options.targetDate || options.today || '');
+    if (!targetDate) return [];
+    const startDate = String(options.startDate || isoDateOffset(targetDate, -Math.max(1, Number(options.lookbackDays || 3))) || '');
+    const typeSet = options.types ? new Set((Array.isArray(options.types) ? options.types : [options.types]).map((type) => String(type || 'rehab'))) : null;
+    return activeRecords(plans)
+      .filter((plan) => plan.date && plan.date < targetDate && (!startDate || plan.date >= startDate))
+      .filter((plan) => !typeSet || typeSet.has(plan.type || 'rehab'))
+      .flatMap((plan) => activePlanItems(plan)
+        .filter((item) => inferCategory(item.type || item.category, item.name) === 'main')
+        .filter((item) => item.status !== 'done' && item.status !== 'skipped')
+        .filter((item) => !isProtectedPlanTask(item, plan) && !item.policy?.blocked && item.policy?.source !== 'blocked')
+        .map((item, index) => {
+          const meta = actionMetaForName(sourceText(item));
+          const risk = (plan.type || 'rehab') === 'rehab' || item.prescriptionActionId || item.policy?.source === 'prescription' ? 'low' : 'medium';
+          return {
+            id: `missed-${plan.id || plan.date}-${item.id || index}`,
+            type: 'carry-over',
+            risk,
+            status: 'pending',
+            reason: risk === 'low' ? '漏练康复/医嘱动作，优先原样顺延候选' : '漏练训练任务，需按今日负载预算确认补偿方式',
+            sourceTask: { planId: plan.id || '', taskId: item.id || '', date: plan.date || '', name: item.name || '' },
+            targetTask: { planId: '', taskId: '', date: targetDate, name: item.name || '' },
+            identity: {
+              actionKey: item.actionKey || meta.actionKey || '',
+              prescriptionActionId: item.prescriptionActionId || '',
+              progressionGroup: item.progressionGroup || meta.progressionGroup || '',
+              bodyPart: meta.bodyPart || ''
+            },
+            loadDelta: {
+              sets: Number(item.spec?.sets || 0),
+              reps: Number(item.spec?.reps || 0),
+              work: Number(item.spec?.work || 0),
+              estimatedLoad: specLoad(item.spec || {})
+            }
+          };
+        }));
+  }
+
+  function adjustmentTypeForItem(item = {}) {
+    const reason = String(item.aiReasoning || '');
+    if (/降载|降低|deload/.test(reason)) return 'deload';
+    if (/加量|加组|太轻|volume/.test(reason)) return 'volume-up';
+    if (/进阶|升级|下一阶/.test(reason)) return 'progress';
+    return 'replace';
+  }
+
+  function adjustmentTypeForPair(before = {}, after = {}) {
+    const explicit = adjustmentTypeForItem(after);
+    if (explicit !== 'replace') return explicit;
+    const beforeSpec = before.spec || {};
+    const afterSpec = after.spec || {};
+    const beforeLevel = Number(before.progressionLevel || before.currentLevel || 0);
+    const afterLevel = Number(after.progressionLevel || after.currentLevel || 0);
+    if (afterLevel > beforeLevel || (before.progressionGroup && before.progressionGroup === after.progressionGroup && before.actionKey && after.actionKey && before.actionKey !== after.actionKey)) return 'progress';
+    if (specLoad(afterSpec) < specLoad(beforeSpec)) return 'deload';
+    if (Number(afterSpec.sets || 0) > Number(beforeSpec.sets || 0)
+      || Number(afterSpec.reps || 0) > Number(beforeSpec.reps || 0)
+      || Number(afterSpec.work || 0) > Number(beforeSpec.work || 0)) return 'volume-up';
+    return 'replace';
+  }
+
+  function taskShapeChanged(before = {}, after = {}) {
+    return String(before.name || '') !== String(after.name || '')
+      || inferCategory(before.type || before.category, before.name) !== inferCategory(after.type || after.category, after.name)
+      || Number(before.progressionLevel || before.currentLevel || 0) !== Number(after.progressionLevel || after.currentLevel || 0)
+      || normalizedSpecFingerprint(before.spec || {}) !== normalizedSpecFingerprint(after.spec || {});
+  }
+
+  function buildPlanAdjustmentChanges(current = {}, merged = {}, sourcePlan = {}) {
+    const currentItems = activePlanItems(current);
+    const nextItems = activePlanItems(merged);
+    const preserved = currentItems.filter((item) => isProtectedPlanTask(item, current));
+    const removed = currentItems.filter((item) => !isProtectedPlanTask(item, current) && !nextItems.some((next) => tasksShareIdentity(next, item)));
+    const added = nextItems.filter((item) => !currentItems.some((before) => tasksShareIdentity(item, before)));
+    const paired = currentItems
+      .filter((item) => !isProtectedPlanTask(item, current) && !removed.includes(item))
+      .map((before) => ({ before, after: nextItems.find((next) => tasksShareIdentity(next, before)) }))
+      .filter(({ before, after }) => after && taskShapeChanged(before, after));
+    return [
+      ...preserved.map((item) => ({
+        type: 'keep',
+        risk: 'low',
+        status: 'auto-applied',
+        reason: item.status === 'done' ? '已完成任务作为历史事实保留' : item.userOverride ? '用户锁定任务不自动覆盖' : '用户编辑任务不自动覆盖',
+        sourceTask: { planId: current.id || '', taskId: item.id || '', date: current.date || '', name: item.name || '' },
+        targetTask: { planId: merged.id || '', taskId: item.id || '', date: merged.date || '', name: item.name || '' }
+      })),
+      ...removed.map((item) => ({
+        type: 'remove',
+        risk: 'medium',
+        status: 'auto-applied',
+        reason: '未完成且未锁定任务被自动调整替换',
+        sourceTask: { planId: current.id || '', taskId: item.id || '', date: current.date || '', name: item.name || '' },
+        targetTask: null
+      })),
+      ...paired.map(({ before, after }) => ({
+        type: adjustmentTypeForPair(before, after),
+        risk: after.requiresUserConfirm ? 'medium' : 'low',
+        status: 'auto-applied',
+        reason: after.aiReasoning || sourcePlan.notes || '同身份任务参数调整',
+        sourceTask: { planId: current.id || '', taskId: before.id || '', date: current.date || '', name: before.name || '' },
+        targetTask: { planId: merged.id || '', taskId: after.id || '', date: merged.date || '', name: after.name || '' },
+        identity: { actionKey: after.actionKey || before.actionKey || '', prescriptionActionId: after.prescriptionActionId || before.prescriptionActionId || '', progressionGroup: after.progressionGroup || before.progressionGroup || '' },
+        loadDelta: {
+          sets: Number(after.spec?.sets || 0) - Number(before.spec?.sets || 0),
+          reps: Number(after.spec?.reps || 0) - Number(before.spec?.reps || 0),
+          work: Number(after.spec?.work || 0) - Number(before.spec?.work || 0),
+          estimatedLoad: specLoad(after.spec || {}) - specLoad(before.spec || {})
+        }
+      })),
+      ...added.map((item) => ({
+        type: adjustmentTypeForItem(item),
+        risk: item.requiresUserConfirm ? 'medium' : 'low',
+        status: 'auto-applied',
+        reason: item.aiReasoning || sourcePlan.notes || '自动调整生成',
+        sourceTask: null,
+        targetTask: { planId: merged.id || '', taskId: item.id || '', date: merged.date || '', name: item.name || '' },
+        identity: {
+          actionKey: item.actionKey || '',
+          prescriptionActionId: item.prescriptionActionId || '',
+          progressionGroup: item.progressionGroup || ''
+        },
+        loadDelta: {
+          sets: Number(item.spec?.sets || 0),
+          reps: Number(item.spec?.reps || 0),
+          work: Number(item.spec?.work || 0),
+          estimatedLoad: specLoad(item.spec || {})
+        }
+      }))
+    ];
+  }
+
   root.planPolicy = {
     ACTIONS,
     PLAN_TYPES,
@@ -638,7 +1051,17 @@
     repairPlanAiJson,
     itemsMatch,
     itemsExactMatch,
+    tasksShareIdentity,
     inferCategory,
-    itemFeedbackFlags
+    itemFeedbackFlags,
+    isUserOwnedPlan,
+    isProtectedPlanTask,
+    validatePlanChanges,
+    buildPlanAdjustmentChanges,
+    detectMissedPlanCandidates,
+    buildAdjustmentBatch,
+    restorePlanAdjustmentPlans,
+    buildProgressionSuggestion,
+    applyFutureProgressionSuggestion
   };
 })();

@@ -50,6 +50,45 @@ test('create and fetch daily plan by date', () => {
     assert.deepEqual(fetched.items[0].progressionHistory, [{ rpe: 2, doneAt: 100 }]);
 });
 
+test('daily plan normalization preserves action provenance identifiers', () => {
+    const plan = createDailyPlanRecord({
+        id: 'plan-1',
+        date: '2026-05-24',
+        items: [{
+            id: 'task-1',
+            name: '处方髋外展',
+            sourceActionId: 'linked-action-1',
+            prescriptionActionId: 'pa-hip-abduction',
+            policy: { source: 'prescription', prescriptionName: '侧卧髋外展' },
+            spec: { sets: 3, reps: 12 }
+        }]
+    }, { nowTs: 100 });
+
+    assert.equal(plan.items[0].sourceActionId, 'linked-action-1');
+    assert.equal(plan.items[0].prescriptionActionId, 'pa-hip-abduction');
+});
+
+test('daily plan normalization preserves next progression suggestion', () => {
+    const plan = createDailyPlanRecord({
+        id: 'plan-1',
+        date: '2026-05-24',
+        items: [{
+            id: 'task-1',
+            name: '基础臀桥',
+            spec: { sets: 3, reps: 12 },
+            nextProgressionSuggestion: {
+                appliesTo: 'future-only',
+                decision: 'volume-up',
+                suggestedSpec: { sets: 4, reps: 12 },
+                reason: '上次反馈太轻'
+            }
+        }]
+    }, { nowTs: 100 });
+
+    assert.equal(plan.items[0].nextProgressionSuggestion.appliesTo, 'future-only');
+    assert.equal(plan.items[0].nextProgressionSuggestion.decision, 'volume-up');
+});
+
 test('update item status marks completion and keeps metadata', () => {
     const plan = createDailyPlanRecord({
         id: 'plan-1',
