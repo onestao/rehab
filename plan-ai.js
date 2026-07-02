@@ -1225,7 +1225,7 @@
                 </div>`,
                 actionsHtml: `
                     <button class="md-btn" type="button" data-modal-close>取消</button>
-                    <button class="md-btn md-btn-filled" type="button" onclick="data.confirmPlanAiPlans()">确认落库</button>
+                    <button class="md-btn md-btn-filled" type="button" data-plan-ai-confirm-save onclick="data.confirmPlanAiPlans(this.dataset.force === 'true')">确认落库</button>
                 `
             });
             this.syncPlanAiConfirmAllState?.();
@@ -1452,7 +1452,13 @@
             });
         },
 
-        confirmPlanAiPlans() {
+        confirmPlanAiPlans(options = {}) {
+            const forceUserPlanOverwrite = options === true || options?.forceUserPlanOverwrite === true;
+            const confirmBtn = queryPlanAiPreview('[data-plan-ai-confirm-save]');
+            if (confirmBtn && !forceUserPlanOverwrite) {
+                confirmBtn.dataset.force = '';
+                confirmBtn.textContent = '确认落库';
+            }
             let plans = this.collectPlanAiPreviewPlans?.() || [];
             if (!plans.length) {
                 this.setPlanAiPreviewIssue?.('预览里没有可保存的训练动作');
@@ -1501,7 +1507,9 @@
                     if (this.selectedPlanId === old.id) this.selectedPlanId = '';
                 });
                 const current = this.getDailyPlans?.(plan.date)?.find((item) => (item.type || 'rehab') === (plan.type || 'rehab'));
-                const preserved = (current?.items || []).filter((item) => item && !item.deleted && protectedPlanTask(item, current));
+                const currentUserPlan = window.planPolicy?.isUserOwnedPlan?.(current);
+                const forceCurrentUserPlan = forceUserPlanOverwrite && currentUserPlan;
+                const preserved = (current?.items || []).filter((item) => item && !item.deleted && (forceCurrentUserPlan ? (item.status === 'done' || Number(item.doneSets || 0) > 0) : protectedPlanTask(item, current)));
                 const aiItems = plan.items.map((item) => {
                     const meta = window.planPolicy?.actionMetaForName?.(item.name || '') || {};
                     const chain = this.activeRecords(this.db.progressionChains || []).find((entry) => entry.id === item.chainId || entry.group === item.chainId)
@@ -1524,7 +1532,7 @@
                     notes: plan.notes,
                     items: [...preserved, ...aiItems]
                 });
-                const validation = current && window.planPolicy?.isUserOwnedPlan?.(current) && !(current.items || []).some((item) => item && !item.deleted) ? null : window.planPolicy?.validatePlanChanges?.({
+                const validation = currentUserPlan && (forceUserPlanOverwrite || !(current.items || []).some((item) => item && !item.deleted)) ? null : window.planPolicy?.validatePlanChanges?.({
                     beforePlans: current ? [current] : [],
                     afterPlans: [merged],
                     source: 'ai'
@@ -1540,9 +1548,14 @@
             if (blockedReason) {
                 this.db.dailyPlans = beforePlansSnapshot;
                 this.selectedPlanId = beforeSelectedPlanId;
-                const message = `训练计划未保存：${blockedReason}${blockedReason === '手工/导入计划不能被自动改写' ? '。删掉或改日期/类型重试。' : ''}`;
+                const canForce = blockedReason === '手工/导入计划不能被自动改写';
+                const message = `训练计划未保存：${blockedReason}${canForce ? '。确认替换请点强制入库。' : ''}`;
                 this.setPlanAiPreviewIssue?.(message);
                 this.focusPlanAiPreviewItem?.({ name: blockedViolation?.taskName || blockedViolation?.duplicateName || '' });
+                if (canForce && confirmBtn) {
+                    confirmBtn.dataset.force = 'true';
+                    confirmBtn.textContent = '强制入库';
+                }
                 window.toast?.show?.(message, 'error', 6200);
                 return;
             }

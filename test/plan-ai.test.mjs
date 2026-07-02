@@ -927,6 +927,8 @@ test('plan AI preview exposes one-click confirmation for all risk items', () => 
   assert.match(ctx.modal.bodyHtml, /data-plan-ai-confirm-all/);
   assert.match(ctx.modal.bodyHtml, /确认所有风险一次性落库/);
   assert.match(ctx.modal.bodyHtml, /共 2 个动作需要确认/);
+  assert.match(ctx.modal.actionsHtml, /data-plan-ai-confirm-save/);
+  assert.match(ctx.modal.actionsHtml, /dataset\.force/);
 });
 
 test('plan AI preview collection does not auto-confirm items without a visible confirmation checkbox', () => {
@@ -1170,14 +1172,61 @@ test('plan AI confirmation blocks replacing same-type manual plans', () => {
   ctx.cleanupEmptyUnselectedPlanTypes = () => {};
   ctx.save = () => { ctx.saved = true; };
   ctx.setPlanAiPreviewIssue = (message) => { ctx.previewIssue = message; };
+  const confirmBtn = { dataset: {}, textContent: '确认落库' };
+  api.__testDocument.querySelector = (selector) => selector === '[data-plan-ai-confirm-save]' ? confirmBtn : null;
 
   api.confirmPlanAiPlans.call(ctx);
 
   assert.equal(ctx.savedPlan, undefined);
   assert.equal(ctx.saved, undefined);
   assert.match(ctx.previewIssue, /训练计划未保存：手工\/导入计划不能被自动改写/);
-  assert.match(ctx.previewIssue, /删掉或改日期\/类型重试/);
+  assert.match(ctx.previewIssue, /确认替换请点强制入库/);
+  assert.equal(confirmBtn.dataset.force, 'true');
+  assert.equal(confirmBtn.textContent, '强制入库');
   assert.deepEqual(JSON.parse(JSON.stringify(ctx.db.dailyPlans[0].items.map((item) => item.name))), ['手工动作']);
+});
+
+test('plan AI confirmation force overwrites unfinished manual plan tasks', () => {
+  const api = loadPlanAi();
+  const ctx = createContext(api);
+  ctx.db.dailyPlans = [{
+    id: 'manual-rehab',
+    date: '2026-05-25',
+    type: 'rehab',
+    source: 'manual',
+    title: '手工康复计划',
+    items: [
+      { id: 'done-task', name: '已完成动作', status: 'done', doneSets: 2, category: 'main', spec: { sets: 2, reps: 10, work: 3 }, userOverride: false },
+      { id: 'manual-task', name: '手工动作', status: 'todo', category: 'main', spec: { sets: 2, reps: 10, work: 3 }, userOverride: false }
+    ]
+  }];
+  ctx._pendingPlanAiPlans = [{
+    date: '2026-05-25',
+    type: 'rehab',
+    title: 'AI 康复计划',
+    notes: 'AI notes',
+    items: [{ name: 'AI 替换动作', category: 'main', requiresUserConfirm: true, userConfirmed: true, spec: { sets: 3, reps: 12, work: 3, repRest: 0, actionRest: 30, isAlt: false, mode: 'reps' } }]
+  }];
+  ctx.collectPlanAiPreviewPlans = () => ctx._pendingPlanAiPlans;
+  ctx.ensureTaskShape = (item) => ({ id: item.id || `task-${item.name}`, status: item.status || 'todo', deleted: false, ...item });
+  ctx.ensureDailyPlanShape = (plan) => ({ id: plan.id || 'manual-rehab', deleted: false, ...plan });
+  ctx.getDailyPlans = (date) => ctx.db.dailyPlans.filter((plan) => plan.date === date && !plan.deleted);
+  ctx.saveDailyPlan = (plan) => {
+    const index = ctx.db.dailyPlans.findIndex((item) => item.id === plan.id || (!item.deleted && item.date === plan.date && item.type === plan.type));
+    if (index >= 0) ctx.db.dailyPlans[index] = plan;
+    else ctx.db.dailyPlans.unshift(plan);
+  };
+  ctx.cleanupEmptyUnselectedPlanTypes = () => {};
+  ctx.save = () => { ctx.saved = true; };
+  ctx.closePlanAiSheet = () => {};
+  ctx._closeActiveModal = () => {};
+  ctx.render = () => {};
+
+  api.confirmPlanAiPlans.call(ctx, true);
+
+  assert.equal(ctx.saved, true);
+  assert.equal(ctx.db.dailyPlans[0].source, 'ai');
+  assert.deepEqual(JSON.parse(JSON.stringify(ctx.db.dailyPlans[0].items.map((item) => item.name))), ['已完成动作', 'AI 替换动作']);
 });
 
 test('plan AI confirmation restores selected plan id after blocked save rollback', () => {
