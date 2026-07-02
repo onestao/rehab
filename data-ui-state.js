@@ -1,6 +1,24 @@
 // @ts-nocheck
 (function () {
+    function dietMealForClock(date = new Date()) {
+        const value = date instanceof Date ? date : new Date(date);
+        const minutes = value.getHours() * 60 + value.getMinutes();
+        if (minutes >= 5 * 60 && minutes < 10 * 60 + 30) return 'breakfast';
+        if (minutes >= 10 * 60 + 30 && minutes < 15 * 60) return 'lunch';
+        if (minutes >= 17 * 60 && minutes < 22 * 60) return 'dinner';
+        return 'snack';
+    }
+
     window.dataUiState = {
+        defaultDietMealForTime(date = new Date()) {
+            return dietMealForClock(date);
+        },
+
+        applyClockDietMealDefault(date = new Date()) {
+            this._dietMeal = this.defaultDietMealForTime(date);
+            return this._dietMeal;
+        },
+
         shiftHistoryMonth(delta) {
             this.historyMonthOffset += delta;
             this.selectedCalendarDate = null;
@@ -365,6 +383,7 @@
 
         openDietModal() {
             const el = document.getElementById('dietModalContent');
+            this.applyClockDietMealDefault?.();
             if (el) el.innerHTML = this.renderDietModalContent();
             this._foodCalUnit = 'kj';
             this.syncFoodCalLabel?.();
@@ -395,7 +414,7 @@
         },
 
         renderDietModalContent() {
-            const meal = this._dietMeal || 'lunch';
+            const meal = this._dietMeal || this.defaultDietMealForTime?.() || 'lunch';
             const meals = [['breakfast','早餐'],['lunch','午餐'],['dinner','晚餐'],['snack','加餐']];
             return '<div class="diet-modal-body">' +
                 '<div class="diet-meal-selector">' + meals.map(([k,v]) => '<button class="diet-meal-pill' + (meal===k ? ' active' : '') + '" onclick="data.setDietMeal(\''+k+'\')" type="button">' + v + '</button>').join('') + '</div>' +

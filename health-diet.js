@@ -16,7 +16,25 @@
         button.appendChild(document.createTextNode(` ${text}`));
     }
 
+    function dietMealForClock(date = new Date()) {
+        const value = date instanceof Date ? date : new Date(date);
+        const minutes = value.getHours() * 60 + value.getMinutes();
+        if (minutes >= 5 * 60 && minutes < 10 * 60 + 30) return 'breakfast';
+        if (minutes >= 10 * 60 + 30 && minutes < 15 * 60) return 'lunch';
+        if (minutes >= 17 * 60 && minutes < 22 * 60) return 'dinner';
+        return 'snack';
+    }
+
     window.dataHealthDiet = {
+        defaultDietMealForTime(date = new Date()) {
+            return dietMealForClock(date);
+        },
+
+        applyClockDietMealDefault(date = new Date()) {
+            this._dietMeal = this.defaultDietMealForTime(date);
+            return this._dietMeal;
+        },
+
         getDietPhotoSupportInfo() {
             const cfg = window.ai?.getEffectiveConfig?.() || window.ai?.cfg || {};
             const provider = String(cfg.provider || '').toLowerCase();
@@ -60,7 +78,7 @@
 
         renderDietModalContent() {
             const mode = this._dietInputMode || this.db.health.dietInputMode || 'ai';
-            const meal = this._dietMeal || 'lunch';
+            const meal = this._dietMeal || this.defaultDietMealForTime?.() || 'lunch';
             const mealBtn = (key, label) => `<button class="diet-meal-pill ${meal === key ? 'active' : ''}" onclick="data.setDietMeal('${key}')" type="button">${this.escapeHtml(label)}</button>`;
             const photoInfo = this.getDietPhotoSupportInfo();
             const photoTitle = this.escapeHtml(this.dietPhotoTitle());
@@ -111,6 +129,7 @@
             const modal = document.getElementById('dietModal');
             const content = document.getElementById('dietModalContent');
             if (!modal || !content) return;
+            this.applyClockDietMealDefault();
             content.innerHTML = this.renderDietModalContent();
             this.syncFoodCalLabel?.();
             this.setDietInputMode(this._dietInputMode || this.db.health.dietInputMode || 'ai');
@@ -456,11 +475,12 @@
         },
 
         setDietMeal(meal) {
-            this._dietMeal = meal || 'lunch';
+            const nextMeal = meal || this.defaultDietMealForTime?.() || 'lunch';
+            this._dietMeal = nextMeal;
             const select = document.getElementById('foodMeal');
-            if (select) select.value = meal;
+            if (select) select.value = nextMeal;
             document.querySelectorAll('.diet-meal-pill').forEach(btn => {
-                btn.classList.toggle('active', btn.textContent === { breakfast: '早餐', lunch: '午餐', dinner: '晚餐', snack: '加餐' }[meal]);
+                btn.classList.toggle('active', btn.textContent === { breakfast: '早餐', lunch: '午餐', dinner: '晚餐', snack: '加餐' }[nextMeal]);
             });
         },
 

@@ -150,7 +150,7 @@ const foodLog = {
         const pro = parseFloat(document.getElementById('foodPro')?.value) || 0;
         const carb = parseFloat(document.getElementById('foodCarb')?.value) || 0;
         const fat = parseFloat(document.getElementById('foodFat')?.value) || 0;
-        const meal = this._dietMeal || 'lunch';
+        const meal = this._dietMeal || this.defaultDietMealForTime?.() || 'lunch';
         if (!name) return alert('请输入食物名称');
         if (!grams || grams <= 0) return alert('请输入食物重量');
         if (!calInput || calInput <= 0 || !cal) return alert('请先选择食物或填写每100g热量');
@@ -670,7 +670,7 @@ const foodLog = {
         if (!item.name) return alert('请输入食物名称');
         if (!this._aiFoodAdded) this._aiFoodAdded = new Set();
         if (this._aiFoodAdded.has(idx)) return;
-        const meal = this._dietMeal || 'lunch';
+        const meal = this._dietMeal || this.defaultDietMealForTime?.() || 'lunch';
         const addedLog = this.aiFoodLog(item, meal, idx);
         this.db.health.foodLogs.push(addedLog);
         this._aiFoodAdded.add(idx);
@@ -683,7 +683,7 @@ const foodLog = {
         const items = this._aiFoodDrafts || this._aiFoodResults || [];
         if (items.length === 0) return;
         if (!this._aiFoodAdded) this._aiFoodAdded = new Set();
-        const meal = this._dietMeal || 'lunch';
+        const meal = this._dietMeal || this.defaultDietMealForTime?.() || 'lunch';
         const addedNow = [];
         const addedLogs = [];
         items.forEach((item, idx) => {
