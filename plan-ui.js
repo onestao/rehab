@@ -204,7 +204,8 @@
             const macros = this.todayMacros?.() || { pro: 0, carb: 0, fat: 0 };
             const goalCal = this.db.health?.dietGoal?.dailyCal || 0;
             const goals = this.defaultDietGoals?.() || { pro: 0, carb: 0, fat: 0 };
-            const progress = goalCal ? Math.min(100, Math.round((intake / goalCal) * 100)) : 0;
+            const displayPercent = goalCal ? Math.max(0, Math.round((intake / goalCal) * 100)) : 0;
+            const ringProgress = Math.min(100, displayPercent);
             const remaining = goalCal ? goalCal - intake : 0;
             const remainingText = goalCal ? (remaining >= 0 ? `剩余${remaining}kcal` : `超出${Math.abs(remaining)}kcal`) : '';
             const macroStops = {
@@ -213,7 +214,7 @@
                 fat: 240 + Math.min(120, this.ratio(macros.fat, goals.fat) * 1.2)
             };
             if (!goalCal) return '<div class="ring ring-diet"><div><b>--</b><small>饮食</small></div></div>';
-            return `<div class="ring ring-diet" style="--progress:${progress};--pro-stop:${macroStops.pro}deg;--carb-stop:${macroStops.carb}deg;--fat-stop:${macroStops.fat}deg"><div><b>${progress}%</b><small>饮食</small><em>${intake}/${goalCal}</em></div></div>`;
+            return `<div class="ring ring-diet" style="--progress:${ringProgress};--pro-stop:${macroStops.pro}deg;--carb-stop:${macroStops.carb}deg;--fat-stop:${macroStops.fat}deg"><div><b>${displayPercent}%</b><small>饮食</small><em>${intake}/${goalCal}</em></div></div>`;
         },
 
         selectTodayPlan(planId) {
@@ -319,7 +320,8 @@
         },
 
         renderPlanTaskDrawerBody(planId) {
-            const plan = this.activeRecords?.(this.db.dailyPlans || []).find((item) => item.id === planId) || this.getTodayDailyPlan?.();
+            const activePlans = this.activeRecords?.(this.db.dailyPlans || []) || [];
+            const plan = planId ? activePlans.find((item) => item.id === planId) : this.getTodayDailyPlan?.();
             if (!plan) return '<div class="plan-empty">暂无训练任务</div>';
             const planMeta = this.planTypeMeta?.(plan.type, plan.title) || { label: '训练计划', icon: 'event_note' };
             const completion = this.completionRate?.(plan) || { done: 0, total: 0, rate: 0 };

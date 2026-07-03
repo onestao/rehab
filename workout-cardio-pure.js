@@ -11,6 +11,18 @@ const cardioTypes = {
     spin_bike: { name: '动感单车', met: 7.5 }
 };
 
+function normalizeCardioCatalog(extraTypes = {}) {
+    const catalog = { ...cardioTypes };
+    Object.entries(extraTypes && typeof extraTypes === 'object' ? extraTypes : {}).forEach(([key, value]) => {
+        const type = String(key || '').trim();
+        const name = String(value?.name || '').trim();
+        const met = Number(value?.met || 0);
+        if (!type || !name || !Number.isFinite(met) || met <= 0) return;
+        catalog[type] = { name, met };
+    });
+    return catalog;
+}
+
 /**
  * @param {number} met
  * @param {number} weightKg
@@ -27,10 +39,16 @@ function calcCalories(met, weightKg, durationMin) {
     return safeMet * safeWeight * (safeDuration / 60);
 }
 
-function normalizeCardioPlan(input = {}) {
+function normalizeCardioPlan(input = {}, extraTypes = {}) {
+    const catalog = normalizeCardioCatalog(extraTypes);
     const rawType = String(input.type || 'walk');
-    const info = cardioTypes[rawType] || cardioTypes.walk;
-    const type = cardioTypes[rawType] ? rawType : 'walk';
+    const customMet = Number(input.met || 0);
+    const customName = String(input.name || '').trim();
+    const customInfo = customName && Number.isFinite(customMet) && customMet > 0
+        ? { name: customName, met: customMet }
+        : null;
+    const info = catalog[rawType] || customInfo || cardioTypes.walk;
+    const type = catalog[rawType] || customInfo ? rawType : 'walk';
     const weight = Number(input.weight || 70);
     const target = Number.parseInt(input.target || 30, 10);
     return {
@@ -42,8 +60,8 @@ function normalizeCardioPlan(input = {}) {
     };
 }
 
-function calcCaloriesForSeconds(plan, seconds) {
-    const normalized = normalizeCardioPlan(plan);
+function calcCaloriesForSeconds(plan, seconds, extraTypes = {}) {
+    const normalized = normalizeCardioPlan(plan, extraTypes);
     return calcCalories(normalized.met, normalized.weight, Number(seconds || 0) / 60);
 }
 
@@ -89,6 +107,7 @@ function buildCardioHistoryRecord({ id, now = Date.now(), dayKey, plan, duration
 
 export {
     cardioTypes,
+    normalizeCardioCatalog,
     calcCalories,
     normalizeCardioPlan,
     calcCaloriesForSeconds,
@@ -101,6 +120,7 @@ export {
 if (typeof window !== 'undefined') {
     window.cardioPure = {
         cardioTypes,
+        normalizeCardioCatalog,
         calcCalories,
         normalizeCardioPlan,
         calcCaloriesForSeconds,

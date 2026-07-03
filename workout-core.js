@@ -101,6 +101,8 @@ Object.assign(workout, {
         document.getElementById('strengthLogCard').classList.toggle('hidden', mode !== 'strengthLog');
         document.getElementById('currentActionList').classList.toggle('hidden', mode !== 'strength');
         document.querySelector('.routine-tool').classList.toggle('hidden', mode !== 'strength');
+        data.refreshExerciseLibrarySelects?.();
+        window.cardio?.refreshTypeSelectors?.();
         this.resetMainPanel();
         this.updateStateClasses();
         if (mode === 'cardio') cardio.updatePlan();

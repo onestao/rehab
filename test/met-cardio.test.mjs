@@ -4,6 +4,7 @@ import {
     cardioTypes,
     calcCalories,
     calcCaloriesForSeconds,
+    normalizeCardioCatalog,
     formatDurationParts,
     shouldAnnounceTarget,
     shouldSaveCardioSession,
@@ -31,6 +32,13 @@ test('cardio helpers normalize timer and save thresholds', () => {
     assert.equal(shouldSaveCardioSession(20), true);
     assert.equal(shouldAnnounceTarget({ seconds: 60, target: 1, targetAnnounced: false }), true);
     assert.equal(shouldAnnounceTarget({ seconds: 60, target: 1, targetAnnounced: true }), false);
+});
+
+test('custom cardio catalog extends type normalization and calorie math', () => {
+    const catalog = normalizeCardioCatalog({ 'action-stair': { name: '登山机', met: 8.8 } });
+
+    assert.equal(catalog['action-stair'].name, '登山机');
+    assert.equal(calcCaloriesForSeconds({ type: 'action-stair', weight: 70 }, 1800, catalog), 308);
 });
 
 test('buildCardioHistoryRecord owns cardio history shape', () => {

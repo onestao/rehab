@@ -7,12 +7,10 @@ assignment
 auto_awesome
 backup
 badge
-balance
 biotech
 block
 bookmark_add
 bookmark_border
-bookmarks
 brightness_auto
 bug_report
 calendar_month
@@ -45,7 +43,6 @@ download_for_offline
 edit
 edit_note
 edit_square
-egg_alt
 error
 event
 event_busy

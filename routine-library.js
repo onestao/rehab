@@ -338,7 +338,7 @@
                             <div class="workout-lib-item-main" onclick="data.addActionFromLibrary('${a.id}')">
                                 <div class="workout-lib-item-info">
                                     <strong>${this.escapeHtml(a.name || '未命名动作')}</strong>
-                                    <small>${a.sets || 1}组 · ${a.reps || 1}次 · ${a.work || 5}s${a.isAlt ? ' · 双侧' : ''}</small>
+                                    <small>${[`${a.sets || 1}组`, `${a.reps || 1}次`, `${a.work || 5}s`, a.isAlt ? '双侧' : '', this.actionExerciseLogLabel?.(a)].filter(Boolean).join(' · ')}</small>
                                 </div>
                                 <span class="material-symbols-rounded">add</span>
                             </div>
@@ -993,6 +993,26 @@
             return (this.db.actions || []).find((a) => a && a.id === actionId);
         },
 
+        exerciseLibraryActions(kind = '') {
+            return this.activeRecords(this.db.actions || []).filter((action) => {
+                if (!action || action.libOnly !== true || !action.exerciseLogEnabled) return false;
+                const category = this.normalizeActionCategory(action.category);
+                if (kind === 'cardio') return category === 'cardio' && Number(action.met || 0) > 0;
+                if (kind === 'strength') return category !== 'cardio';
+                return true;
+            });
+        },
+
+        cardioTypeOptionsFromLibrary() {
+            return this.exerciseLibraryActions('cardio').reduce((acc, action) => {
+                acc[`action:${action.id}`] = {
+                    name: action.name || '自定义有氧',
+                    met: Number(action.met || 0)
+                };
+                return acc;
+            }, {});
+        },
+
         actionCategoryOptions() {
             return [
                 ['training', '训练'],
@@ -1039,6 +1059,13 @@
         actionCategoryLabel(value = '') {
             const normalized = this.normalizeActionCategory(value);
             return this.actionCategoryOptions().find(([key]) => key === normalized)?.[1] || '';
+        },
+
+        actionExerciseLogLabel(action = {}) {
+            if (!action.exerciseLogEnabled) return '';
+            const category = this.normalizeActionCategory(action.category);
+            const met = Number(action.met || 0);
+            return category === 'cardio' && met > 0 ? `可记运动 · ${met} MET` : '可记运动';
         },
 
         renderActionCategoryOptions(value = '') {
@@ -1671,10 +1698,15 @@
                         </div>
                         <div class="md-field"><select id="rlAeCategory">${this.renderActionCategoryOptions(action.category)}</select><label>动作分类</label></div>
                         <div class="md-field"><input id="rlAeBodyPart" type="text" placeholder=" " value="${esc(action.bodyPart || '')}"><label>训练部位</label></div>
+                        <div class="md-field" id="rlAeMetField"><input id="rlAeMet" type="number" min="0" step="0.1" placeholder=" " value="${esc(String(action.met || ''))}"><label>MET（有氧热量）</label></div>
                         <div style="grid-column:1/-1;display:flex;align-items:center;gap:10px;padding:4px 2px">
                             <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
                                 <input id="rlAeIsAlt" type="checkbox" ${action.isAlt ? 'checked' : ''}>
                                 <span style="color:var(--md-sys-on-surface)">双侧交替</span>
+                            </label>
+                            <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
+                                <input id="rlAeExerciseLogEnabled" type="checkbox" ${action.exerciseLogEnabled ? 'checked' : ''}>
+                                <span style="color:var(--md-sys-on-surface)">可在记运动调用</span>
                             </label>
                         </div>
                     </div>
@@ -1685,7 +1717,15 @@
                 `,
                 onMount: (root, close) => {
                     const q = (sel) => root.querySelector(sel);
+                    const syncMetField = () => {
+                        const category = this.normalizeActionCategory(q('#rlAeCategory')?.value || '');
+                        const enabled = !!q('#rlAeExerciseLogEnabled')?.checked;
+                        q('#rlAeMetField')?.classList.toggle('hidden', category !== 'cardio' && !enabled);
+                    };
                     q('#rlAeSets')?.focus?.();
+                    q('#rlAeCategory')?.addEventListener('change', syncMetField);
+                    q('#rlAeExerciseLogEnabled')?.addEventListener('change', syncMetField);
+                    syncMetField();
                     q('[data-rl-save]')?.addEventListener('click', (e) => {
                         e.preventDefault();
                         action.sets = Math.max(1, parseInt(q('#rlAeSets')?.value, 10) || 1);
@@ -1710,8 +1750,11 @@
                         );
                         action.bodyPart = String(q('#rlAeBodyPart')?.value || '').trim();
                         action.isAlt = !!q('#rlAeIsAlt')?.checked;
+                        action.exerciseLogEnabled = !!q('#rlAeExerciseLogEnabled')?.checked;
+                        action.met = Math.max(0, Number(q('#rlAeMet')?.value || 0));
                         this.touchRecord(action);
                         this.save();
+                        window.cardio?.refreshTypeSelectors?.();
                         close();
                         this.renderRoutines();
                     });
@@ -1827,7 +1870,7 @@
                     <div class="library-card-head">
                         <div style="flex:1;min-width:0">
                             <strong>${this.escapeHtml(a.name || '未命名动作')}</strong>
-                            <small>${[this.actionCategoryLabel?.(a.category), a.bodyPart, `${a.sets || 1}组 × ${a.reps || 1}次`, `${a.work || 5}s`, a.phase || 'main', a.isAlt ? '双侧' : ''].filter(Boolean).join(' · ')}</small>
+                            <small>${[this.actionCategoryLabel?.(a.category), a.bodyPart, `${a.sets || 1}组 × ${a.reps || 1}次`, `${a.work || 5}s`, a.phase || 'main', a.isAlt ? '双侧' : '', this.actionExerciseLogLabel?.(a)].filter(Boolean).join(' · ')}</small>
                             ${Array.isArray(a.tags) && a.tags.length ? `<div class="library-inline-tags">${a.tags.map((t) => `<span>${this.escapeHtml(t)}</span>`).join('')}</div>` : ''}
                         </div>
                     </div>

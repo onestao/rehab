@@ -4825,7 +4825,7 @@ body.is-training .fab-pip.active {
 }
 @layer components {
 /* ============================================
-   Record Page — Refactored Layout
+   Record Page
    ============================================ */
 
 /* Record Overview Card (compact) */
@@ -5202,10 +5202,11 @@ body.is-training .fab-pip.active {
 .today-timeline-item.swipe-open .delete-btn {
     background: var(--md-sys-error, #b3261e); color: #fff;
 }
+
 }
 @layer components {
 /* ============================================
-   Workout Plan Card & Library Sheet
+   Workout Plan Card
    ============================================ */
 
 /* Workout Plan Card */
@@ -9992,7 +9993,7 @@ body.is-training .fab-pip.active {
 }
 @layer components {
 /* ============================================
-   V6 UI — Glass language + Global safety nets + Animations
+   V6 UI
    Page-level styles moved to 51..56 v6 partials.
    Dark glass tokens live in 37-dark-mode.css.
    ============================================ */

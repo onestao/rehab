@@ -114,9 +114,13 @@
             if (type === 'strength' && entry?.customName) return entry.customName;
             const map = {
                 walk: '步行',
+                brisk_walk: '快走',
+                jog: '慢跑',
                 run: '跑步',
                 cycling: '骑行',
                 swim: '游泳',
+                elliptical: '椭圆机',
+                rowing: '划船机',
                 battle_rope: '战绳',
                 spin_bike: '动感单车',
                 strength: '力量训练',

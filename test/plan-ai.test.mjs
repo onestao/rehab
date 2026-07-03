@@ -1186,6 +1186,47 @@ test('plan AI confirmation blocks replacing same-type manual plans', () => {
   assert.deepEqual(JSON.parse(JSON.stringify(ctx.db.dailyPlans[0].items.map((item) => item.name))), ['手工动作']);
 });
 
+test('plan AI confirmation merges manual plan when user asks to retain or postpone items', () => {
+  const api = loadPlanAi();
+  const ctx = createContext(api);
+  ctx._lastPlanAiPrompt = '今天夹砖臀桥保留，其他项目可以顺延到下次';
+  ctx.db.dailyPlans = [{
+    id: 'manual-rehab',
+    date: '2026-05-25',
+    type: 'rehab',
+    source: 'manual',
+    title: '手工康复计划',
+    items: [{ id: 'manual-task', name: '手工动作', status: 'todo', category: 'main', spec: { sets: 2, reps: 10, work: 3 }, userOverride: false }]
+  }];
+  ctx._pendingPlanAiPlans = [{
+    date: '2026-05-25',
+    type: 'rehab',
+    title: 'AI 康复计划',
+    notes: 'AI notes',
+    items: [{ name: 'AI 新动作', category: 'main', requiresUserConfirm: true, userConfirmed: true, spec: { sets: 3, reps: 12, work: 3, repRest: 0, actionRest: 30, isAlt: false, mode: 'reps' } }]
+  }];
+  ctx.collectPlanAiPreviewPlans = () => ctx._pendingPlanAiPlans;
+  ctx.ensureTaskShape = (item) => ({ id: item.id || `task-${item.name}`, status: item.status || 'todo', deleted: false, ...item });
+  ctx.ensureDailyPlanShape = (plan) => ({ id: plan.id || 'manual-rehab', deleted: false, ...plan });
+  ctx.getDailyPlans = (date) => ctx.db.dailyPlans.filter((plan) => plan.date === date && !plan.deleted);
+  ctx.saveDailyPlan = (plan) => {
+    const index = ctx.db.dailyPlans.findIndex((item) => item.id === plan.id || (!item.deleted && item.date === plan.date && item.type === plan.type));
+    if (index >= 0) ctx.db.dailyPlans[index] = plan;
+    else ctx.db.dailyPlans.unshift(plan);
+  };
+  ctx.cleanupEmptyUnselectedPlanTypes = () => {};
+  ctx.save = () => { ctx.saved = true; };
+  ctx.closePlanAiSheet = () => {};
+  ctx._closeActiveModal = () => {};
+  ctx.render = () => {};
+
+  api.confirmPlanAiPlans.call(ctx);
+
+  assert.equal(ctx.saved, true);
+  assert.equal(ctx.db.dailyPlans[0].source, 'manual');
+  assert.deepEqual(JSON.parse(JSON.stringify(ctx.db.dailyPlans[0].items.map((item) => item.name))), ['手工动作', 'AI 新动作']);
+});
+
 test('plan AI confirmation force overwrites unfinished manual plan tasks', () => {
   const api = loadPlanAi();
   const ctx = createContext(api);

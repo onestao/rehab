@@ -8,9 +8,9 @@
     <link rel="icon" href="assets/app-icon.svg" type="image/svg+xml">
     <meta name="theme-color" content="#0061a4">
     <style>
-        @import url("https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&icon_names=accessibility_new,add,add_circle,arrow_back,arrow_forward,assignment,auto_awesome,backup,badge,balance,biotech,block,bookmark_add,bookmark_border,bookmarks,brightness_auto,bug_report,calendar_month,check,check_circle,checklist,chevron_left,chevron_right,clinical_notes,close,close_fullscreen,cloud_alert,cloud_done,cloud_off,cloud_sync,compare_arrows,compress,content_copy,dark_mode,data_thresholding,delete,diagnosis,directions_bike,directions_run,directions_walk,done,done_all,download,download_for_offline,edit,edit_note,edit_square,egg_alt,error,event,event_busy,event_note,exercise,expand_less,expand_more,fitness_center,flag,format_color_fill,forum,health_and_safety,help,history,info,inventory_2,keyboard,keyboard_arrow_down,keyboard_arrow_left,keyboard_arrow_right,keyboard_arrow_up,library_books,light_mode,linear_scale,link,local_fire_department,lock,lock_open,manage_search,mic,mic_off,monitor_heart,monitor_weight,monitoring,more_vert,no_food,notifications,notifications_active,palette,pause,pedal_bike,person,picture_in_picture_alt,play_arrow,play_circle,playlist_add,pool,progress_activity,psychology,radio_button_unchecked,record_voice_over,refresh,remove,remove_circle,replay,restart_alt,restaurant,rowing,rule,save,schedule,science,search,search_off,self_improvement,send,settings,shield,short_text,show_chart,skip_next,skip_previous,speed,sports,sports_gymnastics,star,star_border,stop,summarize,swap_horiz,sync,sync_problem,system_update,timeline,timer,tips_and_updates,today,toggle_off,toggle_on,trending_down,trending_flat,trending_up,tune,upload,upload_file,verified,vertical_align_bottom,vertical_align_top,vibration,visibility,visibility_off,volume_off,volume_up,warning,waterfall_chart") layer(fonts);
+        @import url("https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&icon_names=accessibility_new,add,add_circle,arrow_back,arrow_forward,assignment,auto_awesome,backup,badge,biotech,block,bookmark_add,bookmark_border,brightness_auto,bug_report,calendar_month,check,check_circle,checklist,chevron_left,chevron_right,clinical_notes,close,close_fullscreen,cloud_alert,cloud_done,cloud_off,cloud_sync,compare_arrows,compress,content_copy,dark_mode,data_thresholding,delete,diagnosis,directions_bike,directions_run,directions_walk,done,done_all,download,download_for_offline,edit,edit_note,edit_square,error,event,event_busy,event_note,exercise,expand_less,expand_more,fitness_center,flag,format_color_fill,forum,health_and_safety,help,history,info,inventory_2,keyboard,keyboard_arrow_down,keyboard_arrow_left,keyboard_arrow_right,keyboard_arrow_up,library_books,light_mode,linear_scale,link,local_fire_department,lock,lock_open,manage_search,mic,mic_off,monitor_heart,monitor_weight,monitoring,more_vert,no_food,notifications,notifications_active,palette,pause,pedal_bike,person,picture_in_picture_alt,play_arrow,play_circle,playlist_add,pool,progress_activity,psychology,radio_button_unchecked,record_voice_over,refresh,remove,remove_circle,replay,restart_alt,restaurant,rowing,rule,save,schedule,science,search,search_off,self_improvement,send,settings,shield,short_text,show_chart,skip_next,skip_previous,speed,sports,sports_gymnastics,star,star_border,stop,summarize,swap_horiz,sync,sync_problem,system_update,timeline,timer,tips_and_updates,today,toggle_off,toggle_on,trending_down,trending_flat,trending_up,tune,upload,upload_file,verified,vertical_align_bottom,vertical_align_top,vibration,visibility,visibility_off,volume_off,volume_up,warning,waterfall_chart") layer(fonts);
     </style>
-    <link rel="stylesheet" href="build/generated.css?v=303">
+    <link rel="stylesheet" href="build/generated.css?v=304">
 </head>
 <body>
     <div id="appUpdateBanner" class="app-update-banner hidden">
@@ -153,17 +153,24 @@
             </div>
             <div class="md-card strength-log-card hidden" id="strengthLogCard">
                 <div class="md-grid">
+                    <div class="md-field span-full">
+                        <select id="slLibraryAction" onchange="data.applyStrengthLogLibraryAction(this.value)">
+                            <option value="">&#20174;&#21160;&#20316;&#24211;&#36873;&#25321;</option>
+                        </select>
+                        <label>&#21160;&#20316;&#24211;&#35843;&#29992;</label>
+                    </div>
                     <div class="sl-name-row span-full">
                         <div class="md-field">
                             <input type="text" id="slName" placeholder=" "><label>&#21160;&#20316;&#21517;&#31216;</label>
                         </div>
                         <button class="md-icon-btn" onclick="actionHistory.openFor(document.getElementById('slName')?.value)" type="button" aria-label="查看动作历史" title="查看动作历史"><span class="material-symbols-rounded">monitoring</span></button>
                     </div>
-                    <div class="md-field"><input type="number" id="slWeight" step="0.5" placeholder=" "><label>&#37325;&#37327; kg</label></div>
+                    <div class="md-field"><input type="number" id="slWeight" step="0.5" placeholder=" "><label>&#22806;&#21152;&#36127;&#37325; kg</label></div>
                     <div class="md-field"><input type="number" id="slSets" placeholder=" "><label>&#32452;&#25968;</label></div>
                     <div class="md-field"><input type="number" id="slReps" placeholder=" "><label>&#27599;&#32452;&#27425;&#25968;</label></div>
                     <div class="md-field"><input type="number" id="slMinutes" placeholder=" "><label>&#24635;&#26102;&#38271;&#65288;&#20998;&#38047;&#65292;&#21487;&#31354;&#65289;</label></div>
                     <div class="md-field span-full"><input type="text" id="slNote" placeholder=" "><label>&#22791;&#27880;</label></div>
+                    <label class="md-switch span-full"><input type="checkbox" id="slSaveToLibrary"><span>&#35760;&#20303;&#21040;&#21160;&#20316;&#24211;&#24182;&#21487;&#22797;&#29992;</span></label>
                 </div>
                 <button class="md-btn md-btn-filled" onclick="data.addStrengthLog()">
                     <span class="material-symbols-rounded">add</span> &#20445;&#23384;&#21040;&#20170;&#26085;&#35760;&#24405;
@@ -375,49 +382,49 @@
     </nav>
     </div>
 
-    <script src="m3e-ripple.js?v=303"></script>
-    <script src="pwa-support.js?v=303"></script>
-    <script src="toast.js?v=303"></script>
-    <script src="haptics.js?v=303"></script>
-    <script src="error-bus.js?v=303"></script>
-    <script src="i18n.js?v=303"></script>
-    <script src="a11y-focus-trap.js?v=303"></script>
-    <script src="theme.js?v=303"></script>
-    <script src="fooddb.js?v=303"></script>
-    <script src="render-safe.js?v=303"></script>
-    <script src="nav-stack.js?v=303"></script>
-    <script src="app-route.js?v=303"></script>
-    <script type="module" src="data-utils-pure.js?v=303"></script>
-    <script type="module" src="action-identity.js?v=303"></script>
-    <script src="data-utils.js?v=303"></script>
-    <script src="storage/idb.js?v=303"></script>
-    <script src="storage/idb-collections.js?v=303"></script>
-    <script src="storage/idb-advice-collections.js?v=303"></script>
-    <script src="storage/migrate.js?v=303"></script>
-    <script src="data-records.js?v=303"></script>
-    <script src="data-schema.js?v=303"></script>
-    <script src="advice-virtual-list.js?v=303"></script>
-    <script src="data-store.js?v=303"></script>
-    <script src="data-ui-state.js?v=303"></script>
-    <script src="data-views.js?v=303"></script>
-    <script src="routine-plan.js?v=303"></script>
-    <script src="data.js?v=303"></script>
-    <script type="module" src="voice-engine.js?v=303"></script>
-    <script src="voice-cache.js?v=303"></script>
-    <script src="voice-webspeech-adapter.js?v=303"></script>
-    <script src="voice-legado-adapter.js?v=303"></script>
-    <script src="workout-voice.js?v=303"></script>
-    <script src="workout-readiness.js?v=303"></script>
-    <script src="strength-form.js?v=303"></script>
-    <script src="weekly-plan.js?v=303"></script>
-    <script src="action-history.js?v=303"></script>
-    <script type="module" src="sync-pure.js?v=303"></script>
-    <script src="sync-status.js?v=303"></script>
-    <script src="credential-fields.js?v=303"></script>
-    <script src="sheet-drag.js?v=303"></script>
-    <script src="app-update.js?v=303"></script>
-    <script type="module" src="mi-scale-pure.js?v=303"></script>
-    <script src="mi-scale-web-bluetooth.js?v=303"></script>
+    <script src="m3e-ripple.js?v=304"></script>
+    <script src="pwa-support.js?v=304"></script>
+    <script src="toast.js?v=304"></script>
+    <script src="haptics.js?v=304"></script>
+    <script src="error-bus.js?v=304"></script>
+    <script src="i18n.js?v=304"></script>
+    <script src="a11y-focus-trap.js?v=304"></script>
+    <script src="theme.js?v=304"></script>
+    <script src="fooddb.js?v=304"></script>
+    <script src="render-safe.js?v=304"></script>
+    <script src="nav-stack.js?v=304"></script>
+    <script src="app-route.js?v=304"></script>
+    <script type="module" src="data-utils-pure.js?v=304"></script>
+    <script type="module" src="action-identity.js?v=304"></script>
+    <script src="data-utils.js?v=304"></script>
+    <script src="storage/idb.js?v=304"></script>
+    <script src="storage/idb-collections.js?v=304"></script>
+    <script src="storage/idb-advice-collections.js?v=304"></script>
+    <script src="storage/migrate.js?v=304"></script>
+    <script src="data-records.js?v=304"></script>
+    <script src="data-schema.js?v=304"></script>
+    <script src="advice-virtual-list.js?v=304"></script>
+    <script src="data-store.js?v=304"></script>
+    <script src="data-ui-state.js?v=304"></script>
+    <script src="data-views.js?v=304"></script>
+    <script src="routine-plan.js?v=304"></script>
+    <script src="data.js?v=304"></script>
+    <script type="module" src="voice-engine.js?v=304"></script>
+    <script src="voice-cache.js?v=304"></script>
+    <script src="voice-webspeech-adapter.js?v=304"></script>
+    <script src="voice-legado-adapter.js?v=304"></script>
+    <script src="workout-voice.js?v=304"></script>
+    <script src="workout-readiness.js?v=304"></script>
+    <script src="strength-form.js?v=304"></script>
+    <script src="weekly-plan.js?v=304"></script>
+    <script src="action-history.js?v=304"></script>
+    <script type="module" src="sync-pure.js?v=304"></script>
+    <script src="sync-status.js?v=304"></script>
+    <script src="credential-fields.js?v=304"></script>
+    <script src="sheet-drag.js?v=304"></script>
+    <script src="app-update.js?v=304"></script>
+    <script type="module" src="mi-scale-pure.js?v=304"></script>
+    <script src="mi-scale-web-bluetooth.js?v=304"></script>
     <div id="weightModal" class="md-modal md-modal-sheet hidden" aria-hidden="true">
         <div class="md-modal-backdrop" onclick="data.closeWeightModal()"></div>
         <div class="md-modal-card md-modal-sheet-card">
@@ -836,7 +843,7 @@
             const p = new Promise((res, rej) => {
                 const link = document.createElement('link');
                 link.rel = 'stylesheet';
-                link.href = `css-src/${name}.css?v=303`;
+                link.href = `css-src/${name}.css?v=304`;
                 link.dataset.appCss = name;
                 link.onload = () => {
                     link.dataset.loaded = 'true';
@@ -877,7 +884,7 @@
                 if (_loaded.has(name)) return res();
                 const s = document.createElement('script');
                 if (MODULE_SCRIPTS.has(name)) s.type = 'module';
-                s.src = `${name}${name === 'ai-vision-pure' ? '.mjs' : '.js'}?v=303`;
+                s.src = `${name}${name === 'ai-vision-pure' ? '.mjs' : '.js'}?v=304`;
                 s.onload = () => { _loaded.add(name); res(); };
                 s.onerror = rej;
                 document.head.appendChild(s);
