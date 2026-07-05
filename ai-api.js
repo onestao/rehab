@@ -118,7 +118,20 @@ Object.assign(ai, {
     },
 
     _coerceAiJsonPayload(value, opts = {}) {
-        if ((opts.expected || 'array') !== 'array') return value;
+        const expected = opts.expected || 'array';
+        if (expected === 'object') {
+            if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+            const wrapperKeys = opts.wrapperKeys || ['data', 'result', 'payload', 'item'];
+            const shapeKeys = opts.shapeKeys || [];
+            const hasShape = item => !shapeKeys.length || shapeKeys.some(key => item?.[key] !== undefined);
+            if (hasShape(value)) return value;
+            for (const key of wrapperKeys) {
+                const nested = value[key];
+                if (nested && typeof nested === 'object' && !Array.isArray(nested) && hasShape(nested)) return nested;
+            }
+            return value;
+        }
+        if (expected !== 'array') return value;
         if (Array.isArray(value)) return value;
         if (!value || typeof value !== 'object') return null;
         const wrapperKeys = opts.wrapperKeys || [
@@ -949,3 +962,5 @@ Object.assign(ai, {
         return JSON.parse(match[0]);
     }
 });
+
+window.aiDebug?.patch?.();

@@ -161,6 +161,7 @@ data.ensureAiRuntime = async function (options = {}) {
         });
     }
     const client = await data._aiRuntimePromise;
+    window.aiDebug?.patch?.();
     if (options.vision && !data._aiVisionRuntimeReady) {
         if (!data._aiVisionRuntimePromise) {
             data._aiVisionRuntimePromise = (async () => {
