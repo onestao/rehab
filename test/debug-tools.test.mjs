@@ -108,6 +108,14 @@ function loadDebugTools({ persisted = false } = {}) {
                 calls.planDisable += 1;
             }
         },
+        aiDebug: {
+            enable() {
+                calls.aiEnable = (calls.aiEnable || 0) + 1;
+            },
+            disable() {
+                calls.aiDisable = (calls.aiDisable || 0) + 1;
+            }
+        },
         errorBus: {
             enableDebug() {
                 calls.errorEnable += 1;
@@ -182,7 +190,8 @@ test('debug tools toggle lazily loads debug extensions and cleans up on disable'
     assert.equal(enabled, true);
     assert.equal(host._debugToolsEnabled, true);
     assert.equal(store.get('rehab_debug_tools'), '1');
-    assert.deepEqual(calls.load, ['debug-plan-ai']);
+    assert.deepEqual(calls.load, ['debug-ai', 'debug-plan-ai']);
+    assert.equal(calls.aiEnable, 1);
     assert.equal(calls.planEnable, 1);
     assert.equal(calls.errorEnable, 1);
     assert.equal(elements.has('adviceDebugFab'), true);
@@ -192,6 +201,7 @@ test('debug tools toggle lazily loads debug extensions and cleans up on disable'
     assert.equal(disabled, false);
     assert.equal(host._debugToolsEnabled, false);
     assert.equal(store.has('rehab_debug_tools'), false);
+    assert.equal(calls.aiDisable, 1);
     assert.equal(calls.planDisable, 1);
     assert.equal(calls.errorDisable, 1);
     assert.equal(elements.has('adviceDebugFab'), false);

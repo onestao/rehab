@@ -75,6 +75,7 @@ interface Window {
   dataPlanAi: any;
   planAiPure: any;
   debugTools: any;
+  aiDebug: any;
   backupRingPure: any;
   backupImportPure: any;
   loadAppScript: (name: string) => Promise<void>;

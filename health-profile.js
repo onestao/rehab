@@ -97,6 +97,17 @@
         try { return JSON.parse(match[0]); } catch { return null; }
     }
 
+    function parseRehabWeeklyJson(aiClient, raw) {
+        if (typeof aiClient?._parseAiJsonPayload === 'function') {
+            return aiClient._parseAiJsonPayload(raw, {
+                expected: 'object',
+                shapeKeys: ['actions'],
+                wrapperKeys: ['rehabWeekly', 'weeklyPrescription', 'prescription', 'result', 'data', 'payload', '康复周处方', '处方', '结果']
+            });
+        }
+        return extractJsonObject(raw);
+    }
+
     window.dataHealthProfile = {
         rehabWeekStart(date = new Date()) {
             const d = new Date(date);
@@ -927,13 +938,14 @@
             this.setRehabParsePending(true);
             this.setRehabParseStatus('正在让 AI 解析自然语言处方...', 'busy');
             try {
-                if (typeof window.ai === 'undefined' || typeof ai.call !== 'function') throw new Error('AI 模块未加载');
+                const aiClient = window.ai || (typeof ai !== 'undefined' ? ai : null);
+                if (!aiClient || typeof aiClient.call !== 'function') throw new Error('AI 模块未加载');
                 const content = this.buildRehabWeeklyPrompt(rawText, weekStart, visitDate);
-                const result = await ai.call([
+                const result = await aiClient.call([
                     { role: 'system', content: '你是康复训练处方结构化助手，只返回严格 JSON。' },
                     { role: 'user', content }
                 ], 2200);
-                const parsed = extractJsonObject(result);
+                const parsed = parseRehabWeeklyJson(aiClient, result);
                 if (!parsed) throw new Error('AI 返回不是有效 JSON');
                 const draft = this.normalizeRehabWeeklyPayload(parsed, { weekStart, visitDate, rawText });
                 // Auto-mark previously active actions as dropped if not mentioned this week,
@@ -976,6 +988,12 @@
                 this.setRehabParseStatus('已解析，请先查看差分，再确认动作。', 'ok');
                 window.haptics?.success?.();
             } catch (e) {
+                window.errorBus?.report?.('ai-rehab-weekly', e, {
+                    phase: 'parse',
+                    code: e?.code || '',
+                    rawSnippet: String(e?.body || '').slice(0, 240),
+                    inputSnippet: rawText.slice(0, 160)
+                });
                 this.setRehabParseStatus(e?.message || 'AI 解析失败', 'error');
             } finally {
                 this.setRehabParsePending(false);

@@ -258,6 +258,17 @@
     }
 
     registerExtension({
+        name: 'ai',
+        async enable() {
+            if (typeof window.loadAppScript === 'function') await window.loadAppScript('debug-ai');
+            window.aiDebug?.enable?.();
+        },
+        disable() {
+            window.aiDebug?.disable?.();
+        }
+    });
+
+    registerExtension({
         name: 'plan-ai',
         async enable() {
             if (typeof window.loadAppScript === 'function') await window.loadAppScript('debug-plan-ai');
