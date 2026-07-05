@@ -97,14 +97,15 @@ function createContext(api, plans) {
   };
 }
 
-test('today card removes Today kicker and shows weekly plan dock', () => {
+test('today card removes Today kicker and shows recent plan dock', () => {
   const api = loadPlanUi();
   const plans = [{ id: 'p1', type: 'bulk', title: '增肌日程', items: [], pendingCooldowns: [] }];
   const html = api.renderPlanTodaySection.call(createContext(api, plans));
 
   assert.equal(html.includes('<span class="cardio-kicker">今日</span>'), false);
   assert.match(html, /openPlanTodayAiSheet/);
-  assert.match(html, /aria-label="本周计划"/);
+  assert.match(html, /aria-label="近期计划"/);
+  assert.match(html, /3-7天/);
   assert.match(html, /planWeekly\?\.open/);
   assert.doesNotMatch(html, /aria-label="暂无待集中拉伸"/);
 });

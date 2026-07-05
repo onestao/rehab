@@ -2,18 +2,18 @@
 (function () {
     if (window.planWeekly) return;
 
-    function dayStart(date = new Date()) {
-        const copy = new Date(date);
-        const offset = (copy.getDay() + 6) % 7;
-        copy.setHours(0, 0, 0, 0);
-        copy.setDate(copy.getDate() - offset);
-        return copy;
-    }
-
     function addDays(date, delta) {
         const copy = new Date(date);
         copy.setDate(copy.getDate() + delta);
         return copy;
+    }
+
+    function dateFromKey(key) {
+        return data.dateFromKey?.(key) || new Date(`${key}T00:00:00`);
+    }
+
+    function logicalTodayKey() {
+        return data.logicalDateKey?.() || data.dateKey?.(new Date()) || new Date().toISOString().slice(0, 10);
     }
 
     function statusMeta(item = {}) {
@@ -27,21 +27,29 @@
         selectedDate: '',
 
         range() {
-            const start = dayStart();
-            return Array.from({ length: 7 }, (_, index) => {
+            const today = logicalTodayKey();
+            const start = addDays(dateFromKey(today), -3);
+            return Array.from({ length: 11 }, (_, index) => {
                 const date = addDays(start, index);
-                const key = data.dateKey(date);
+                const key = data.dateKey ? data.dateKey(date) : date.toISOString().slice(0, 10);
                 const plans = data.getDailyPlans?.(key) || [];
                 const rate = data.aggregateCompletionRate?.(plans) || { done: 0, total: 0, rate: 0 };
-                return { date, key, plans, plan: plans[0] || null, rate };
+                const missed = key < today && Number(rate.total || 0) > Number(rate.done || 0);
+                return {
+                    date,
+                    key,
+                    plans,
+                    rate: { ...rate, missed }
+                };
             });
         },
 
         summary() {
             const items = this.range();
+            const today = logicalTodayKey();
             const done = items.reduce((sum, item) => sum + Number(item.rate.done || 0), 0);
             const total = items.reduce((sum, item) => sum + Number(item.rate.total || 0), 0);
-            const missed = items.reduce((sum, item) => sum + Math.max(0, Number(item.rate.total || 0) - Number(item.rate.done || 0)), 0);
+            const missed = items.reduce((sum, item) => item.key < today ? sum + Math.max(0, Number(item.rate.total || 0) - Number(item.rate.done || 0)) : sum, 0);
             return { done, total, missed };
         },
 
@@ -179,7 +187,8 @@
 
         render() {
             const list = this.range();
-            const selected = this.selectedDate || list[0]?.key || '';
+            const today = logicalTodayKey();
+            const selected = this.selectedDate || (list.some((item) => item.key === today) ? today : list[0]?.key || '');
             return `<div class="plan-weekly-sheet">
                 <div class="plan-weekly-list">
                     ${list.map((item) => {
@@ -191,7 +200,7 @@
                                 <small>${item.rate.done}/${item.rate.total || 0} 完成</small>
                             </div>
                             <span class="plan-weekly-day-progress"><i style="width:${percent}%"></i></span>
-                            <span class="material-symbols-rounded">${item.rate.total && item.rate.done < item.rate.total ? 'warning' : 'check_circle'}</span>
+                            <span class="material-symbols-rounded">${item.rate.missed ? 'warning' : (item.rate.total && item.rate.done >= item.rate.total ? 'check_circle' : 'event_note')}</span>
                         </button>
                     `; }).join('')}
                 </div>
