@@ -1,0 +1,75 @@
+import assert from 'node:assert/strict';
+import { existsSync, readFileSync } from 'node:fs';
+import path from 'node:path';
+import { test } from 'node:test';
+
+function readRootFile(file) {
+    return readFileSync(path.join(process.cwd(), file), 'utf8');
+}
+
+function extractBlock(source, start, end) {
+    const startIndex = source.indexOf(start);
+    assert.notEqual(startIndex, -1, `${start} should exist`);
+    const endIndex = source.indexOf(end, startIndex);
+    assert.notEqual(endIndex, -1, `${end} should exist after ${start}`);
+    return source.slice(startIndex, endIndex);
+}
+
+test('today keeps quick record modules lazy until the user taps a record action', () => {
+    const html = readRootFile('index.html');
+    const todayDeps = html.match(/today:\s*\[([^\]]*)\]/)?.[1] || '';
+
+    assert.match(todayDeps, /'history-view'/);
+    assert.doesNotMatch(todayDeps, /'plan-ui'|'health-diet'|'health-weight'|'health-exercise'|'food-log'/);
+    assert.match(html, /function scheduleTodayEnhancementLoad\(\)/);
+});
+
+test('food AI recognition lazily loads the AI runtime before touching window.ai', () => {
+    const foodLog = readRootFile('food-log.js');
+    const data = readRootFile('data.js');
+    const healthDiet = readRootFile('health-diet.js');
+
+    assert.match(data, /ensureAiRuntime/);
+    assert.match(foodLog, /ensureAiRuntime/);
+    assert.match(healthDiet, /ensureAiRuntime\(\{ vision: true \}\)/);
+    assert.doesNotMatch(foodLog, /\bai\.cfg|\bai\.parseFood/);
+});
+
+test('service worker awaits runtime cache writes and keeps heavy lazy modules out of install precache', () => {
+    const sw = readRootFile('sw.js');
+    const precacheAssets = sw.match(/const ASSETS = \[([\s\S]*?)\];/)?.[1] || '';
+
+    assert.match(sw, /await cache\.put\(request, clone\)\.catch/);
+    for (const asset of [
+        'assets/heic2any.min.js',
+        'plan-ai.js',
+        'plan-auto-adjust.js',
+        'routine-library.js',
+        'weekly-summary.js',
+        'report-panel.js',
+        'ai-api.js',
+        'ai-store.js',
+        'ai-profile.js',
+        'ai-models.js',
+        'ai-vision-pure.mjs'
+    ]) {
+        assert.doesNotMatch(precacheAssets, new RegExp(asset.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+    }
+});
+
+test('edge performance smoke script is available as an explicit npm script', () => {
+    const packageJson = JSON.parse(readRootFile('package.json'));
+    const scriptPath = path.join(process.cwd(), 'scripts', 'edge-perf-smoke.mjs');
+
+    assert.equal(existsSync(scriptPath), true);
+    assert.equal(packageJson.scripts['perf:edge'], 'node scripts/edge-perf-smoke.mjs');
+});
+
+test('material symbols font loading is deferred until after first render', () => {
+    const html = readRootFile('index.html');
+    const eagerHead = extractBlock(html, '<head>', '<noscript>');
+
+    assert.doesNotMatch(eagerHead, /fonts\.googleapis\.com/);
+    assert.match(html, /function scheduleMaterialSymbolsLoad\(\)/);
+    assert.match(html, /scheduleMaterialSymbolsLoad\(\);/);
+});

@@ -355,11 +355,13 @@ const foodLog = {
     async requestFoodAliasGroups(names = []) {
         const input = [...new Set((names || []).map(name => String(name || '').trim()).filter(Boolean))].slice(0, 120);
         if (input.length < 2) return [];
+        const aiClient = await this.ensureAiRuntime?.() || window.ai;
+        if (!aiClient?.call) throw new Error('AI 模块未加载完成');
         const tpl = window.dataAiTemplates;
         const prefResult = tpl?.buildPromptMessages('food_alias_merge', {}, window.data?.db) || {};
         const sysMsg = prefResult.messages?.find(m => m.role === 'system')?.content || '只返回纯 JSON 数组，不要 markdown，不要解释。';
         const prompt = `合并同一种食物的历史名称。canonical 用简洁中文名，aliases 只能来自输入。只返回 JSON 数组：[{"canonical":"标准名","aliases":["原名1","原名2"]}]\n输入：${JSON.stringify(input)}`;
-        const raw = await window.ai.call([
+        const raw = await aiClient.call([
             { role: 'system', content: sysMsg },
             { role: 'user', content: prompt }
         ], 900);
@@ -445,7 +447,16 @@ const foodLog = {
             setStatus('历史食物名称不足，暂不需要合并');
             return;
         }
-        if (!window.ai?.cfg?.enabled || typeof window.ai?.call !== 'function') {
+        let aiClient = null;
+        try {
+            aiClient = await this.ensureAiRuntime?.() || window.ai;
+        } catch (e) {
+            window.errorBus?.report?.('food.aiDedupe.load', e);
+            setStatus('AI 模块加载失败，请稍后重试');
+            return;
+        }
+        const effective = aiClient?.getEffectiveConfig?.() || aiClient?.cfg || {};
+        if (!effective.enabled || typeof aiClient?.call !== 'function') {
             setStatus('请先在设置中配置 AI 后再合并历史同类项');
             window.toast?.show?.('请先在设置中配置 AI', 'info');
             return;
@@ -606,11 +617,17 @@ const foodLog = {
             setTimeout(() => { if (textarea) textarea.placeholder = '说说你这顿吃了什么，例如：鸡胸肉饭加一杯豆浆'; }, 3000);
             return;
         }
-        if (!ai.cfg.enabled) return alert('请先在设置中配置 AI 接口');
         const statusEl = document.getElementById('foodAiStatus');
-        if (statusEl) statusEl.textContent = 'AI 分析中...';
+        if (statusEl) statusEl.textContent = '正在加载 AI 模块...';
         try {
-            const items = this.normalizeAiFoodItems(await ai.parseFood(text));
+            const aiClient = await this.ensureAiRuntime?.() || window.ai;
+            const effective = aiClient?.getEffectiveConfig?.() || aiClient?.cfg || {};
+            if (!effective.enabled || typeof aiClient?.parseFood !== 'function') {
+                if (statusEl) statusEl.textContent = '请先在设置中配置 AI 接口';
+                return alert('请先在设置中配置 AI 接口');
+            }
+            if (statusEl) statusEl.textContent = 'AI 分析中...';
+            const items = this.normalizeAiFoodItems(await aiClient.parseFood(text));
             if (!items.length) throw new Error('未识别到食物');
             this._aiFoodResults = items;
             this._aiFoodAdded = new Set();
@@ -618,7 +635,14 @@ const foodLog = {
             this.renderAiFoodResults();
             if (statusEl) statusEl.textContent = `AI 已识别 ${items.length} 项，点击逐个添加或批量添加`;
         } catch (e) {
-            if (statusEl) statusEl.textContent = 'AI 识别失败: ' + (window.toast ? toast.sanitize(e) : e.message);
+            const message = window.toast ? toast.sanitize(e) : String(e?.message || e);
+            window.errorBus?.report?.('ai-food', e, {
+                phase: 'parse-text',
+                code: e?.code || '',
+                inputSnippet: text.slice(0, 160),
+                rawSnippet: String(e?.body || '').slice(0, 240)
+            });
+            if (statusEl) statusEl.textContent = 'AI 识别失败: ' + message;
         }
     },
 

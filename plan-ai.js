@@ -29,6 +29,13 @@
     const protectedPlanTask = window.planPolicy.isProtectedPlanTask;
 
     const isPlainObject = (value) => value && typeof value === 'object' && !Array.isArray(value);
+
+    function hasUserPlanMergeIntent(text = '') {
+        const raw = String(text || '').trim();
+        if (!raw) return false;
+        return /(保留|继续|沿用|照旧|不要删|不删除|不要覆盖|不覆盖|顺延|延后|延期|推迟|挪到|移到|明天|下一次|下次)/.test(raw);
+    }
+
     function stripPlanAiMeta(result) {
         if (!result || typeof result !== 'object') return result;
         const { meta, ...publicResult } = result;
@@ -1117,6 +1124,8 @@
             }
             const types = normalizePlanTypes(this._planAiTypes);
             const prompt = bodyValue('planAiPrompt').trim();
+            this._lastPlanAiPrompt = prompt;
+            this._planAiAllowUserPlanMerge = hasUserPlanMergeIntent(prompt);
             const outputTokenBudget = mode === 'week' ? 5200 : 3600;
             const messages = [
                 { role: 'system', content: '你是训练排程助手，只输出 JSON。' },
@@ -1454,6 +1463,7 @@
 
         confirmPlanAiPlans(options = {}) {
             const forceUserPlanOverwrite = options === true || options?.forceUserPlanOverwrite === true;
+            const allowUserPlanMerge = !forceUserPlanOverwrite && (this._planAiAllowUserPlanMerge || hasUserPlanMergeIntent(this._lastPlanAiPrompt || ''));
             const confirmBtn = queryPlanAiPreview('[data-plan-ai-confirm-save]');
             if (confirmBtn && !forceUserPlanOverwrite) {
                 confirmBtn.dataset.force = '';
@@ -1528,11 +1538,11 @@
                     date: plan.date,
                     type: plan.type || 'rehab',
                     title: plan.title || this.planTypeMeta?.(plan.type)?.label || '训练计划',
-                    source: 'ai',
+                    source: currentUserPlan && allowUserPlanMerge ? (current.source || 'manual') : 'ai',
                     notes: plan.notes,
                     items: [...preserved, ...aiItems]
                 });
-                const validation = currentUserPlan && (forceUserPlanOverwrite || !(current.items || []).some((item) => item && !item.deleted)) ? null : window.planPolicy?.validatePlanChanges?.({
+                const validation = currentUserPlan && (forceUserPlanOverwrite || allowUserPlanMerge || !(current.items || []).some((item) => item && !item.deleted)) ? null : window.planPolicy?.validatePlanChanges?.({
                     beforePlans: current ? [current] : [],
                     afterPlans: [merged],
                     source: 'ai'

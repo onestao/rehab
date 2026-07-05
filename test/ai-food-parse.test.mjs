@@ -8,6 +8,21 @@ async function loadFoodLog() {
     return vm.runInNewContext(`${source}\nfoodLog;`, {});
 }
 
+async function loadAiApi(raw) {
+    const source = await readFile(new URL('../ai-api.js', import.meta.url), 'utf8');
+    const sandbox = {
+        ai: {},
+        window: {
+            dataAiTemplates: null,
+            data: { db: {} }
+        },
+        console
+    };
+    vm.runInNewContext(`${source}\nai;`, sandbox);
+    sandbox.ai.call = async () => raw;
+    return sandbox.ai;
+}
+
 test('normalizes Chinese AI food fields into app nutrition fields', async () => {
     const foodLog = await loadFoodLog();
 
@@ -100,4 +115,31 @@ test('converts kilojoule food energy values to kcal', async () => {
 
     const [item2] = foodLog.normalizeAiFoodItems([{ name: '牛奶', energy: { value: 836, unit: 'kJ' } }]);
     assert.equal(item2.cal, 199.8);
+});
+
+test('parseFood accepts fenced, wrapped, and noisy model JSON responses', async () => {
+    const cases = [
+        {
+            raw: '```json\n[{"name":"鸡胸肉","grams":120}]\n```',
+            name: '鸡胸肉'
+        },
+        {
+            raw: '识别结果：{"foods":[{"name":"米饭","grams":150}]}',
+            name: '米饭'
+        },
+        {
+            raw: '{"name":"鸡蛋","grams":50,"cal":70}',
+            name: '鸡蛋'
+        },
+        {
+            raw: '结果：[{"name":"豆浆","grams":300}]\n备注：[完成]',
+            name: '豆浆'
+        }
+    ];
+
+    for (const item of cases) {
+        const ai = await loadAiApi(item.raw);
+        const parsed = await ai.parseFood('早餐');
+        assert.equal(parsed[0].name, item.name);
+    }
 });

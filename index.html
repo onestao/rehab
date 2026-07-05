@@ -7,10 +7,8 @@
     <link rel="manifest" href="manifest.json">
     <link rel="icon" href="assets/app-icon.svg" type="image/svg+xml">
     <meta name="theme-color" content="#0061a4">
-    <style>
-        @import url("https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&icon_names=accessibility_new,add,add_circle,arrow_back,arrow_forward,assignment,auto_awesome,backup,badge,balance,biotech,block,bookmark_add,bookmark_border,bookmarks,brightness_auto,bug_report,calendar_month,check,check_circle,checklist,chevron_left,chevron_right,clinical_notes,close,close_fullscreen,cloud_alert,cloud_done,cloud_off,cloud_sync,compare_arrows,compress,content_copy,dark_mode,data_thresholding,delete,diagnosis,directions_bike,directions_run,directions_walk,done,done_all,download,download_for_offline,edit,edit_note,edit_square,egg_alt,error,event,event_busy,event_note,exercise,expand_less,expand_more,fitness_center,flag,format_color_fill,forum,health_and_safety,help,history,info,inventory_2,keyboard,keyboard_arrow_down,keyboard_arrow_left,keyboard_arrow_right,keyboard_arrow_up,library_books,light_mode,linear_scale,link,local_fire_department,lock,lock_open,manage_search,mic,mic_off,monitor_heart,monitor_weight,monitoring,more_vert,no_food,notifications,notifications_active,palette,pause,pedal_bike,person,picture_in_picture_alt,play_arrow,play_circle,playlist_add,pool,progress_activity,psychology,radio_button_unchecked,record_voice_over,refresh,remove,remove_circle,replay,restart_alt,restaurant,rowing,rule,save,schedule,science,search,search_off,self_improvement,send,settings,shield,short_text,show_chart,skip_next,skip_previous,speed,sports,sports_gymnastics,star,star_border,stop,summarize,swap_horiz,sync,sync_problem,system_update,timeline,timer,tips_and_updates,today,toggle_off,toggle_on,trending_down,trending_flat,trending_up,tune,upload,upload_file,verified,vertical_align_bottom,vertical_align_top,vibration,visibility,visibility_off,volume_off,volume_up,warning,waterfall_chart") layer(fonts);
-    </style>
-    <link rel="stylesheet" href="build/generated.css?v=303">
+    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&icon_names=accessibility_new,add,add_circle,arrow_back,arrow_forward,assignment,auto_awesome,backup,badge,balance,biotech,block,bookmark_add,bookmark_border,bookmarks,brightness_auto,bug_report,calendar_month,check,check_circle,checklist,chevron_left,chevron_right,clinical_notes,close,close_fullscreen,cloud_alert,cloud_done,cloud_off,cloud_sync,compare_arrows,compress,content_copy,dark_mode,data_thresholding,delete,diagnosis,directions_bike,directions_run,directions_walk,done,done_all,download,download_for_offline,edit,edit_note,edit_square,egg_alt,error,event,event_busy,event_note,exercise,expand_less,expand_more,fitness_center,flag,format_color_fill,forum,health_and_safety,help,history,info,inventory_2,keyboard,keyboard_arrow_down,keyboard_arrow_left,keyboard_arrow_right,keyboard_arrow_up,library_books,light_mode,linear_scale,link,local_fire_department,lock,lock_open,manage_search,mic,mic_off,monitor_heart,monitor_weight,monitoring,more_vert,no_food,notifications,notifications_active,palette,pause,pedal_bike,person,picture_in_picture_alt,play_arrow,play_circle,playlist_add,pool,progress_activity,psychology,radio_button_unchecked,record_voice_over,refresh,remove,remove_circle,replay,restart_alt,restaurant,rowing,rule,save,schedule,science,search,search_off,self_improvement,send,settings,shield,short_text,show_chart,skip_next,skip_previous,speed,sports,sports_gymnastics,star,star_border,stop,summarize,swap_horiz,sync,sync_problem,system_update,timeline,timer,tips_and_updates,today,toggle_off,toggle_on,trending_down,trending_flat,trending_up,tune,upload,upload_file,verified,vertical_align_bottom,vertical_align_top,vibration,visibility,visibility_off,volume_off,volume_up,warning,waterfall_chart"></noscript>
+    <link rel="stylesheet" href="build/generated.css?v=306">
 </head>
 <body>
     <div id="appUpdateBanner" class="app-update-banner hidden">
@@ -153,17 +151,24 @@
             </div>
             <div class="md-card strength-log-card hidden" id="strengthLogCard">
                 <div class="md-grid">
+                    <div class="md-field span-full">
+                        <select id="slLibraryAction" onchange="data.applyStrengthLogLibraryAction(this.value)">
+                            <option value="">&#20174;&#21160;&#20316;&#24211;&#36873;&#25321;</option>
+                        </select>
+                        <label>&#21160;&#20316;&#24211;&#35843;&#29992;</label>
+                    </div>
                     <div class="sl-name-row span-full">
                         <div class="md-field">
                             <input type="text" id="slName" placeholder=" "><label>&#21160;&#20316;&#21517;&#31216;</label>
                         </div>
                         <button class="md-icon-btn" onclick="actionHistory.openFor(document.getElementById('slName')?.value)" type="button" aria-label="查看动作历史" title="查看动作历史"><span class="material-symbols-rounded">monitoring</span></button>
                     </div>
-                    <div class="md-field"><input type="number" id="slWeight" step="0.5" placeholder=" "><label>&#37325;&#37327; kg</label></div>
+                    <div class="md-field"><input type="number" id="slWeight" step="0.5" placeholder=" "><label>&#22806;&#21152;&#36127;&#37325; kg</label></div>
                     <div class="md-field"><input type="number" id="slSets" placeholder=" "><label>&#32452;&#25968;</label></div>
                     <div class="md-field"><input type="number" id="slReps" placeholder=" "><label>&#27599;&#32452;&#27425;&#25968;</label></div>
                     <div class="md-field"><input type="number" id="slMinutes" placeholder=" "><label>&#24635;&#26102;&#38271;&#65288;&#20998;&#38047;&#65292;&#21487;&#31354;&#65289;</label></div>
                     <div class="md-field span-full"><input type="text" id="slNote" placeholder=" "><label>&#22791;&#27880;</label></div>
+                    <label class="md-switch span-full"><input type="checkbox" id="slSaveToLibrary"><span>&#35760;&#20303;&#21040;&#21160;&#20316;&#24211;&#24182;&#21487;&#22797;&#29992;</span></label>
                 </div>
                 <button class="md-btn md-btn-filled" onclick="data.addStrengthLog()">
                     <span class="material-symbols-rounded">add</span> &#20445;&#23384;&#21040;&#20170;&#26085;&#35760;&#24405;
@@ -375,49 +380,26 @@
     </nav>
     </div>
 
-    <script src="m3e-ripple.js?v=303"></script>
-    <script src="pwa-support.js?v=303"></script>
-    <script src="toast.js?v=303"></script>
-    <script src="haptics.js?v=303"></script>
-    <script src="error-bus.js?v=303"></script>
-    <script src="i18n.js?v=303"></script>
-    <script src="a11y-focus-trap.js?v=303"></script>
-    <script src="theme.js?v=303"></script>
-    <script src="fooddb.js?v=303"></script>
-    <script src="render-safe.js?v=303"></script>
-    <script src="nav-stack.js?v=303"></script>
-    <script src="app-route.js?v=303"></script>
-    <script type="module" src="data-utils-pure.js?v=303"></script>
-    <script type="module" src="action-identity.js?v=303"></script>
-    <script src="data-utils.js?v=303"></script>
-    <script src="storage/idb.js?v=303"></script>
-    <script src="storage/idb-collections.js?v=303"></script>
-    <script src="storage/idb-advice-collections.js?v=303"></script>
-    <script src="storage/migrate.js?v=303"></script>
-    <script src="data-records.js?v=303"></script>
-    <script src="data-schema.js?v=303"></script>
-    <script src="advice-virtual-list.js?v=303"></script>
-    <script src="data-store.js?v=303"></script>
-    <script src="data-ui-state.js?v=303"></script>
-    <script src="data-views.js?v=303"></script>
-    <script src="routine-plan.js?v=303"></script>
-    <script src="data.js?v=303"></script>
-    <script type="module" src="voice-engine.js?v=303"></script>
-    <script src="voice-cache.js?v=303"></script>
-    <script src="voice-webspeech-adapter.js?v=303"></script>
-    <script src="voice-legado-adapter.js?v=303"></script>
-    <script src="workout-voice.js?v=303"></script>
-    <script src="workout-readiness.js?v=303"></script>
-    <script src="strength-form.js?v=303"></script>
-    <script src="weekly-plan.js?v=303"></script>
-    <script src="action-history.js?v=303"></script>
-    <script type="module" src="sync-pure.js?v=303"></script>
-    <script src="sync-status.js?v=303"></script>
-    <script src="credential-fields.js?v=303"></script>
-    <script src="sheet-drag.js?v=303"></script>
-    <script src="app-update.js?v=303"></script>
-    <script type="module" src="mi-scale-pure.js?v=303"></script>
-    <script src="mi-scale-web-bluetooth.js?v=303"></script>
+    <script src="m3e-ripple.js?v=306"></script>
+    <script src="toast.js?v=306"></script>
+    <script src="error-bus.js?v=306"></script>
+    <script src="i18n.js?v=306"></script>
+    <script src="theme.js?v=306"></script>
+    <script src="render-safe.js?v=306"></script>
+    <script src="nav-stack.js?v=306"></script>
+    <script src="app-route.js?v=306"></script>
+    <script type="module" src="data-utils-pure.js?v=306"></script>
+    <script type="module" src="action-identity.js?v=306"></script>
+    <script src="data-utils.js?v=306"></script>
+    <script src="storage/idb.js?v=306"></script>
+    <script src="storage/migrate.js?v=306"></script>
+    <script src="data-records.js?v=306"></script>
+    <script src="data-schema.js?v=306"></script>
+    <script src="data-store.js?v=306"></script>
+    <script src="data-ui-state.js?v=306"></script>
+    <script src="data-views.js?v=306"></script>
+    <script src="data.js?v=306"></script>
+    <script src="sync-status.js?v=306"></script>
     <div id="weightModal" class="md-modal md-modal-sheet hidden" aria-hidden="true">
         <div class="md-modal-backdrop" onclick="data.closeWeightModal()"></div>
         <div class="md-modal-card md-modal-sheet-card">
@@ -748,17 +730,18 @@
         </div>
     </div>
     <script>
+        const MATERIAL_SYMBOLS_CSS = 'https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&icon_names=accessibility_new,add,add_circle,arrow_back,arrow_forward,assignment,auto_awesome,backup,badge,balance,biotech,block,bookmark_add,bookmark_border,bookmarks,brightness_auto,bug_report,calendar_month,check,check_circle,checklist,chevron_left,chevron_right,clinical_notes,close,close_fullscreen,cloud_alert,cloud_done,cloud_off,cloud_sync,compare_arrows,compress,content_copy,dark_mode,data_thresholding,delete,diagnosis,directions_bike,directions_run,directions_walk,done,done_all,download,download_for_offline,edit,edit_note,edit_square,egg_alt,error,event,event_busy,event_note,exercise,expand_less,expand_more,fitness_center,flag,format_color_fill,forum,health_and_safety,help,history,info,inventory_2,keyboard,keyboard_arrow_down,keyboard_arrow_left,keyboard_arrow_right,keyboard_arrow_up,library_books,light_mode,linear_scale,link,local_fire_department,lock,lock_open,manage_search,mic,mic_off,monitor_heart,monitor_weight,monitoring,more_vert,no_food,notifications,notifications_active,palette,pause,pedal_bike,person,picture_in_picture_alt,play_arrow,play_circle,playlist_add,pool,progress_activity,psychology,radio_button_unchecked,record_voice_over,refresh,remove,remove_circle,replay,restart_alt,restaurant,rowing,rule,save,schedule,science,search,search_off,self_improvement,send,settings,shield,short_text,show_chart,skip_next,skip_previous,speed,sports,sports_gymnastics,star,star_border,stop,summarize,swap_horiz,sync,sync_problem,system_update,timeline,timer,tips_and_updates,today,toggle_off,toggle_on,trending_down,trending_flat,trending_up,tune,upload,upload_file,verified,vertical_align_bottom,vertical_align_top,vibration,visibility,visibility_off,volume_off,volume_up,warning,waterfall_chart';
         const PAGE_DEPS = {
             workout: ['voice-engine','voice-cache','voice-webspeech-adapter','voice-legado-adapter','workout-voice','workout-readiness','strength-form','weekly-plan','action-history','plan-chains','plan-progression','plan-store','plan-feedback','plan-cooldown','plan-auto-adjust','plan-weekly','plan-equipment','plan-ui','workout-system','workout-pip','workout-core','workout-cardio-pure','workout-cardio','workout-engine','workout-state','swipe-actions','routine-plan','routine-library','workout-wakelock','workout-media-session','ai-store','ai-profile','ai-api'],
             'ai-coach': ['lib/virtual-core.umd','ai-store','ai-profile','ai-model-cache','ai-models','ai-api','ai-pricing','ai-templates','advice-template-manager','advice-rules','plan-analytics','advice-panel','coach-context','advice-attachments','advice-render','advice-prompt','advice-stream-renderer','routine-library','plan-chains','plan-progression','plan-store','plan-ai-pure','plan-ai'],
             profile: ['voice-engine','voice-cache','voice-webspeech-adapter','voice-legado-adapter','workout-voice','credential-fields','weekly-plan','backup','sync-ui','sync-adapters','sync','routine-library','goal-plan','weekly-summary','plan-chains','plan-progression','plan-store','plan-equipment','plan-ui','ai-store','ai-profile','ai-model-cache','ai-models'],
             records: ['history-view','weekly-summary','health-diet','health-weight','health-profile','health-exercise','goal-plan','routine-library','food-log','pr-tracker','volume-heatmap','action-history','report-metrics-pure','report-panel','plan-chains','plan-progression','plan-store','plan-weekly','plan-ui','ai-store','ai-profile','ai-model-cache','ai-models','ai-api'],
-            today: ['health-diet','health-weight','health-exercise','food-log','history-view','weekly-summary','report-metrics-pure','report-panel','routine-library','plan-chains','plan-progression','plan-store','plan-feedback','plan-cooldown','plan-auto-adjust','plan-weekly','plan-equipment','plan-ui','ai-store','ai-profile','ai-model-cache','ai-models','ai-api']
+            today: ['history-view']
         };
         const CSS_DEPS = {
             profile: ['42-health-profile']
         };
-        const _loaded = new Set(['render-safe','nav-stack','data-utils-pure','action-identity','data-records','data-schema','data-utils','storage/idb','storage/migrate','advice-virtual-list','data-store','data-ui-state','data-views','data','voice-engine','voice-cache','voice-webspeech-adapter','voice-legado-adapter','workout-voice','workout-readiness','strength-form','weekly-plan','action-history','sync-pure','sync-status','credential-fields','sheet-drag','haptics','app-update','pwa-support']);
+        const _loaded = new Set(['render-safe','nav-stack','data-utils-pure','action-identity','data-records','data-schema','data-utils','storage/idb','storage/migrate','data-store','data-ui-state','data-views','data','sync-status']);
         const _loadingPromises = new Map();
         const _loadedCss = new Set();
         const _loadingCssPromises = new Map();
@@ -766,13 +749,15 @@
         const SCRIPT_PREREQUISITES = {
             'ai-profile': ['ai-store'],
             'ai-model-cache': ['ai-store'],
-            'ai-models': ['ai-store','ai-model-cache','ai-vision-pure'],
-            'ai-api': ['ai-store'],
+            'ai-models': ['ai-store','ai-profile','ai-model-cache','ai-vision-pure'],
+            'ai-api': ['ai-store','ai-profile'],
             'data-utils': ['render-safe'],
             'data-schema': ['data-records','action-identity'],
             'data-store': ['data-records','data-schema'],
+            'storage/idb-collections': ['storage/idb'],
+            'storage/idb-advice-collections': ['storage/idb'],
             'advice-template-manager': ['ai-templates'],
-            'advice-panel': ['lib/virtual-core.umd','ai-model-cache','advice-template-manager','advice-rules','plan-analytics'],
+            'advice-panel': ['lib/virtual-core.umd','advice-virtual-list','ai-model-cache','advice-template-manager','advice-rules','plan-analytics'],
             'coach-context': ['advice-panel'],
             'advice-attachments': ['advice-panel'],
             'advice-render': ['advice-panel','coach-context'],
@@ -785,8 +770,9 @@
             'workout-voice': ['voice-engine','voice-webspeech-adapter','voice-legado-adapter','voice-cache'],
             'workout-system': ['workout-voice'],
             'workout-readiness': ['workout-voice'],
+            'health-weight': ['mi-scale-pure','mi-scale-web-bluetooth'],
             'backup': ['backup-ring-pure','backup-import-pure'],
-            'sync': ['backup','sync-ui','sync-adapters'],
+            'sync': ['sync-pure','backup','sync-ui','sync-adapters'],
             'routine-library': ['routine-plan'],
             'rehab-policy': [],
             'plan-store': ['plan-chains','plan-progression','rehab-policy'],
@@ -802,7 +788,102 @@
             ,'report-panel': ['report-metrics-pure']
         };
 
+        function runWhenIdle(callback, options) {
+            const idle = window.requestIdleCallback || ((cb) => setTimeout(cb, options?.timeout || 1500));
+            return idle(callback, options);
+        }
+        function scheduleMaterialSymbolsLoad() {
+            if (scheduleMaterialSymbolsLoad._scheduled) return;
+            scheduleMaterialSymbolsLoad._scheduled = true;
+            window.setTimeout(() => {
+                runWhenIdle(() => {
+                    if (document.querySelector('link[data-icon-font="material-symbols"]')) return;
+                    const link = document.createElement('link');
+                    link.rel = 'stylesheet';
+                    link.href = MATERIAL_SYMBOLS_CSS;
+                    link.dataset.iconFont = 'material-symbols';
+                    document.head.appendChild(link);
+                }, { timeout: 6000 });
+            }, 2000);
+        }
+        function schedulePostRenderUtilityLoad() {
+            if (schedulePostRenderUtilityLoad._scheduled) return;
+            schedulePostRenderUtilityLoad._scheduled = true;
+            window.setTimeout(() => {
+                runWhenIdle(() => {
+                    Promise.allSettled([
+                        loadScript('haptics'),
+                        loadScript('a11y-focus-trap'),
+                        loadScript('sheet-drag')
+                    ]).catch(() => {});
+                }, { timeout: 6000 });
+            }, 2000);
+        }
+        function scheduleTodayEnhancementLoad() {
+            if (scheduleTodayEnhancementLoad._scheduled) return;
+            scheduleTodayEnhancementLoad._scheduled = true;
+            window.setTimeout(() => {
+                runWhenIdle(() => {
+                    if ((document.querySelector('.page.active')?.id || '') !== 'today') return;
+                    loadScript('plan-ui')
+                        .then(() => {
+                            data.refreshModules?.();
+                            if ((document.querySelector('.page.active')?.id || '') === 'today') data.render?.('today');
+                        })
+                        .catch((e) => errorBus?.report?.('today.planUi.lazyLoad', e));
+                }, { timeout: 5000 });
+            }, 1000);
+        }
+        function bootPerfDebugEnabled() {
+            try {
+                return new URLSearchParams(window.location.search).has('debugPerf') ||
+                    localStorage.getItem('rehab_debug_perf') === '1' ||
+                    localStorage.getItem('rehab_debug_tools') === '1';
+            } catch {
+                return false;
+            }
+        }
+        function bootMark(name) {
+            try { performance.mark(name); } catch {}
+        }
+        function bootMeasure(name, start, end) {
+            try {
+                if (performance.getEntriesByName(name, 'measure').length) performance.clearMeasures(name);
+                performance.measure(name, start, end);
+            } catch {}
+        }
+        function logBootPerfSummary() {
+            if (!bootPerfDebugEnabled()) return;
+            try {
+                const rows = performance.getEntriesByType('measure')
+                    .filter((entry) => entry.name.startsWith('boot:'))
+                    .map((entry) => ({ name: entry.name, ms: Math.round(entry.duration) }));
+                console.table(rows);
+            } catch (e) {
+                console.info('[boot:perf]', e);
+            }
+        }
+        function scheduleServiceWorkerRegistration() {
+            if (scheduleServiceWorkerRegistration._scheduled) return;
+            scheduleServiceWorkerRegistration._scheduled = true;
+            window.setTimeout(() => {
+                runWhenIdle(() => {
+                    loadScript('app-update')
+                        .then(() => appUpdate.registerServiceWorker?.())
+                        .catch((e) => errorBus?.report?.('appUpdate.lazyLoad', e));
+                }, { timeout: 6000 });
+            }, 8000);
+        }
+        function idlePreloadEnabled() {
+            try {
+                return new URLSearchParams(window.location.search).has('idlePreload') ||
+                    localStorage.getItem('rehab_idle_preload') === '1';
+            } catch {
+                return false;
+            }
+        }
         function idlePreloadBudget() {
+            if (!idlePreloadEnabled()) return 0;
             const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection || null;
             if (connection?.saveData) return 0;
             if (['slow-2g', '2g'].includes(connection?.effectiveType || '')) return 0;
@@ -836,7 +917,7 @@
             const p = new Promise((res, rej) => {
                 const link = document.createElement('link');
                 link.rel = 'stylesheet';
-                link.href = `css-src/${name}.css?v=303`;
+                link.href = `css-src/${name}.css?v=306`;
                 link.dataset.appCss = name;
                 link.onload = () => {
                     link.dataset.loaded = 'true';
@@ -877,7 +958,7 @@
                 if (_loaded.has(name)) return res();
                 const s = document.createElement('script');
                 if (MODULE_SCRIPTS.has(name)) s.type = 'module';
-                s.src = `${name}${name === 'ai-vision-pure' ? '.mjs' : '.js'}?v=303`;
+                s.src = `${name}${name === 'ai-vision-pure' ? '.mjs' : '.js'}?v=306`;
                 s.onload = () => { _loaded.add(name); res(); };
                 s.onerror = rej;
                 document.head.appendChild(s);
@@ -895,8 +976,9 @@
             const pending = deps.filter(name => !_loaded.has(name));
             if (pending.length) await Promise.all(pending.map(loadScript));
             data.refreshModules?.();
-            if (page === 'ai-coach' && window.ai && typeof ai.init === 'function' && !_loaded.has('_aiInit')) {
+            if (page === 'ai-coach' && window.ai && typeof ai.init === 'function' && !data._aiRuntimeReady && !_loaded.has('_aiInit')) {
                 await ai.init({ saveData: true, renderData: false });
+                data._aiRuntimeReady = true;
                 _loaded.add('_aiInit');
             }
             if (page === 'ai-coach' && window.advicePanel) {
@@ -976,15 +1058,26 @@
         };
         window.ui = ui;
         window.onload = async () => {
+            bootMark('boot:start');
             try { await i18n?.init?.(); i18n?.applyDom?.(document); } catch {}
             const hadRouteHash = !!window.location.hash;
             window.navStack?.init?.();
             window.appRoute?.init?.();
             theme.init();
-            if (window.appUpdate) appUpdate.registerServiceWorker();
             try {
+                bootMark('boot:deps:start');
                 await ensureDeps(document.querySelector('.page.active')?.id || 'today');
+                bootMark('boot:deps:end');
+                bootMeasure('boot:deps', 'boot:deps:start', 'boot:deps:end');
+                bootMark('boot:data-init:start');
                 await data.init();
+                bootMark('boot:data-init:end');
+                bootMeasure('boot:data-init', 'boot:data-init:start', 'boot:data-init:end');
+                bootMark('boot:first-render:end');
+                bootMeasure('boot:first-render', 'boot:start', 'boot:first-render:end');
+                scheduleMaterialSymbolsLoad();
+                schedulePostRenderUtilityLoad();
+                scheduleTodayEnhancementLoad();
                 window.workoutVoice?.init?.();
                 window.workoutVoice?.renderSettingsUI?.();
             } catch (e) {
@@ -994,24 +1087,33 @@
             }
             if (window.syncStatus) syncStatus.init();
             if (hadRouteHash) await window.appRoute?.applyCurrent?.();
-            else await window.pwaSupport?.openShortcut?.();
+            else {
+                const hasShortcut = (() => {
+                    try { return new URLSearchParams(window.location.search).has('shortcut'); } catch { return false; }
+                })();
+                if (hasShortcut) await loadScript('pwa-support');
+                await window.pwaSupport?.openShortcut?.();
+            }
+            scheduleServiceWorkerRegistration();
             try { document.getElementById('localeSelectSheet') && (document.getElementById('localeSelectSheet').value = i18n.currentLocale || 'auto'); } catch {}
             ui.syncSwitchAria(document.getElementById('isAlt'));
             window.addEventListener('scroll', () => {
                 document.querySelector('.md-top-app-bar')?.classList.toggle('scrolled', window.scrollY > 8);
             }, { passive: true });
-            const idle = window.requestIdleCallback || ((cb) => setTimeout(cb, 1500));
-            idle(() => {
+            runWhenIdle(() => {
+                bootMark('boot:idle-preload:start');
                 const activeId = document.querySelector('.page.active')?.id || 'today';
-                const pages = Object.keys(PAGE_DEPS).filter(p => p !== activeId).slice(0, idlePreloadBudget());
+                const preloadBudget = idlePreloadBudget();
+                const pages = Object.keys(PAGE_DEPS).filter(p => p !== activeId).slice(0, preloadBudget);
                 let index = 0;
                 const warmNext = () => {
                     const page = pages[index++];
                     if (!page) return;
-                    ensureDeps(page, { includeCss: false }).catch(() => {}).finally(() => idle(warmNext, { timeout: 4000 }));
+                    ensureDeps(page, { includeCss: false }).catch(() => {}).finally(() => runWhenIdle(warmNext, { timeout: 4000 }));
                 };
                 warmNext();
-                idle(() => warmLazyCss('42-health-profile'), { timeout: 6000 });
+                if (preloadBudget > 0) runWhenIdle(() => warmLazyCss('42-health-profile'), { timeout: 6000 });
+                logBootPerfSummary();
             });
         };
     </script>

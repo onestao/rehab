@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "build:css": "node scripts/build-css.mjs",
+    "perf:edge": "node scripts/edge-perf-smoke.mjs",
     "icons": "node scripts/collect-icons.mjs",
     "bump": "node scripts/bump-version.js",
     "version": "node scripts/bump-version.js && git add index.html sw.js scripts/ build/",

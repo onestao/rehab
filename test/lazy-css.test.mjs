@@ -55,7 +55,7 @@ test('health profile lazy CSS is warmed only during idle-friendly conditions', (
     assert.match(html, /function canIdlePreloadCss\(\)/);
     assert.match(html, /connection\?\.saveData\) return false/);
     assert.match(html, /function warmLazyCss\(name\)/);
-    assert.match(html, /idle\(\(\) => warmLazyCss\('42-health-profile'\), \{ timeout: 6000 \}\)/);
+    assert.match(html, /runWhenIdle\(\(\) => warmLazyCss\('42-health-profile'\), \{ timeout: 6000 \}\)/);
 });
 
 test('records training keeps only critical health profile layout in eager CSS', () => {

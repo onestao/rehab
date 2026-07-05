@@ -136,6 +136,37 @@ test('idb adapter persists advice chat when advice collection store is unavailab
     assert.deepEqual(clone(await result.adapter.read('rehab.db')), next);
 });
 
+test('createAdapter can defer first-run idb migration without opening idb during boot', async () => {
+    const { localStorage, storageIdb, storageMigrate } = loadStorageMigrate();
+    const initial = {
+        schemaVersion: 3,
+        actions: [],
+        history: [{ id: 'history-boot', updatedAt: 1 }],
+        health: { aiAdviceChat: [{ id: 'advice-boot', updatedAt: 2 }] }
+    };
+    let opened = false;
+    storageIdb.open = async () => {
+        opened = true;
+        throw new Error('IDB should not open during deferred boot');
+    };
+    localStorage.setItem('rehab.db', JSON.stringify(initial));
+
+    const result = await storageMigrate.createAdapter({
+        dbKey: 'rehab.db',
+        cfgKey: 'rehab.cfg',
+        storageVersionKey: 'storageVersion',
+        migrationFailedKey: 'migration.failed',
+        targetVersion: 4,
+        deferMigration: true
+    });
+
+    assert.equal(result.mode, 'localStorage');
+    assert.equal(result.migration.deferred, true);
+    assert.equal(opened, false);
+    assert.equal(localStorage.getItem('storageVersion'), null);
+    assert.deepEqual(clone(result.adapter.read('rehab.db')), initial);
+});
+
 test('idb adapter merges working-set advice into collection store without clearing cold history', async () => {
     const { appWindow, localStorage, storageMigrate } = loadStorageMigrate();
     const initial = {

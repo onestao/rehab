@@ -411,6 +411,7 @@
     const storageMigrate = {
         migrateAdviceToVersioned: migrateAdviceToVersioned,
         createLocalAdapter: createLocalAdapter,
+        createIdbAdapter: createIdbAdapter,
 
         async createAdapter(options) {
             const localAdapter = createLocalAdapter({ dbKey: options?.dbKey });
@@ -421,6 +422,17 @@
                     adapter: localAdapter,
                     mode: 'localStorage',
                     migration: { ok: false, reason: 'IndexedDB 不可用，继续使用 localStorage' }
+                };
+            }
+
+            const targetVersion = Number(options?.targetVersion || 2);
+            const currentVersion = Number(localStorage.getItem(options?.storageVersionKey) || 0);
+            if (options?.deferMigration && currentVersion < targetVersion) {
+                window.errorBus?.event?.('storage.migration', 'deferred', { currentVersion, targetVersion });
+                return {
+                    adapter: localAdapter,
+                    mode: 'localStorage',
+                    migration: { ok: true, deferred: true, reason: '' }
                 };
             }
 

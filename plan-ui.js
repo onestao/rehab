@@ -121,7 +121,23 @@
         renderTodayV6PlanCard() {
             const todayPlans = this.getTodayDailyPlans?.() || [];
             const selected = todayPlans.find((item) => item.id === this.selectedPlanId) || todayPlans[0] || null;
-            if (!selected) return '';
+            if (!selected) {
+                return `<div class="sect-head"><span class="t">当前训练计划</span><button class="a" onclick="data.openNewPlanSheet()" type="button">新建计划</button></div>
+                <div class="glass-card plan-card">
+                    <div class="plan-head">
+                        <div>
+                            <div class="pt">待安排</div>
+                            <div class="pn">今天还没有训练计划</div>
+                        </div>
+                        <div class="plan-chip"><span class="material-symbols-rounded">event_note</span>0/0</div>
+                    </div>
+                    <div class="plan-meta"><span>先创建计划，或让 AI 根据当前目标安排今天的训练。</span></div>
+                    <div class="plan-actions">
+                        <button class="md-btn md-btn-filled" type="button" onclick="data.openNewPlanSheet()"><span class="material-symbols-rounded">playlist_add</span>新建计划</button>
+                        <button class="md-btn md-btn-tonal" type="button" onclick="data.openPlanTodayAiSheet?.()"><span class="material-symbols-rounded">auto_awesome</span>AI 安排</button>
+                    </div>
+                </div>`;
+            }
             const plan = selected;
             const planMeta = this.planTypeMeta?.(plan.type || 'rehab', plan.title) || { label: '训练计划', icon: 'event_note' };
             const completion = this.completionRate?.(plan) || { done: 0, total: 0, rate: 0 };
@@ -204,7 +220,8 @@
             const macros = this.todayMacros?.() || { pro: 0, carb: 0, fat: 0 };
             const goalCal = this.db.health?.dietGoal?.dailyCal || 0;
             const goals = this.defaultDietGoals?.() || { pro: 0, carb: 0, fat: 0 };
-            const progress = goalCal ? Math.min(100, Math.round((intake / goalCal) * 100)) : 0;
+            const displayPercent = goalCal ? Math.max(0, Math.round((intake / goalCal) * 100)) : 0;
+            const ringProgress = Math.min(100, displayPercent);
             const remaining = goalCal ? goalCal - intake : 0;
             const remainingText = goalCal ? (remaining >= 0 ? `剩余${remaining}kcal` : `超出${Math.abs(remaining)}kcal`) : '';
             const macroStops = {
@@ -213,7 +230,7 @@
                 fat: 240 + Math.min(120, this.ratio(macros.fat, goals.fat) * 1.2)
             };
             if (!goalCal) return '<div class="ring ring-diet"><div><b>--</b><small>饮食</small></div></div>';
-            return `<div class="ring ring-diet" style="--progress:${progress};--pro-stop:${macroStops.pro}deg;--carb-stop:${macroStops.carb}deg;--fat-stop:${macroStops.fat}deg"><div><b>${progress}%</b><small>饮食</small><em>${intake}/${goalCal}</em></div></div>`;
+            return `<div class="ring ring-diet" style="--progress:${ringProgress};--pro-stop:${macroStops.pro}deg;--carb-stop:${macroStops.carb}deg;--fat-stop:${macroStops.fat}deg"><div><b>${displayPercent}%</b><small>饮食</small><em>${intake}/${goalCal}</em></div></div>`;
         },
 
         selectTodayPlan(planId) {
@@ -309,17 +326,27 @@
 
         renderTodayAiReminder() {
             const collapsed = this.isCollapsed?.('todayAiReminder', true);
+            const content = this.renderContextAiCard?.('today') || `<div class="context-ai-card context-ai-placeholder">
+                <div class="context-ai-head">
+                    <div><span class="cardio-kicker">AI 建议</span><h3>综合分析</h3><small>配置 AI 后，可结合今日饮食、训练和体重记录生成建议</small></div>
+                    <span class="context-ai-icon material-symbols-rounded">psychology</span>
+                </div>
+                <div class="context-ai-actions">
+                    <button class="md-btn md-btn-tonal" type="button" onclick="ui.tab('ai-coach', document.querySelectorAll('.nav-item')[3])">打开 AI</button>
+                </div>
+            </div>`;
             return `<div class="md-card collapsible-card today-ai-reminder ${collapsed ? 'collapsed' : ''}">
                 <button class="panel-head collapsible-head-btn" type="button" onclick="data.toggleCollapse('todayAiReminder')">
                     <div><span class="cardio-kicker">AI</span><h3>今日 AI 提醒</h3><small>展开查看快速建议</small></div>
                     <span class="collapse-btn"><span class="material-symbols-rounded">${collapsed ? 'expand_more' : 'expand_less'}</span></span>
                 </button>
-                <div class="collapse-content">${this.renderContextAiCard?.('today') || ''}</div>
+                <div class="collapse-content">${content}</div>
             </div>`;
         },
 
         renderPlanTaskDrawerBody(planId) {
-            const plan = this.activeRecords?.(this.db.dailyPlans || []).find((item) => item.id === planId) || this.getTodayDailyPlan?.();
+            const activePlans = this.activeRecords?.(this.db.dailyPlans || []) || [];
+            const plan = planId ? activePlans.find((item) => item.id === planId) : this.getTodayDailyPlan?.();
             if (!plan) return '<div class="plan-empty">暂无训练任务</div>';
             const planMeta = this.planTypeMeta?.(plan.type, plan.title) || { label: '训练计划', icon: 'event_note' };
             const completion = this.completionRate?.(plan) || { done: 0, total: 0, rate: 0 };

@@ -456,6 +456,7 @@
             const modal = document.getElementById('exerciseModal');
             modal?.classList.remove('hidden');
             modal?.setAttribute('aria-hidden', 'false');
+            this.refreshExerciseLibrarySelects?.();
         },
 
         closeExerciseModal() {
@@ -470,25 +471,30 @@
         },
 
         renderExerciseModalContent() {
+            const typeOptions = this.renderManualExerciseTypeOptions?.('walk') || '<option value="walk">步行</option><option value="run">跑步</option><option value="cycling">骑行</option><option value="swim">游泳</option><option value="strength">力量训练 (无氧)</option><option value="stretch">拉伸/瑜伽</option><option value="custom">自定义运动</option>';
             return '<div class="exercise-modal-body"><div class="md-grid exercise-grid">' +
-                '<div class="md-field"><select id="manualExerciseType" onchange="data.toggleManualCustomExercise(this.value)"><option value="walk">步行</option><option value="run">跑步</option><option value="cycling">骑行</option><option value="swim">游泳</option><option value="battle_rope">战绳</option><option value="spin_bike">动感单车</option><option value="strength">力量训练 (无氧)</option><option value="stretch">拉伸/瑜伽</option><option value="custom">自定义运动</option></select><label>运动种类</label></div>' +
+                '<div class="md-field span-full"><select id="manualExerciseLibraryAction" onchange="data.applyExerciseLibraryAction(this.value)"><option value="">从动作库选择</option></select><label>动作库调用</label></div>' +
+                '<div class="md-field"><select id="manualExerciseType" onchange="data.toggleManualCustomExercise(this.value)">' + typeOptions + '</select><label>运动种类</label></div>' +
                 '<div class="md-field hidden" id="manualExerciseCustomField"><input type="text" id="manualExerciseCustom" placeholder=" "><label>动作 / 自定义名称</label></div>' +
-                '<div class="md-field hidden" id="manualExerciseWeightField"><input type="number" id="manualExerciseWeight" step="0.5" placeholder=" "><label>负重 kg</label></div>' +
+                '<div class="md-field hidden" id="manualExerciseWeightField"><input type="number" id="manualExerciseWeight" step="0.5" placeholder=" "><label>外加负重 kg</label></div>' +
                 '<div class="md-field hidden" id="manualExerciseSetsField"><input type="number" id="manualExerciseSets" step="1" placeholder=" "><label>组数</label></div>' +
                 '<div class="md-field hidden" id="manualExerciseRepsField"><input type="number" id="manualExerciseReps" step="1" placeholder=" "><label>每组次数</label></div>' +
                 '<div class="md-field"><input type="number" id="manualExerciseMinutes" step="1" placeholder=" "><label>时长 分钟</label></div>' +
                 '<div class="md-field"><input type="number" id="manualExerciseCalories" step="1" placeholder=" "><label>热量 kcal</label></div>' +
                 '<div class="md-field"><input type="number" id="manualExerciseDistance" step="0.1" placeholder=" "><label>距离 km</label></div>' +
                 '<div class="md-field span-full"><input type="text" id="manualExerciseNote" placeholder=" "><label>备注</label></div>' +
+                '<label class="md-switch span-full"><input type="checkbox" id="manualExerciseSaveToLibrary"><span>记住到动作库并可复用</span></label>' +
                 '</div><button class="md-btn md-btn-filled" onclick="data.addExerciseFromModal()"><span class="material-symbols-rounded">add</span> 添加运动记录</button></div>';
         },
 
         addExerciseFromModal() {
             if (!this.addManualExercise()) return;
-            ['manualExerciseCustom','manualExerciseWeight','manualExerciseSets','manualExerciseReps','manualExerciseMinutes','manualExerciseCalories','manualExerciseDistance','manualExerciseNote'].forEach(function(id) { var el = document.getElementById(id); if (el) el.value = ''; });
+            ['manualExerciseCustom','manualExerciseWeight','manualExerciseSets','manualExerciseReps','manualExerciseMinutes','manualExerciseCalories','manualExerciseDistance','manualExerciseNote','manualExerciseLibraryAction'].forEach(function(id) { var el = document.getElementById(id); if (el) el.value = ''; });
             var t = document.getElementById('manualExerciseType'); if (t) t.value = 'walk';
+            var saveLib = document.getElementById('manualExerciseSaveToLibrary'); if (saveLib) saveLib.checked = false;
             var cf = document.getElementById('manualExerciseCustomField'); if (cf) cf.classList.add('hidden');
             ['manualExerciseWeightField','manualExerciseSetsField','manualExerciseRepsField'].forEach(function(id) { var el = document.getElementById(id); if (el) el.classList.add('hidden'); });
+            this.refreshExerciseLibrarySelects?.();
             if (typeof workout !== 'undefined' && workout.showToast) workout.showToast('运动记录已添加');
         },
 

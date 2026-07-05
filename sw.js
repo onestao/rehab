@@ -1,142 +1,80 @@
 // @ts-nocheck
-const CACHE = 'training-assistant-v303';
+const CACHE = 'training-assistant-v306';
 const CACHE_VERSION = CACHE.replace(/^training-assistant-v/, '');
 const ASSETS = [
     'index.html',
-    'build/generated.css?v=303',
+    'build/generated.css?v=306',
     'assets/app-icon.svg',
     'assets/screenshots/android-today.svg',
     'assets/screenshots/android-workout.svg',
-    'pwa-support.js?v=303',
-    'workout-readiness.js?v=303',
+    'pwa-support.js?v=306',
     // Lazy CSS: loaded on profile or records/training entry, still precached for offline use.
-    'css-src/42-health-profile.css?v=303',
-    'theme.js?v=303',
-    'haptics.js?v=303',
-    'fooddb.js?v=303',
-    'ai-store.js?v=303',
-    'ai-vision-pure.mjs?v=303',
-    'ai-profile.js?v=303',
-    'ai-model-cache.js?v=303',
-    'ai-models.js?v=303',
-    'ai-api.js?v=303',
-    'ai-pricing.js?v=303',
-    'ai-templates.js?v=303',
-    'render-safe.js?v=303',
-    'nav-stack.js?v=303',
-    'app-route.js?v=303',
-    'data-utils-pure.js?v=303',
-    'action-identity.js?v=303',
-    'data-utils.js?v=303',
-    'data-records.js?v=303',
-    'data-schema.js?v=303',
-    'storage/idb.js?v=303',
-    'storage/idb-collections.js?v=303',
-    'storage/idb-advice-collections.js?v=303',
-    'storage/migrate.js?v=303',
-    'advice-virtual-list.js?v=303',
-    'data-store.js?v=303',
-    'data-ui-state.js?v=303',
-    'health-diet.js?v=303',
-    'health-weight.js?v=303',
-    'health-exercise.js?v=303',
-    'goal-plan.js?v=303',
-    'routine-plan.js?v=303',
-    'routine-library.js?v=303',
-    'data-views.js?v=303',
-    'data.js?v=303',
-    'voice-engine.js?v=303',
-    'voice-cache.js?v=303',
-    'voice-webspeech-adapter.js?v=303',
-    'voice-legado-adapter.js?v=303',
-    'workout-voice.js?v=303',
-    'strength-form.js?v=303',
-    'weekly-plan.js?v=303',
-    'action-history.js?v=303',
-    'plan-chains.js?v=303',
-    'plan-progression.js?v=303',
-    'rehab-policy.js?v=303',
-    'plan-store.js?v=303',
-    'plan-feedback.js?v=303',
-    'plan-cooldown.js?v=303',
-    'plan-auto-adjust.js?v=303',
-    'plan-weekly.js?v=303',
-    'plan-equipment.js?v=303',
-    'plan-ai-pure.js?v=303',
-    'plan-ai.js?v=303',
-    'plan-ui.js?v=303',
-    'rehab-progression-pure.js?v=303',
-    'plan-store-pure.js?v=303',
-    'food-log.js?v=303',
-    'lib/virtual-core.umd.js?v=303',
-    'lib/flexsearch.light.js?v=303',
-    'lib/flexsearch.light.js',
-    'advice-search.worker.js',
-    'advice-search.worker.js?v=303',
-    'advice-panel.js?v=303',
-    'coach-context.js?v=303',
-    'advice-rules.js?v=303',
-    'plan-analytics.js?v=303',
-    'advice-template-manager.js?v=303',
-    'advice-render.js?v=303',
-    'advice-attachments.js?v=303',
-    'advice-prompt.js?v=303',
-    'advice-stream-renderer.js?v=303',
-    'backup-import-pure.js?v=303',
-    'backup-ring-pure.js?v=303',
-    'backup.js?v=303',
-    'sync-ui.js?v=303',
-    'sync-adapters.js?v=303',
-    'sync.js?v=303',
-    'sync-pure.js?v=303',
-    'sync-status.js?v=303',
-    'workout-system.js?v=303',
-    'workout-wakelock.js?v=303',
-    'workout-media-session.js?v=303',
-    'workout-pip.js?v=303',
-    'workout-core.js?v=303',
-    'workout-cardio-pure.js?v=303',
-    'workout-cardio.js?v=303',
-    'workout-engine.js?v=303',
-    'workout-state.js?v=303',
-    'app-update.js?v=303',
-    'credential-fields.js?v=303',
-    'sheet-drag.js?v=303',
-    'mi-scale-pure.js?v=303',
-    'mi-scale-web-bluetooth.js?v=303',
-    'm3e-ripple.js?v=303',
-    'toast.js?v=303',
-    'error-bus.js?v=303',
-    'i18n.js?v=303',
-    'a11y-focus-trap.js?v=303',
-    'i18n/zh-CN.json?v=303',
-    'i18n/en-US.json?v=303',
-    'weekly-summary.js?v=303',
-    'pr-tracker.js?v=303',
-    'volume-heatmap.js?v=303',
-    'swipe-actions.js?v=303',
-    'health-profile.js?v=303',
-    'report-metrics-pure.js?v=303',
-    'report-panel.js?v=303',
-    'assets/vision-models.json',
-    'assets/heic2any.min.js',
-    'assets/model-icons/openai.svg',
-    'assets/model-icons/gemini.svg',
-    'assets/model-icons/grok.svg',
-    'assets/model-icons/deepseek.svg',
-    'assets/model-icons/claude.svg',
-    'assets/model-icons/qwen.svg',
-    'assets/model-icons/doubao.svg',
-    'assets/model-icons/kimi.svg',
-    'assets/model-icons/minimax.svg',
-    'assets/model-icons/mimo.svg',
-    'assets/model-icons/glm.svg',
-    'assets/model-icons/generic.svg',
+    'css-src/42-health-profile.css?v=306',
+    'theme.js?v=306',
+    'haptics.js?v=306',
+    'fooddb.js?v=306',
+    'render-safe.js?v=306',
+    'nav-stack.js?v=306',
+    'app-route.js?v=306',
+    'data-utils-pure.js?v=306',
+    'action-identity.js?v=306',
+    'data-utils.js?v=306',
+    'data-records.js?v=306',
+    'data-schema.js?v=306',
+    'storage/idb.js?v=306',
+    'storage/idb-collections.js?v=306',
+    'storage/idb-advice-collections.js?v=306',
+    'storage/migrate.js?v=306',
+    'advice-virtual-list.js?v=306',
+    'data-store.js?v=306',
+    'data-ui-state.js?v=306',
+    'data-views.js?v=306',
+    'data.js?v=306',
+    'plan-chains.js?v=306',
+    'plan-progression.js?v=306',
+    'rehab-policy.js?v=306',
+    'plan-store.js?v=306',
+    'plan-feedback.js?v=306',
+    'plan-cooldown.js?v=306',
+    'plan-weekly.js?v=306',
+    'plan-equipment.js?v=306',
+    'plan-ui.js?v=306',
+    'rehab-progression-pure.js?v=306',
+    'plan-store-pure.js?v=306',
+    'backup-import-pure.js?v=306',
+    'backup-ring-pure.js?v=306',
+    'backup.js?v=306',
+    'sync-ui.js?v=306',
+    'sync-adapters.js?v=306',
+    'sync.js?v=306',
+    'sync-pure.js?v=306',
+    'sync-status.js?v=306',
+    'workout-system.js?v=306',
+    'workout-wakelock.js?v=306',
+    'workout-media-session.js?v=306',
+    'workout-pip.js?v=306',
+    'workout-core.js?v=306',
+    'workout-cardio-pure.js?v=306',
+    'workout-cardio.js?v=306',
+    'workout-engine.js?v=306',
+    'workout-state.js?v=306',
+    'app-update.js?v=306',
+    'sheet-drag.js?v=306',
+    'm3e-ripple.js?v=306',
+    'toast.js?v=306',
+    'error-bus.js?v=306',
+    'i18n.js?v=306',
+    'a11y-focus-trap.js?v=306',
+    'i18n/zh-CN.json?v=306',
+    'i18n/en-US.json?v=306',
     'manifest.json'
     , 'favicon.ico'
 ];
 
 let voiceTtsHosts = new Set();
+const RUNTIME_CACHE_FIRST_ASSETS = new Set([
+    'assets/heic2any.min.js'
+]);
 
 self.addEventListener('install', (e) => {
     e.waitUntil((async () => {
@@ -174,12 +112,36 @@ function normalizeVersionedAsset(url) {
     return next.toString();
 }
 
+function isRuntimeCacheFirstAsset(url) {
+    const pathname = url.pathname.replace(/^\/+/, '');
+    if (RUNTIME_CACHE_FIRST_ASSETS.has(pathname)) return true;
+    return [...RUNTIME_CACHE_FIRST_ASSETS].some((asset) => pathname.endsWith('/' + asset));
+}
+
+async function fetchRuntimeCacheFirst(request) {
+    const cached = await caches.match(request);
+    if (cached) return cached;
+    try {
+        const res = await fetch(request, { credentials: 'same-origin', cache: 'no-store' });
+        if (res && res.ok) {
+            const clone = res.clone();
+            const cache = await caches.open(CACHE);
+            await cache.put(request, clone).catch(() => {});
+        }
+        return res;
+    } catch (err) {
+        const fallback = await caches.match(request);
+        if (fallback) return fallback;
+        throw err;
+    }
+}
+
 async function fetchNavigation(request) {
     try {
         const res = await fetch(request, { cache: 'no-store' });
         if (res && res.ok) {
             const cache = await caches.open(CACHE);
-            cache.put('index.html', res.clone()).catch(() => {});
+            await cache.put('index.html', res.clone()).catch(() => {});
         }
         return res;
     } catch (err) {
@@ -203,6 +165,11 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
+    if (isRuntimeCacheFirstAsset(url)) {
+        event.respondWith(fetchRuntimeCacheFirst(event.request));
+        return;
+    }
+
     if (isVersionedAsset(url)) {
         // Cache-first for hashed assets: avoids slow waterfall on tab switch.
         event.respondWith((async () => {
@@ -214,7 +181,7 @@ self.addEventListener('fetch', (event) => {
                 if (res && res.ok) {
                     const clone = res.clone();
                     const cache = await caches.open(CACHE);
-                    cache.put(cacheKey, clone).catch(() => {});
+                    await cache.put(cacheKey, clone).catch(() => {});
                 }
                 return res;
             } catch (err) {
@@ -233,7 +200,7 @@ self.addEventListener('fetch', (event) => {
             if (res && res.ok) {
                 const clone = res.clone();
                 const cache = await caches.open(CACHE);
-                cache.put(event.request, clone).catch(() => {});
+                await cache.put(event.request, clone).catch(() => {});
             }
             return res;
         } catch (err) {

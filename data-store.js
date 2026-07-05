@@ -14,6 +14,7 @@
         _rejectPersist: null,
         _dbDirty: false,
         _quotaWarned: false,
+        _storageMigrationScheduled: false,
 
         /** Try localStorage.setItem; on QuotaExceededError run eviction once and retry.
          *  Returns true on success, false on permanent failure. */
@@ -79,16 +80,83 @@
             return this._storage;
         },
 
+        _bootPerf(label) {
+            if (typeof performance === 'undefined' || typeof performance.mark !== 'function') {
+                return () => {};
+            }
+            const safeLabel = String(label || 'step');
+            const start = `boot:data-init:${safeLabel}:start`;
+            const end = `boot:data-init:${safeLabel}:end`;
+            try {
+                performance.mark(start);
+            } catch (_) {
+                return () => {};
+            }
+            return () => {
+                try {
+                    performance.mark(end);
+                    performance.measure(`boot:data-init:${safeLabel}`, start, end);
+                    performance.clearMarks(start);
+                    performance.clearMarks(end);
+                } catch (_) {}
+            };
+        },
+
+        _storageMigrationOptions() {
+            return {
+                dbKey: this.DB_KEY,
+                cfgKey: this.CFG_KEY,
+                storageVersionKey: this.STORAGE_VERSION_KEY,
+                migrationFailedKey: this.MIGRATION_FAILED_KEY,
+                targetVersion: this.STORAGE_TARGET_VERSION
+            };
+        },
+
+        scheduleDeferredStorageMigration(options) {
+            if (this._storageMigrationScheduled || !window.storageMigrate?.migrateLocalToIdb) return;
+            this._storageMigrationScheduled = true;
+            const run = async () => {
+                if (typeof window.loadAppScript === 'function') {
+                    await Promise.all([
+                        window.loadAppScript('storage/idb-collections'),
+                        window.loadAppScript('storage/idb-advice-collections')
+                    ]);
+                }
+                const localAdapter = window.storageMigrate.createLocalAdapter?.({ dbKey: options.dbKey }) || this.createLocalStorageAdapter();
+                window.errorBus?.event?.('storage.migration', 'start:deferred', { targetVersion: Number(options.targetVersion || 2) });
+                const migration = await window.storageMigrate.migrateLocalToIdb(options, localAdapter);
+                window.errorBus?.event?.('storage.migration', migration.ok ? 'success:deferred' : 'failed:deferred', {
+                    targetVersion: Number(options.targetVersion || 2),
+                    reason: migration.reason || ''
+                });
+                if (!migration.ok) return;
+                if (typeof window.storageMigrate.createIdbAdapter === 'function') {
+                    this._storage = window.storageMigrate.createIdbAdapter(options);
+                    this._storageMode = 'idb';
+                    await Promise.resolve(this._storage.write(this.DB_KEY, this.db));
+                    if (this.cfg) await Promise.resolve(this._storage.write(this.CFG_KEY, this.cfg));
+                }
+            };
+            setTimeout(() => {
+                const idle = window.requestIdleCallback || ((cb) => setTimeout(cb, 0));
+                idle(() => {
+                    run().catch((e) => {
+                        window.errorBus?.event?.('storage.migration', 'exception:deferred', { error: e });
+                    });
+                }, { timeout: 5000 });
+            }, 3000);
+        },
+
         async init() {
             const started = Date.now();
             window.errorBus?.event?.('storage', 'init:start');
+            let done = this._bootPerf('storage-adapter');
+            let migrationResult = null;
+            const migrationOptions = this._storageMigrationOptions();
             if (window.storageMigrate && typeof window.storageMigrate.createAdapter === 'function') {
-                const migrationResult = await window.storageMigrate.createAdapter({
-                    dbKey: this.DB_KEY,
-                    cfgKey: this.CFG_KEY,
-                    storageVersionKey: this.STORAGE_VERSION_KEY,
-                    migrationFailedKey: this.MIGRATION_FAILED_KEY,
-                    targetVersion: this.STORAGE_TARGET_VERSION
+                migrationResult = await window.storageMigrate.createAdapter({
+                    ...migrationOptions,
+                    deferMigration: true
                 });
                 this._storage = migrationResult.adapter;
                 this._storageMode = migrationResult.mode;
@@ -104,36 +172,51 @@
                 this._storage = this.createLocalStorageAdapter();
                 this._storageMode = this._storage.mode;
             }
+            done();
 
+            done = this._bootPerf('storage-read');
             const storage = this.resolveStorageAdapter();
             const localDb = await Promise.resolve(storage.read(this.DB_KEY));
             const localCfg = await Promise.resolve(storage.read(this.CFG_KEY));
+            done();
             if (localDb) this.db = localDb;
-            else await this.migrateLegacy();
+            else {
+                done = this._bootPerf('legacy-migrate');
+                await this.migrateLegacy();
+                done();
+            }
             if (window.storageMigrate?.migrateAdviceToVersioned) {
+                done = this._bootPerf('advice-migrate');
                 this.db = window.storageMigrate.migrateAdviceToVersioned(this.db);
+                done();
             }
             if (localCfg) this.cfg = localCfg;
+            done = this._bootPerf('normalize');
             this.normalizeDb();
+            done();
+            done = this._bootPerf('api-init');
             this._initHistoryApi();
             this._initAdviceApi();
-            try {
-                const recentAdvice = await this.advice.getRecent(50);
-                if (recentAdvice && recentAdvice.length > 0) {
-                    const localAdvice = Array.isArray(this.db.health.aiAdviceChat) ? this.db.health.aiAdviceChat : [];
-                    const recentChronological = recentAdvice.slice().reverse();
-                    this.db.health.aiAdviceChat = this.advice._mergeChronological(localAdvice, recentChronological);
-                    this.advice.workingSet = this.db.health.aiAdviceChat;
-                }
-                this.advice.setActiveRecords(this.activeRecords(this.db.health.aiAdviceChat || []), 'recent');
-                this.advice.initSearchWorker?.();
-            } catch (e) { console.error('Load recent advice failed', e); }
+            done();
+            done = this._bootPerf('advice-active-records');
+            this.advice.setActiveRecords(this.activeRecords(this.db.health.aiAdviceChat || []), 'recent');
+            done();
+            done = this._bootPerf('startup-hooks');
+            this.scheduleAdviceColdStart?.();
+            if (migrationResult?.migration?.deferred) this.scheduleDeferredStorageMigration(migrationOptions);
             this.bindFlushHooks();
             if (window.sync && typeof sync.initUI === 'function') sync.initUI();
+            done();
+            done = this._bootPerf('ai-init');
             if (typeof ai !== 'undefined') await ai.init({ saveData: true, renderData: false });
+            done();
+            done = this._bootPerf('render');
             this.render();
+            done();
+            done = this._bootPerf('post-render');
             this.restoreActionDraft();
             if (window.cardio) cardio.initUI();
+            done();
             window.errorBus?.event?.('storage', 'init:success', {
                 mode: this._storageMode,
                 elapsedMs: Date.now() - started,
@@ -449,6 +532,28 @@
             };
             this.advice = adviceApi;
             adviceApi.setActiveRecords(adviceApi.workingSet, 'recent');
+        },
+
+        scheduleAdviceColdStart() {
+            if (this._adviceColdStartScheduled) return;
+            this._adviceColdStartScheduled = true;
+            const idle = window.requestIdleCallback || ((cb) => setTimeout(cb, 1500));
+            idle(() => {
+                this.loadRecentAdviceColdStart?.().catch((e) => console.error('Load recent advice failed', e));
+            }, { timeout: 5000 });
+        },
+
+        async loadRecentAdviceColdStart() {
+            if (!this.advice) return;
+            const recentAdvice = await this.advice.getRecent(50);
+            if (recentAdvice && recentAdvice.length > 0) {
+                const localAdvice = Array.isArray(this.db.health.aiAdviceChat) ? this.db.health.aiAdviceChat : [];
+                const recentChronological = recentAdvice.slice().reverse();
+                this.db.health.aiAdviceChat = this.advice._mergeChronological(localAdvice, recentChronological);
+                this.advice.workingSet = this.db.health.aiAdviceChat;
+                this.advice.setActiveRecords(this.activeRecords(this.db.health.aiAdviceChat || []), 'recent');
+            }
+            this.advice.initSearchWorker?.();
         },
 
         purgeBefore(ts, retentionMs = 30 * 24 * 60 * 60 * 1000) {

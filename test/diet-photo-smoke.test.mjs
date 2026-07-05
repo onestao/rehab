@@ -11,9 +11,11 @@ test('diet photo browser assets are wired for offline use', async () => {
     ]);
 
     assert.match(html, /ai-vision-pure/);
-    assert.match(sw, /ai-vision-pure\.mjs\?v=/);
-    assert.match(sw, /assets\/vision-models\.json/);
-    assert.match(sw, /assets\/heic2any\.min\.js/);
+    const precacheAssets = sw.match(/const ASSETS = \[([\s\S]*?)\];/)?.[1] || '';
+    assert.doesNotMatch(precacheAssets, /assets\/heic2any\.min\.js/);
+    assert.doesNotMatch(precacheAssets, /ai-vision-pure\.mjs|assets\/vision-models\.json/);
+    assert.match(sw, /RUNTIME_CACHE_FIRST_ASSETS[\s\S]*assets\/heic2any\.min\.js/);
+    assert.match(sw, /fetchRuntimeCacheFirst/);
     assert.match(healthDiet, /image\/jpeg,image\/png,image\/webp,image\/heic,image\/heif/);
     assert.match(heicBundle, /heic2any/);
 });

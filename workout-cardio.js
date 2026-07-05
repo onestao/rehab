@@ -7,9 +7,33 @@ const cardio = {
     timer: null,
     targetAnnounced: false,
 
+    typeCatalog() {
+        return window.cardioPure.normalizeCardioCatalog(data.cardioTypeOptionsFromLibrary?.() || {});
+    },
+
+    syncTypeSelect(select, selectedValue = '') {
+        if (!select) return;
+        const catalog = this.typeCatalog();
+        const current = selectedValue || select.value || 'walk';
+        select.textContent = '';
+        Object.entries(catalog).forEach(([type, info]) => {
+            const option = document.createElement('option');
+            option.value = type;
+            option.textContent = `${info.name} ${info.met} MET`;
+            select.appendChild(option);
+        });
+        select.value = catalog[current] ? current : 'walk';
+    },
+
+    refreshTypeSelectors() {
+        this.syncTypeSelect(document.getElementById('cardioType'), data.db.cardio?.type || 'walk');
+        this.syncTypeSelect(document.getElementById('cardioEditType'), document.getElementById('cardioEditType')?.value || 'walk');
+    },
+
     initUI() {
         const cfg = data.db.cardio || {};
-        document.getElementById('cardioType').value = cfg.type || 'walk';
+        this.refreshTypeSelectors();
+        document.getElementById('cardioType').value = this.typeCatalog()[cfg.type] ? cfg.type : 'walk';
         document.getElementById('cardioWeight').value = cfg.weight || 70;
         document.getElementById('cardioTarget').value = cfg.target || 30;
         this.updatePlan();
@@ -19,7 +43,7 @@ const cardio = {
         const type = document.getElementById('cardioType').value;
         const weight = parseFloat(document.getElementById('cardioWeight').value) || 70;
         const target = parseInt(document.getElementById('cardioTarget').value) || 30;
-        return window.cardioPure.normalizeCardioPlan({ type, weight, target });
+        return window.cardioPure.normalizeCardioPlan({ type, weight, target }, this.typeCatalog());
     },
 
     updatePlan() {
@@ -105,6 +129,7 @@ const cardio = {
         const modal = document.getElementById('cardioEditModal');
         const min = Math.floor(duration / 60);
         const sec = duration % 60;
+        this.syncTypeSelect(document.getElementById('cardioEditType'), plan.type);
         document.getElementById('cardioEditType').value = plan.type;
         document.getElementById('cardioEditMin').value = min;
         document.getElementById('cardioEditSec').value = sec;
@@ -140,7 +165,7 @@ const cardio = {
         const min = parseInt(document.getElementById('cardioEditMin').value) || 0;
         const sec = parseInt(document.getElementById('cardioEditSec').value) || 0;
         const totalSec = min * 60 + sec;
-        const cal = window.cardioPure.calcCaloriesForSeconds({ type, weight, target: 1 }, totalSec);
+        const cal = window.cardioPure.calcCaloriesForSeconds({ type, weight, target: 1 }, totalSec, this.typeCatalog());
         document.getElementById('cardioEditCal').value = Math.round(cal);
     },
 
@@ -151,6 +176,7 @@ const cardio = {
         const weight = parseFloat(document.getElementById('cardioEditWeight').value) || 70;
         const target = parseInt(document.getElementById('cardioEditTarget').value) || 0;
         const calories = parseInt(document.getElementById('cardioEditCal').value) || 0;
+        const plan = window.cardioPure.normalizeCardioPlan({ type, weight, target }, this.typeCatalog());
         const duration = min * 60 + sec;
         if (!window.cardioPure.shouldSaveCardioSession(duration)) {
             alert('有氧时间低于20秒，无法保存');
@@ -160,7 +186,7 @@ const cardio = {
             id: data.generateRecordId('history'),
             now: Date.now(),
             dayKey: data.logicalDateKey(),
-            plan: { type, weight, target },
+            plan,
             duration,
             calories
         });

@@ -109,6 +109,31 @@ test('today card removes Today kicker and shows weekly plan dock', () => {
   assert.doesNotMatch(html, /aria-label="暂无待集中拉伸"/);
 });
 
+test('diet ring displays intake above 100 percent while clamping visual progress', () => {
+  const api = loadPlanUi();
+  const ctx = {
+    ...createContext(api, []),
+    db: { dailyPlans: [], health: { dietGoal: { dailyCal: 2000 }, weights: [] } },
+    todayCalories() {
+      return 3000;
+    },
+    todayMacros() {
+      return { pro: 90, carb: 300, fat: 80 };
+    },
+    defaultDietGoals() {
+      return { pro: 100, carb: 250, fat: 70 };
+    },
+    ratio(value, total) {
+      return total ? Math.max(0, Math.min(100, Math.round((value / total) * 100))) : 0;
+    }
+  };
+
+  const html = api.renderPlanIntakeRing.call(ctx);
+
+  assert.match(html, />150%<\/b>/);
+  assert.match(html, /--progress:100;/);
+});
+
 test('today AI types use selected plan first and include other daily plan types', () => {
   const api = loadPlanUi();
   const plans = [
@@ -120,6 +145,26 @@ test('today AI types use selected plan first and include other daily plan types'
   ctx.selectedPlanId = 'bulk';
 
   assert.deepEqual(Array.from(api.todayPlanAiTypes.call(ctx)), ['bulk', 'rehab', 'cut']);
+});
+
+test('today plan card renders an actionable state when no plan exists', () => {
+  const api = loadPlanUi();
+  const html = api.renderTodayV6PlanCard.call(createContext(api, []));
+
+  assert.match(html, /当前训练计划/);
+  assert.match(html, /今天还没有训练计划/);
+  assert.match(html, /openNewPlanSheet/);
+  assert.match(html, /openPlanTodayAiSheet/);
+});
+
+test('today AI reminder keeps visible content without configured AI', () => {
+  const api = loadPlanUi();
+  const html = api.renderTodayAiReminder.call(createContext(api, []));
+
+  assert.match(html, /今日 AI 提醒/);
+  assert.match(html, /配置 AI 后/);
+  assert.match(html, /打开 AI/);
+  assert.doesNotMatch(html, /<div class="collapse-content"><\/div>/);
 });
 
 test('new plan AI entry opens generator without creating a manual placeholder', () => {
@@ -170,6 +215,21 @@ test('task drawer exposes compact cancel daily plan action', () => {
   assert.match(html, /data-cancel-plan-id="rehab"/);
   assert.match(html, /plan-cancel-day-btn/);
   assert.match(html, /取消计划/);
+});
+
+test('task drawer does not fall back to another plan when requested plan was cancelled', () => {
+  const api = loadPlanUi();
+  const plans = [{
+    id: 'other',
+    type: 'bulk',
+    title: '增肌日程',
+    items: [{ id: 'task-1', name: '深蹲', status: 'todo', spec: { sets: 3, reps: 8 } }],
+    pendingCooldowns: []
+  }];
+  const html = api.renderPlanTaskDrawerBody.call(createContext(api, plans), 'cancelled');
+
+  assert.match(html, /暂无训练任务/);
+  assert.doesNotMatch(html, /深蹲/);
 });
 
 test('prescription confirmation copy does not call cautious prescriptions non-prescription', async () => {
