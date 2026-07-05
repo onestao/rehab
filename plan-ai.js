@@ -52,6 +52,17 @@
         return Array.from(document.querySelectorAll(selector));
     }
 
+    function planAiTargetDates(ctx, mode = 'today') {
+        const today = ctx.logicalDateKey?.() || ctx.dateKey?.(new Date()) || new Date().toISOString().slice(0, 10);
+        const start = ctx.dateFromKey?.(today) || new Date(`${today}T00:00:00`);
+        const length = mode === 'week' ? 7 : 1;
+        return Array.from({ length }, (_, index) => {
+            const date = new Date(start);
+            date.setDate(date.getDate() + index);
+            return ctx.dateKey ? ctx.dateKey(date) : date.toISOString().slice(0, 10);
+        });
+    }
+
     function planAiPreviewItemName(item = {}) {
         return String(item?.name || item?.canonicalName || item?.title || '').trim();
     }
@@ -793,13 +804,7 @@
                     userOverride: !!item.userOverride
                 }))
             }));
-            const targetDates = mode === 'week'
-                ? Array.from({ length: 7 }, (_, index) => {
-                    const date = new Date(today);
-                    date.setDate(date.getDate() + index);
-                    return this.dateKey ? this.dateKey(date) : date.toISOString().slice(0, 10);
-                })
-                : [today];
+            const targetDates = planAiTargetDates(this, mode);
             const currentTargetPlans = this.activeRecords(this.db.dailyPlans || [])
                 .filter((plan) => targetDates.includes(plan.date) && types.includes(plan.type || 'rehab'))
                 .map((plan) => ({
@@ -850,9 +855,10 @@
                 sourcePlans: this.activeRecords(this.db.dailyPlans || []),
                 types
             });
+            const planJsonShape = '{"date":"YYYY-MM-DD","type":"<rehab|cut|bulk|maintenance|custom>","title":"...","notes":"...","items":[{"name":"...","prescriptionActionId":"","category":"<warmup|main|cooldown>","chainHint":"","spec":{"sets":<int>,"reps":<int>,"work":<int>,"repRest":<int>,"actionRest":<int>,"isAlt":<bool>,"mode":"<reps|hold|alt-reps|alt-hold>"},"cooldownRefs":[],"aiReasoning":"...","durationEstHint":"","requiresUserConfirm":false}]}';
             const promptMode = mode === 'week'
-                ? '请为接下来 7 天输出严格 JSON，结构为：{"plans":[{"date":"YYYY-MM-DD","type":"<rehab|cut|bulk|maintenance|custom>","title":"...","notes":"...","items":[{"name":"...","prescriptionActionId":"","category":"<warmup|main|cooldown>","chainHint":"","spec":{"sets":<int>,"reps":<int>,"work":<int>,"repRest":<int>,"actionRest":<int>,"isAlt":<bool>,"mode":"<reps|hold|alt-reps|alt-hold>"},"cooldownRefs":[],"aiReasoning":"...","durationEstHint":"","requiresUserConfirm":false}]}]}'
-                : '请输出严格 JSON，结构为：{"date":"YYYY-MM-DD","type":"<rehab|cut|bulk|maintenance|custom>","title":"...","notes":"...","items":[{"name":"...","prescriptionActionId":"","category":"<warmup|main|cooldown>","chainHint":"","spec":{"sets":<int>,"reps":<int>,"work":<int>,"repRest":<int>,"actionRest":<int>,"isAlt":<bool>,"mode":"<reps|hold|alt-reps|alt-hold>"},"cooldownRefs":[],"aiReasoning":"...","durationEstHint":"","requiresUserConfirm":false}]}';
+                ? `输出严格 JSON：{"plans":[${planJsonShape}]}`
+                : `请输出严格 JSON，结构为：${planJsonShape}`;
             const specRules = [
                 '只输出 JSON 本体，不要使用 Markdown 代码块、不要前后加自然语言、不要注释。所有数值字段必须是 number 类型，布尔字段必须是 true/false，禁止用字符串如 "3"、"true"。',
                 '每个 item 必须填齐：name(string)、category(枚举 warmup/main/cooldown)、spec.sets(int≥1)、spec.reps(int≥0)、spec.work(int>0)、spec.repRest(int 0..30)、spec.actionRest(int 0..90)、spec.isAlt(bool)、spec.mode(枚举 reps/hold/alt-reps/alt-hold)。任一字段缺失或为 0/空都视为不合规，必须重填。',
@@ -871,7 +877,7 @@
                 '  次数动作: {"name":"深蹲","category":"main","spec":{"sets":3,"reps":12,"work":3,"repRest":0,"actionRest":45,"isAlt":false,"mode":"reps"}}',
                 '  静态保持: {"name":"靠墙静蹲","category":"main","spec":{"sets":3,"reps":0,"work":40,"repRest":0,"actionRest":30,"isAlt":false,"mode":"hold"}}',
                 '  双侧交替: {"name":"侧弓步","category":"main","spec":{"sets":3,"reps":10,"work":3,"repRest":0,"actionRest":45,"isAlt":true,"mode":"alt-reps"}}',
-                '必须参考今日已完成运动摘要；如果今天已经高强度训练过同动作或同部位，后续计划应降低重复负荷、改为恢复/拉伸/低强度技术练习，除非用户明确要求继续加量。'
+                '必须参考今日已完成运动摘要；今日同动作/同部位已高强度训练时，后续降负荷或改恢复，除非用户要求加量。'
             ].join('\n');
             const overwriteRules = [
                 '当前计划覆盖规则: 你正在重写目标日期/类型的计划，而不是只追加动作。必须先参考“目标当前计划完整摘要”。',
@@ -913,10 +919,12 @@
                 rehabPolicyRules,
                 bodyPartRules,
                 confirmationRules,
-                '所有 spec 字段（sets/reps/work/repRest/actionRest/isAlt/mode）都必须由你显式填写，不能依赖客户端推断；如果你拿不准就按规则中的默认值填上，但绝不能省略字段或填 0/空。mode 必须根据动作类型正确选择 reps/hold/alt-reps/alt-hold。',
-                types.length > 1
-                    ? `本次需要同时生成多个计划类型，请分别输出到 plans 数组中，每个选中类型各生成 1 个 plan：\n${typeInstructions}`
-                    : `计划类型: ${types[0]} / ${metas[0]?.label || '训练计划'}`,
+                'spec sets/reps/work/repRest/actionRest/isAlt/mode 必须显式填写；拿不准按默认值，不能省略或填0/空。mode 要匹配动作。',
+                mode === 'week'
+                    ? `目标日期列表:${JSON.stringify(targetDates)};${types.length > 1 ? `每日期每类型1 plan,共 ${targetDates.length * types.length} 个 plan:${typeInstructions}` : `每天1个${types[0]} plan,共 ${targetDates.length} 个 plan`}`
+                    : (types.length > 1
+                        ? `本次需要同时生成多个计划类型，请分别输出到 plans 数组中，每个选中类型各生成 1 个 plan：\n${typeInstructions}`
+                        : `计划类型: ${types[0]} / ${metas[0]?.label || '训练计划'}`),
                 `训练阶段: ${prefs.customStageLabel || prefs.stage || 'unset'}`,
                 `设计偏好装备: ${prefEquipment.join(', ') || '无'}`,
                 `健康档案装备偏好: ${profileEquipment.join(', ') || '无'}`,
@@ -1111,9 +1119,11 @@
             return stripPlanAiMeta(parsed);
         },
 
-        validatePlanAiPayload(rawText, fallbackTypes = 'rehab') {
-            const validation = validatePlanAiPayloadPure(rawText, buildPlanAiPayloadOptions(this, fallbackTypes));
-            return stripPlanAiMeta(validation);
+        validatePlanAiPayload(rawText, fallbackTypes = 'rehab', targetDates = []) {
+            const validation = stripPlanAiMeta(validatePlanAiPayloadPure(rawText, buildPlanAiPayloadOptions(this, fallbackTypes)));
+            const missing = targetDates.filter((date) => date && !String(rawText || '').includes(date));
+            if (missing.length) return { ...validation, ok: false, errors: [...(validation.errors || []), `缺:${missing.join('、')}`] };
+            return validation;
         },
 
         async submitPlanAi(mode = 'today') {
@@ -1126,6 +1136,7 @@
             const prompt = bodyValue('planAiPrompt').trim();
             this._lastPlanAiPrompt = prompt;
             this._planAiAllowUserPlanMerge = hasUserPlanMergeIntent(prompt);
+            const targetDates = planAiTargetDates(this, mode);
             const outputTokenBudget = mode === 'week' ? 5200 : 3600;
             const messages = [
                 { role: 'system', content: '你是训练排程助手，只输出 JSON。' },
@@ -1151,7 +1162,7 @@
                         text = await window.ai.call(messages, outputTokenBudget);
                     }
                     this.setPlanAiStatus?.('已收到计划草稿，正在校验 JSON…', 'busy');
-                    const validation = this.validatePlanAiPayload(text, types);
+                    const validation = this.validatePlanAiPayload(text, types, mode === 'week' ? targetDates : []);
                     if (validation.ok) break;
                     if (validation.errors?.length && attempt < MAX_ATTEMPTS - 1) {
                         messages.push({ role: 'assistant', content: text });

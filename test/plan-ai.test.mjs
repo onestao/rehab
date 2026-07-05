@@ -745,6 +745,43 @@ test('plan AI context includes six recent rehab prescriptions', () => {
   assert.match(prompt, /第4-6周处方仅用于理解长期禁忌/);
 });
 
+test('plan AI week context names every target date for the next seven days', () => {
+  const api = loadPlanAi();
+  const ctx = createContext(api);
+  ctx.logicalDateKey = () => '2026-07-05';
+  ctx.dateFromKey = (value) => new Date(`${value}T00:00:00`);
+  ctx.dateKey = (date) => [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, '0'),
+    String(date.getDate()).padStart(2, '0')
+  ].join('-');
+
+  const prompt = api.buildPlanAiContext.call(ctx, 'week', '安排未来一周', ['rehab']);
+
+  assert.match(prompt, /目标日期列表/);
+  assert.match(prompt, /\["2026-07-05","2026-07-06","2026-07-07","2026-07-08","2026-07-09","2026-07-10","2026-07-11"\]/);
+  assert.match(prompt, /共 7 个 plan/);
+});
+
+test('plan AI weekly validation rejects JSON missing target dates', () => {
+  const api = loadPlanAi();
+  const ctx = createContext(api);
+  const raw = JSON.stringify({
+    plans: [{
+      date: '2026-07-05',
+      type: 'rehab',
+      title: '康复计划',
+      items: [{ name: '桥式', category: 'main', spec: { sets: 2, reps: 10, work: 3, repRest: 0, actionRest: 30, isAlt: false, mode: 'reps' } }]
+    }]
+  });
+
+  const validation = api.validatePlanAiPayload.call(ctx, raw, ['rehab'], ['2026-07-05', '2026-07-06', '2026-07-07', '2026-07-08', '2026-07-09', '2026-07-10', '2026-07-11']);
+
+  assert.equal(validation.ok, false);
+  assert.match(validation.errors.join('\n'), /缺:/);
+  assert.match(validation.errors.join('\n'), /2026-07-06/);
+});
+
 test('plan AI context binds unlinked weekly prescriptions into the prescription library', () => {
   const api = loadPlanAi();
   const ctx = createContext(api);

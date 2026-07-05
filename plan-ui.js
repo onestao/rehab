@@ -96,7 +96,7 @@
                     </div>
                     <div style="display:flex;align-items:center;gap:6px">
                         ${streakDays > 0 ? `<span class="streak-chip"><span class="material-symbols-rounded">local_fire_department</span>连续 ${streakDays} 天</span>` : ''}
-                        ${prefs.showWeeklyDock === false ? '' : `<button class="md-icon-btn-bar today-weekly-plan-btn" type="button" onclick="window.planWeekly?.open?.()" aria-label="本周计划" title="本周计划 · ${weeklySummary.done}/${weeklySummary.total || 0} 完成"><span class="material-symbols-rounded">calendar_month</span></button>`}
+                        ${prefs.showWeeklyDock === false ? '' : `<button class="md-icon-btn-bar today-weekly-plan-btn" type="button" onclick="window.planWeekly?.open?.()" aria-label="近期计划" title="3-7天 · ${weeklySummary.done}/${weeklySummary.total || 0} 完成"><span class="material-symbols-rounded">calendar_month</span></button>`}
                         <button class="md-icon-btn-bar" type="button" onclick="data.openPlanTodayAiSheet?.()" aria-label="AI 重排训练计划"><span class="material-symbols-rounded">auto_awesome</span></button>
                     </div>
                 </div>

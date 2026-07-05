@@ -126,6 +126,58 @@ test('weekly plan delegates untrusted plan and task ids instead of inline JS', (
     assert.deepEqual(calls, [['menu', `plan');globalThis.pwned=1;//`, `task');globalThis.pwned=1;//`]]);
 });
 
+test('weekly plan shows recent past and future days across natural week boundary', () => {
+    const localDateKey = (date) => [
+        date.getFullYear(),
+        String(date.getMonth() + 1).padStart(2, '0'),
+        String(date.getDate()).padStart(2, '0')
+    ].join('-');
+    const data = {
+        logicalDateKey() { return '2026-07-05'; },
+        dateKey(date) {
+            return localDateKey(date);
+        },
+        dateFromKey(value) {
+            return new Date(`${value}T00:00:00`);
+        },
+        getDailyPlans(date) {
+            if (date === '2026-07-03') {
+                return [{ id: 'recent-plan', date, items: [{ id: 'task-past', name: 'Recent missed task', status: 'todo' }] }];
+            }
+            return date === '2026-07-06'
+                ? [{ id: 'next-week-plan', date, items: [{ id: 'task-next', name: 'Next week task', status: 'todo' }] }]
+                : [];
+        },
+        aggregateCompletionRate(plans) {
+            return plans.length ? { done: 0, total: 1, rate: 0 } : { done: 0, total: 0, rate: 0 };
+        },
+        escapeHtml,
+        handlePlanTaskTap() {},
+        openPlanTaskMenu() {}
+    };
+    const { api } = loadWindowModule('plan-weekly.js', 'window.planWeekly', { data });
+
+    const range = api.range();
+
+    assert.deepEqual(JSON.parse(JSON.stringify(range.map((item) => item.key))), [
+        '2026-07-02',
+        '2026-07-03',
+        '2026-07-04',
+        '2026-07-05',
+        '2026-07-06',
+        '2026-07-07',
+        '2026-07-08',
+        '2026-07-09',
+        '2026-07-10',
+        '2026-07-11',
+        '2026-07-12'
+    ]);
+    api.selectedDate = '2026-07-03';
+    assert.match(api.render(), /Recent missed task/);
+    api.selectedDate = '2026-07-06';
+    assert.match(api.render(), /Next week task/);
+});
+
 test('template manager delegates untrusted template ids instead of inline JS', () => {
     const { api } = loadWindowModule('advice-template-manager.js', 'window.adviceTemplateManager');
     const malicious = `tpl');globalThis.pwned=1;//`;
