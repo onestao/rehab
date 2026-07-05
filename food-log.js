@@ -618,7 +618,14 @@ const foodLog = {
             this.renderAiFoodResults();
             if (statusEl) statusEl.textContent = `AI 已识别 ${items.length} 项，点击逐个添加或批量添加`;
         } catch (e) {
-            if (statusEl) statusEl.textContent = 'AI 识别失败: ' + (window.toast ? toast.sanitize(e) : e.message);
+            const message = window.toast ? toast.sanitize(e) : String(e?.message || e);
+            window.errorBus?.report?.('ai-food', e, {
+                phase: 'parse-text',
+                code: e?.code || '',
+                inputSnippet: text.slice(0, 160),
+                rawSnippet: String(e?.body || '').slice(0, 240)
+            });
+            if (statusEl) statusEl.textContent = 'AI 识别失败: ' + message;
         }
     },
 

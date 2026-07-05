@@ -59,6 +59,100 @@ Object.assign(ai, {
         return err;
     },
 
+    _balancedJsonSpans(raw, open, close) {
+        const text = String(raw || '');
+        const spans = [];
+        for (let i = 0; i < text.length; i++) {
+            if (text[i] !== open) continue;
+            let depth = 0;
+            let quote = '';
+            let escaped = false;
+            for (let j = i; j < text.length; j++) {
+                const ch = text[j];
+                if (quote) {
+                    if (escaped) escaped = false;
+                    else if (ch === '\\') escaped = true;
+                    else if (ch === quote) quote = '';
+                    continue;
+                }
+                if (ch === '"' || ch === "'") {
+                    quote = ch;
+                    continue;
+                }
+                if (ch === open) depth += 1;
+                else if (ch === close) {
+                    depth -= 1;
+                    if (depth === 0) {
+                        spans.push({ start: i, text: text.slice(i, j + 1) });
+                        break;
+                    }
+                }
+            }
+        }
+        return spans;
+    },
+
+    _jsonTextCandidates(raw) {
+        const text = String(raw || '').trim();
+        const seen = new Set();
+        const candidates = [];
+        const add = value => {
+            const next = String(value || '').trim();
+            if (next && !seen.has(next)) {
+                seen.add(next);
+                candidates.push(next);
+            }
+        };
+        add(text);
+        text.replace(/```(?:json|javascript|js)?\s*([\s\S]*?)```/gi, (_m, body) => {
+            add(body);
+            return _m;
+        });
+        add(text.replace(/^```(?:json|javascript|js)?\s*/i, '').replace(/```\s*$/i, ''));
+        const spans = [
+            ...this._balancedJsonSpans(text, '{', '}'),
+            ...this._balancedJsonSpans(text, '[', ']')
+        ].sort((a, b) => a.start - b.start || b.text.length - a.text.length);
+        spans.forEach(span => add(span.text));
+        return candidates;
+    },
+
+    _coerceAiJsonPayload(value, opts = {}) {
+        if ((opts.expected || 'array') !== 'array') return value;
+        if (Array.isArray(value)) return value;
+        if (!value || typeof value !== 'object') return null;
+        const wrapperKeys = opts.wrapperKeys || [
+            'items', 'foods', 'foodItems', 'food_items', 'foodList', 'food_list',
+            'results', 'result', 'data', 'list', '食物', '食物列表', '结果'
+        ];
+        for (const key of wrapperKeys) {
+            if (Array.isArray(value[key])) return value[key];
+        }
+        const singleFoodKeys = ['name', 'food', 'foodName', 'dish', '食物', '食物名', '名称', '名字'];
+        if (singleFoodKeys.some(key => value[key] !== undefined && value[key] !== null && value[key] !== '')) return [value];
+        return null;
+    },
+
+    _parseAiJsonPayload(raw, opts = {}) {
+        let lastError = null;
+        let parsedButWrongShape = false;
+        for (const candidate of this._jsonTextCandidates(raw)) {
+            try {
+                const parsed = JSON.parse(candidate);
+                const coerced = this._coerceAiJsonPayload(parsed, opts);
+                if (coerced !== null) return coerced;
+                parsedButWrongShape = true;
+            } catch (e) {
+                lastError = e;
+            }
+        }
+        throw this._makeAiError('AI 返回格式异常', {
+            code: parsedButWrongShape ? 'AI_JSON_SHAPE_MISMATCH' : 'AI_JSON_PARSE_FAILED',
+            body: String(raw || '').slice(0, 500),
+            cause: lastError || undefined
+        });
+    },
+
     _makeHttpAiError(status, body = '') {
         return this._makeAiError(`AI 请求失败: ${status} ${String(body).slice(0, 120)}`, {
             status,
@@ -734,9 +828,10 @@ Object.assign(ai, {
             { role: 'system', content: sysMsg },
             { role: 'user', content: userMsg }
         ]);
-        const match = raw.match(/\[[\s\S]*\]/);
-        if (!match) throw new Error('AI 返回格式异常');
-        return JSON.parse(match[0]);
+        return this._parseAiJsonPayload(raw, {
+            expected: 'array',
+            wrapperKeys: ['items', 'foods', 'foodItems', 'food_items', 'foodList', 'food_list', 'results', 'result', 'data', '食物', '食物列表', '结果']
+        });
     },
 
     _visionFailureCacheKey() {
@@ -789,16 +884,14 @@ Object.assign(ai, {
         const prompt = prefResult.messages?.find(m => m.role === 'user')?.content || `你是营养师助手。用户给出了一张"这顿饭/食物"的照片。请你根据图片内容识别食物，并严格只返回 JSON 数组，不要其他文字。\n每个元素格式：{"name":"食物名","grams":克数,"cal":热量kcal,"pro":蛋白质g,"carb":碳水g,"fat":脂肪g,"fiber":膳食纤维g,"sugar":糖g,"sodium":钠mg,"saturatedFat":饱和脂肪g,"ingredients":["主要配料"],"cooking":"烹饪方式","source":"估算依据","confidence":0-100,"note":"健康性备注"}\n要求：\n- 如果无法判断克数，请用常见份量估算；\n- fiber/sugar/sodium/saturatedFat/ingredients/cooking/source/confidence/note 可根据可见信息合理填写，无法判断时使用 0、空数组或空字符串；\n- 如果图片中看不清或不确定，请不要编造，返回空数组 [] 或减少条目；\n- 不要输出 markdown、不要解释。`;
         const raw = await this.callVisionTextImage(prompt, file, 2000, sysMsg, opts);
         opts.onProgress?.({ stage: 'parse' });
-        const match = String(raw || '').match(/\[[\s\S]*\]/);
-        if (!match) {
-            console.warn('AI 返回格式异常:', String(raw || '').slice(0, 80));
-            throw this._makeAiError('AI 返回格式异常', { code: 'AI_JSON_PARSE_FAILED', body: String(raw || '').slice(0, 200) });
-        }
         try {
-            return JSON.parse(match[0]);
+            return this._parseAiJsonPayload(raw, {
+                expected: 'array',
+                wrapperKeys: ['items', 'foods', 'foodItems', 'food_items', 'foodList', 'food_list', 'results', 'result', 'data', '食物', '食物列表', '结果']
+            });
         } catch (e) {
             console.warn('AI 返回格式异常:', String(raw || '').slice(0, 80));
-            throw this._makeAiError('AI 返回格式异常', { code: 'AI_JSON_PARSE_FAILED', body: String(raw || '').slice(0, 200), cause: e });
+            throw e;
         }
     },
 
