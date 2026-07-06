@@ -32,7 +32,14 @@
 }
 .cal-day.selected { background: var(--md-sys-primary-container); border-color: var(--md-sys-primary); box-shadow: 0 0 0 2px var(--md-sys-primary-container); }
 
-.health-swipe-deck,
+.health-swipe-deck {
+    max-width: 100%;
+    min-width: 0;
+    overflow-x: auto;
+    overflow-y: visible;
+    contain: inline-size;
+}
+
 .library-swipe-deck {
     max-width: 100%;
     min-width: 0;
