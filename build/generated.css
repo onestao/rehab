@@ -1778,6 +1778,10 @@ mark.ai-hit {
     opacity: 0;
     margin-top: 0;
 }
+.collapsible-card:not(.collapsed) .collapse-content {
+    max-height: none;
+    overflow: visible;
+}
 .collapsible-card.collapsed .panel-head { margin-bottom: 0; }
 .collapsible-card {
     border-radius: 24px;
@@ -1929,6 +1933,7 @@ mark.ai-hit {
 .day-detail-item.swipe-open .delete-btn {
     background: var(--md-sys-error, #b3261e); color: #fff;
 }
+
 }
 @layer components {
 /* --- Diet Card --- */
@@ -1964,13 +1969,27 @@ mark.ai-hit {
 .diet-btn-row { display: flex; gap: 6px; grid-column: 1 / -1; }
 .diet-btn-row .md-btn-filled { flex: 1; margin-top: 0; }
 .diet-btn-row .md-btn-tonal { flex: none; width: 48px; padding: 0; margin-top: 0; }
-/* 编辑食物/运动行内操作按钮：统一两个按钮高度，去掉 filled 默认 margin-top */
-.food-edit-actions { align-items: center; }
+/* 编辑食物/运动行内操作按钮：保证窄屏下取消按钮仍有可读宽度。 */
+.food-edit-actions {
+    display: grid;
+    grid-template-columns: minmax(76px, max-content) minmax(0, 1fr);
+    align-items: center;
+}
 .food-edit-actions .md-btn,
 .food-edit-actions .md-btn-tonal,
 .food-edit-actions .md-btn-filled {
     height: 44px;
+    min-width: 0;
     margin-top: 0;
+}
+.food-edit-actions .md-btn-tonal {
+    width: auto;
+    min-width: 76px;
+    padding-inline: 14px;
+}
+.food-edit-actions .md-btn-filled {
+    width: 100%;
+    padding-inline: 16px;
 }
 .food-search-results { display: grid; gap: 4px; max-height: 160px; overflow-y: auto; }
 .food-result-item {
@@ -2026,6 +2045,11 @@ mark.ai-hit {
 }
 .food-inline-edit-grid .md-field { margin-bottom: 0; }
 .food-inline-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.food-inline-actions.food-edit-actions {
+    display: grid;
+    grid-template-columns: minmax(76px, max-content) minmax(0, 1fr);
+    justify-content: stretch;
+}
 .food-ai-status {
     display: flex;
     align-items: center;
@@ -10453,7 +10477,14 @@ body.is-training .fab-pip.active {
 }
 .cal-day.selected { background: var(--md-sys-primary-container); border-color: var(--md-sys-primary); box-shadow: 0 0 0 2px var(--md-sys-primary-container); }
 
-.health-swipe-deck,
+.health-swipe-deck {
+    max-width: 100%;
+    min-width: 0;
+    overflow-x: auto;
+    overflow-y: visible;
+    contain: inline-size;
+}
+
 .library-swipe-deck {
     max-width: 100%;
     min-width: 0;

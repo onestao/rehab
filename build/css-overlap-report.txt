@@ -352,6 +352,10 @@ mark.ai-hit
   files: 18-health-diet.css, 19-health-weightloss-ai.css, 36-responsive.css
     gap: 14px | 10px (18-health-diet.css / 36-responsive.css)
 
+.food-edit-actions .md-btn-tonal
+  files: 18-health-diet.css
+    min-width: 0 | 76px (18-health-diet.css / 18-health-diet.css)
+
 .food-result-item
   files: 18-health-diet.css, 37-dark-mode.css
     background: var(--md-sys-surface-container-lowest) | var(--md-sys-surface-container-high) (18-health-diet.css / 37-dark-mode.css)
@@ -702,10 +706,6 @@ mark.ai-hit
   files: 38-record-page.css, 36-responsive.css
     padding: 0 8px | 0 10px (38-record-page.css / 36-responsive.css)
     font-size: 12px | 11px (38-record-page.css / 36-responsive.css)
-
-.health-swipe-deck
-  files: 38-record-page.css, 53-v6-records.css
-    overflow-y: visible | clip (38-record-page.css / 53-v6-records.css)
 
 .today-timeline-card
   files: 38-record-page.css, 36-responsive.css
@@ -1168,7 +1168,7 @@ mark.ai-hit
   files: 57-weight-report.css
     animation: none | weight-chart-range-zoom var(--md-sys-motion-duration-medium, 220ms) var(--md-sys-motion-emphasized, cubic-bezier(0.2, 0, 0, 1)) both (57-weight-report.css / 57-weight-report.css)
 
-## DUPLICATES (same selector + same property + same value): 32
+## DUPLICATES (same selector + same property + same value): 33
 .md-top-app-bar
   files: 04-layout-appbar.css, 37-dark-mode.css
     background: transparent (04-layout-appbar.css / 37-dark-mode.css)
@@ -1287,6 +1287,11 @@ mark.ai-hit
   files: 33-workout-input-card.css, 36-responsive.css
     gap: 6px (33-workout-input-card.css / 33-workout-input-card.css)
 
+.health-swipe-deck
+  files: 38-record-page.css, 53-v6-records.css
+    overflow-x: auto (38-record-page.css / 53-v6-records.css)
+    overflow-y: visible (38-record-page.css / 53-v6-records.css)
+
 .health-swipe-page
   files: 38-record-page.css, 53-v6-records.css
     min-width: 0 (38-record-page.css / 53-v6-records.css)
@@ -1321,7 +1326,7 @@ mark.ai-hit
   files: 49-plan.css, 49-plan-ai.css
     color: var(--md-sys-on-surface-variant) (49-plan.css / 49-plan-ai.css)
 
-## COMPLEMENTS (same selector, disjoint properties): 115
+## COMPLEMENTS (same selector, disjoint properties): 116
 .bar-leading
   files: 04-layout-appbar.css, 50-v6-ui.css
 
@@ -1357,6 +1362,9 @@ mark.ai-hit
 
 .day-detail-card
   files: 17-record-tabs-health.css, 19-health-weightloss-ai.css
+
+.food-edit-actions .md-btn-filled
+  files: 18-health-diet.css
 
 .weightloss-head small
   files: 19-health-weightloss-ai.css

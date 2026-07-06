@@ -98,6 +98,10 @@
     opacity: 0;
     margin-top: 0;
 }
+.collapsible-card:not(.collapsed) .collapse-content {
+    max-height: none;
+    overflow: visible;
+}
 .collapsible-card.collapsed .panel-head { margin-bottom: 0; }
 .collapsible-card {
     border-radius: 24px;
