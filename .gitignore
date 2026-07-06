@@ -1,4 +1,5 @@
 .kilo/
+.worktrees/
 .codegraph/
 .cursor/
 archive/
