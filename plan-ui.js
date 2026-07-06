@@ -97,7 +97,7 @@
                     <div style="display:flex;align-items:center;gap:6px">
                         ${streakDays > 0 ? `<span class="streak-chip"><span class="material-symbols-rounded">local_fire_department</span>连续 ${streakDays} 天</span>` : ''}
                         ${prefs.showWeeklyDock === false ? '' : `<button class="md-icon-btn-bar today-weekly-plan-btn" type="button" onclick="window.planWeekly?.open?.()" aria-label="近期计划" title="3-7天 · ${weeklySummary.done}/${weeklySummary.total || 0} 完成"><span class="material-symbols-rounded">calendar_month</span></button>`}
-                        <button class="md-icon-btn-bar" type="button" onclick="data.openPlanTodayAiSheet?.()" aria-label="AI 重排训练计划"><span class="material-symbols-rounded">auto_awesome</span></button>
+                        <button class="md-icon-btn-bar" type="button" onclick="data.openPlanTodayAiSheet?.()" aria-label="AI"><span class="material-symbols-rounded">auto_awesome</span></button>
                     </div>
                 </div>
                 <div class="rings">
@@ -134,7 +134,7 @@
                     <div class="plan-meta"><span>先创建计划，或让 AI 根据当前目标安排今天的训练。</span></div>
                     <div class="plan-actions">
                         <button class="md-btn md-btn-filled" type="button" onclick="data.openNewPlanSheet()"><span class="material-symbols-rounded">playlist_add</span>新建计划</button>
-                        <button class="md-btn md-btn-tonal" type="button" onclick="data.openPlanTodayAiSheet?.()"><span class="material-symbols-rounded">auto_awesome</span>AI 安排</button>
+                        <button class="md-btn md-btn-tonal" type="button" onclick="data.openPlanTodayAiSheet?.()"><span class="material-symbols-rounded">auto_awesome</span>AI 生成</button>
                     </div>
                 </div>`;
             }
@@ -249,20 +249,22 @@
         },
 
         openPlanTodayAiSheet() {
-            this.openPlanAiSheet?.('today', this.todayPlanAiTypes());
+            this.openNewPlanSheet?.({ defaultTypes: this.todayPlanAiTypes() });
         },
 
-        openNewPlanSheet() {
+        openNewPlanSheet(options = {}) {
+            const config = typeof options === 'string' ? { defaultMode: options } : (options || {});
             const types = ['rehab', 'cut', 'bulk', 'maintenance', 'custom'];
-            this._newPlanTypes = normalizePlanTypes(this._newPlanTypes || ['rehab']);
+            this._newPlanTypes = normalizePlanTypes(config.defaultTypes || this._newPlanTypes || ['rehab']);
+            const weekFirst = config.defaultMode === 'week';
             this._openModal?.({
-                title: '+ 新建训练计划',
+                title: '计划',
                 icon: 'add_circle',
                 bodyHtml: `<div id="planCreateSheetBody">${this.renderNewPlanSheetBody(types)}</div>`,
                 actionsHtml: `
                     <button class="md-btn" type="button" data-modal-close>关闭</button>
                     <button class="md-btn md-btn-tonal" type="button" onclick="data.createSelectedPlans(false)">手动创建</button>
-                    <button class="md-btn md-btn-filled" type="button" onclick="data.createSelectedPlans(true)">AI 生成</button>
+                    <button class="md-btn md-btn-filled" type="button" onclick="data.createSelectedPlans('${weekFirst ? 'week' : 'today'}')">AI ${weekFirst ? '7天' : '今日'}</button>
                 `
             });
         },
@@ -270,7 +272,6 @@
         renderNewPlanSheetBody(types = ['rehab']) {
             const selected = new Set(normalizePlanTypes(this._newPlanTypes || ['rehab']));
             return `<div class="plan-create-sheet">
-                <p>可同时选择多个计划类型。AI 会一次生成多个 plan，手动创建则直接建立空白 plan。</p>
                 ${types.map((type) => {
                     const meta = this.planTypeMeta?.(type) || { label: type, icon: 'event_note' };
                     return `<button class="model-picker-row plan-create-row ${planStatusClass(type)} ${selected.has(type) ? 'active' : ''}" type="button" onclick="data.toggleNewPlanType('${type}')">
@@ -295,7 +296,7 @@
             const today = this.logicalDateKey?.() || this.dateKey(new Date());
             if (openAi) {
                 this._closeActiveModal?.();
-                this.openPlanAiSheet?.('today', types);
+                this.openPlanAiSheet?.(openAi === 'week' ? 'week' : 'today', types);
                 return;
             }
             const created = types.map((type) => {

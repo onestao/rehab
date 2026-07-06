@@ -954,6 +954,7 @@
         },
 
         openPlanAiSheet(mode = 'today', typesInput = 'rehab') {
+            mode = mode === 'week' ? 'week' : 'today';
             const sheet = document.getElementById('planAiSheet');
             const body = document.getElementById('planAiSheetBody');
             if (!sheet || !body) return;
@@ -994,7 +995,7 @@
                     <div id="planAiStatus" class="plan-ai-status" aria-live="polite">填写补充要求后点击生成，AI 会返回可编辑的计划草稿。</div>
                     <div class="md-row modal-actions">
                         <button class="md-btn" type="button" onclick="data.closePlanAiSheet()">取消</button>
-                        <button id="planAiSubmitBtn" class="md-btn md-btn-filled" type="button" onclick="data.submitPlanAi('${mode}')">生成计划</button>
+                        <button id="planAiSubmitBtn" class="md-btn md-btn-filled" type="button" onclick="data.submitPlanAi('${mode}')">生成</button>
                     </div>
                 </div>`;
             sheet.classList.remove('hidden');
@@ -1120,13 +1121,16 @@
         },
 
         validatePlanAiPayload(rawText, fallbackTypes = 'rehab', targetDates = []) {
-            const validation = stripPlanAiMeta(validatePlanAiPayloadPure(rawText, buildPlanAiPayloadOptions(this, fallbackTypes)));
-            const missing = targetDates.filter((date) => date && !String(rawText || '').includes(date));
+            const options = buildPlanAiPayloadOptions(this, fallbackTypes);
+            const validation = stripPlanAiMeta(validatePlanAiPayloadPure(rawText, options));
+            const planDates = new Set((stripPlanAiMeta(parsePlanAiPayloadPure(rawText, options)).plans || []).map((plan) => String(plan.date || '')));
+            const missing = (targetDates || []).filter((date) => date && !planDates.has(date));
             if (missing.length) return { ...validation, ok: false, errors: [...(validation.errors || []), `缺:${missing.join('、')}`] };
             return validation;
         },
 
         async submitPlanAi(mode = 'today') {
+            mode = mode === 'week' ? 'week' : 'today';
             if (!window.ai?.call) {
                 this.setPlanAiStatus?.('AI 模块尚未加载完成，请稍后重试。', 'error');
                 window.toast?.show?.('AI 模块尚未加载完成', 'error');
@@ -1149,6 +1153,7 @@
                 const MAX_ATTEMPTS = 2;
                 let text = '';
                 let parsed = null;
+                let validation = null;
                 for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
                     if (attempt > 0) {
                         this.setPlanAiStatus?.(`第 ${attempt + 1} 次尝试：AI 正在修正 spec 字段…`, 'busy');
@@ -1162,7 +1167,7 @@
                         text = await window.ai.call(messages, outputTokenBudget);
                     }
                     this.setPlanAiStatus?.('已收到计划草稿，正在校验 JSON…', 'busy');
-                    const validation = this.validatePlanAiPayload(text, types, mode === 'week' ? targetDates : []);
+                    validation = this.validatePlanAiPayload(text, types, mode === 'week' ? targetDates : []);
                     if (validation.ok) break;
                     if (validation.errors?.length && attempt < MAX_ATTEMPTS - 1) {
                         messages.push({ role: 'assistant', content: text });
@@ -1172,6 +1177,10 @@
                         });
                         continue;
                     }
+                }
+                if (validation && !validation.ok) {
+                    this.setPlanAiStatus?.('计划不完整，请重试。', 'error');
+                    return;
                 }
                 parsed = this.parsePlanAiPayload(text, types);
                 if (!parsed.ok) {
