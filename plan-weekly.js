@@ -228,7 +228,7 @@
                 </div>
                 <div class="md-row modal-actions">
                     <button class="md-btn" type="button" data-modal-close onclick="planWeekly.close()">关闭</button>
-                    <button class="md-btn md-btn-tonal" type="button" onclick="data.openPlanAiSheet('week')">+ AI 重排剩余天</button>
+                    <button class="md-btn md-btn-tonal" type="button" onclick="data.openNewPlanSheet?.('week')">AI</button>
                 </div>
             </div>`;
         }

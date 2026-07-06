@@ -782,6 +782,25 @@ test('plan AI weekly validation rejects JSON missing target dates', () => {
   assert.match(validation.errors.join('\n'), /2026-07-06/);
 });
 
+test('plan AI weekly validation requires parsed plans for target dates', () => {
+  const api = loadPlanAi();
+  const ctx = createContext(api);
+  const raw = JSON.stringify({
+    plans: [{
+      date: '2026-07-05',
+      type: 'rehab',
+      title: '康复计划',
+      notes: '明天 2026-07-06 休息观察',
+      items: [{ name: '桥式', category: 'main', spec: { sets: 2, reps: 10, work: 3, repRest: 0, actionRest: 30, isAlt: false, mode: 'reps' } }]
+    }]
+  });
+
+  const validation = api.validatePlanAiPayload.call(ctx, raw, ['rehab'], ['2026-07-05', '2026-07-06']);
+
+  assert.equal(validation.ok, false);
+  assert.match(validation.errors.join('\n'), /缺:2026-07-06/);
+});
+
 test('plan AI context binds unlinked weekly prescriptions into the prescription library', () => {
   const api = loadPlanAi();
   const ctx = createContext(api);
