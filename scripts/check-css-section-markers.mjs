@@ -17,7 +17,7 @@ async function checkSection(section, bucket) {
     const file = section.file;
     const marker = section.marker;
     const content = await readFile(path.join(root, 'css-src', file), 'utf8');
-    const head = content.slice(0, 400);
+    const head = content.slice(0, 400).replace(/\r\n/g, '\n');
     if (marker.type === 'exact') {
         if (!head.startsWith(marker.value)) {
             errors.push(`${bucket}/${file}: missing marker "${marker.value.replace(/\n/g, '\\n')}" at file head`);

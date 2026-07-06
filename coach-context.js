@@ -133,7 +133,23 @@ Object.assign(advicePanel, {
                 if (e.note) details.push(`备注：${e.note}`);
                 return `- ${e.date}｜${label}｜${details.join('｜')}`;
             }).join('\n');
-            const formatWeights = list => list.map(w => `- ${w.date}｜${w.weight.toFixed(2)} kg`).join('\n');
+            const formatWeightDateTime = w => {
+                const measuredAt = w?.measuredAt ? new Date(w.measuredAt) : null;
+                if (measuredAt && Number.isFinite(measuredAt.getTime())) {
+                    const yyyy = measuredAt.getFullYear();
+                    const mm = String(measuredAt.getMonth() + 1).padStart(2, '0');
+                    const dd = String(measuredAt.getDate()).padStart(2, '0');
+                    const hh = String(measuredAt.getHours()).padStart(2, '0');
+                    const min = String(measuredAt.getMinutes()).padStart(2, '0');
+                    return { at: `${yyyy}-${mm}-${dd} ${hh}:${min}`, note: '实测时间' };
+                }
+                return { at: `${w.date} 07:00`, note: '默认晨起空腹（未记录具体时刻）' };
+            };
+            const formatWeights = list => list.map(w => {
+                const weight = Number(w.weight);
+                const measured = formatWeightDateTime(w);
+                return `- ${measured.at}｜${Number.isFinite(weight) ? weight.toFixed(2) : String(w.weight || '--')} kg｜时间:${measured.note}`;
+            }).join('\n');
             const formatRehabWeekly = list => list.map(week => {
                 const actions = (week.actions || []).map(a => `${a.name || '未命名'}[${a.actionId || '?'}]（${a.status || 'continued'}${a.painLevel ? `，疼痛${a.painLevel}/10` : ''}${a.needsReview ? '，需确认' : ''}${a.progressesFrom ? '，进阶自:' + a.progressesFrom : ''}${a.coachNote ? '，' + a.coachNote : ''}）`).join('；');
                 const extras = [];

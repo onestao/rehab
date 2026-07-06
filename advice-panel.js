@@ -5,7 +5,8 @@ const advicePanel = {
     SCROLL_KEY: 'rehab_advice_scroll_top',
     PAGE_SCROLL_KEY: 'rehab_advice_page_scroll_offset',
     TEMPLATE_MANAGE_KEY: 'rehab_ai_template_manage',
-    ADVICE_OUTPUT_TOKEN_BUDGET: 4096,
+    ADVICE_OUTPUT_TOKEN_BUDGET: 8192,
+    ADVICE_AUTO_CONTINUE_LIMIT: 1,
     attach(target) {
         Object.assign(target, {
             DRAFT_KEY: this.DRAFT_KEY,
@@ -359,6 +360,10 @@ const advicePanel = {
         } catch {
             // ignore
         }
+    },
+
+    isAdviceTokenLimitFinishReason(finishReason = '') {
+        return /length|max[_-]?tokens?|max[_-]?output/.test(String(finishReason || '').toLowerCase());
     },
 
     pruneAdviceVersionGroup(rootId, maxVersions = 10) {
@@ -2199,7 +2204,7 @@ const advicePanel = {
             const baseMessages = this.buildAdviceMessages(effectivePrompt, model, { contextMode });
             const messages = this.applyAdviceAttachmentsToMessages?.(baseMessages, attachments) || baseMessages;
             requestMessages = messages;
-            const outputTokenBudget = Math.max(2400, Number(this.ADVICE_OUTPUT_TOKEN_BUDGET) || 4096);
+            const outputTokenBudget = Math.max(2400, Number(this.ADVICE_OUTPUT_TOKEN_BUDGET || advicePanel.ADVICE_OUTPUT_TOKEN_BUDGET) || 8192);
             window.errorBus?.event?.('advice.request', 'prepared', {
                 provider,
                 model,
@@ -2214,29 +2219,46 @@ const advicePanel = {
             let _pendingFrame = 0;
             /** @type {{ in: number, out: number }|null} */
             let lastUsage = null;
-            const onToken = (delta, accumulated, meta) => {
+            let activeRequestUsage = null;
+            let completedUsage = { in: 0, out: 0 };
+            let lastFinishReason = '';
+            const addUsage = (a, b) => ({
+                in: Number(a?.in || 0) + Number(b?.in || 0),
+                out: Number(a?.out || 0) + Number(b?.out || 0)
+            });
+            const displayUsage = () => addUsage(completedUsage, activeRequestUsage);
+            const finishRequestUsage = () => {
+                if (!activeRequestUsage) return;
+                completedUsage = addUsage(completedUsage, activeRequestUsage);
+                lastUsage = completedUsage;
+                activeRequestUsage = null;
+            };
+            const createOnToken = (prefix = '') => (delta, accumulated, meta) => {
                     if (controller.signal.aborted || this._activeAdvicePendingId !== pendingId) return;
                     const idx = this.db.health.aiAdviceChat.findIndex(msg => msg.id === pendingId);
                     if (idx < 0) return;
                     if (this.db.health.aiAdviceChat[idx].stopped) return;
-                    this.db.health.aiAdviceChat[idx].content = accumulated;
-                    if (this.db.health.aiAdviceChat[idx].pending && accumulated) this.db.health.aiAdviceChat[idx].pending = false;
+                    const displayAccumulated = prefix + accumulated;
+                    this.db.health.aiAdviceChat[idx].content = displayAccumulated;
+                    if (this.db.health.aiAdviceChat[idx].pending && displayAccumulated) this.db.health.aiAdviceChat[idx].pending = false;
                     if (meta?.usage) {
-                        lastUsage = meta.usage;
-                        this.db.health.aiAdviceChat[idx].tokenUsage = meta.usage;
+                        activeRequestUsage = meta.usage;
+                        lastUsage = displayUsage();
+                        this.db.health.aiAdviceChat[idx].tokenUsage = lastUsage;
                         const modelName = model || ai.cfg.model || '';
                         if (window.aiPricing?.estimate) {
-                            const est = window.aiPricing.estimate(meta.usage, provider, modelName);
+                            const est = window.aiPricing.estimate(lastUsage, provider, modelName);
                             this.db.health.aiAdviceChat[idx].costUsd = est.costUsd;
                         }
                     }
                     if (meta?.finishReason) {
-                        this.db.health.aiAdviceChat[idx].finishReason = String(meta.finishReason);
+                        lastFinishReason = String(meta.finishReason);
+                        this.db.health.aiAdviceChat[idx].finishReason = lastFinishReason;
                     }
                     if (meta?.done) this.db.health.aiAdviceChat[idx].streamDone = true;
                     this.db.health.aiAdviceChat[idx].updatedAt = Date.now();
                     const bubble = document.querySelector(`[data-advice-id="${pendingId}"]`);
-                    if (!bubble || !accumulated) return;
+                    if (!bubble || !displayAccumulated) return;
                     const contentEl = bubble.querySelector('.advice-bubble-content');
                     if (!contentEl) return;
                     if (!contentEl._renderer && window.adviceStreamRenderer) {
@@ -2244,28 +2266,29 @@ const advicePanel = {
                             chunkPerFrame: 8,
                             renderMarkdown: (text) => this.renderAdviceMarkdown(text)
                         });
-                        contentEl._renderer.seed(accumulated);
+                        contentEl._renderer.seed(displayAccumulated);
                         this._activeStreamRenderer = contentEl._renderer;
                         this._streamRenderers[pendingId] = contentEl._renderer;
                     }
                     if (contentEl._renderer) {
                         const suffix = window.adviceStreamRenderer?.pendingAccumulatedSuffix
-                            ? window.adviceStreamRenderer.pendingAccumulatedSuffix(contentEl._renderer.getState?.(), accumulated)
+                            ? window.adviceStreamRenderer.pendingAccumulatedSuffix(contentEl._renderer.getState?.(), displayAccumulated)
                             : null;
                         if (suffix !== null) {
                             if (suffix) contentEl._renderer.enqueue(suffix);
                         } else {
-                            contentEl._renderer.seed(accumulated);
+                            contentEl._renderer.seed(displayAccumulated);
                         }
                     } else {
                         // fallback
-                        contentEl.innerHTML = this.renderAdviceMarkdown(accumulated);
+                        contentEl.innerHTML = this.renderAdviceMarkdown(displayAccumulated);
                     }
                     bubble.classList.remove('pending');
                     const dots = bubble.querySelector('.advice-typing-dot');
                     if (dots) dots.remove();
                     if (!this._adviceUserScrollPaused) this.scheduleAdviceStreamScroll();
             };
+            const onToken = createOnToken();
             full = hasImageAttachment
                 ? await ai.callAdviceWithAttachments(messages, attachments, outputTokenBudget, {
                     signal: controller.signal,
@@ -2280,6 +2303,40 @@ const advicePanel = {
                     }
                 })
                 : await ai.callStream(messages, outputTokenBudget, onToken, { signal: controller.signal });
+            finishRequestUsage();
+            const autoContinueLimit = Math.max(0, Number(this.ADVICE_AUTO_CONTINUE_LIMIT || advicePanel.ADVICE_AUTO_CONTINUE_LIMIT) || 0);
+            let autoContinueCount = 0;
+            while (!hasImageAttachment
+                && autoContinueCount < autoContinueLimit
+                && String(full || '').trim()
+                && (this.isAdviceTokenLimitFinishReason || advicePanel.isAdviceTokenLimitFinishReason).call(this, lastFinishReason)) {
+                autoContinueCount += 1;
+                const continuedFrom = full;
+                const previousFinishReason = lastFinishReason;
+                lastFinishReason = '';
+                activeRequestUsage = null;
+                try {
+                    const continuationMessages = [
+                        ...messages,
+                        { role: 'assistant', content: continuedFrom },
+                        { role: 'user', content: '继续上一条回复：从断点处直接续写剩余内容，不要重复前文，不要重新开头，优先把结尾补完整。' }
+                    ];
+                    const continued = await ai.callStream(continuationMessages, outputTokenBudget, createOnToken(continuedFrom), { signal: controller.signal });
+                    finishRequestUsage();
+                    full = continuedFrom + String(continued || '');
+                } catch (continueError) {
+                    if (controller.signal.aborted || continueError?.code === 'AI_CANCELLED' || continueError?.name === 'AbortError') throw continueError;
+                    lastFinishReason = previousFinishReason;
+                    const idx = this.db.health.aiAdviceChat.findIndex(msg => msg.id === pendingId);
+                    if (idx >= 0) this.db.health.aiAdviceChat[idx].finishReason = previousFinishReason;
+                    window.errorBus?.event?.('advice.request', 'auto_continue_failed', {
+                        provider,
+                        model,
+                        message: continueError?.message || String(continueError)
+                    });
+                    break;
+                }
+            }
             if (hasImageAttachment) {
                 const idx = this.db.health.aiAdviceChat.findIndex(msg => msg.id === pendingId);
                 if (idx >= 0) {

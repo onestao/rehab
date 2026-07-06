@@ -7,6 +7,7 @@
 - New browser-facing JS files must be added to `index.html` loading order and `sw.js` precache assets.
 - CSS source lives in `css-src/`; after changing CSS, run `npm run build:css`.
 - Any changes to sync, data persistence, workout timing, AI rendering, or Service Worker behavior must pass `npm run ci`.
+- For user-reported bug fixes and cross-cutting AI/health data behavior changes, apply the same scoped change to both `ui-mockup` and `perfrom` when both worktrees are available, unless the user explicitly asks for one branch only. Prefer existing worktrees over switching branches.
 
 ## Safety Rules
 

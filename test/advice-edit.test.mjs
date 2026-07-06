@@ -68,6 +68,7 @@ function loadAdvicePanelHarness() {
         buildAdviceMessages(prompt) { return [{ role: 'user', content: prompt }]; },
         SCROLL_KEY: context.__advicePanel.SCROLL_KEY,
         PAGE_SCROLL_KEY: context.__advicePanel.PAGE_SCROLL_KEY,
+        ADVICE_OUTPUT_TOKEN_BUDGET: context.__advicePanel.ADVICE_OUTPUT_TOKEN_BUDGET,
         save() {},
         render() {},
         rerenderAdvicePanel() {},
@@ -374,6 +375,25 @@ test('AI advice auto context keeps plain weight questions focused', () => {
     assert.match(userContent, /【目标与计划】/);
     assert.doesNotMatch(userContent, /【最近30天训练记录】|【最近30天训练计划】|【近6周康复中心处方】/);
     assert.doesNotMatch(userContent, /肩袖损伤|推举/);
+});
+
+test('AI advice weight context includes measured time and morning default', () => {
+    const { data } = loadCoachContextHarness({
+        adviceRange: 'month',
+        adviceContexts: { diet: false, training: false, weight: true, goal: false },
+        sortedWeights() {
+            return [
+                { date: '2026-05-29', weight: 72.3, measuredAt: '2026-05-29T06:35:00' },
+                { date: '2026-05-30', weight: 71.8 }
+            ];
+        }
+    });
+
+    const messages = data.buildAdviceMessages('分析我最近体重趋势', 'test-model');
+    const userContent = messages.find(message => message.role === 'user')?.content || '';
+
+    assert.match(userContent, /2026-05-29 06:35｜72\.30 kg｜时间:实测时间/);
+    assert.match(userContent, /2026-05-30 07:00｜71\.80 kg｜时间:默认晨起空腹（未记录具体时刻）/);
 });
 
 test('AI advice auto context includes training and diet only when weight question asks for them', () => {
@@ -1180,27 +1200,62 @@ test('cancelAiAdvice immediately freezes UI and preserves partial assistant repl
     assert.ok(saveCount >= 1);
 });
 
-test('sendAiAdvice uses larger output budget and preserves length finish reason', async () => {
+test('sendAiAdvice uses larger output budget and auto-continues length replies once', async () => {
     const data = loadAdvicePanelHarness();
     data.db.health.aiAdviceChat = [];
-    let seenMaxTokens = 0;
-    data.__context.ai.callStream = async (_messages, maxTokens, onToken) => {
-        seenMaxTokens = maxTokens;
-        onToken('partial answer', 'partial answer', {
-            usage: { in: 12, out: 4096 },
-            finishReason: 'length',
+    const seenMaxTokens = [];
+    const seenMessages = [];
+    data.__context.ai.callStream = async (messages, maxTokens, onToken) => {
+        seenMaxTokens.push(maxTokens);
+        seenMessages.push(messages);
+        if (seenMaxTokens.length === 1) {
+            onToken('partial ', 'partial ', {
+                usage: { in: 12, out: 8192 },
+                finishReason: 'length',
+                done: true
+            });
+            return 'partial ';
+        }
+        onToken('answer', 'answer', {
+            usage: { in: 4, out: 10 },
+            finishReason: 'stop',
             done: true
         });
-        return 'partial answer';
+        return 'answer';
     };
 
     await data.sendAiAdvice('give me a long answer');
 
     const reply = data.db.health.aiAdviceChat.find(msg => msg.role === 'assistant');
-    assert.equal(seenMaxTokens, 4096);
-    assert.equal(reply.finishReason, 'length');
-    assert.deepEqual(reply.tokenUsage, { in: 12, out: 4096 });
+    assert.deepEqual(seenMaxTokens, [8192, 8192]);
+    assert.equal(seenMessages[1].at(-2).role, 'assistant');
+    assert.equal(seenMessages[1].at(-2).content, 'partial ');
+    assert.match(seenMessages[1].at(-1).content, /从断点处直接续写/);
+    assert.equal(reply.content, 'partial answer');
+    assert.equal(reply.finishReason, 'stop');
+    assert.equal(reply.tokenUsage.in, 16);
+    assert.equal(reply.tokenUsage.out, 8202);
     assert.equal(reply.pending, false);
+});
+
+test('sendAiAdvice keeps length finish reason when auto-continue also reaches limit', async () => {
+    const data = loadAdvicePanelHarness();
+    data.db.health.aiAdviceChat = [];
+    data.__context.ai.callStream = async (_messages, _maxTokens, onToken) => {
+        const piece = data.db.health.aiAdviceChat.find(msg => msg.role === 'assistant')?.content ? 'tail' : 'partial ';
+        onToken(piece, piece, {
+            usage: { in: 1, out: 8192 },
+            finishReason: 'length',
+            done: true
+        });
+        return piece;
+    };
+
+    await data.sendAiAdvice('give me a long answer');
+
+    const reply = data.db.health.aiAdviceChat.find(msg => msg.role === 'assistant');
+    assert.equal(reply.content, 'partial tail');
+    assert.equal(reply.finishReason, 'length');
 });
 
 test('attachment updateAdviceSendState keeps stop button while advice is sending', () => {
