@@ -150,6 +150,16 @@ test('plan AI type chips render all plan types with selected chips active', () =
   assert.match(html, /plan-ai-type-chip active[\s\S]*?aria-pressed="true"[\s\S]*?减脂日程/);
 });
 
+test('plan AI mode chips expose today and seven-day generation', () => {
+  const api = loadPlanAi();
+  const html = api.renderPlanAiModeChips.call(createContext(api), 'week');
+
+  assert.match(html, /今日/);
+  assert.match(html, /7天/);
+  assert.match(html, /onclick="data\.togglePlanAiMode\('today'\)"/);
+  assert.match(html, /md-chip active[\s\S]*?aria-pressed="true"[\s\S]*?7天/);
+});
+
 test('plan action search includes rehab prescriptions and action library', () => {
   const api = loadPlanAi();
   const ctx = createContext(api);
@@ -680,6 +690,15 @@ test('plan AI context tells the model to keep warmup and cooldown below main tra
   assert.match(prompt, /cooldown 只用于拉伸\/呼吸\/恢复/);
   assert.match(prompt, /main 才承载主要训练负荷/);
   assert.match(prompt, /不得作为进阶加量对象/);
+});
+
+test('plan AI context treats user note reps and duration as spec instructions', () => {
+  const api = loadPlanAi();
+  const prompt = api.buildPlanAiContext.call(createContext(api), 'today', '侧卧髋外展改成每组15次，靠墙静蹲保持30秒', ['rehab']);
+
+  assert.match(prompt, /用户补充中的次数\/组数\/时长\/休息=硬约束/);
+  assert.match(prompt, /写入 spec\.sets\/reps\/work\/repRest\/actionRest/);
+  assert.match(prompt, /侧卧髋外展改成每组15次/);
 });
 
 test('plan AI parser caps warmup and cooldown intensity even when model copies main training load', () => {

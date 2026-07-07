@@ -4,12 +4,12 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 
-function loadPlanAutoAdjust() {
+function loadPlanAutoAdjust(options = {}) {
     const policyCode = readFileSync(new URL('../rehab-policy.js', import.meta.url), 'utf8');
     const code = readFileSync(new URL('../plan-auto-adjust.js', import.meta.url), 'utf8');
     const sandbox = {
         window: {
-            toast: { show() {} },
+            toast: options.toast || { show() {} },
             data: { dateKey: () => '2026-06-23' }
         },
         data: { dateKey: () => '2026-06-23' },
@@ -126,7 +126,10 @@ function doneItem(input) {
 }
 
 test('auto-adjust fallback preserves recovery structure and respects prescription caution', async () => {
-    const api = loadPlanAutoAdjust();
+    const toastCalls = [];
+    const api = loadPlanAutoAdjust({
+        toast: { show: (...args) => toastCalls.push(args) }
+    });
     const db = {
         dailyPlans: [{
             id: 'source-plan',
@@ -165,6 +168,13 @@ test('auto-adjust fallback preserves recovery structure and respects prescriptio
     assert.equal(db.planAdjustments.length, 1);
     assert.equal(db.planAdjustments[0].status, 'applied');
     assert.equal(db.lastPlanAutoAdjust.batchId, db.planAdjustments[0].id);
+    const fallbackToast = toastCalls.find(([message]) => /AI 调整失败/.test(message));
+    assert.ok(fallbackToast);
+    assert.deepEqual(JSON.parse(JSON.stringify(fallbackToast[2].actions.map((action) => action.label))), ['撤销', '重试 AI']);
+    let retryOptions = null;
+    ctx.autoAdjustNextDayPlans = (retry) => { retryOptions = retry; };
+    fallbackToast[2].actions[1].onClick();
+    assert.deepEqual(JSON.parse(JSON.stringify(retryOptions)), { sourceDate: '2026-06-22', targetDate: '2026-06-23', force: true });
 
     const names = Array.from(plan.items.map((item) => item.name));
     assert.deepEqual(names, ['髋部热身', '单腿站立外展', '靠墙深蹲', '夹砖臀桥', '臀中肌泡沫轴放松']);
