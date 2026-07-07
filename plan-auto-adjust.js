@@ -399,7 +399,7 @@
             const types = normalizePlanTypes(sourcePlans.map((plan) => plan.type || 'rehab'));
             const key = `${AUTO_KEY_PREFIX}${sourceDate}:${targetDate}:${types.join(',')}`;
             const latestDoneAt = Math.max(...sourcePlans.flatMap((plan) => mainItems(plan).map((item) => Number(item.feedback?.doneAt || item.updatedAt || 0))));
-            if (this.db?.lastPlanAutoAdjust?.key === key && Number(this.db.lastPlanAutoAdjust.latestDoneAt || 0) >= latestDoneAt) return null;
+            if (!options.force && this.db?.lastPlanAutoAdjust?.key === key && Number(this.db.lastPlanAutoAdjust.latestDoneAt || 0) >= latestDoneAt) return null;
 
             this._autoAdjustInFlight = true;
             window.toast?.show?.('正在根据今日反馈自动调整明天计划…', 'info', 3200);
@@ -424,8 +424,10 @@
                 if (applied) {
                     window.toast?.show?.('AI 调整失败，已用本地规则保守调整明天计划', 'info', {
                         timeout: 8000,
-                        action: '撤销',
-                        onAction: () => this.undoLastPlanAutoAdjust?.()
+                        actions: [
+                            { label: '撤销', onClick: () => this.undoLastPlanAutoAdjust?.() },
+                            { label: '重试 AI', onClick: () => this.autoAdjustNextDayPlans?.({ sourceDate, targetDate, force: true }) }
+                        ]
                     });
                 } else {
                     window.toast?.show?.(`自动调整失败：${window.toast?.sanitize ? toast.sanitize(error) : error?.message || error}`, 'error');

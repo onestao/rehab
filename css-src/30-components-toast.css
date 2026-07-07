@@ -65,6 +65,11 @@
 .app-toast[data-type="success"] {
     border-color: color-mix(in srgb, var(--md-sys-primary) 30%, var(--glass-border));
 }
+.app-toast-text {
+    flex: 1 1 auto;
+    min-width: 0;
+    line-height: 1.35;
+}
 .app-toast-action {
     flex: none;
     height: 32px;
@@ -76,6 +81,7 @@
     font-size: 12px;
     font-weight: 700;
     cursor: pointer;
+    pointer-events: auto;
     position: relative;
     overflow: hidden;
     -webkit-tap-highlight-color: transparent;
@@ -95,4 +101,4 @@
 .app-toast-action:hover::after { opacity: var(--md-state-hover, 0.08); }
 .app-toast-action:active { transform: scale(0.94); }
 .app-toast-action:active::after { opacity: var(--md-state-press, 0.12); }
-
+

@@ -715,6 +715,14 @@
             }).join('');
         },
 
+        renderPlanAiModeChips(mode = 'today') {
+            const current = mode === 'week' ? 'week' : 'today';
+            return [['today', '今日'], ['week', '7天']].map(([key, label]) => {
+                const active = current === key;
+                return `<button class="md-chip ${active ? 'active' : ''}" type="button" data-plan-ai-mode="${key}" onclick="data.togglePlanAiMode('${key}')" aria-pressed="${active}">${label}</button>`;
+            }).join('');
+        },
+
         renderPlanAiConditionChips() {
             const profile = profileContext(this.db.health?.profile || {});
             const selected = new Set(currentSelectedConditionIds(this, profile));
@@ -855,28 +863,24 @@
                 sourcePlans: this.activeRecords(this.db.dailyPlans || []),
                 types
             });
+            const userSpecRule = /(\d+\s*(组|次|秒|分钟|min)|次数|时长|每组|保持|休息)/i.test(userText)
+                ? '用户补充中的次数/组数/时长/休息=硬约束，写入 spec.sets/reps/work/repRest/actionRest；不安全则 aiReasoning 说明替代值。'
+                : '';
             const planJsonShape = '{"date":"YYYY-MM-DD","type":"<rehab|cut|bulk|maintenance|custom>","title":"...","notes":"...","items":[{"name":"...","prescriptionActionId":"","category":"<warmup|main|cooldown>","chainHint":"","spec":{"sets":<int>,"reps":<int>,"work":<int>,"repRest":<int>,"actionRest":<int>,"isAlt":<bool>,"mode":"<reps|hold|alt-reps|alt-hold>"},"cooldownRefs":[],"aiReasoning":"...","durationEstHint":"","requiresUserConfirm":false}]}';
             const promptMode = mode === 'week'
                 ? `输出严格 JSON：{"plans":[${planJsonShape}]}`
                 : `请输出严格 JSON，结构为：${planJsonShape}`;
             const specRules = [
                 '只输出 JSON 本体，不要使用 Markdown 代码块、不要前后加自然语言、不要注释。所有数值字段必须是 number 类型，布尔字段必须是 true/false，禁止用字符串如 "3"、"true"。',
-                '每个 item 必须填齐：name(string)、category(枚举 warmup/main/cooldown)、spec.sets(int≥1)、spec.reps(int≥0)、spec.work(int>0)、spec.repRest(int 0..30)、spec.actionRest(int 0..90)、spec.isAlt(bool)、spec.mode(枚举 reps/hold/alt-reps/alt-hold)。任一字段缺失或为 0/空都视为不合规，必须重填。',
+                '字段必填: name、category(warmup/main/cooldown)、spec.sets≥1/reps≥0/work>0/repRest 0..30/actionRest 0..90/isAlt/mode；缺失、0、空都不合规。',
                 'spec.mode 决定动作类型，必须从以下四选一：',
                 '  mode="reps"：次数动作（如深蹲、俯卧撑）→ reps≥1, work≥1（每次动作秒数）, isAlt=false',
                 '  mode="hold"：静态保持（如靠墙静蹲、平板支撑）→ reps=0, work≥15（保持秒数）, isAlt=false',
                 '  mode="alt-reps"：双侧交替次数（如侧弓步、单臂划船）→ reps≥1, work≥1, isAlt=true',
                 '  mode="alt-hold"：双侧交替保持（如单腿站立）→ reps=0, work≥15, isAlt=true',
                 'category 只能是 warmup（热身）/ main（主训练）/ cooldown（拉伸放松）三选一；不要使用其他词。',
-                '阶段难度必须分层：warmup 只用于准备身体，不得复制主训练难度，最多 1-2 组、轻中等强度、短休息；cooldown 只用于拉伸/呼吸/恢复，最多 1-2 组、低强度、不得作为进阶加量对象；main 才承载主要训练负荷。',
-                'warmup/cooldown 即使服务于高强度主训练，也必须明显低于主训练：不要给 3-5 组、接近力竭、长组间休息、大重量、复杂高阶动作或 progression chain。',
-                'spec.work 是每次动作的执行/保持秒数，必须 >0：力量/次数动作 2-5 秒；静态保持/拉伸/呼吸/支撑 20-45 秒。识别不出来时按"次数动作 reps=12, work=3"兜底，绝对禁止 work=0 或省略。',
-                'spec.repRest 是同一组内每次/左右侧之间的休息秒数：常规力量 0-10、慢速/高强度最多 15、连续次数动作直接 0；上限 20。必须显式给出该字段。',
-                'spec.actionRest 是组间休息秒数：康复/激活/活动度/拉伸 15-30、常规主训 30-60、大重量复合最多 75；严禁 >90。必须显式给出该字段。',
-                '示例（仅作字段格式参考，不要照抄内容）：',
-                '  次数动作: {"name":"深蹲","category":"main","spec":{"sets":3,"reps":12,"work":3,"repRest":0,"actionRest":45,"isAlt":false,"mode":"reps"}}',
-                '  静态保持: {"name":"靠墙静蹲","category":"main","spec":{"sets":3,"reps":0,"work":40,"repRest":0,"actionRest":30,"isAlt":false,"mode":"hold"}}',
-                '  双侧交替: {"name":"侧弓步","category":"main","spec":{"sets":3,"reps":10,"work":3,"repRest":0,"actionRest":45,"isAlt":true,"mode":"alt-reps"}}',
+                '阶段难度必须分层：warmup 只用于准备身体，1-2组低中强度；cooldown 只用于拉伸/呼吸/恢复，1-2组低强度，不得作为进阶加量对象；main 才承载主要训练负荷。',
+                'work: 次数动作2-5秒，保持/拉伸20-45秒；拿不准用 reps=12,work=3。repRest: 0-10秒，慢速高强度最多15；actionRest: 康复15-30，主训30-60，大复合最多75。',
                 '必须参考今日已完成运动摘要；今日同动作/同部位已高强度训练时，后续降负荷或改恢复，除非用户要求加量。'
             ].join('\n');
             const overwriteRules = [
@@ -945,6 +949,7 @@
                 `诊断/处方部位约束: ${JSON.stringify(bodyPartConstraints)}`,
                 rehabWeekly.length ? '康复处方规则: 必须优先遵守最近3周康复中心处方；continued/progressed 动作应保留或参考；dropped 动作不能出现在计划中；new/watch/needsReview 动作不得自动加量，疼痛>=4/10 只能降级或替换。第4-6周处方仅用于理解长期禁忌、反复疼痛和动作演变。' : '',
                 '冲突优先级: 安全/健康禁忌/疼痛阈值 > 最近3周康复处方 > 当前计划保留/改造 > 用户临时目标。',
+                userSpecRule,
                 `最近 7 天对应类型计划摘要: ${JSON.stringify(recentPlans)}`,
                 `健康档案: ${JSON.stringify(profile)}`,
                 `目标类型: ${String(this.db.health?.dietGoal?.goalType || this.db.health?.goalType || '')}`,
@@ -961,6 +966,7 @@
             const types = normalizePlanTypes(typesInput);
             const meta = this.planTypeMeta?.(types[0]) || { label: '训练计划', icon: 'event_note' };
             this._planAiTypes = types;
+            this._planAiMode = mode;
             const profile = profileContext(this.db.health?.profile || {});
             this._planAiConditionIds = currentSelectedConditionIds(this, profile);
             body.innerHTML = `
@@ -974,6 +980,10 @@
                     </div>
                     <div id="planAiTypeChipRow" class="plan-ai-chip-row">
                         ${this.renderPlanAiTypeChips(types)}
+                    </div>
+                    <div class="plan-ai-condition-head"><span>生成范围</span></div>
+                    <div id="planAiModeChipRow" class="plan-ai-chip-row">
+                        ${this.renderPlanAiModeChips(mode)}
                     </div>
                     <div class="plan-ai-chip-row">
                         ${this.planAiQuickPrompts().map((text) => `<button class="md-chip" type="button" onclick="data.handlePlanAiQuickPrompt('${this.escapeHtml(text)}')">${this.escapeHtml(text)}</button>`).join('')}
@@ -990,12 +1000,12 @@
                     </div>
                     <div class="md-field">
                         <textarea id="planAiPrompt" rows="5" placeholder=" "></textarea>
-                        <label>告诉 AI 你的目标、疼痛点或希望保留的动作</label>
+                        <label>告诉 AI 目标、疼痛点、保留动作或次数/时长调整</label>
                     </div>
                     <div id="planAiStatus" class="plan-ai-status" aria-live="polite">填写补充要求后点击生成，AI 会返回可编辑的计划草稿。</div>
                     <div class="md-row modal-actions">
                         <button class="md-btn" type="button" onclick="data.closePlanAiSheet()">取消</button>
-                        <button id="planAiSubmitBtn" class="md-btn md-btn-filled" type="button" onclick="data.submitPlanAi('${mode}')">生成</button>
+                        <button id="planAiSubmitBtn" class="md-btn md-btn-filled" type="button" onclick="data.submitPlanAi()">生成</button>
                     </div>
                 </div>`;
             sheet.classList.remove('hidden');
@@ -1008,6 +1018,7 @@
             sheet?.classList.add('hidden');
             sheet?.setAttribute('aria-hidden', 'true');
             this._planAiTypes = null;
+            this._planAiMode = null;
             this._planAiConditionIds = null;
             this._planAiTemporaryConditions = null;
             return true;
@@ -1036,6 +1047,15 @@
             this.refreshPlanAiTypeChips();
         },
 
+        togglePlanAiMode(mode = 'today') {
+            this._planAiMode = mode === 'week' ? 'week' : 'today';
+            queryPlanAiPreviewAll('#planAiModeChipRow [data-plan-ai-mode]').forEach((chip) => {
+                const active = chip.getAttribute('data-plan-ai-mode') === this._planAiMode;
+                chip.classList.toggle('active', active);
+                chip.setAttribute('aria-pressed', String(active));
+            });
+        },
+
         handlePlanAiQuickPrompt(text) {
             if (text === '+ 新建训练计划') {
                 this.openNewPlanSheet?.();
@@ -1060,7 +1080,7 @@
             btn.disabled = !!pending;
             btn.innerHTML = pending
                 ? '<span class="material-symbols-rounded">progress_activity</span>生成中'
-                : '生成计划';
+                : '生成';
         },
 
         setPlanAiPreviewIssue(message = '') {
@@ -1129,7 +1149,8 @@
             return validation;
         },
 
-        async submitPlanAi(mode = 'today') {
+        async submitPlanAi(mode = '') {
+            mode = mode || this._planAiMode || 'today';
             mode = mode === 'week' ? 'week' : 'today';
             if (!window.ai?.call) {
                 this.setPlanAiStatus?.('AI 模块尚未加载完成，请稍后重试。', 'error');
