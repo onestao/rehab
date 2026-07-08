@@ -157,7 +157,37 @@ test('plan AI mode chips expose today and seven-day generation', () => {
   assert.match(html, /今日/);
   assert.match(html, /7天/);
   assert.match(html, /onclick="data\.togglePlanAiMode\('today'\)"/);
-  assert.match(html, /md-chip active[\s\S]*?aria-pressed="true"[\s\S]*?7天/);
+  assert.match(html, /plan-ai-mode-chip active[\s\S]*?aria-pressed="true"[\s\S]*?7天/);
+});
+
+test('plan AI mode toggle updates selected mode chip state', () => {
+  const api = loadPlanAi();
+  const todayChip = {
+    mode: 'today',
+    classes: new Set(['active']),
+    attrs: { 'aria-pressed': 'true' },
+    getAttribute(name) { return name === 'data-plan-ai-mode' ? this.mode : this.attrs[name]; },
+    setAttribute(name, value) { this.attrs[name] = value; },
+    classList: { toggle: (name, active) => active ? todayChip.classes.add(name) : todayChip.classes.delete(name) }
+  };
+  const weekChip = {
+    mode: 'week',
+    classes: new Set(),
+    attrs: { 'aria-pressed': 'false' },
+    getAttribute(name) { return name === 'data-plan-ai-mode' ? this.mode : this.attrs[name]; },
+    setAttribute(name, value) { this.attrs[name] = value; },
+    classList: { toggle: (name, active) => active ? weekChip.classes.add(name) : weekChip.classes.delete(name) }
+  };
+  api.__testDocument.querySelectorAll = () => [todayChip, weekChip];
+  const ctx = createContext(api);
+
+  api.togglePlanAiMode.call(ctx, 'week');
+
+  assert.equal(ctx._planAiMode, 'week');
+  assert.equal(todayChip.classes.has('active'), false);
+  assert.equal(todayChip.attrs['aria-pressed'], 'false');
+  assert.equal(weekChip.classes.has('active'), true);
+  assert.equal(weekChip.attrs['aria-pressed'], 'true');
 });
 
 test('plan action search includes rehab prescriptions and action library', () => {
