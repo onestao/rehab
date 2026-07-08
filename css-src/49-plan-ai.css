@@ -426,11 +426,13 @@
     flex: none;
 }
 
-.plan-ai-type-chip {
+.plan-ai-type-chip,
+.plan-ai-mode-chip {
     border: 1px solid transparent;
 }
 
-.plan-ai-type-chip.active {
+.plan-ai-type-chip.active,
+.plan-ai-mode-chip.active {
     border-color: color-mix(in srgb, var(--md-sys-primary) 44%, transparent);
     background: var(--md-sys-primary-container);
     color: var(--md-sys-on-primary-container);

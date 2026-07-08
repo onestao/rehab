@@ -719,7 +719,7 @@
             const current = mode === 'week' ? 'week' : 'today';
             return [['today', '今日'], ['week', '7天']].map(([key, label]) => {
                 const active = current === key;
-                return `<button class="md-chip ${active ? 'active' : ''}" type="button" data-plan-ai-mode="${key}" onclick="data.togglePlanAiMode('${key}')" aria-pressed="${active}">${label}</button>`;
+                return `<button class="md-chip plan-ai-mode-chip ${active ? 'active' : ''}" type="button" data-plan-ai-mode="${key}" onclick="data.togglePlanAiMode('${key}')" aria-pressed="${active}">${label}</button>`;
             }).join('');
         },
 
