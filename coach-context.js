@@ -299,13 +299,10 @@ Object.assign(advicePanel, {
 
     async requestAiAdvice(prompt, model) {
         const messages = this.buildAdviceMessages(prompt, model);
-        const oldOverride = ai.overrideModel;
-        if (model) ai.setOverride?.({ model });
-        try {
-            return await ai.call(messages, 2400);
-        } finally {
-            ai.overrideModel = oldOverride || null;
-        }
+        if (!window.ai?.run) return await ai.call(messages, 2400);
+        const cached = model ? (ai.models || []).find(item => item.id === model && item.profileId) : null;
+        const routeOverride = model ? { profileId: cached?.profileId || ai.cfg.activeProfileId || '', modelId: model } : null;
+        return await ai.run({ taskId: 'advice.chat', messages, maxTokens: 2400, routeOverride });
     },
 });
 

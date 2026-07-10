@@ -13,7 +13,11 @@
         const m = String(baseKey || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
         const date = m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : new Date();
         date.setDate(date.getDate() + days);
-        return window.data?.dateKey ? data.dateKey(date) : date.toISOString().slice(0, 10);
+        return [
+            date.getFullYear(),
+            String(date.getMonth() + 1).padStart(2, '0'),
+            String(date.getDate()).padStart(2, '0')
+        ].join('-');
     }
 
     function normalizePlanTypes(types = []) {
@@ -63,6 +67,11 @@
         return window.planPolicy?.actionMetaForName?.(`${item.name || ''} ${item.aiReasoning || ''}`) || {};
     }
 
+    function itemBodyPart(item = {}) {
+        const meta = taskMeta(item);
+        return meta.bodyPart || inferBodyPart(`${item.bodyPart || ''} ${item.name || ''} ${item.feedback?.painPart || ''} ${item.feedback?.note || ''} ${item.aiReasoning || ''}`);
+    }
+
     function findProgressionChain(ctx = {}, item = {}) {
         const meta = taskMeta(item);
         const chainId = item.chainId || meta.chainId || '';
@@ -78,12 +87,13 @@
         const rpes = rows.map(({ item }) => Number(item.feedback?.rpe || 0)).filter(Boolean);
         const tooHard = rows.filter(({ item }) => Number(item.feedback?.rpe || 0) === 5);
         const easy = rows.filter(({ item }) => [1, 2].includes(Number(item.feedback?.rpe || 0)));
+        const parts = (list) => [...new Set(list.map(({ item }) => itemBodyPart(item)).filter(Boolean))];
         return {
             count: rpes.length,
             maxRpe: rpes.length ? Math.max(...rpes) : 0,
             avgRpe: rpes.length ? Number((rpes.reduce((sum, value) => sum + value, 0) / rpes.length).toFixed(1)) : 0,
-            tooHardParts: [...new Set(tooHard.map(({ item }) => inferBodyPart(`${item.name || ''} ${item.feedback?.note || ''} ${item.aiReasoning || ''}`)).filter(Boolean))],
-            easyParts: [...new Set(easy.map(({ item }) => inferBodyPart(`${item.name || ''} ${item.feedback?.note || ''} ${item.aiReasoning || ''}`)).filter(Boolean))],
+            tooHardParts: parts(tooHard),
+            easyParts: parts(easy),
             notes: rows.map(({ item }) => `${item.name || '任务'}: RPE${item.feedback.rpe}${item.feedback.note ? ` ${item.feedback.note}` : ''}`).slice(0, 10)
         };
     }
@@ -441,7 +451,7 @@
         async ensureAutoPlanAiReady() {
             if (typeof window.loadAppScript === 'function') {
                 if (!window.ai) await window.loadAppScript('ai-store');
-                if (!window.ai?.call) await window.loadAppScript('ai-api');
+                if (!window.ai?.run) await window.loadAppScript('ai-api');
                 if (!window.planAiPure) await window.loadAppScript('plan-ai-pure');
                 if (!window.dataPlanAi?.buildPlanAiContext) await window.loadAppScript('plan-ai');
                 this.refreshModules?.();
@@ -449,7 +459,7 @@
             if (window.ai && !window.ai.cfg?.profiles?.length && typeof window.ai.init === 'function') {
                 await window.ai.init({ saveData: true, renderData: false });
             }
-            if (!window.ai?.call && !window.ai?.callStream) throw new Error('AI 模块未配置或未加载');
+            if (!window.ai?.run) throw new Error('AI 模块未配置或未加载');
             if (typeof this.buildPlanAiContext !== 'function' || typeof this.parsePlanAiPayload !== 'function') throw new Error('训练计划 AI 模块未就绪');
         },
 
@@ -459,6 +469,22 @@
             const cautiousPrescription = prescription.filter((action) => action.safetyLevel === 'cautious');
             const addablePrescription = prescription.filter((action) => action.canAutoAdd);
             const avoided = avoidedActionNames(this.db || {});
+            const typeSet = new Set(normalizePlanTypes(types));
+            const targetAiPlans = (this.activeRecords?.(this.db?.dailyPlans || []) || [])
+                .filter((plan) => plan.date === targetDate && typeSet.has(plan.type || 'rehab') && String(plan.source || '') === 'ai')
+                .filter((plan) => {
+                    const items = activeItems(plan);
+                    return items.length && !items.some((item) => item.requiresUserConfirm && item.userConfirmed !== true);
+                });
+            const targetAiPlanTypes = [...new Set(targetAiPlans.map((plan) => plan.type || 'rehab'))];
+            const previousStart = dateOffset(targetDate, -3);
+            const futureEnd = dateOffset(targetDate, 6);
+            const bodyPartSchedule = (this.activeRecords?.(this.db?.dailyPlans || []) || [])
+                .filter((plan) => plan.date && plan.date >= previousStart && plan.date <= futureEnd)
+                .sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')))
+                .flatMap((plan) => mainItems(plan).slice(0, 8).map((item) => `${plan.date}:${plan.type || 'rehab'}:${item.name || ''}/${itemBodyPart(item) || '未识别'}`))
+                .join('|');
+            const targetAiSummary = targetAiPlans.map((plan) => `${plan.type || 'rehab'}:${activeItems(plan).map((item) => `${item.name || ''}/${taskCategory(item)}/${itemBodyPart(item) || ''}/${JSON.stringify(item.spec || {})}`).join(',')}`).join('|');
             const policyContext = window.planPolicy?.buildPlanPolicyContext?.({
                 db: this.db || {},
                 activeRecords: this.activeRecords?.bind(this),
@@ -481,33 +507,29 @@
             }).filter(Boolean));
 
             const extra = [
-                '自动调整模式：今天训练已经结束，请直接生成/重写明天计划。',
-                '自动调整风格：平衡。既不能机械只接受最新处方，也不能脱离最新医嘱随意安排。',
-                '动作链规则：基础臀桥 -> 夹砖臀桥 -> 骨盆内收夹砖臀桥 是同一条进阶链；单腿臀桥属于“如果不稳才增加”的条件动作，不得自动替代这条链。',
-                `源日期: ${sourceDate}；目标日期必须是: ${targetDate}。`,
-                '必须延续今天已完成的计划类型，不要凭空新增未训练类型。',
-                '计划结构：优先输出 1-2 个 warmup、3-6 个 main、1-2 个 cooldown；不要因为自动调整而删掉原本存在的冷却/放松环节。',
-                '反馈规则：RPE 1 可对安全的主训练小幅推进；RPE 2-3 以稳定复现为主；RPE 4 保持或轻微降载并观察；RPE 5 必须降载、替换或避开高负荷。热身和冷却不根据 RPE 自动加量。',
-                '用户反馈优先级：若用户选择不再加量、保持下次、疼痛>=4、不想继续或不适合，必须保持/降载/等待确认，不得自动进阶。',
-                '部位要求：疼痛避让，同时保证康复尽可能科学锻炼到相关功能链和全身部位，不要机械重复单一处方动作。',
-                '处方优先：有康复处方时使用最近3周中 canAutoAdd=true 的处方动作作为主框架；可加入辅助/活动度/拮抗肌动作来补足部位覆盖，但必须在 aiReasoning 中说明。',
-                '非医嘱新增动作：必须设置 requiresUserConfirm=true、userConfirmed=false，并在 aiReasoning 中明确“非医嘱新增，需要用户确认”。',
-                '谨慎处方：safetyLevel=cautious、watch、needsReview、低置信度或条件性动作不得自动新增或加量；若今天已经完成且反馈良好，只能按原剂量保守保留并说明。',
-                '硬红线：dropped/avoid/暂停/停做/疼痛>=4 的处方动作不得出现；用户锁定任务由客户端保留，不要试图覆盖。',
-                `医嘱/历史策略上下文: ${JSON.stringify(policyContext?.summary || policyContext || {})}`,
-                `今日已完成动作进阶信号(progressionSignal): ${JSON.stringify(sourceSignals)}`,
-                `今日反馈统计: ${JSON.stringify(stats)}`,
-                `可自动安排处方动作: ${JSON.stringify(addablePrescription)}`,
-                `谨慎/待确认处方动作: ${JSON.stringify(cautiousPrescription)}`,
-                `禁用/高疼痛处方动作: ${JSON.stringify(avoided)}`
+                '自动调明天；医嘱优先、反馈优先。',
+                targetAiPlans.length
+                    ? `已有已确认AI(${targetAiPlanTypes.join('、')})：以它微调，禁整套重写；只按反馈改量/部位/少量增删，未否定原动作保留。`
+                    : '无AI基线：全新生成时按前3天+未来7天部位排程，避开连续高负荷/疼痛部位。',
+                '桥链勿被单腿臀桥自动替代；延续今日类型；结构1-2 warmup/3-6 main/1-2 cooldown。',
+                `源:${sourceDate};目标:${targetDate}。`,
+                'RPE1小进；2-3稳；4保持/轻降；5降载/替换；热身冷却不加量。',
+                '不加量/保持/疼痛>=4/不想继续/不适合=>hold/deload/待确认。',
+                '处方近3周canAutoAdd做主框架；非医嘱新增须确认；cautious/watch不新增不加量；dropped/avoid/暂停禁用；锁定不覆盖。',
+                `策略: ${JSON.stringify(policyContext?.summary || policyContext || {})}`,
+                `进阶信号: ${JSON.stringify(sourceSignals)}`,
+                `反馈: ${JSON.stringify(stats)}`,
+                `目标AI: ${targetAiSummary || '无'}`,
+                `部位排程: ${bodyPartSchedule || '无'}`,
+                `可排处方: ${JSON.stringify(addablePrescription)}`,
+                `谨慎处方: ${JSON.stringify(cautiousPrescription)}`,
+                `禁用处方: ${JSON.stringify(avoided)}`
             ].join('\n');
             const messages = [
-                { role: 'system', content: '你是康复和训练排程助手，只输出严格 JSON。' },
-                { role: 'user', content: `${this.buildPlanAiContext('today', extra, types)}\n目标日期覆盖: 所有输出 plan.date 必须等于 ${targetDate}。` }
+                { role: 'system', content: '只输出严格JSON。' },
+                { role: 'user', content: `${this.buildPlanAiContext('today', extra, types, { targetDate })}\nplan.date=${targetDate}。` }
             ];
-            const text = typeof window.ai.callStream === 'function'
-                ? await window.ai.callStream(messages, 1800)
-                : await window.ai.call(messages, 1800);
+            const text = await window.ai.runStream('plan.adjust', messages, 1800);
             const parsed = this.parsePlanAiPayload(text, types);
             if (!parsed.ok) throw new Error(parsed.reason || 'AI 返回计划无法解析');
             return parsed.plans.map((plan) => ({ ...plan, date: targetDate }));
@@ -593,12 +615,13 @@
                 const current = (this.activeRecords?.(this.db.dailyPlans || []) || []).find((item) => item.date === plan.date && (item.type || 'rehab') === (plan.type || 'rehab'));
                 const preserved = activeItems(current).filter((item) => window.planPolicy?.isProtectedPlanTask?.(item, current));
                 const generatedItems = (plan.items || []).filter((item) => !preserved.some((protectedItem) => window.planPolicy?.tasksShareIdentity?.(item, protectedItem)));
+                const mergedSource = String(current?.source || '') === 'ai' && String(plan.source || '') === 'ai' ? 'ai' : source;
                 const merged = this.ensureDailyPlanShape?.({
                     ...(current || {}),
                     date: plan.date,
                     type: plan.type || 'rehab',
                     title: plan.title || this.planTypeMeta?.(plan.type)?.label || '训练计划',
-                    source,
+                    source: mergedSource,
                     notes: plan.notes,
                     items: [...preserved, ...generatedItems]
                 }) || plan;

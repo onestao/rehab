@@ -259,12 +259,14 @@
     width: 44px;
     height: 44px;
     border-radius: 16px;
-    display: inline-flex;
+    /* Material Symbols is loaded unlayered and would otherwise replace flex centering. */
+    display: inline-flex !important;
     align-items: center;
     justify-content: center;
     background: var(--md-sys-tertiary-container);
     color: var(--md-sys-on-tertiary-container);
     font-size: 24px;
+    line-height: 1;
     font-variation-settings: 'FILL' 1;
     flex: none;
 }

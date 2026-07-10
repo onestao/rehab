@@ -1,8 +1,73 @@
 ﻿// @ts-nocheck
 Object.assign(ai, {
+    _effectiveConfigForRequest(opts = {}) {
+        if (opts?.effective) return opts.effective;
+        if (opts?.taskId && this.resolveTaskConfig) return this.resolveTaskConfig(opts.taskId, opts.routeOverride || null);
+        const cfg = this.cfg || {};
+        return this.getEffectiveConfig ? this.getEffectiveConfig() : { ...cfg, profileId: cfg.activeProfileId || '', apiKey: this.apiKeyFor?.(cfg.activeProfileId) || '' };
+    },
+
+    _reasoningRequestOptions(effective = {}, maxTokens = 0) {
+        const helper = window.aiRoutingPure;
+        if (!helper?.buildReasoningOptions) {
+            return { params: {}, omitTemperature: false, maxOutputTokens: maxTokens, effectiveDepth: 'off' };
+        }
+        return helper.buildReasoningOptions({
+            provider: effective.provider,
+            model: effective.model,
+            capabilities: effective.capabilities || {},
+            reasoningDepth: effective.reasoningDepth || 'auto',
+            maxOutputTokens: maxTokens
+        });
+    },
+
+    async run(options = {}) {
+        const taskId = options.taskId || 'advice.chat';
+        const sequence = this.getTaskRequestSequence
+            ? this.getTaskRequestSequence(taskId, options.routeOverride || null)
+            : [this._effectiveConfigForRequest({ taskId, routeOverride: options.routeOverride })];
+        let lastError = null;
+        for (let index = 0; index < sequence.length; index++) {
+            const effective = sequence[index];
+            let emitted = false;
+            const originalOnToken = options.onToken || (() => {});
+            const requestOpts = {
+                ...options,
+                taskId,
+                effective,
+                onToken: (delta, accumulated, meta) => {
+                    if (delta || accumulated) emitted = true;
+                    return originalOnToken(delta, accumulated, meta);
+                }
+            };
+            try {
+                if (options.imageFile) {
+                    return await this.callVisionTextImage(options.promptText || '', options.imageFile, options.maxTokens || 2000, options.systemText || '', requestOpts);
+                }
+                if (Array.isArray(options.attachments) && options.attachments.some(item => item?.kind === 'image' && item.file)) {
+                    return await this.callAdviceWithAttachments(options.messages || [], options.attachments, options.maxTokens || 2400, requestOpts);
+                }
+                if (options.stream) {
+                    return await this.callStream(options.messages || [], options.maxTokens || 2000, requestOpts.onToken, requestOpts);
+                }
+                return await this.call(options.messages || [], options.maxTokens || 2000, requestOpts);
+            } catch (error) {
+                lastError = error;
+                const retryable = window.aiRoutingPure?.isRetryableAiError?.(error) === true;
+                if (!retryable || emitted || index >= sequence.length - 1) throw error;
+                try { window.dispatchEvent(new CustomEvent('ai:route-fallback', { detail: { taskId, index, error } })); } catch {}
+            }
+        }
+        throw lastError || new Error('AI 请求失败');
+    },
+
+    runStream(taskId, messages, maxTokens, onToken = () => {}, options = {}) {
+        return this.run({ ...options, taskId, messages, maxTokens, stream: true, onToken });
+    },
+
     // --- API Calls (统一入口，按 provider 分发) ---
-    async call(messages, maxTokens = 2000) {
-        const effective = this.getEffectiveConfig ? this.getEffectiveConfig() : { ...this.cfg, profileId: this.cfg.activeProfileId, apiKey: this.apiKeyFor(this.cfg.activeProfileId) };
+    async call(messages, maxTokens = 2000, opts = {}) {
+        const effective = this._effectiveConfigForRequest(opts);
         if (!effective.enabled) throw new Error('请先在设置中配置 AI 接口');
         const key = effective.apiKey;
         if (!key) throw new Error('请先在当前 AI 配置中填写 API Key');
@@ -361,7 +426,7 @@ Object.assign(ai, {
     },
 
     async callVisionTextImage(promptText, imageFile, maxTokens = 2000, systemText = '', opts = {}) {
-        const effective = this.getEffectiveConfig ? this.getEffectiveConfig() : { ...this.cfg, profileId: this.cfg.activeProfileId, apiKey: this.apiKeyFor(this.cfg.activeProfileId) };
+        const effective = this._effectiveConfigForRequest(opts);
         if (!effective.enabled) throw new Error('请先在设置中配置 AI 接口');
         const key = effective.apiKey;
         if (!key) throw new Error('请先在当前 AI 配置中填写 API Key');
@@ -388,7 +453,7 @@ Object.assign(ai, {
 
     async callAdviceWithAttachments(messages = [], attachments = [], maxTokens = 2400, opts = {}) {
         const images = (attachments || []).filter(att => att && att.kind === 'image' && att.file);
-        if (!images.length) return this.call(messages, maxTokens);
+        if (!images.length) return this.call(messages, maxTokens, opts);
         const promptText = (messages || [])
             .filter(m => m.role !== 'system')
             .map(m => `${m.role === 'assistant' ? 'AI' : '用户'}：${m.content || ''}`)
@@ -404,7 +469,7 @@ Object.assign(ai, {
     },
 
     async callStream(messages, maxTokens = 2000, onToken = () => {}, opts = {}) {
-        const effective = this.getEffectiveConfig ? this.getEffectiveConfig() : { ...this.cfg, profileId: this.cfg.activeProfileId, apiKey: this.apiKeyFor(this.cfg.activeProfileId) };
+        const effective = this._effectiveConfigForRequest(opts);
         if (!effective.enabled) throw new Error('请先在设置中配置 AI 接口');
         const key = effective.apiKey;
         if (!key) throw new Error('请先在当前 AI 配置中填写 API Key');
@@ -436,7 +501,9 @@ Object.assign(ai, {
                 ]
             }
         ];
-        const body = { model: effective.model, messages, temperature: 0.3, max_tokens: maxTokens };
+        const reasoning = this._reasoningRequestOptions(effective, maxTokens);
+        const body = { model: effective.model, messages, max_tokens: reasoning.maxOutputTokens, ...reasoning.params };
+        if (!reasoning.omitTemperature) body.temperature = 0.3;
         const res = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
@@ -456,6 +523,7 @@ Object.assign(ai, {
 
     async _callOpenAIResponsesVision(promptText, img, maxTokens, key, effective, systemText = '', signal = null) {
         const url = `${effective.baseUrl}/responses`;
+        const reasoning = this._reasoningRequestOptions(effective, maxTokens);
         const body = {
             model: effective.model,
             input: [{
@@ -465,9 +533,10 @@ Object.assign(ai, {
                     { type: 'input_image', image_url: img.dataUrl }
                 ]
             }],
-            max_output_tokens: maxTokens,
-            temperature: 0.3
+            max_output_tokens: reasoning.maxOutputTokens,
+            ...reasoning.params
         };
+        if (!reasoning.omitTemperature) body.temperature = 0.3;
         if (systemText) body.instructions = systemText;
         const res = await fetch(url, {
             method: 'POST',
@@ -495,6 +564,7 @@ Object.assign(ai, {
 
     async _callClaudeVision(promptText, img, maxTokens, key, effective, systemText = '', signal = null) {
         const url = `${effective.baseUrl}/messages`;
+        const reasoning = this._reasoningRequestOptions(effective, maxTokens);
         const body = {
             model: effective.model,
             messages: [{
@@ -504,9 +574,10 @@ Object.assign(ai, {
                     { type: 'image', source: { type: 'base64', media_type: img.mimeType, data: img.base64 } }
                 ]
             }],
-            max_tokens: maxTokens,
-            temperature: 0.3
+            max_tokens: reasoning.maxOutputTokens,
+            ...reasoning.params
         };
+        if (!reasoning.omitTemperature) body.temperature = 0.3;
         if (systemText) body.system = systemText;
         const res = await fetch(url, {
             method: 'POST',
@@ -540,9 +611,14 @@ Object.assign(ai, {
                 { inline_data: { mime_type: img.mimeType, data: img.base64 } }
             ]
         }];
+        const reasoning = this._reasoningRequestOptions(effective, maxTokens);
         const body = {
             contents,
-            generationConfig: { temperature: 0.3, maxOutputTokens: maxTokens },
+            generationConfig: {
+                maxOutputTokens: reasoning.maxOutputTokens,
+                ...reasoning.params,
+                ...(!reasoning.omitTemperature ? { temperature: 0.3 } : {})
+            },
             ...(systemText ? { systemInstruction: { parts: [{ text: systemText }] } } : {})
         };
         const res = await fetch(url, {
@@ -565,7 +641,9 @@ Object.assign(ai, {
     // ---------- OpenAI Chat Completions ----------
     async _callOpenAIChat(messages, maxTokens, key, stream, onChunk, effective = this.getEffectiveConfig?.() || this.cfg, signal = null) {
         const url = `${effective.baseUrl}/chat/completions`;
-        const body = { model: effective.model, messages, temperature: 0.3, max_tokens: maxTokens };
+        const reasoning = this._reasoningRequestOptions(effective, maxTokens);
+        const body = { model: effective.model, messages, max_tokens: reasoning.maxOutputTokens, ...reasoning.params };
+        if (!reasoning.omitTemperature) body.temperature = 0.3;
         if (stream) body.stream = true;
         const res = await fetch(url, {
             method: 'POST',
@@ -617,12 +695,14 @@ Object.assign(ai, {
             role: m.role,
             content: [{ type: m.role === 'assistant' ? 'output_text' : 'input_text', text: m.content }]
         }));
+        const reasoning = this._reasoningRequestOptions(effective, maxTokens);
         const body = {
             model: effective.model,
             input,
-            max_output_tokens: maxTokens,
-            temperature: 0.3
+            max_output_tokens: reasoning.maxOutputTokens,
+            ...reasoning.params
         };
+        if (!reasoning.omitTemperature) body.temperature = 0.3;
         if (sys) body.instructions = sys;
         if (stream) body.stream = true;
 
@@ -670,12 +750,14 @@ Object.assign(ai, {
             role: m.role === 'assistant' ? 'assistant' : 'user',
             content: m.content
         }));
+        const reasoning = this._reasoningRequestOptions(effective, maxTokens);
         const body = {
             model: effective.model,
             messages: msgs,
-            max_tokens: maxTokens,
-            temperature: 0.3
+            max_tokens: reasoning.maxOutputTokens,
+            ...reasoning.params
         };
+        if (!reasoning.omitTemperature) body.temperature = 0.3;
         if (sys) body.system = sys;
         if (stream) body.stream = true;
 
@@ -722,9 +804,14 @@ Object.assign(ai, {
         }));
         const action = stream ? `streamGenerateContent?alt=sse&key=${key}` : `generateContent?key=${key}`;
         const url = `${effective.baseUrl}/models/${effective.model}:${action}`;
+        const reasoning = this._reasoningRequestOptions(effective, maxTokens);
         const body = {
             contents,
-            generationConfig: { temperature: 0.3, maxOutputTokens: maxTokens },
+            generationConfig: {
+                maxOutputTokens: reasoning.maxOutputTokens,
+                ...reasoning.params,
+                ...(!reasoning.omitTemperature ? { temperature: 0.3 } : {})
+            },
             ...(sys ? { systemInstruction: { parts: [{ text: sys }] } } : {})
         };
         const res = await fetch(url, {
@@ -837,10 +924,15 @@ Object.assign(ai, {
         const prefResult = tpl?.buildPromptMessages('food_parse_text', { text: text }, window.data?.db) || {};
         const sysMsg = prefResult.messages?.find(m => m.role === 'system')?.content || '你是营养师助手，只返回纯 JSON 数组，不要 markdown，不要解释。';
         const userMsg = prefResult.messages?.find(m => m.role === 'user')?.content || `用户描述：${text}`;
-        const raw = await this.call([
+        const messages = [
             { role: 'system', content: sysMsg },
             { role: 'user', content: userMsg }
-        ]);
+        ];
+        const raw = this.resolveTaskConfig ? await this.run({
+            taskId: 'food.text',
+            messages,
+            maxTokens: 2000
+        }) : await this.call(messages, 2000);
         return this._parseAiJsonPayload(raw, {
             expected: 'array',
             wrapperKeys: ['items', 'foods', 'foodItems', 'food_items', 'foodList', 'food_list', 'results', 'result', 'data', '食物', '食物列表', '结果']
@@ -895,7 +987,9 @@ Object.assign(ai, {
         const prefResult = tpl?.buildPromptMessages('food_parse_image', {}, window.data?.db) || {};
         const sysMsg = prefResult.messages?.find(m => m.role === 'system')?.content || '你是营养师助手，只返回纯 JSON 数组，不要 markdown，不要解释。';
         const prompt = prefResult.messages?.find(m => m.role === 'user')?.content || `你是营养师助手。用户给出了一张"这顿饭/食物"的照片。请你根据图片内容识别食物，并严格只返回 JSON 数组，不要其他文字。\n每个元素格式：{"name":"食物名","grams":克数,"cal":热量kcal,"pro":蛋白质g,"carb":碳水g,"fat":脂肪g,"fiber":膳食纤维g,"sugar":糖g,"sodium":钠mg,"saturatedFat":饱和脂肪g,"ingredients":["主要配料"],"cooking":"烹饪方式","source":"估算依据","confidence":0-100,"note":"健康性备注"}\n要求：\n- 如果无法判断克数，请用常见份量估算；\n- fiber/sugar/sodium/saturatedFat/ingredients/cooking/source/confidence/note 可根据可见信息合理填写，无法判断时使用 0、空数组或空字符串；\n- 如果图片中看不清或不确定，请不要编造，返回空数组 [] 或减少条目；\n- 不要输出 markdown、不要解释。`;
-        const raw = await this.callVisionTextImage(prompt, file, 2000, sysMsg, opts);
+        const raw = this.resolveTaskConfig
+            ? await this.run({ ...opts, taskId: 'food.vision', promptText: prompt, imageFile: file, systemText: sysMsg, maxTokens: 2000 })
+            : await this.callVisionTextImage(prompt, file, 2000, sysMsg, opts);
         opts.onProgress?.({ stage: 'parse' });
         try {
             return this._parseAiJsonPayload(raw, {
@@ -953,10 +1047,15 @@ Object.assign(ai, {
         }
         if (healthPrompt) prompt = prompt.replace('\n\n请严格只返回', `${healthPrompt}\n\n请严格只返回`);
         if (healthPrompt && prefTags) prompt = prompt.replace(`\n\n${prefTags}\n`, `${healthPrompt}\n\n${prefTags}\n`);
-        const raw = await this.call([
+        const messages = [
             { role: 'system', content: sysMsg },
             { role: 'user', content: prompt }
-        ]);
+        ];
+        const raw = this.resolveTaskConfig ? await this.run({
+            taskId: 'goal.body',
+            messages,
+            maxTokens: 2600
+        }) : await this.call(messages, 2600);
         const match = raw.match(/\{[\s\S]*"tips"[\s\S]*\}/);
         if (!match) throw new Error('AI 返回格式异常');
         return JSON.parse(match[0]);

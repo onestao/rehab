@@ -1168,14 +1168,10 @@ mark.ai-hit
   files: 57-weight-report.css
     animation: none | weight-chart-range-zoom var(--md-sys-motion-duration-medium, 220ms) var(--md-sys-motion-emphasized, cubic-bezier(0.2, 0, 0, 1)) both (57-weight-report.css / 57-weight-report.css)
 
-## DUPLICATES (same selector + same property + same value): 33
+## DUPLICATES (same selector + same property + same value): 32
 .md-top-app-bar
   files: 04-layout-appbar.css, 37-dark-mode.css
     background: transparent (04-layout-appbar.css / 37-dark-mode.css)
-
-#ai-coach.page.active
-  files: 06-layout-page.css, 46-advice-ai.css
-    display: block (06-layout-page.css / 46-advice-ai.css)
 
 .timer-stats
   files: 09-workout-timer.css, 52-v6-workout.css
@@ -1326,7 +1322,7 @@ mark.ai-hit
   files: 49-plan.css, 49-plan-ai.css
     color: var(--md-sys-on-surface-variant) (49-plan.css / 49-plan-ai.css)
 
-## COMPLEMENTS (same selector, disjoint properties): 116
+## COMPLEMENTS (same selector, disjoint properties): 117
 .bar-leading
   files: 04-layout-appbar.css, 50-v6-ui.css
 
@@ -1383,6 +1379,9 @@ mark.ai-hit
 
 .goal-safety-metrics small
   files: 19-health-weightloss-ai.css
+
+.ai-task-settings-empty
+  files: 20-settings-ai.css
 
 .pref-panel-actions
   files: 20-settings-ai.css

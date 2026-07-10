@@ -33,6 +33,7 @@ Object.assign(ai, {
         if (!profile.apiKey) return alert('请填写 API Key');
 
         const idx = this.cfg.profiles.findIndex(p => p.id === profile.id);
+        const previous = idx >= 0 ? this.cfg.profiles[idx] : null;
         const meta = {
             id: profile.id,
             name: profile.name,
@@ -52,6 +53,13 @@ Object.assign(ai, {
         this.cfg.enabled = true;
 
         this.keyMap[profile.id] = profile.apiKey;
+        if ((this.models || []).some(model => model.profileId === 'temp')) {
+            this.models = this.models.map(model => model.profileId === 'temp' ? { ...model, profileId: profile.id } : model);
+            await this.persistModelCache?.();
+        }
+        if (previous?.baseUrl && previous.baseUrl !== profile.baseUrl) {
+            await this.clearModelCache?.(profile.id, false);
+        }
         await this.persistKeyMap();
         await this.persist();
         this.persistDataDb(false);
@@ -66,10 +74,18 @@ Object.assign(ai, {
         const id = this.cfg.activeProfileId;
         if (!id) return;
         this.cfg.profiles = this.cfg.profiles.filter(p => p.id !== id);
+        this.cfg.taskRoutes = Object.fromEntries(Object.entries(this.cfg.taskRoutes || {}).flatMap(([taskId, route]) => {
+            if (route?.primary?.profileId === id) return [];
+            return [[taskId, {
+                ...route,
+                fallbacks: (route?.fallbacks || []).filter(item => item?.profileId !== id)
+            }]];
+        }));
         delete this.keyMap[id];
         await this.persistKeyMap();
         await this.idbDelete(this.apiKeyKey(id));
         try { localStorage.removeItem(this.apiKeyKey(id)); } catch {}
+        await this.clearModelCache?.(id, true);
         this.cfg.activeProfileId = this.cfg.profiles[0]?.id || '';
         this.loadActiveProfileToForm();
         await this.persist();
@@ -110,6 +126,7 @@ Object.assign(ai, {
             model: this.cfg.model,
             baseUrl: this.cfg.baseUrl,
             extraVisionKeywords: this.cfg.extraVisionKeywords || '',
+            taskRoutes: this.cfg.taskRoutes || {},
             enabled: this.cfg.enabled
         });
         await this.idbSet(this.KEY, payload);
@@ -127,7 +144,9 @@ Object.assign(ai, {
         if (typeof data === 'undefined' || !data.db) return;
         data.db.aiProfiles = this.cfg.profiles || [];
         data.db.aiActiveId = this.cfg.activeProfileId || '';
-        data.db.aiModels = this.models || [];
+        // Model discovery is derived, endpoint-scoped local cache. Do not sync it through the main database.
+        data.db.aiModels = [];
+        data.db.aiTaskRoutes = this.cfg.taskRoutes || {};
     },
 
     checkEncrypted() {
@@ -196,7 +215,7 @@ Object.assign(ai, {
         const password = document.getElementById('aiEncryptPass')?.value;
         if (!password || password.length < 4) return alert('请输入至少4位的加密密码');
         const profiles = this.cfg.profiles.map(p => ({ ...p, apiKey: this.apiKeyFor(p.id) }));
-        const payload = JSON.stringify({ activeProfileId: this.cfg.activeProfileId, profiles, models: this.models });
+        const payload = JSON.stringify({ activeProfileId: this.cfg.activeProfileId, profiles, taskRoutes: this.cfg.taskRoutes || {} });
         try {
             const cipher = await this.encryptData(payload, password);
             data.db.encryptedAi = cipher;
@@ -241,6 +260,7 @@ Object.assign(ai, {
             (cfg.profiles || []).forEach(p => { if (p.apiKey) this.keyMap[p.id] = p.apiKey; });
             await this.persistKeyMap();
             this.models = cfg.models || this.models;
+            this.cfg.taskRoutes = cfg.taskRoutes && typeof cfg.taskRoutes === 'object' ? cfg.taskRoutes : (this.cfg.taskRoutes || {});
             await this.idbSet(this.MODELS_KEY, JSON.stringify(this.models));
             try { localStorage.setItem(this.MODELS_KEY, JSON.stringify(this.models)); } catch {}
             this.loadActiveProfileToForm();

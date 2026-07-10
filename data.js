@@ -13,6 +13,7 @@ const data = {
         aiProfiles: [],
         aiActiveId: '',
         aiModels: [],
+        aiTaskRoutes: {},
         aiTemplates: [],
         aiTemplateActiveId: '',
         aiTrash: [],

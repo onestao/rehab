@@ -220,6 +220,7 @@
                     ${isGain ? `<div class="md-field span-full"><select id="planExperience"><option value="beginner">新手</option><option value="intermediate">中级</option><option value="advanced">高级</option></select><label>训练经验</label></div>` : ''}
                 </div>
                 <div id="planProfileHint" class="food-ai-status">性别 / 年龄已从健康档案自动读取：${profile.gender === 'female' ? '女' : '男'} · ${profile.age || '未填写'} 岁${profile.age ? '' : '，建议先到「健康」页补充年龄以提升方案准确度'}</div>
+                <div data-ai-task-picker="goal.body"></div>
                 <button class="md-btn md-btn-filled" onclick="data.requestWeightLossPlan()"><span class="material-symbols-rounded">psychology</span> AI 生成${isGain ? '增肌' : '减重'}方案</button>
                 <div id="planStatus" class="food-ai-status"></div>
             </div>

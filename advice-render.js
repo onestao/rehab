@@ -157,11 +157,15 @@ Object.assign(advicePanel, {
         return { key: 'generic', label: 'AI 模型', mark: 'AI' };
     },
 
-    adviceModelVisual(model = '') {
-        const provider = this.detectAdviceModelProvider(model);
-        const iconSrcs = this.iconFallbackSrcs(provider.key);
-        const theme = this.modelThemeFor(provider.key);
-        const visual = { ...provider, iconSrcs, theme };
+    adviceModelVisual(model = '', provider = '', iconKey = '') {
+        const detected = this.detectAdviceModelProvider(model);
+        const explicitKey = String(iconKey || '').trim().toLowerCase();
+        const providerKey = this.providerKeyForModel?.(provider, model) || '';
+        const key = explicitKey || (detected.key !== 'generic' ? detected.key : providerKey) || 'generic';
+        const marks = { openai: 'GPT', gemini: 'Gem', grok: 'G', deepseek: 'DS', claude: 'C', qwen: 'Q', doubao: '豆', kimi: 'K', minimax: 'MM', mimo: 'Mi', glm: 'GLM' };
+        const iconSrcs = this.iconFallbackSrcs(key);
+        const theme = this.modelThemeFor(key);
+        const visual = { ...detected, key, mark: marks[key] || detected.mark || 'AI', iconSrcs, theme };
         this._lastVisual = visual;
         return visual;
     },

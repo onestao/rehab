@@ -34,6 +34,8 @@ content_copy
 dark_mode
 data_thresholding
 delete
+delete_forever
+delete_sweep
 diagnosis
 directions_bike
 directions_run

@@ -547,9 +547,6 @@
 *::before
   02-base.css, 36-responsive.css, 50-v6-ui.css, 40-a11y.css
 
-#ai-coach.page.active
-  06-layout-page.css, 46-advice-ai.css
-
 #app
   06-layout-page.css, 36-responsive.css
 

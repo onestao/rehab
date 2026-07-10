@@ -97,6 +97,8 @@
                         <button id="dietPhotoButton" class="md-btn md-btn-tonal" type="button" title="${photoTitle}"><span class="material-symbols-rounded">visibility</span> 图片识别</button>
                         <input id="dietPhotoInput" class="hidden" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif">
                     </div>
+                    <div data-ai-task-picker="food.text"></div>
+                    <div data-ai-task-picker="food.vision"></div>
                     <small id="foodAiStatus" class="food-ai-status"></small>
                     <div id="foodAiResults"></div>
                 </div>
