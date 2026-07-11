@@ -16,9 +16,9 @@ const syncStatus = {
         this.patchSync();
         this.render();
         if (typeof window !== 'undefined') {
-            window.addEventListener('online', () => sync.flushQueue?.());
+            window.addEventListener('online', () => window.sync?.flushQueue?.());
             clearInterval(this._queueTimer);
-            this._queueTimer = setInterval(() => sync.flushQueue?.(), 60000);
+            this._queueTimer = setInterval(() => window.sync?.flushQueue?.(), 60000);
         }
     },
 

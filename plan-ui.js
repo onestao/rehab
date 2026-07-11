@@ -113,7 +113,7 @@
                 </div>
                 ${todayPlans.length > 1 ? `<div class="plan-type-tabs">${todayPlans.map((item) => {
                     const meta = this.planTypeMeta?.(item.type, item.title) || { label: item.title || '计划', icon: 'event_note' };
-                    return `<button class="plan-type-tab ${item.id === plan.id ? 'active' : ''} ${planStatusClass(item.type)}" type="button" onclick="data.selectTodayPlan('${item.id}')"><span class="material-symbols-rounded">${meta.icon}</span>${this.escapeHtml(item.title || meta.label)}</button>`;
+                    return `<button class="plan-type-tab ${item.id === plan.id ? 'active' : ''} ${planStatusClass(item.type)}" type="button" onclick="window.dataPlanUi.selectTodayPlan.call(data, '${item.id}')"><span class="material-symbols-rounded">${meta.icon}</span>${this.escapeHtml(item.title || meta.label)}</button>`;
                 }).join('')}</div>` : ''}
             </div>`;
         },

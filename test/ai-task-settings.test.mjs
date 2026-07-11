@@ -30,11 +30,24 @@ test('model labels include connection identity for duplicate model ids', () => {
     assert.equal(helpers.modelOptionLabel(second), 'SiliconFlow \u00b7 shared-model');
 });
 
-test('compact model control uses shared icon without a persistent model name', () => {
+test('compact model control shows the selected model name beside the shared icon', () => {
     const source = readFileSync(new URL('../ai-task-settings.js', import.meta.url), 'utf8');
     const block = source.match(/function createCompactModelControl[\s\S]*?return button;/)?.[0] || '';
-    assert.match(block, /modelVisualNode\(selected\)/);
-    assert.doesNotMatch(block, /ai-compact-model-name/);
+    assert.match(block, /modelVisualNode\(selected(?:, visual)?\)/);
+    assert.match(block, /ai-compact-model-name/);
+    assert.match(block, /modelShortName\(selected\)/);
+});
+
+test('compact model control applies the selected model visual theme', () => {
+    const source = readFileSync(new URL('../ai-task-settings.js', import.meta.url), 'utf8');
+    const css = readFileSync(new URL('../css-src/20-settings-ai.css', import.meta.url), 'utf8');
+    const block = source.match(/function createCompactModelControl[\s\S]*?return button;/)?.[0] || '';
+
+    assert.match(block, /resolveModelVisual\(selected\)/);
+    assert.match(block, /--ai-model-control-bg/);
+    assert.match(block, /--ai-model-control-color/);
+    assert.match(css, /background:\s*var\(--ai-model-control-bg/);
+    assert.match(css, /color:\s*var\(--ai-model-control-color/);
 });
 
 test('unknown reasoning depth falls back to auto', () => {

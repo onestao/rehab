@@ -1,7 +1,7 @@
 # css overlap report
 # real-conflict threshold: 220
 
-## REAL CONFLICTS (same selector + same property, different value): 220
+## REAL CONFLICTS (same selector + same property, different value): 219
 :root
   files: 01-vars.css, 37-dark-mode.css, 49-plan.css, 41-m3e-effects.css
     --md-sys-primary: #0061a4 | #a0cafd (01-vars.css / 37-dark-mode.css)
@@ -363,10 +363,6 @@ mark.ai-hit
 .food-result-item:active
   files: 18-health-diet.css, 37-dark-mode.css
     background: var(--md-sys-surface-container) | var(--md-sys-surface-container-highest) (18-health-diet.css / 37-dark-mode.css)
-
-.diet-ai-actions
-  files: 18-health-diet.css
-    grid-template-columns: repeat(2, minmax(0, 1fr)) | 1fr (18-health-diet.css / 18-health-diet.css)
 
 .diet-log-item
   files: 18-health-diet.css, 37-dark-mode.css

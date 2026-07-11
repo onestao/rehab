@@ -46,3 +46,10 @@ test('diet photo file input accepts images without forcing camera capture', asyn
     assert.doesNotMatch(healthDiet, /capture=/);
     assert.match(healthDiet, /图片识别/);
 });
+
+test('diet text and photo model pickers sit beside their recognition buttons', async () => {
+    const healthDiet = await readFile(new URL('../health-diet.js', import.meta.url), 'utf8');
+
+    assert.match(healthDiet, /diet-ai-action-row[\s\S]*?aiParseFood\(\)[\s\S]*?data-ai-task-picker="food\.text"/);
+    assert.match(healthDiet, /diet-ai-action-row[\s\S]*?id="dietPhotoButton"[\s\S]*?data-ai-task-picker="food\.vision"/);
+});

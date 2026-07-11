@@ -8,7 +8,7 @@
     <link rel="icon" href="assets/app-icon.svg" type="image/svg+xml">
     <meta name="theme-color" content="#0061a4">
     <link rel="preload" href="assets/material-symbols-rounded.woff2" as="font" type="font/woff2" crossorigin>
-    <link rel="stylesheet" href="build/generated.css?v=314">
+    <link rel="stylesheet" href="build/generated.css?v=318">
 </head>
 <body>
     <div id="appUpdateBanner" class="app-update-banner hidden">
@@ -381,26 +381,26 @@
     </nav>
     </div>
 
-    <script src="m3e-ripple.js?v=314"></script>
-    <script src="toast.js?v=314"></script>
-    <script src="error-bus.js?v=314"></script>
-    <script src="i18n.js?v=314"></script>
-    <script src="theme.js?v=314"></script>
-    <script src="render-safe.js?v=314"></script>
-    <script src="nav-stack.js?v=314"></script>
-    <script src="app-route.js?v=314"></script>
-    <script type="module" src="data-utils-pure.js?v=314"></script>
-    <script type="module" src="action-identity.js?v=314"></script>
-    <script src="data-utils.js?v=314"></script>
-    <script src="storage/idb.js?v=314"></script>
-    <script src="storage/migrate.js?v=314"></script>
-    <script src="data-records.js?v=314"></script>
-    <script src="data-schema.js?v=314"></script>
-    <script src="data-store.js?v=314"></script>
-    <script src="data-ui-state.js?v=314"></script>
-    <script src="data-views.js?v=314"></script>
-    <script src="data.js?v=314"></script>
-    <script src="sync-status.js?v=314"></script>
+    <script src="m3e-ripple.js?v=318"></script>
+    <script src="toast.js?v=318"></script>
+    <script src="error-bus.js?v=318"></script>
+    <script src="i18n.js?v=318"></script>
+    <script src="theme.js?v=318"></script>
+    <script src="render-safe.js?v=318"></script>
+    <script src="nav-stack.js?v=318"></script>
+    <script src="app-route.js?v=318"></script>
+    <script type="module" src="data-utils-pure.js?v=318"></script>
+    <script type="module" src="action-identity.js?v=318"></script>
+    <script src="data-utils.js?v=318"></script>
+    <script src="storage/idb.js?v=318"></script>
+    <script src="storage/migrate.js?v=318"></script>
+    <script src="data-records.js?v=318"></script>
+    <script src="data-schema.js?v=318"></script>
+    <script src="data-store.js?v=318"></script>
+    <script src="data-ui-state.js?v=318"></script>
+    <script src="data-views.js?v=318"></script>
+    <script src="data.js?v=318"></script>
+    <script src="sync-status.js?v=318"></script>
     <div id="weightModal" class="md-modal md-modal-sheet hidden" aria-hidden="true">
         <div class="md-modal-backdrop" onclick="data.closeWeightModal()"></div>
         <div class="md-modal-card md-modal-sheet-card">
@@ -748,6 +748,8 @@
         const MODULE_SCRIPTS = new Set(['data-utils-pure','action-identity','sync-pure','workout-cardio-pure','voice-engine','report-metrics-pure','ai-vision-pure','ai-model-catalog-pure','ai-routing-pure','backup-ring-pure','backup-import-pure','mi-scale-pure']);
         const MJS_SCRIPTS = new Set(['ai-vision-pure','ai-model-catalog-pure','ai-routing-pure']);
         const SCRIPT_PREREQUISITES = {
+            'history-view': ['health-summary-pure'],
+            'goal-plan': ['health-summary-pure'],
             'ai-model-visual': [],
             'ai-profile': ['ai-store'],
             'ai-model-cache': ['ai-store','ai-model-catalog-pure'],
@@ -910,7 +912,7 @@
             const p = new Promise((res, rej) => {
                 const link = document.createElement('link');
                 link.rel = 'stylesheet';
-                link.href = `css-src/${name}.css?v=314`;
+                link.href = `css-src/${name}.css?v=318`;
                 link.dataset.appCss = name;
                 link.onload = () => {
                     link.dataset.loaded = 'true';
@@ -951,7 +953,7 @@
                 if (_loaded.has(name)) return res();
                 const s = document.createElement('script');
                 if (MODULE_SCRIPTS.has(name)) s.type = 'module';
-                s.src = `${name}${MJS_SCRIPTS.has(name) ? '.mjs' : '.js'}?v=314`;
+                s.src = `${name}${MJS_SCRIPTS.has(name) ? '.mjs' : '.js'}?v=318`;
                 s.onload = () => { _loaded.add(name); res(); };
                 s.onerror = rej;
                 document.head.appendChild(s);

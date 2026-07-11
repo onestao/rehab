@@ -5,7 +5,7 @@
             const goalType = this.db.health.goalType || 'loss';
             const isGain = goalType === 'gain';
             const profile = this.db.health?.profile || {};
-            const latest = this.sortedWeights().slice(-1)[0];
+            const latest = window.healthSummaryPure?.latestWeight?.(this.db.health?.weights) || this.sortedWeights?.().slice(-1)[0];
             const currentWeight = parseFloat(document.getElementById('planCurrentWeight')?.value) || latest?.weight;
             const targetWeight = parseFloat(document.getElementById('planTargetWeight')?.value);
             const height = parseFloat(document.getElementById('planHeight')?.value);
@@ -183,7 +183,7 @@
             const profile = this.db.health?.profile || {};
             const plan = this.db.health.bodyPlan || this.db.health.weightPlan;
             const goal = this.db.health.dietGoal;
-            const latest = this.sortedWeights().slice(-1)[0];
+            const latest = window.healthSummaryPure?.latestWeight?.(this.db.health?.weights) || this.sortedWeights?.().slice(-1)[0];
             const currentWeight = latest?.weight || '';
             const diffText = plan?.meta ? (isGain
                 ? `+${(plan.meta.targetWeight - plan.meta.currentWeight).toFixed(2)} kg`

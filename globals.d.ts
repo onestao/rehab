@@ -60,6 +60,7 @@ interface Window {
   dataRoutinePlan: any;
   dataRoutineLibrary: any;
   dataHistoryView: any;
+  healthSummaryPure: any;
   dataWeeklySummary: any;
   dataViews: any;
   dataAiTemplates: any;

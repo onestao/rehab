@@ -12,9 +12,9 @@ test('unknown unsafe icon keys use a stable generic fallback', () => {
     assert.equal(value.key, 'generic');
     assert.equal(value.iconSrcs.at(-1), 'assets/model-icons/generic.svg');
 });
-test('fallback order prefers color and mono CDN before local assets', () => {
+test('fallback order prefers bundled local assets before network fallbacks', () => {
     const sources = visual.iconFallbackSrcs('openai');
-    assert.match(sources[0], /openai-color\.svg$/);
-    assert.match(sources[1], /openai\.svg$/);
+    assert.equal(sources[0], 'assets/model-icons/openai.svg');
+    assert.match(sources[1], /openai-color\.svg$/);
     assert.equal(sources.at(-1), 'assets/model-icons/generic.svg');
 });

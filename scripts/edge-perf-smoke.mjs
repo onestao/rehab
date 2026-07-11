@@ -217,6 +217,7 @@ async function launchBrowser(url) {
 async function collectMetrics(page, url, waitMs) {
     const requests = new Map();
     const exceptions = [];
+    const consoleErrors = [];
     page.on('Network.responseReceived', (event) => {
         requests.set(event.requestId, {
             url: event.response?.url || '',
@@ -231,6 +232,14 @@ async function collectMetrics(page, url, waitMs) {
     });
     page.on('Runtime.exceptionThrown', (event) => {
         exceptions.push(event.exceptionDetails?.text || event.exceptionDetails?.exception?.description || 'runtime exception');
+    });
+    page.on('Runtime.consoleAPICalled', (event) => {
+        if (event.type !== 'error') return;
+        const message = (event.args || []).map(arg => {
+            if (arg.value !== undefined) return String(arg.value);
+            return arg.description || arg.className || arg.type || '';
+        }).filter(Boolean).join(' ');
+        consoleErrors.push(message || 'console.error');
     });
     await page.send('Page.enable');
     await page.send('Network.enable');
@@ -303,6 +312,7 @@ async function collectMetrics(page, url, waitMs) {
     const metrics = result.result?.value || {};
     metrics.networkTransferSize = [...requests.values()].reduce((sum, item) => sum + Number(item.encodedDataLength || 0), 0);
     metrics.exceptions = exceptions;
+    metrics.consoleErrors = consoleErrors;
     return metrics;
 }
 
@@ -347,6 +357,7 @@ async function main() {
         if (longTaskMs > budgets.longTaskMs) failures.push(`long task total ${longTaskMs}ms > ${budgets.longTaskMs}ms`);
         if (transferKb > budgets.transferKb) failures.push(`transfer ${transferKb}KB > ${budgets.transferKb}KB`);
         if (metrics.exceptions?.length) failures.push(`runtime exceptions: ${metrics.exceptions.slice(0, 3).join(' | ')}`);
+        if (metrics.consoleErrors?.length) failures.push(`console errors: ${metrics.consoleErrors.slice(0, 3).join(' | ')}`);
         console.log(JSON.stringify({
             url: local.url,
             scriptCount: metrics.scriptCount,
@@ -363,6 +374,7 @@ async function main() {
             transferKb,
             resourceTransferKb,
             networkTransferKb,
+            consoleErrors: metrics.consoleErrors,
             largestResources: metrics.largestResources,
             slowestResources: metrics.slowestResources,
             budgets
@@ -376,7 +388,11 @@ async function main() {
     } finally {
         try { browser?.page?.close(); } catch {}
         try { browser?.browser?.close(); } catch {}
-        if (browser?.child && !browser.child.killed) browser.child.kill();
+        if (browser?.child && browser.child.exitCode == null) {
+            const exited = new Promise(resolve => browser.child.once('exit', resolve));
+            browser.child.kill();
+            await Promise.race([exited, delay(2000)]);
+        }
         if (server) await new Promise(resolve => server.close(resolve));
         if (profileDir) {
             for (let attempt = 0; attempt < 5; attempt += 1) {

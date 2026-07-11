@@ -50,8 +50,8 @@ Object.assign(advicePanel, {
         const mark = this.escapeHtml(visual.mark || 'AI');
         if (!srcs.length) return mark;
         const src = srcs[0];
-        const fallbacks = srcs.slice(1).map(s => `this.src='${this.escapeHtml(s)}'`).join(';');
-        const onerror = fallbacks ? `this.onerror=function(){this.onerror=null;${fallbacks}};` : 'this.onerror=null;';
+        const fallbacks = srcs.slice(1).map(s => `'${this.escapeHtml(s)}'`).join(',');
+        const onerror = fallbacks ? `const a=[${fallbacks}],i=+(this.dataset.fi||0);if(i<a.length){this.dataset.fi=i+1;this.src=a[i]}else{this.onerror=null}` : 'this.onerror=null;';
         return `<img class="advice-model-icon" src="${this.escapeHtml(src)}" alt="" onerror="${onerror}">`;
     },
 

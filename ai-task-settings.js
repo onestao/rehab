@@ -60,10 +60,14 @@
         return withoutVendor.length > 18 ? `${withoutVendor.slice(0, 16)}\u2026` : withoutVendor;
     }
 
-    function modelVisualNode(model) {
-        const visual = root.aiModelVisual?.resolve?.({ modelId: model?.displayName || modelId(model), provider: model?.provider || model?.profileName || model?.connectionName, iconKey: model?.iconKey || model?.vendor }) || { mark: 'AI', iconSrcs: [] };
+    function resolveModelVisual(model) {
+        return root.aiModelVisual?.resolve?.({ modelId: model?.displayName || modelId(model), provider: model?.provider || model?.profileName || model?.connectionName, iconKey: model?.iconKey || model?.vendor }) || { mark: 'AI', iconSrcs: [], theme: {} };
+    }
+
+    function modelVisualNode(model, visual = resolveModelVisual(model)) {
         const slot = el('span', 'ai-model-connection-mark');
         slot.setAttribute('aria-hidden', 'true');
+        if (visual.theme?.markBg) slot.style.setProperty('--ai-model-mark-bg', visual.theme.markBg);
         if (!visual.iconSrcs?.length) { slot.textContent = visual.mark || 'AI'; return slot; }
         const image = document.createElement('img');
         image.className = 'ai-model-visual-icon';
@@ -177,11 +181,18 @@
     function createCompactModelControl(taskId, models, route, save) {
         const selected = selectedModel(models, route);
         const button = el('button', 'ai-compact-model');
+        const visual = resolveModelVisual(selected);
         const selectedKey = selected ? modelKey(selected) : '';
         const invalid = !!routePrimary(route) && !models.some(model => modelKey(model) === selectedKey);
         if (invalid) button.classList.add('is-invalid');
         button.type = 'button';
-        button.append(modelVisualNode(selected), invalid ? icon('error') : icon('expand_more'));
+        if (visual.theme?.bg) button.style.setProperty('--ai-model-control-bg', visual.theme.bg);
+        if (visual.theme?.color) button.style.setProperty('--ai-model-control-color', visual.theme.color);
+        button.append(
+            modelVisualNode(selected, visual),
+            el('span', 'ai-compact-model-name', modelShortName(selected)),
+            invalid ? icon('error') : icon('expand_more')
+        );
         button.setAttribute('aria-label', `\u9009\u62e9\u6a21\u578b\uff1a${modelOptionLabel(selected)}`);
         button.addEventListener('click', () => openQuickSheet(`\u9009\u62e9\u6a21\u578b \u00b7 ${modelOptionLabel(selected)}`, body => {
             const favorites = favoriteKeys();

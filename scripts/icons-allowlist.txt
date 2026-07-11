@@ -101,3 +101,8 @@ flag
 system_update
 download_for_offline
 upload_file
+balance
+bookmarks
+delete_forever
+delete_sweep
+egg_alt

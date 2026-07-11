@@ -23,12 +23,11 @@
 
         renderRecordOverview() {
             const today = this.logicalDateKey();
-            const weight = this.activeRecords(this.db.health.weights || []).find(w => w.date === today) || this.sortedWeights().slice(-1)[0];
-            const intake = this.todayCalories();
-            const exerciseCal = this.todayTrainingCalories();
-            const macros = this.todayMacros();
+            const summary = window.healthSummaryPure?.summarizeToday?.(this.db, today, {
+                historyDayKey: record => this.historyDayKey(record)
+            }) || { weight: null, intake: 0, exerciseCal: 0, macros: { pro: 0, carb: 0, fat: 0 }, goals: { pro: 90, carb: 180, fat: 55 } };
+            const { weight, intake, exerciseCal, macros, goals } = summary;
             const goalCal = this.db.health.dietGoal?.dailyCal || 0;
-            const goals = this.defaultDietGoals();
             const progress = goalCal ? Math.min(100, Math.round((intake / goalCal) * 100)) : 0;
             const remaining = goalCal ? goalCal - intake : 0;
             const macroStops = {

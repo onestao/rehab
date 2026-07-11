@@ -93,12 +93,16 @@
                 <div id="foodAiArea" class="diet-ai-entry ${mode === 'ai' ? '' : 'hidden'}">
                     <textarea id="foodAiText" class="diet-ai-input" placeholder="说说你这顿吃了什么，例如：鸡胸肉饭加一杯豆浆" oninput="data.autoResizeDietInput(this)"></textarea>
                     <div class="diet-ai-actions">
-                        <button class="md-btn md-btn-filled" onclick="data.aiParseFood()" type="button"><span class="material-symbols-rounded">auto_awesome</span> 文本识别</button>
-                        <button id="dietPhotoButton" class="md-btn md-btn-tonal" type="button" title="${photoTitle}"><span class="material-symbols-rounded">visibility</span> 图片识别</button>
+                        <div class="diet-ai-action-row">
+                            <button class="md-btn md-btn-filled" onclick="data.aiParseFood()" type="button"><span class="material-symbols-rounded">auto_awesome</span> 文本识别</button>
+                            <div class="diet-ai-model-control" data-ai-task-picker="food.text"></div>
+                        </div>
+                        <div class="diet-ai-action-row">
+                            <button id="dietPhotoButton" class="md-btn md-btn-tonal" type="button" title="${photoTitle}"><span class="material-symbols-rounded">visibility</span> 图片识别</button>
+                            <div class="diet-ai-model-control" data-ai-task-picker="food.vision"></div>
+                        </div>
                         <input id="dietPhotoInput" class="hidden" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif">
                     </div>
-                    <div data-ai-task-picker="food.text"></div>
-                    <div data-ai-task-picker="food.vision"></div>
                     <small id="foodAiStatus" class="food-ai-status"></small>
                     <div id="foodAiResults"></div>
                 </div>

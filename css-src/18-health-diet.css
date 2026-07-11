@@ -279,8 +279,15 @@
 }
 .diet-ai-actions {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: minmax(0, 1fr);
     gap: 8px;
+}
+.diet-ai-action-row {
+    display: grid;
+    grid-template-columns: minmax(120px, 1fr) minmax(0, clamp(120px, 42vw, 176px));
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
 }
 .diet-ai-actions .md-btn {
     width: 100%;
@@ -292,10 +299,31 @@
     justify-content: center;
     white-space: nowrap;
 }
+.diet-ai-model-control {
+    min-width: 0;
+}
+.diet-ai-model-control .ai-task-settings-empty {
+    padding: 0;
+    text-align: right;
+}
+.diet-ai-model-control .ai-task-inline-picker {
+    display: block;
+    padding: 0;
+}
+.diet-ai-model-control .ai-task-inline-title {
+    display: none;
+}
+.diet-ai-model-control .ai-task-inline-controls {
+    display: block;
+}
+.diet-ai-model-control .ai-task-quick-controls {
+    grid-template-columns: minmax(0, 1fr) clamp(28px, 9vw, 34px);
+    gap: 6px;
+}
 
 @media (max-width: 360px) {
-    .diet-ai-actions {
-        grid-template-columns: 1fr;
+    .diet-ai-model-control .ai-compact-model-name {
+        display: none;
     }
 }
 .diet-ai-input {

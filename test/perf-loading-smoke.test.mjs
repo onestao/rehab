@@ -60,9 +60,12 @@ test('service worker awaits runtime cache writes and keeps heavy lazy modules ou
 test('edge performance smoke script is available as an explicit npm script', () => {
     const packageJson = JSON.parse(readRootFile('package.json'));
     const scriptPath = path.join(process.cwd(), 'scripts', 'edge-perf-smoke.mjs');
+    const script = readRootFile('scripts/edge-perf-smoke.mjs');
 
     assert.equal(existsSync(scriptPath), true);
     assert.equal(packageJson.scripts['perf:edge'], 'node scripts/edge-perf-smoke.mjs');
+    assert.match(script, /Runtime\.consoleAPICalled/);
+    assert.match(script, /console errors:/);
 });
 
 test('material symbols use a preloaded local font without a delayed remote swap', () => {
