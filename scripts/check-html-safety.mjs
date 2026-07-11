@@ -9,7 +9,7 @@ const REVIEWED_HTML_SINK_FILES = new Map([
   ['advice-stream-renderer.js', { sinks: 5, review: 'stream chunks are rendered through the supplied markdown renderer.' }],
   ['advice-template-manager.js', { sinks: 2, review: 'template manager HTML comes from renderTemplateManagerContent with escaped fields.' }],
   ['advice-virtual-list.js', { sinks: 6, review: 'virtual rows are produced by reviewed renderItem/renderAdviceMessages callbacks.' }],
-  ['ai-models.js', { sinks: 2, review: 'model labels and ids are escaped before list rendering.' }],
+  ['ai-models.js', { sinks: 3, review: 'model labels, ids, and offline family groups are escaped before list rendering.' }],
   ['ai-profile.js', { sinks: 1, review: 'select options are built from escaped profile names.' }],
   ['credential-fields.js', { sinks: 1, review: 'static icon-only button markup.' }],
   ['data-ui-state.js', { sinks: 2, review: 'modal bodies come from reviewed diet/exercise renderers.' }],

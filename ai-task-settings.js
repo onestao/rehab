@@ -167,9 +167,11 @@
 
     function createCompactModelControl(taskId, models, route, save) {
         const selected = selectedModel(models, route);
-        const button = el('button', 'ai-compact-model');
+        const selectedKey = selected ? modelKey(selected) : '';
+        const unavailable = Boolean(selectedKey) && !models.some(model => modelKey(model) === selectedKey);
+        const button = el('button', `ai-compact-model ${unavailable ? 'is-unavailable' : ''}`);
         button.type = 'button';
-        button.append(connectionMark(selected), el('span', 'ai-compact-model-name', modelShortName(selected)), icon('expand_more'));
+        button.append(connectionMark(selected), el('span', 'ai-compact-model-name', unavailable ? `${modelShortName(selected)} · 已失效` : modelShortName(selected)), icon('expand_more'));
         button.setAttribute('aria-label', `\u9009\u62e9\u6a21\u578b\uff1a${modelOptionLabel(selected)}`);
         button.addEventListener('click', () => openQuickSheet('\u9009\u62e9\u6a21\u578b', body => {
             const favorites = favoriteKeys();
@@ -228,6 +230,11 @@
             const favoriteSet = new Set(favoriteRows.map(modelKey));
             const recentRows = recentKeys.map(key => ordered.find(model => modelKey(model) === key)).filter(model => model && !favoriteSet.has(modelKey(model)));
             const promoted = new Set([...favoriteSet, ...recentRows.map(modelKey)]);
+            if (!ordered.length) {
+                const empty = el('div', 'ai-task-settings-empty');
+                empty.append(el('strong', '', '暂无可用模型'), el('small', '', '请先启用供应商并添加模型'));
+                body.append(empty);
+            }
             appendRows('\u6536\u85cf\u6a21\u578b', favoriteRows);
             appendRows('\u6700\u8fd1\u4f7f\u7528', recentRows);
             const groups = new Map();
@@ -324,7 +331,6 @@
     function openReasoningMenu(route, models, save) {
         const current = normalizeReasoningDepth(route?.reasoningDepth);
         const model = selectedModel(models, route);
-        const explicitlyUnsupported = model?.capabilities?.reasoning === false;
         openQuickSheet('\u63a8\u7406\u5f3a\u5ea6', body => DEPTHS.forEach(depth => {
             const option = el('button', `ai-reasoning-menu-item is-${depth.value}`);
             option.type = 'button';
@@ -333,7 +339,6 @@
             labels.append(el('strong', '', depth.label), el('small', '', depth.title));
             option.append(labels);
             if (depth.value === current) option.append(icon('check'));
-            option.disabled = explicitlyUnsupported && !['auto', 'off'].includes(depth.value);
             option.addEventListener('click', () => { closeQuickSheet(); save({ ...route, reasoningDepth: depth.value }); });
             body.append(option);
         }));

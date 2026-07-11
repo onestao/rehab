@@ -6,10 +6,17 @@ import vm from 'node:vm';
 import {
     clearModelCatalog,
     endpointFingerprint,
+    inferModelFamily,
     migrateLegacyModelCatalog,
     normalizeCatalogModel,
     replaceDiscoveredModelsForProfile
 } from '../ai-model-catalog-pure.mjs';
+
+test('infers model families offline and falls back to upstream owner', () => {
+    assert.equal(inferModelFamily({ id: 'google/gemini-2.5-flash' }), 'Gemini');
+    assert.equal(inferModelFamily({ id: 'custom-v2', owned_by: 'Lab API' }), 'Lab API');
+    assert.equal(inferModelFamily({ id: 'unknown-v2' }), '其他');
+});
 
 test('refreshing a profile replaces only its discovered snapshot', () => {
     const existing = [

@@ -68,11 +68,18 @@ test('selectable model values include profile identity', () => {
   assert.deepEqual(Array.from(rows, row => row.value), ['p1::shared-model', 'p2::shared-model']);
 });
 
-test('vision tasks exclude models explicitly marked without vision', () => {
+test('feature model choice stays user-controlled even when capability metadata is incompatible', () => {
   const ai = loadRuntime();
   ai.models[0].capabilities.vision = false;
   const rows = ai.listSelectableModels('food.vision');
-  assert.deepEqual(Array.from(rows, row => row.profileId), ['p2']);
+  assert.deepEqual(Array.from(rows, row => row.profileId), ['p1', 'p2']);
+});
+
+test('disabled and archived suppliers do not contribute new selectable models', () => {
+  const ai = loadRuntime();
+  ai.cfg.profiles[0].enabled = false;
+  ai.cfg.profiles[1].archived = true;
+  assert.deepEqual(Array.from(ai.listSelectableModels('advice.chat')), []);
 });
 
 test('task fallback mode is persisted and controls the request sequence', async () => {

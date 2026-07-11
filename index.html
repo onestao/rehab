@@ -240,17 +240,24 @@
             <div id="profileContent"></div>
             <div id="profileSettings" class="hidden">
                 <div class="md-card sync-card" data-settings="ai">
-                    <div class="ai-card-header"><span class="material-symbols-rounded">psychology</span><strong>AI &#35774;&#32622;</strong><span id="aiStatus" class="ai-status ai-off">&#26410;&#37197;&#32622;</span></div>
+                    <div class="ai-card-header"><span class="material-symbols-rounded">psychology</span><strong>AI &#35774;&#32622;</strong><span id="aiStatus" class="ai-status ai-off">0/0 &#24050;&#21551;&#29992;</span></div>
+                    <div class="ai-settings-section-head"><div><strong>&#20379;&#24212;&#21830;</strong><small>&#25152;&#26377;&#24050;&#21551;&#29992;&#20379;&#24212;&#21830;&#30340;&#24050;&#28155;&#21152;&#27169;&#22411;&#37117;&#21487;&#20379;&#21151;&#33021;&#36873;&#25321;</small></div></div>
                     <div class="md-row ai-profile-actions">
                         <div class="md-field" style="flex:1">
                             <select id="aiProfileSelect" onchange="ai.selectProfile(this.value)"></select>
-                            <label>&#37197;&#32622;&#26723;&#26696;</label>
+                            <label>&#20379;&#24212;&#21830;</label>
                         </div>
-                        <button class="md-btn md-btn-tonal" onclick="ai.deleteCurrentProfile()"><span class="material-symbols-rounded">delete</span> &#21024;&#38500;&#24403;&#21069;</button>
+                        <button class="icon-btn" type="button" onclick="ai.toggleCurrentSupplier()" aria-label="&#21551;&#29992;&#25110;&#31105;&#29992;&#24403;&#21069;&#20379;&#24212;&#21830;"><span class="material-symbols-rounded">power_settings_new</span></button>
+                        <button class="icon-btn" type="button" onclick="ai.moveCurrentSupplier(-1)" aria-label="&#19978;&#31227;&#20379;&#24212;&#21830;"><span class="material-symbols-rounded">arrow_upward</span></button>
+                        <button class="icon-btn" type="button" onclick="ai.moveCurrentSupplier(1)" aria-label="&#19979;&#31227;&#20379;&#24212;&#21830;"><span class="material-symbols-rounded">arrow_downward</span></button>
+                        <button class="icon-btn" type="button" onclick="ai.refreshAllSuppliers()" aria-label="&#21047;&#26032;&#20840;&#37096;&#24050;&#21551;&#29992;&#20379;&#24212;&#21830;"><span class="material-symbols-rounded">cloud_sync</span></button>
+                        <button class="icon-btn" type="button" onclick="ai.archiveCurrentSupplier()" aria-label="&#24402;&#26723;&#24403;&#21069;&#20379;&#24212;&#21830;"><span class="material-symbols-rounded">archive</span></button>
+                        <button class="icon-btn" type="button" onclick="ai.restoreArchivedSupplier()" aria-label="&#26597;&#30475;&#24182;&#24674;&#22797;&#24050;&#24402;&#26723;&#20379;&#24212;&#21830;"><span class="material-symbols-rounded">unarchive</span></button>
+                        <button class="icon-btn" type="button" onclick="ai.permanentlyDeleteArchivedSupplier()" aria-label="&#27704;&#20037;&#21024;&#38500;&#24050;&#24402;&#26723;&#20379;&#24212;&#21830;"><span class="material-symbols-rounded">delete_forever</span></button>
                     </div>
                     <div class="md-row ai-profile-actions">
-                        <div class="md-field" style="flex:1 1 auto;min-width:0"><input type="text" id="aiProfileName" placeholder=" "><label>&#26723;&#26696;&#21517;&#31216;</label></div>
-                        <button class="md-btn md-btn-tonal" onclick="ai.saveAsNewProfile()"><span class="material-symbols-rounded">bookmark_add</span> &#21478;&#23384;</button>
+                        <div class="md-field" style="flex:1 1 auto;min-width:0"><input type="text" id="aiProfileName" placeholder=" "><label>&#20379;&#24212;&#21830;&#21517;&#31216;</label></div>
+                        <button class="icon-btn" onclick="ai.saveAsNewProfile()" aria-label="&#28155;&#21152;&#20379;&#24212;&#21830;"><span class="material-symbols-rounded">add</span></button>
                     </div>
                     <div class="md-field">
                         <select id="aiProvider">
@@ -263,26 +270,11 @@
                     </div>
                     <div class="md-field"><input type="text" id="aiBaseUrl" pattern="^https?://.+" placeholder=" "><label>Base URL</label></div>
                     <div class="md-field"><input type="text" id="aiApiKey" class="masked-input credential-masked" placeholder=" " autocomplete="one-time-code" autocapitalize="off" autocorrect="off" spellcheck="false" inputmode="text" data-lpignore="true" data-1p-ignore="true" data-form-type="other" name="ai-api-key-secret-rnd"><label>API Key</label></div>
-                    <button class="md-btn md-btn-tonal" onclick="ai.fetchModels()"><span class="material-symbols-rounded">refresh</span> &#33719;&#21462;&#21487;&#29992;&#27169;&#22411;</button>
+                    <div class="md-row ai-supplier-actions"><button class="md-btn md-btn-filled" onclick="ai.saveCurrentProfile()"><span class="material-symbols-rounded">save</span> &#20445;&#23384;&#20379;&#24212;&#21830;</button><button class="md-btn md-btn-tonal" onclick="ai.fetchModels()"><span class="material-symbols-rounded">refresh</span> &#21047;&#26032;&#20505;&#36873;&#27169;&#22411;</button></div>
                     <div id="aiFetchStatus" class="food-ai-status"></div>
                     <div id="aiModelList" class="ai-model-list hidden"></div>
-                    <div class="md-field"><input type="text" id="aiModel" placeholder=" " onfocus="ai.showCachedModels()"><label>&#27169;&#22411;&#21517;&#31216;</label></div>
+                    <div class="md-row ai-manual-model"><div class="md-field"><input type="text" id="aiModel" placeholder=" " onfocus="ai.showCachedModels()"><label>&#25163;&#21160;&#28155;&#21152;&#27169;&#22411; ID</label></div><button class="icon-btn" type="button" onclick="ai.addManualModel()" aria-label="&#28155;&#21152;&#27169;&#22411;"><span class="material-symbols-rounded">add</span></button></div>
                     <div class="md-field"><input type="text" id="aiExtraVisionKeywords" placeholder=" "><label>&#33258;&#23450;&#20041;&#35270;&#35273;&#27169;&#22411;&#20851;&#38190;&#23383;&#65288;&#36887;&#21495;&#20998;&#38548;&#65289;</label></div>
-                    <div class="ai-settings-section" aria-labelledby="aiModelCacheTitle">
-                        <div class="ai-settings-section-head">
-                            <div>
-                                <strong id="aiModelCacheTitle">&#27169;&#22411;&#32531;&#23384;&#31649;&#29702;</strong>
-                                <small>&#21047;&#26032;&#25110;&#28165;&#29702;&#24403;&#21069;&#36830;&#25509;&#30340;&#27169;&#22411;&#30446;&#24405;&#12290;</small>
-                            </div>
-                        </div>
-                        <div id="aiModelCacheActions" class="ai-cache-actions">
-                            <button class="md-btn md-btn-tonal" type="button" onclick="window.aiTaskSettings?.refreshCurrentModels()"><span class="material-symbols-rounded">refresh</span> &#21047;&#26032;&#24403;&#21069;</button>
-                            <button class="md-btn md-btn-tonal" type="button" onclick="window.aiTaskSettings?.clearCurrentModelCache()"><span class="material-symbols-rounded">delete_sweep</span> &#28165;&#29702;&#24403;&#21069;</button>
-                            <button class="md-btn md-btn-text ai-cache-danger" type="button" onclick="window.aiTaskSettings?.clearAllModelCaches()"><span class="material-symbols-rounded">delete_forever</span> &#28165;&#29702;&#20840;&#37096;</button>
-                        </div>
-                        <div id="aiModelCacheStatus" class="ai-task-settings-status" role="status" aria-live="polite"></div>
-                    </div>
-                    <button class="md-btn md-btn-filled" onclick="ai.saveCurrentProfile()"><span class="material-symbols-rounded">save</span> &#20445;&#23384;&#24403;&#21069;&#37197;&#32622;</button>
                     <div class="md-divider"></div>
                     <div class="ai-settings-section" aria-labelledby="aiTaskSettingsTitle">
                         <div class="ai-settings-section-head">

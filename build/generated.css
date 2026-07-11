@@ -3383,6 +3383,20 @@ mark.ai-hit {
     .pref-field-control { gap: 3px; }
     .pref-chip { font-size: 11px; padding: 0 10px; height: 28px; }
 }
+.ai-supplier-actions,
+.ai-manual-model { align-items: center; gap: 8px; }
+.ai-manual-model .md-field { flex: 1; min-width: 0; }
+.ai-model-candidate-group { border: 0; padding: 0; margin: 12px 0; }
+.ai-model-candidate-group legend { color: var(--md-sys-color-primary); font-size: 12px; font-weight: 700; padding: 8px 0; }
+.ai-model-candidate,
+.ai-added-model { min-height: 56px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid var(--md-sys-color-outline-variant); }
+.ai-model-candidate > span,
+.ai-added-model > span { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.ai-model-candidate small,
+.ai-added-model small { overflow-wrap: anywhere; color: var(--md-sys-color-on-surface-variant); }
+.ai-model-candidate em { color: var(--md-sys-color-primary); font-size: 12px; font-style: normal; }
+.ai-model-add-selected { position: sticky; bottom: 8px; width: 100%; margin-top: 12px; }
+.ai-compact-model.is-unavailable { color: var(--md-sys-color-error); outline: 1px solid var(--md-sys-color-error); }
 
 }
 @layer components {

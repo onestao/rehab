@@ -14,6 +14,8 @@ const ai = {
         baseUrl: '',
         extraVisionKeywords: '',
         taskRoutes: {},
+        discoverySnapshots: {},
+        supplierSchemaVersion: 1,
         enabled: false
     },
     models: [],
@@ -31,6 +33,8 @@ const ai = {
             baseUrl: '',
             extraVisionKeywords: '',
             taskRoutes: {},
+            discoverySnapshots: {},
+            supplierSchemaVersion: 1,
             enabled: false
         };
         this.models = [];
@@ -92,6 +96,13 @@ const ai = {
         this.models = Array.isArray(this.models) ? this.models : [];
         this.keyMap = this.keyMap && typeof this.keyMap === 'object' ? this.keyMap : {};
         this.cfg.taskRoutes = this.cfg.taskRoutes && typeof this.cfg.taskRoutes === 'object' ? this.cfg.taskRoutes : {};
+        this.cfg.discoverySnapshots = this.cfg.discoverySnapshots && typeof this.cfg.discoverySnapshots === 'object' ? this.cfg.discoverySnapshots : {};
+        this.cfg.profiles = this.cfg.profiles.map((profile, index) => ({
+            ...profile,
+            enabled: profile.enabled !== false,
+            archived: profile.archived === true,
+            order: Number.isFinite(profile.order) ? profile.order : index
+        }));
         if (typeof this.migrateLegacyModelCache === 'function') await this.migrateLegacyModelCache();
         if (!this.cfg.activeProfileId && this.cfg.profiles.length) {
             this.cfg.activeProfileId = this.cfg.profiles[0].id;
