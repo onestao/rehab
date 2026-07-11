@@ -36,7 +36,7 @@ function loadRuntime() {
     CustomEvent: class CustomEvent { constructor(type, init) { this.type = type; this.detail = init?.detail; } }
   };
   sandbox.window.window = sandbox.window;
-  vm.runInNewContext(`${pureCode}\nwindow.aiRoutingPure = { REASONING_DEPTHS, normalizeTaskRegistry, registerTaskDefinitions, normalizeTaskRoute, resolveTaskRoute, buildFallbackSequence, buildReasoningOptions, isRetryableAiError };`, sandbox);
+  vm.runInNewContext(`${pureCode}\nwindow.aiRoutingPure = { REASONING_DEPTHS, FALLBACK_MODES, normalizeTaskRegistry, registerTaskDefinitions, normalizeTaskRoute, resolveTaskRoute, buildFallbackSequence, buildReasoningOptions, isRetryableAiError };`, sandbox);
   vm.runInNewContext(runtimeCode, sandbox);
   return ai;
 }
@@ -73,4 +73,16 @@ test('vision tasks exclude models explicitly marked without vision', () => {
   ai.models[0].capabilities.vision = false;
   const rows = ai.listSelectableModels('food.vision');
   assert.deepEqual(Array.from(rows, row => row.profileId), ['p2']);
+});
+
+test('task fallback mode is persisted and controls the request sequence', async () => {
+  const ai = loadRuntime();
+  await ai.setTaskRoute('advice.chat', {
+    primary: { profileId: 'p1', modelId: 'shared-model' },
+    fallbackMode: 'manual',
+    fallbacks: [{ profileId: 'p2', modelId: 'shared-model' }]
+  });
+  assert.equal(ai.getTaskRequestSequence('advice.chat').length, 1);
+  await ai.setTaskRoute('advice.chat', { ...ai.getTaskRoute('advice.chat'), fallbackMode: 'automatic' });
+  assert.deepEqual(Array.from(ai.getTaskRequestSequence('advice.chat'), item => item.profileId), ['p1', 'p2']);
 });

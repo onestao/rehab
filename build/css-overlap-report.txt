@@ -1322,7 +1322,7 @@ mark.ai-hit
   files: 49-plan.css, 49-plan-ai.css
     color: var(--md-sys-on-surface-variant) (49-plan.css / 49-plan-ai.css)
 
-## COMPLEMENTS (same selector, disjoint properties): 117
+## COMPLEMENTS (same selector, disjoint properties): 116
 .bar-leading
   files: 04-layout-appbar.css, 50-v6-ui.css
 
@@ -1379,9 +1379,6 @@ mark.ai-hit
 
 .goal-safety-metrics small
   files: 19-health-weightloss-ai.css
-
-.ai-task-settings-empty
-  files: 20-settings-ai.css
 
 .pref-panel-actions
   files: 20-settings-ai.css

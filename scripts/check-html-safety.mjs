@@ -25,13 +25,13 @@ const REVIEWED_HTML_SINK_FILES = new Map([
   ['plan-ui.js', { sinks: 4, review: 'plan UI sections compose reviewed plan renderers.' }],
   ['plan-weekly.js', { sinks: 3, review: 'weekly plan panel markup is generated from structured plan state.' }],
   ['pwa-support.js', { sinks: 2, review: 'install/update banners use static controlled markup.' }],
-  ['report-panel.js', { sinks: 3, review: 'report renderers escape report fields before insertion.' }],
+  ['report-panel.js', { sinks: 4, review: 'report renderers escape report, version, model, and task fields before insertion.' }],
   ['routine-library.js', { sinks: 11, review: 'routine/action renderers escape library names and notes.' }],
   ['routine-plan.js', { sinks: 5, review: 'routine plan renderers escape routine/action fields.' }],
   ['sync-status.js', { sinks: 1, review: 'sync status markup is controlled by local status enums.' }],
   ['sync-ui.js', { sinks: 1, review: 'sync settings panel uses reviewed credential renderers.' }],
   ['toast.js', { sinks: 1, review: 'toast text is escaped before innerHTML assignment.' }],
-  ['weekly-summary.js', { sinks: 9, review: 'weekly summary renderers escape record text before insertion.' }],
+  ['weekly-summary.js', { sinks: 10, review: 'weekly and monthly summary renderers escape metadata and render AI content through the reviewed markdown renderer.' }],
   ['workout-readiness.js', { sinks: 1, review: 'readiness card markup is generated from controlled readiness state.' }],
 ]);
 

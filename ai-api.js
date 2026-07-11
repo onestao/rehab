@@ -27,6 +27,20 @@ Object.assign(ai, {
             ? this.getTaskRequestSequence(taskId, options.routeOverride || null)
             : [this._effectiveConfigForRequest({ taskId, routeOverride: options.routeOverride })];
         let lastError = null;
+        const withMeta = (text, effective, index) => {
+            if (index > 0) window.toast?.show?.(`\u4e3b\u6a21\u578b\u4e0d\u53ef\u7528\uff0c\u5df2\u4f7f\u7528\u5907\u7528\u6a21\u578b ${effective.modelId || effective.model || ''}`, 'warning');
+            return options.returnMeta ? {
+                text,
+                meta: {
+                    taskId,
+                    profileId: effective.profileId || '',
+                    provider: effective.provider || '',
+                    modelId: effective.modelId || effective.model || '',
+                    reasoningDepth: effective.reasoningDepth || 'auto',
+                    fallback: { used: index > 0, index, mode: effective.route?.fallbackMode || 'manual' }
+                }
+            } : text;
+        };
         for (let index = 0; index < sequence.length; index++) {
             const effective = sequence[index];
             let emitted = false;
@@ -42,19 +56,29 @@ Object.assign(ai, {
             };
             try {
                 if (options.imageFile) {
-                    return await this.callVisionTextImage(options.promptText || '', options.imageFile, options.maxTokens || 2000, options.systemText || '', requestOpts);
+                    const text = await this.callVisionTextImage(options.promptText || '', options.imageFile, options.maxTokens || 2000, options.systemText || '', requestOpts);
+                    return withMeta(text, effective, index);
                 }
                 if (Array.isArray(options.attachments) && options.attachments.some(item => item?.kind === 'image' && item.file)) {
-                    return await this.callAdviceWithAttachments(options.messages || [], options.attachments, options.maxTokens || 2400, requestOpts);
+                    const text = await this.callAdviceWithAttachments(options.messages || [], options.attachments, options.maxTokens || 2400, requestOpts);
+                    return withMeta(text, effective, index);
                 }
                 if (options.stream) {
-                    return await this.callStream(options.messages || [], options.maxTokens || 2000, requestOpts.onToken, requestOpts);
+                    const text = await this.callStream(options.messages || [], options.maxTokens || 2000, requestOpts.onToken, requestOpts);
+                    return withMeta(text, effective, index);
                 }
-                return await this.call(options.messages || [], options.maxTokens || 2000, requestOpts);
+                const text = await this.call(options.messages || [], options.maxTokens || 2000, requestOpts);
+                return withMeta(text, effective, index);
             } catch (error) {
                 lastError = error;
                 const retryable = window.aiRoutingPure?.isRetryableAiError?.(error) === true;
-                if (!retryable || emitted || index >= sequence.length - 1) throw error;
+                if (!retryable || emitted || index >= sequence.length - 1) {
+                    const route = this.getTaskRoute?.(taskId) || {};
+                    if (!emitted && route.fallbackMode !== 'automatic' && route.fallbacks?.[0]) {
+                        error.aiFallback = { taskId, target: route.fallbacks[0] };
+                    }
+                    throw error;
+                }
                 try { window.dispatchEvent(new CustomEvent('ai:route-fallback', { detail: { taskId, index, error } })); } catch {}
             }
         }

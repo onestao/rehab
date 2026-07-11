@@ -214,6 +214,13 @@
 .ai-input .advice-model-picker.advice-model-chip.is-override { width: auto; min-width: 54px; padding: 0 5px 0 5px; gap: 3px; }
 .ai-input .advice-model-picker .advice-model-picker-arrow { display: none; }
 .ai-input .advice-model-picker .advice-model-mark { width: 26px; height: 26px; font-size: 10px; }
+.ai-input .advice-reasoning-chip { width: 36px; height: 36px; min-width: 36px; border: 0; border-radius: 50%; background: var(--md-sys-surface-container-high); display: inline-grid; place-items: center; cursor: pointer; }
+.ai-input .advice-reasoning-chip.is-auto { color: #1769aa; }
+.ai-input .advice-reasoning-chip.is-off { color: var(--md-sys-on-surface-variant); }
+.ai-input .advice-reasoning-chip.is-low { color: #7b3fb2; }
+.ai-input .advice-reasoning-chip.is-medium { color: #9a6700; }
+.ai-input .advice-reasoning-chip.is-high { color: #b21f87; }
+.advice-reasoning-menu .ai-reasoning-menu-item { width: 100%; padding: 0 8px; }
 .ai-input .advice-model-picker .advice-model-icon { width: 20px; height: 20px; }
 .ai-input .advice-model-chip-x { position: static; z-index: 4; width: 18px; height: 18px; font-size: 13px; line-height: 1; flex: none; }
 .ai-input textarea { flex: 1 1 auto; min-width: 0; border: none; background: transparent; font-size: 13px; color: var(--md-sys-on-surface); outline: none; resize: none; min-height: 24px; max-height: 160px; font-family: inherit; overflow-wrap: anywhere; overscroll-behavior: contain; touch-action: pan-y; -webkit-overflow-scrolling: touch; }

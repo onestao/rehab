@@ -687,11 +687,11 @@
         </div>
     </div>
     <div id="aiModelPickerSheet" class="md-modal md-modal-sheet hidden" aria-hidden="true">
-        <div class="md-modal-backdrop" onclick="data.closeAdviceModelPicker?.()"></div>
+        <div class="md-modal-backdrop" onclick="window.aiTaskSettings?.closeQuickSheet?.();data.closeAdviceModelPicker?.()"></div>
         <div class="md-modal-card md-modal-sheet-card">
             <div class="md-modal-head">
                 <strong>选择本次模型</strong>
-                <button class="icon-btn" onclick="data.closeAdviceModelPicker?.()" aria-label="&#20851;&#38381;" data-modal-close><span class="material-symbols-rounded">close</span></button>
+                <button class="icon-btn" onclick="window.aiTaskSettings?.closeQuickSheet?.();data.closeAdviceModelPicker?.()" aria-label="&#20851;&#38381;" data-modal-close><span class="material-symbols-rounded">close</span></button>
             </div>
             <div id="aiModelPickerContent"></div>
         </div>
@@ -762,8 +762,8 @@
         const PAGE_DEPS = {
             workout: ['voice-engine','voice-cache','voice-webspeech-adapter','voice-legado-adapter','workout-voice','workout-readiness','strength-form','weekly-plan','action-history','plan-chains','plan-progression','plan-store','plan-feedback','plan-cooldown','plan-auto-adjust','plan-weekly','plan-equipment','plan-ui','workout-system','workout-pip','workout-core','workout-cardio-pure','workout-cardio','workout-engine','workout-state','swipe-actions','routine-plan','routine-library','workout-wakelock','workout-media-session','ai-store','ai-profile','ai-routing-pure','ai-routing','ai-api','ai-task-settings'],
             'ai-coach': ['lib/virtual-core.umd','ai-store','ai-profile','ai-model-catalog-pure','ai-model-cache','ai-models','ai-routing-pure','ai-routing','ai-api','ai-task-settings','ai-pricing','ai-templates','advice-template-manager','advice-rules','plan-analytics','advice-panel','coach-context','advice-attachments','advice-render','advice-prompt','advice-stream-renderer','routine-library','plan-chains','plan-progression','plan-store','plan-ai-pure','plan-ai'],
-            profile: ['voice-engine','voice-cache','voice-webspeech-adapter','voice-legado-adapter','workout-voice','credential-fields','weekly-plan','backup','sync-ui','sync-adapters','sync','routine-library','goal-plan','weekly-summary','plan-chains','plan-progression','plan-store','plan-equipment','plan-ui','ai-store','ai-profile','ai-model-catalog-pure','ai-model-cache','ai-models','ai-routing-pure','ai-routing','ai-task-settings'],
-            records: ['history-view','weekly-summary','health-diet','health-weight','health-profile','health-exercise','goal-plan','routine-library','food-log','pr-tracker','volume-heatmap','action-history','report-metrics-pure','report-panel','plan-chains','plan-progression','plan-store','plan-weekly','plan-ui','ai-store','ai-profile','ai-model-catalog-pure','ai-model-cache','ai-models','ai-routing-pure','ai-routing','ai-api','ai-task-settings'],
+            profile: ['voice-engine','voice-cache','voice-webspeech-adapter','voice-legado-adapter','workout-voice','credential-fields','weekly-plan','backup','sync-ui','sync-adapters','sync','routine-library','goal-plan','report-version-pure','weekly-summary','plan-chains','plan-progression','plan-store','plan-equipment','plan-ui','ai-store','ai-profile','ai-model-catalog-pure','ai-model-cache','ai-models','ai-routing-pure','ai-routing','ai-api','ai-task-settings'],
+            records: ['history-view','report-version-pure','weekly-summary','health-diet','health-weight','health-profile','health-exercise','goal-plan','routine-library','food-log','pr-tracker','volume-heatmap','action-history','report-metrics-pure','report-panel','plan-chains','plan-progression','plan-store','plan-weekly','plan-ui','ai-store','ai-profile','ai-model-catalog-pure','ai-model-cache','ai-models','ai-routing-pure','ai-routing','ai-api','ai-task-settings'],
             today: ['history-view']
         };
         const CSS_DEPS = {
@@ -817,7 +817,8 @@
             'debug-tools': [],
             'debug-ai': [],
             'debug-plan-ai': []
-            ,'report-panel': ['report-metrics-pure']
+            ,'report-panel': ['report-metrics-pure','report-version-pure']
+            ,'weekly-summary': ['report-version-pure']
         };
 
         function runWhenIdle(callback, options) {

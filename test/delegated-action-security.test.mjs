@@ -336,8 +336,8 @@ test('model picker stars models and sorts starred rows first', () => {
 
     api.adviceStarredModels = [];
     api.toggleAdviceModelStar('openai', 'openai-model');
-    assert.equal(api.adviceStarredModels.includes('openai::openai-model'), true);
-    assert.equal(stored.rehab_advice_settings.includes('openai::openai-model'), true);
+    assert.equal(api.adviceStarredModels.includes('p-openai::openai-model'), true);
+    assert.equal(stored.rehab_advice_settings.includes('p-openai::openai-model'), true);
 
     const root = fakeRoot();
     let starred = null;

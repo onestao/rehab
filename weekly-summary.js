@@ -318,6 +318,7 @@
                     <button class="summary-ai-btn" ${hasAi ? '' : 'disabled'} onclick="data.askWeeklySummaryAi('${safe(insight.weekKey)}', true)" type="button"><span class="material-symbols-rounded">trending_down</span>判断降载</button>
                 </div>
                 <div data-ai-task-picker="summary.weekly"></div>
+                ${this.renderSavedSummaryResults('weekly', insight.weekKey)}
             </div>
             <div class="summary-glass-card">
                 <div class="summary-kicker">周概览</div>
@@ -341,15 +342,15 @@
         askWeeklySummaryAi(weekKey = '', deload = false) {
             const basePrompt = this.weeklyAiPromptForWeek(weekKey);
             const prompt = deload ? `${basePrompt}\n请特别判断下一周是否需要 deload，并给出具体降载比例、保留动作和恢复安排。` : basePrompt;
-            this._inlineSummaryAi('weekly', weekKey, prompt, deload ? '判断降载' : '周总结');
+            this._inlineSummaryAi('weekly', weekKey, prompt, deload ? '判断降载' : '周总结', deload ? 'deload' : 'summary');
         },
 
         askMonthlySummaryAi(monthKey = '') {
             const prompt = this.monthlySummaryAiPrompt(monthKey);
-            this._inlineSummaryAi('monthly', monthKey, prompt, '月总结');
+            this._inlineSummaryAi('monthly', monthKey, prompt, '月总结', 'summary');
         },
 
-        async _inlineSummaryAi(kind, periodKey, prompt, label) {
+        async _inlineSummaryAi(kind, periodKey, prompt, label, resultType = 'summary', routeOverride = null) {
             const hasAi = !!(this.db?.aiProfiles?.length && (this.db.aiActiveId || this.db.aiProfiles[0]?.id)) || !!(window.ai && ai.cfg?.enabled);
             if (!hasAi) return alert('请先在设置中配置 AI');
             const body = document.getElementById('summarySheetBody');
@@ -377,7 +378,7 @@
                 if (window.ai?.run) {
                     let accumulated = '';
                     let _lastRender = 0;
-                    const result = await ai.run({ taskId, messages, maxTokens: 1800, stream: true, onToken: (delta, acc) => {
+                    const result = await ai.run({ taskId, messages, maxTokens: 1800, stream: true, returnMeta: true, routeOverride, onToken: (delta, acc) => {
                         accumulated = acc;
                         const now = Date.now();
                         if (now - _lastRender > 60) {
@@ -385,39 +386,108 @@
                             responseEl.innerHTML = `<div class="summary-ai-result">${renderMd(accumulated)}</div>`;
                         }
                     } });
-                    const finalText = typeof result === 'string' ? result : accumulated;
+                    const meta = window.reportVersionPure.metaFromResult(result, window.ai?.resolveTaskConfig?.(taskId) || window.ai?.getEffectiveConfig?.() || {});
+                    const finalText = meta.text || accumulated;
                     responseEl.innerHTML = `<div class="summary-ai-result">${renderMd(finalText)}</div>`;
-                    this._saveSummaryReport(kind, periodKey, finalText);
+                    this._saveSummaryReport(kind, periodKey, resultType, finalText, meta);
                 } else {
                     const result = await ai.call(messages, 1800);
                     const text = typeof result === 'string' ? result : (result?.choices?.[0]?.message?.content || JSON.stringify(result));
                     responseEl.innerHTML = `<div class="summary-ai-result">${renderMd(text)}</div>`;
-                    this._saveSummaryReport(kind, periodKey, text);
+                    this._saveSummaryReport(kind, periodKey, resultType, text, window.reportVersionPure.metaFromResult(result));
                 }
             } catch (err) {
-                responseEl.innerHTML = `<div class="summary-ai-error"><span class="material-symbols-rounded">error</span> ${safe(String(err?.message || err || '请求失败'))}</div>`;
+                const message = String(err?.message || err || '请求失败');
+                responseEl.innerHTML = `<div class="summary-ai-error"><span class="material-symbols-rounded">error</span> ${safe(message)}</div>`;
+                if (err?.aiFallback?.target) window.toast?.show?.(message, 'error', { timeout: 6000, action: '使用备用模型重试', onAction: () => this._inlineSummaryAi(kind, periodKey, prompt, label, resultType, err.aiFallback.target) });
             }
         },
 
-        _saveSummaryReport(kind, periodKey, content) {
+        _saveSummaryReport(kind, periodKey, resultType, content, meta = {}) {
             try {
                 this.db.health.reports = this.db.health.reports || [];
                 const now = Date.now();
-                const existing = this.activeRecords(this.db.health.reports).find(r => r.kind === `summary_${kind}` && r.periodKey === periodKey);
-                const record = {
+                const existing = this.activeRecords(this.db.health.reports).find(r => r.kind === `summary_${kind}` && r.periodKey === periodKey && (r.resultType || 'summary') === resultType);
+                let record = {
+                    ...(existing || {}),
                     id: existing?.id || this.generateRecordId(`summary-${kind}`),
                     kind: `summary_${kind}`,
                     periodKey,
+                    resultType,
                     generatedAt: existing?.generatedAt || new Date(now).toISOString(),
                     updatedAt: now,
                     deleted: false,
-                    content,
-                    ai: { summary: content, model: 'ai', prompt_id: `summary_${kind}` }
+                    content
                 };
+                record = window.reportVersionPure.appendVersion(record, {
+                    content,
+                    ai: { summary: content, model: meta.model || 'ai', profileId: meta.profileId || '', reasoningEffort: meta.reasoningEffort || '', fallback: meta.fallback || null, prompt_id: `summary_${kind}_${resultType}` }
+                }, now);
                 if (existing) Object.assign(existing, record);
                 else this.db.health.reports.push(record);
                 this.saveAndBackup?.();
+                this.renderSavedSummaryResult(kind, periodKey, resultType);
             } catch {}
+        },
+
+        findSummaryReport(kind, periodKey, resultType = 'summary') {
+            const report = this.activeRecords(this.db.health.reports || []).find(r => r.kind === `summary_${kind}` && r.periodKey === periodKey && (r.resultType || 'summary') === resultType) || null;
+            if (report) Object.assign(report, window.reportVersionPure.normalizeRecord(report));
+            return report;
+        },
+
+        renderSummaryVersion(report, resultType) {
+            const safe = this.escapeHtml.bind(this);
+            const version = window.reportVersionPure.activeVersion(report);
+            if (!version) return '';
+            const index = Math.max(0, report.versions.findIndex(v => v.id === report.activeVersionId));
+            const ai = version.ai || {};
+            const renderMd = this.renderAdviceMarkdown ? (t) => this.renderAdviceMarkdown(t) : (t) => `<p>${safe(t)}</p>`;
+            return `<div class="summary-ai-response" data-summary-result="${safe(resultType)}">
+                <div class="summary-version-head"><b>${resultType === 'deload' ? '降载判断' : '总结'}</b><small>${safe(ai.model || 'AI')}${ai.reasoningEffort ? ` · ${safe(ai.reasoningEffort)}` : ''}</small></div>
+                <div class="summary-ai-result">${renderMd(version.content || ai.summary || '')}</div>
+                <div class="advice-version-switcher" aria-label="总结版本">
+                    <button class="advice-version-btn" ${index <= 0 ? 'disabled' : ''} onclick="data.cycleSummaryVersion('${safe(report.id)}', -1)" type="button" aria-label="上一个版本"><span class="material-symbols-rounded">chevron_left</span></button>
+                    <span>${index + 1}/${report.versions.length}</span>
+                    <button class="advice-version-btn" ${index >= report.versions.length - 1 ? 'disabled' : ''} onclick="data.cycleSummaryVersion('${safe(report.id)}', 1)" type="button" aria-label="下一个版本"><span class="material-symbols-rounded">chevron_right</span></button>
+                    <button class="advice-version-btn" onclick="data.deleteSummaryVersion('${safe(report.id)}')" type="button" aria-label="删除当前版本"><span class="material-symbols-rounded">delete</span></button>
+                </div>
+            </div>`;
+        },
+
+        renderSavedSummaryResults(kind, periodKey) {
+            const types = kind === 'weekly' ? ['summary', 'deload'] : ['summary'];
+            return types.map(type => {
+                const report = this.findSummaryReport(kind, periodKey, type);
+                return report ? this.renderSummaryVersion(report, type) : '';
+            }).join('');
+        },
+
+        renderSavedSummaryResult(kind, periodKey, resultType) {
+            const body = document.getElementById('summarySheetBody');
+            if (!body) return;
+            body.innerHTML = kind === 'monthly'
+                ? this.renderMonthlySummarySheetBody(periodKey)
+                : this.renderWeeklySummarySheetBody(periodKey);
+        },
+
+        cycleSummaryVersion(id, delta) {
+            const report = this.activeRecords(this.db.health.reports || []).find(r => r.id === id);
+            if (!report) return;
+            Object.assign(report, window.reportVersionPure.cycle(report, delta), { updatedAt: Date.now() });
+            this.saveAndBackup?.();
+            const target = document.querySelector(`[data-summary-result="${report.resultType || 'summary'}"]`);
+            if (target) target.outerHTML = this.renderSummaryVersion(report, report.resultType || 'summary');
+        },
+
+        deleteSummaryVersion(id) {
+            const report = this.activeRecords(this.db.health.reports || []).find(r => r.id === id);
+            if (!report) return;
+            const next = window.reportVersionPure.removeVersion(report, report.activeVersionId);
+            if (!next.versions.length) report.deleted = true;
+            else Object.assign(report, next, { updatedAt: Date.now() });
+            this.saveAndBackup?.();
+            this.renderSavedSummaryResult(report.kind === 'summary_monthly' ? 'monthly' : 'weekly', report.periodKey, report.resultType || 'summary');
         },
 
         openWeeklySummarySheet() {
@@ -519,6 +589,7 @@
                     <button class="summary-ai-btn" ${hasAi ? '' : 'disabled'} onclick="data.askMonthlySummaryAi('${safe(m.monthKey)}')" type="button"><span class="material-symbols-rounded">auto_awesome</span>${safe(m.monthLabel)}总结</button>
                 </div>
                 <div data-ai-task-picker="summary.monthly"></div>
+                ${this.renderSavedSummaryResults('monthly', m.monthKey)}
             </div>`;
         },
 

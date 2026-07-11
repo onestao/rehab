@@ -163,6 +163,23 @@
     justify-content: space-between;
     gap: 8px;
 }
+.weight-report-version-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+.weight-report-version-row > small {
+    min-width: 0;
+    color: var(--md-sys-on-surface-variant);
+    font-size: 11px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.weight-report-version-row .advice-version-switcher {
+    flex: 0 0 auto;
+}
 .weight-report-period small,
 .weight-report-archive summary small {
     color: var(--md-sys-on-surface-variant);

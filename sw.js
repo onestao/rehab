@@ -35,6 +35,7 @@ const ASSETS = [
     'ai-routing-pure.mjs?v=312',
     'ai-routing.js?v=312',
     'ai-task-settings.js?v=312',
+    'report-version-pure.js?v=312',
     'plan-chains.js?v=312',
     'plan-progression.js?v=312',
     'rehab-policy.js?v=312',

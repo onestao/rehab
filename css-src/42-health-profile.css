@@ -1207,6 +1207,21 @@
     padding: 14px;
     animation: summarySheetFadeIn .25s var(--md-sys-motion-emphasized);
 }
+.summary-version-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+.summary-version-head small {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--md-sys-on-surface-variant);
+    font-size: 11px;
+}
 .summary-ai-loading {
     display: flex;
     align-items: center;

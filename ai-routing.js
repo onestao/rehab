@@ -59,12 +59,13 @@
                 taskId,
                 primary: defaultPrimary(),
                 reasoningDepth: definition?.defaultReasoningDepth || 'auto',
+                fallbackMode: 'manual',
                 fallbacks: []
             };
             if (!helper?.resolveTaskRoute) return fallback;
             return helper.resolveTaskRoute({
                 taskRegistry: TASK_DEFINITIONS,
-                defaultRoute: { primary: defaultPrimary(), reasoningDepth: 'auto', fallbacks: [] },
+                defaultRoute: { primary: defaultPrimary(), reasoningDepth: 'auto', fallbackMode: 'manual', fallbacks: [] },
                 taskRoutes: this.cfg.taskRoutes || {}
             }, taskId);
         },
@@ -138,7 +139,7 @@
             const route = helper?.resolveTaskRoute
                 ? helper.resolveTaskRoute({
                     taskRegistry: TASK_DEFINITIONS,
-                    defaultRoute: { primary: defaultPrimary(), reasoningDepth: 'auto', fallbacks: [] },
+                    defaultRoute: { primary: defaultPrimary(), reasoningDepth: 'auto', fallbackMode: 'manual', fallbacks: [] },
                     taskRoutes: this.cfg.taskRoutes || {}
                 }, taskId, override)
                 : { ...this.getTaskRoute(taskId), ...(override || {}) };
