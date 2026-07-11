@@ -83,7 +83,7 @@
     min-height: 48px;
     border: 1px solid var(--md-sys-outline-variant);
     border-radius: var(--md-sys-shape-lg);
-    background: var(--md-sys-surface-container-lowest);
+    background: color-mix(in srgb, var(--glass-bg) 82%, var(--md-sys-surface-container-lowest));
     color: var(--md-sys-on-surface);
     display: flex;
     align-items: center;
@@ -91,6 +91,8 @@
     padding: 10px 12px;
     text-align: left;
 }
+
+.model-picker-row:focus-visible { outline: 2px solid var(--md-sys-primary); outline-offset: 2px; }
 
 .model-picker-row .advice-model-mark {
     flex: none;

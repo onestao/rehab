@@ -1296,7 +1296,7 @@ const advicePanel = {
         const style = this.adviceModelThemeStyle(visual);
         return `<button class="advice-model-picker advice-model-chip advice-model-${visual.key} ${isOverride ? 'is-override' : ''}" ${style ? `style="${this.escapeHtml(style)}"` : ''} onclick="data.openAdviceModelPicker()" type="button" aria-label="切换分析模型：${this.escapeHtml(label)}" title="切换分析模型：${this.escapeHtml(label)}">
             <span class="advice-model-mark">${this.adviceModelIconHtml(visual)}</span>
-            ${isOverride ? `<span class="advice-model-chip-x" onclick="event.stopPropagation();ai.resetTaskRoute?.('${this.escapeHtml(taskId)}').then(()=>data.rerenderAdvicePanel?.())" role="button" aria-label="恢复默认">×</span>` : ''}
+            <span class="material-symbols-rounded advice-model-chip-arrow" aria-hidden="true">expand_more</span>
         </button>`;
     },
 
@@ -1386,6 +1386,7 @@ const advicePanel = {
             window.haptics?.light?.();
             this.refreshAdviceModelChip?.();
             this.rerenderAdvicePanel?.();
+            window.toast?.show?.(`已切换至 ${this.modelShortName(model)}`, 'success');
         });
     },
 

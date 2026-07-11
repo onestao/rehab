@@ -36,7 +36,9 @@
     }
 
     function defaultPrimary() {
-        const profile = profileForId(ai.cfg.activeProfileId) || ai.cfg.profiles?.[0] || null;
+        const profile = profileForId(ai.cfg.activeProfileId)
+            || ai.cfg.profiles?.find(item => item.enabled !== false && item.archived !== true)
+            || null;
         const modelId = String(profile?.model || ai.cfg.model || '').trim();
         return profile?.id && modelId ? { profileId: profile.id, modelId } : null;
     }
@@ -98,15 +100,11 @@
 
         listSelectableModels(taskId = '') {
             const definition = this.getTaskDefinition(taskId);
-            const required = definition?.requiredCapabilities || [];
             const rows = [];
             const seen = new Set();
             const add = (profile, modelId, model = null) => {
-                if (!profile?.id || !modelId || !this.apiKeyFor?.(profile.id)) return;
-                if (model && this.isModelEnabled && !this.isModelEnabled(model)) return;
+                if (!profile?.id || profile.enabled === false || profile.archived === true || !modelId || !this.apiKeyFor?.(profile.id)) return;
                 const capabilities = model?.capabilities || {};
-                if (required.some(capability => capabilities[capability] === false)) return;
-                if (required.includes('vision') && model?.isImageGen) return;
                 const key = `${profile.id}::${modelId}`;
                 if (seen.has(key)) return;
                 seen.add(key);
@@ -126,7 +124,6 @@
                 });
             };
             (this.cfg.profiles || []).forEach(profile => {
-                if (profile.model) add(profile, profile.model, modelForTarget(profile.id, profile.model));
                 (this.models || [])
                     .filter(model => String(model.profileId || '') === String(profile.id))
                     .forEach(model => add(profile, model.id, model));
@@ -144,7 +141,7 @@
                 }, taskId, override)
                 : { ...this.getTaskRoute(taskId), ...(override || {}) };
             const target = route.primary || defaultPrimary();
-            const profile = profileForId(target?.profileId) || profileForId(this.cfg.activeProfileId);
+            const profile = profileForId(target?.profileId);
             const modelId = target?.modelId || profile?.model || this.cfg.model || '';
             const model = modelForTarget(profile?.id, modelId);
             return {
@@ -158,7 +155,7 @@
                 extraVisionKeywords: profile?.extraVisionKeywords || this.cfg.extraVisionKeywords || '',
                 reasoningDepth: route.reasoningDepth || 'auto',
                 capabilities: model?.capabilities || {},
-                enabled: !!((profile?.baseUrl || this.cfg.baseUrl) && modelId),
+                enabled: !!(profile && profile.enabled !== false && profile.archived !== true && profile.baseUrl && modelId && model),
                 apiKey: profile?.id ? this.apiKeyFor(profile.id) : ''
             };
         },

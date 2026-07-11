@@ -34,6 +34,17 @@ function inferVendor(model = {}, provider = '') {
         || provider;
 }
 
+export function inferModelFamily(model = {}) {
+    const id = String(model.id || model.name || '').toLowerCase();
+    const owner = String(model.owned_by || model.ownedBy || model.vendor || model.publisher || '').trim();
+    const rules = [
+        [/claude/, 'Claude'], [/gemini/, 'Gemini'], [/(^|[/_-])gpt([/_-]|$)|(^|[/_-])o[134]([/_-]|$)/, 'OpenAI'],
+        [/deepseek/, 'DeepSeek'], [/qwen|qwq/, 'Qwen'], [/glm/, 'GLM'], [/llama/, 'Llama'],
+        [/mistral|mixtral/, 'Mistral'], [/command-r/, 'Command'], [/embedding|embed/, 'Embedding']
+    ];
+    return rules.find(([pattern]) => pattern.test(id))?.[1] || owner || '其他';
+}
+
 function inferIconKey(vendor = '', provider = '', modelId = '') {
     const value = `${vendor} ${modelId}`.toLowerCase();
     if (/anthropic|claude/.test(value)) return 'claude';
@@ -77,6 +88,7 @@ export function normalizeCatalogModel(model = {}, context = {}) {
         provider,
         endpointFingerprint: String(context.endpointFingerprint || model.endpointFingerprint || endpointFingerprint(context.baseUrl || '')),
         vendor,
+        family: String(model.family || inferModelFamily(model)),
         owned_by: String(model.owned_by || model.ownedBy || vendor),
         iconKey: String(model.iconKey || inferIconKey(vendor, provider, id)),
         capabilities: {
@@ -161,6 +173,7 @@ if (typeof window !== 'undefined') {
     window.aiModelCatalogPure = {
         clearModelCatalog,
         endpointFingerprint,
+        inferModelFamily,
         migrateLegacyModelCatalog,
         normalizeCatalogModel,
         replaceDiscoveredModelsForProfile

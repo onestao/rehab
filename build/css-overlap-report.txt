@@ -542,9 +542,14 @@ mark.ai-hit
 
 .md-nav-rail
   files: 27-layout-nav.css, 36-responsive.css, 37-dark-mode.css, 56-v6-nav.css
-    background: color-mix(in srgb, var(--md-sys-surface-container) 80%, transparent) | var(--md-sys-surface-container) (27-layout-nav.css / 37-dark-mode.css / 56-v6-nav.css)
-    backdrop-filter: blur(20px) | blur(24px) saturate(180%) (27-layout-nav.css / 37-dark-mode.css / 56-v6-nav.css)
-    -webkit-backdrop-filter: blur(20px) | blur(24px) saturate(180%) (27-layout-nav.css / 56-v6-nav.css)
+    width: 100% | calc(100% - 16px) (27-layout-nav.css / 27-layout-nav.css)
+    height: calc(76px + env(safe-area-inset-bottom)) | 68px (27-layout-nav.css / 27-layout-nav.css)
+    background: color-mix(in srgb, var(--md-sys-surface-container) 80%, transparent) | color-mix(in srgb, var(--glass-bg-strong) 88%, transparent) | var(--md-sys-surface-container) (27-layout-nav.css / 27-layout-nav.css / 37-dark-mode.css / 56-v6-nav.css)
+    padding: 6px 8px calc(6px + env(safe-area-inset-bottom)) | 6px (27-layout-nav.css / 27-layout-nav.css)
+    backdrop-filter: blur(20px) | var(--glass-blur, blur(22px)) saturate(1.18) | blur(24px) saturate(180%) (27-layout-nav.css / 27-layout-nav.css / 37-dark-mode.css / 56-v6-nav.css)
+    -webkit-backdrop-filter: blur(20px) | var(--glass-blur, blur(22px)) saturate(1.18) | blur(24px) saturate(180%) (27-layout-nav.css / 27-layout-nav.css / 56-v6-nav.css)
+    box-shadow: 0 -1px 0 var(--md-sys-outline-variant) | var(--glass-shadow-inset), 0 10px 28px color-mix(in srgb, var(--md-sys-on-surface) 11%, transparent) (27-layout-nav.css / 27-layout-nav.css / 56-v6-nav.css)
+    border-radius: 22px | 0 (27-layout-nav.css / 36-responsive.css)
 
 .workout-controls
   files: 28-workout-fab.css, 37-dark-mode.css, 52-v6-workout.css
@@ -1322,7 +1327,7 @@ mark.ai-hit
   files: 49-plan.css, 49-plan-ai.css
     color: var(--md-sys-on-surface-variant) (49-plan.css / 49-plan-ai.css)
 
-## COMPLEMENTS (same selector, disjoint properties): 116
+## COMPLEMENTS (same selector, disjoint properties): 119
 .bar-leading
   files: 04-layout-appbar.css, 50-v6-ui.css
 
@@ -1380,7 +1385,13 @@ mark.ai-hit
 .goal-safety-metrics small
   files: 19-health-weightloss-ai.css
 
+#aiModelPickerSheet .md-modal-sheet-card
+  files: 20-settings-ai.css
+
 .pref-panel-actions
+  files: 20-settings-ai.css
+
+.ai-model-family-title
   files: 20-settings-ai.css
 
 .mode-tab:active
@@ -1409,6 +1420,9 @@ mark.ai-hit
 
 .nav-content
   files: 27-layout-nav.css, 50-v6-ui.css
+
+.nav-item.active small
+  files: 27-layout-nav.css
 
 .nav-item.active .nav-content > .material-symbols-rounded
   files: 27-layout-nav.css, 56-v6-nav.css

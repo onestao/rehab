@@ -1,8 +1,11 @@
 accessibility_new
 add
 add_circle
+archive
 arrow_back
+arrow_downward
 arrow_forward
+arrow_upward
 assignment
 auto_awesome
 backup
@@ -35,7 +38,6 @@ dark_mode
 data_thresholding
 delete
 delete_forever
-delete_sweep
 diagnosis
 directions_bike
 directions_run
@@ -62,6 +64,7 @@ forum
 health_and_safety
 help
 history
+hub
 info
 inventory_2
 keyboard
@@ -95,6 +98,7 @@ play_arrow
 play_circle
 playlist_add
 pool
+power_settings_new
 progress_activity
 psychology
 radio_button_unchecked
@@ -141,6 +145,7 @@ trending_down
 trending_flat
 trending_up
 tune
+unarchive
 upload
 upload_file
 verified

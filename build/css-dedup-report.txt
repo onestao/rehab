@@ -580,6 +580,9 @@ media (max-width: 480px)
 media (max-width: 520px)
   26-settings-sync.css, 57-weight-report.css
 
+media (max-width: 640px)
+  27-layout-nav.css, 49-plan.css
+
 media (min-width: 600px)
   06-layout-page.css, 36-responsive.css
 

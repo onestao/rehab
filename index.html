@@ -8,7 +8,7 @@
     <link rel="icon" href="assets/app-icon.svg" type="image/svg+xml">
     <meta name="theme-color" content="#0061a4">
     <link rel="preload" href="assets/material-symbols-rounded.woff2" as="font" type="font/woff2" crossorigin>
-    <link rel="stylesheet" href="build/generated.css?v=313">
+    <link rel="stylesheet" href="build/generated.css?v=314">
 </head>
 <body>
     <div id="appUpdateBanner" class="app-update-banner hidden">
@@ -239,48 +239,12 @@
             <div id="profileSettings" class="hidden">
                 <div class="md-card sync-card" data-settings="ai">
                     <div class="ai-card-header"><span class="material-symbols-rounded">psychology</span><strong>AI &#35774;&#32622;</strong><span id="aiStatus" class="ai-status ai-off">&#26410;&#37197;&#32622;</span></div>
-                    <div class="md-row ai-profile-actions">
-                        <div class="md-field" style="flex:1">
-                            <select id="aiProfileSelect" onchange="ai.selectProfile(this.value)"></select>
-                            <label>&#37197;&#32622;&#26723;&#26696;</label>
-                        </div>
-                        <button class="md-btn md-btn-tonal" onclick="ai.deleteCurrentProfile()"><span class="material-symbols-rounded">delete</span> &#21024;&#38500;&#24403;&#21069;</button>
-                    </div>
-                    <div class="md-row ai-profile-actions">
-                        <div class="md-field" style="flex:1 1 auto;min-width:0"><input type="text" id="aiProfileName" placeholder=" "><label>&#26723;&#26696;&#21517;&#31216;</label></div>
-                        <button class="md-btn md-btn-tonal" onclick="ai.saveAsNewProfile()"><span class="material-symbols-rounded">bookmark_add</span> &#21478;&#23384;</button>
-                    </div>
-                    <div class="md-field">
-                        <select id="aiProvider">
-                            <option value="openai">OpenAI &#20860;&#23481;&#25509;&#21475; (Chat Completions)</option>
-                            <option value="openai-responses">OpenAI Responses API</option>
-                            <option value="claude">Claude (Anthropic)</option>
-                            <option value="gemini">Gemini</option>
-                        </select>
-                        <label>AI &#25552;&#20379;&#21830;</label>
-                    </div>
-                    <div class="md-field"><input type="text" id="aiBaseUrl" pattern="^https?://.+" placeholder=" "><label>Base URL</label></div>
-                    <div class="md-field"><input type="text" id="aiApiKey" class="masked-input credential-masked" placeholder=" " autocomplete="one-time-code" autocapitalize="off" autocorrect="off" spellcheck="false" inputmode="text" data-lpignore="true" data-1p-ignore="true" data-form-type="other" name="ai-api-key-secret-rnd"><label>API Key</label></div>
-                    <button class="md-btn md-btn-tonal" onclick="ai.fetchModels()"><span class="material-symbols-rounded">refresh</span> &#33719;&#21462;&#21487;&#29992;&#27169;&#22411;</button>
-                    <div id="aiFetchStatus" class="food-ai-status"></div>
-                    <div id="aiModelList" class="ai-model-list hidden"></div>
-                    <div class="md-field"><input type="text" id="aiModel" placeholder=" " onfocus="ai.showCachedModels()"><label>&#27169;&#22411;&#21517;&#31216;</label></div>
-                    <div class="md-field"><input type="text" id="aiExtraVisionKeywords" placeholder=" "><label>&#33258;&#23450;&#20041;&#35270;&#35273;&#27169;&#22411;&#20851;&#38190;&#23383;&#65288;&#36887;&#21495;&#20998;&#38548;&#65289;</label></div>
-                    <div class="ai-settings-section" aria-labelledby="aiModelCacheTitle">
-                        <div class="ai-settings-section-head">
-                            <div>
-                                <strong id="aiModelCacheTitle">&#27169;&#22411;&#32531;&#23384;&#31649;&#29702;</strong>
-                                <small>&#21047;&#26032;&#25110;&#28165;&#29702;&#24403;&#21069;&#36830;&#25509;&#30340;&#27169;&#22411;&#30446;&#24405;&#12290;</small>
-                            </div>
-                        </div>
-                        <div id="aiModelCacheActions" class="ai-cache-actions">
-                            <button class="md-btn md-btn-tonal" type="button" onclick="window.aiTaskSettings?.refreshCurrentModels()"><span class="material-symbols-rounded">refresh</span> &#21047;&#26032;&#24403;&#21069;</button>
-                            <button class="md-btn md-btn-tonal" type="button" onclick="window.aiTaskSettings?.clearCurrentModelCache()"><span class="material-symbols-rounded">delete_sweep</span> &#28165;&#29702;&#24403;&#21069;</button>
-                            <button class="md-btn md-btn-text ai-cache-danger" type="button" onclick="window.aiTaskSettings?.clearAllModelCaches()"><span class="material-symbols-rounded">delete_forever</span> &#28165;&#29702;&#20840;&#37096;</button>
-                        </div>
-                        <div id="aiModelCacheStatus" class="ai-task-settings-status" role="status" aria-live="polite"></div>
-                    </div>
-                    <button class="md-btn md-btn-filled" onclick="ai.saveCurrentProfile()"><span class="material-symbols-rounded">save</span> &#20445;&#23384;&#24403;&#21069;&#37197;&#32622;</button>
+                    <button class="ai-provider-summary" type="button" onclick="window.aiProviderManager?.open()">
+                        <span class="material-symbols-rounded" aria-hidden="true">psychology</span>
+                        <span><strong>&#20379;&#24212;&#21830;</strong><small id="aiProviderSummary">0 &#24050;&#21551;&#29992; / 0 &#20010;&#20379;&#24212;&#21830;</small></span>
+                        <span class="material-symbols-rounded" aria-hidden="true">chevron_right</span>
+                    </button>
+                    <div id="aiModelCacheStatus" class="ai-task-settings-status" role="status" aria-live="polite"></div>
                     <div class="md-divider"></div>
                     <div class="ai-settings-section" aria-labelledby="aiTaskSettingsTitle">
                         <div class="ai-settings-section-head">
@@ -383,6 +347,14 @@
                 </div>
             </div>
         </section>
+        <section id="aiProviderManager" class="ai-provider-manager hidden" aria-hidden="true" aria-label="AI &#20379;&#24212;&#21830;&#31649;&#29702;">
+            <header class="ai-provider-manager-bar">
+                <button class="ai-icon-btn" type="button" onclick="window.aiProviderManager?.panel === 'detail' ? (window.aiProviderManager.panel='list',window.aiProviderManager.render()) : window.aiProviderManager?.close()" aria-label="&#36820;&#22238;"><span class="material-symbols-rounded">arrow_back</span></button>
+                <strong id="aiProviderManagerTitle">&#20379;&#24212;&#21830;</strong>
+                <button class="ai-icon-btn" type="button" onclick="window.aiProviderManager?.close()" aria-label="&#20851;&#38381;"><span class="material-symbols-rounded">close</span></button>
+            </header>
+            <div id="aiProviderManagerBody" class="ai-provider-manager-body"></div>
+        </section>
     </main>
 
     <nav class="md-nav-rail">
@@ -409,26 +381,26 @@
     </nav>
     </div>
 
-    <script src="m3e-ripple.js?v=313"></script>
-    <script src="toast.js?v=313"></script>
-    <script src="error-bus.js?v=313"></script>
-    <script src="i18n.js?v=313"></script>
-    <script src="theme.js?v=313"></script>
-    <script src="render-safe.js?v=313"></script>
-    <script src="nav-stack.js?v=313"></script>
-    <script src="app-route.js?v=313"></script>
-    <script type="module" src="data-utils-pure.js?v=313"></script>
-    <script type="module" src="action-identity.js?v=313"></script>
-    <script src="data-utils.js?v=313"></script>
-    <script src="storage/idb.js?v=313"></script>
-    <script src="storage/migrate.js?v=313"></script>
-    <script src="data-records.js?v=313"></script>
-    <script src="data-schema.js?v=313"></script>
-    <script src="data-store.js?v=313"></script>
-    <script src="data-ui-state.js?v=313"></script>
-    <script src="data-views.js?v=313"></script>
-    <script src="data.js?v=313"></script>
-    <script src="sync-status.js?v=313"></script>
+    <script src="m3e-ripple.js?v=314"></script>
+    <script src="toast.js?v=314"></script>
+    <script src="error-bus.js?v=314"></script>
+    <script src="i18n.js?v=314"></script>
+    <script src="theme.js?v=314"></script>
+    <script src="render-safe.js?v=314"></script>
+    <script src="nav-stack.js?v=314"></script>
+    <script src="app-route.js?v=314"></script>
+    <script type="module" src="data-utils-pure.js?v=314"></script>
+    <script type="module" src="action-identity.js?v=314"></script>
+    <script src="data-utils.js?v=314"></script>
+    <script src="storage/idb.js?v=314"></script>
+    <script src="storage/migrate.js?v=314"></script>
+    <script src="data-records.js?v=314"></script>
+    <script src="data-schema.js?v=314"></script>
+    <script src="data-store.js?v=314"></script>
+    <script src="data-ui-state.js?v=314"></script>
+    <script src="data-views.js?v=314"></script>
+    <script src="data.js?v=314"></script>
+    <script src="sync-status.js?v=314"></script>
     <div id="weightModal" class="md-modal md-modal-sheet hidden" aria-hidden="true">
         <div class="md-modal-backdrop" onclick="data.closeWeightModal()"></div>
         <div class="md-modal-card md-modal-sheet-card">
@@ -761,8 +733,8 @@
     <script>
         const PAGE_DEPS = {
             workout: ['voice-engine','voice-cache','voice-webspeech-adapter','voice-legado-adapter','workout-voice','workout-readiness','strength-form','weekly-plan','action-history','plan-chains','plan-progression','plan-store','plan-feedback','plan-cooldown','plan-auto-adjust','plan-weekly','plan-equipment','plan-ui','workout-system','workout-pip','workout-core','workout-cardio-pure','workout-cardio','workout-engine','workout-state','swipe-actions','routine-plan','routine-library','workout-wakelock','workout-media-session','ai-store','ai-profile','ai-routing-pure','ai-routing','ai-api','ai-task-settings'],
-            'ai-coach': ['lib/virtual-core.umd','ai-store','ai-profile','ai-model-catalog-pure','ai-model-cache','ai-models','ai-routing-pure','ai-routing','ai-api','ai-task-settings','ai-pricing','ai-templates','advice-template-manager','advice-rules','plan-analytics','advice-panel','coach-context','advice-attachments','advice-render','advice-prompt','advice-stream-renderer','routine-library','plan-chains','plan-progression','plan-store','plan-ai-pure','plan-ai'],
-            profile: ['voice-engine','voice-cache','voice-webspeech-adapter','voice-legado-adapter','workout-voice','credential-fields','weekly-plan','backup','sync-ui','sync-adapters','sync','routine-library','goal-plan','report-version-pure','weekly-summary','plan-chains','plan-progression','plan-store','plan-equipment','plan-ui','ai-store','ai-profile','ai-model-catalog-pure','ai-model-cache','ai-models','ai-routing-pure','ai-routing','ai-api','ai-task-settings'],
+            'ai-coach': ['lib/virtual-core.umd','ai-store','ai-profile','ai-model-catalog-pure','ai-model-cache','ai-models','ai-routing-pure','ai-routing','ai-api','ai-task-settings','ai-provider-manager','ai-pricing','ai-templates','advice-template-manager','advice-rules','plan-analytics','advice-panel','coach-context','advice-attachments','advice-render','advice-prompt','advice-stream-renderer','routine-library','plan-chains','plan-progression','plan-store','plan-ai-pure','plan-ai'],
+            profile: ['voice-engine','voice-cache','voice-webspeech-adapter','voice-legado-adapter','workout-voice','credential-fields','weekly-plan','backup','sync-ui','sync-adapters','sync','routine-library','goal-plan','report-version-pure','weekly-summary','plan-chains','plan-progression','plan-store','plan-equipment','plan-ui','ai-store','ai-profile','ai-model-catalog-pure','ai-model-cache','ai-models','ai-routing-pure','ai-routing','ai-api','ai-task-settings','ai-provider-manager'],
             records: ['history-view','report-version-pure','weekly-summary','health-diet','health-weight','health-profile','health-exercise','goal-plan','routine-library','food-log','pr-tracker','volume-heatmap','action-history','report-metrics-pure','report-panel','plan-chains','plan-progression','plan-store','plan-weekly','plan-ui','ai-store','ai-profile','ai-model-catalog-pure','ai-model-cache','ai-models','ai-routing-pure','ai-routing','ai-api','ai-task-settings'],
             today: ['history-view']
         };
@@ -776,12 +748,14 @@
         const MODULE_SCRIPTS = new Set(['data-utils-pure','action-identity','sync-pure','workout-cardio-pure','voice-engine','report-metrics-pure','ai-vision-pure','ai-model-catalog-pure','ai-routing-pure','backup-ring-pure','backup-import-pure','mi-scale-pure']);
         const MJS_SCRIPTS = new Set(['ai-vision-pure','ai-model-catalog-pure','ai-routing-pure']);
         const SCRIPT_PREREQUISITES = {
+            'ai-model-visual': [],
             'ai-profile': ['ai-store'],
             'ai-model-cache': ['ai-store','ai-model-catalog-pure'],
             'ai-models': ['ai-store','ai-profile','ai-model-cache','ai-vision-pure'],
             'ai-routing': ['ai-store','ai-profile','ai-model-cache','ai-routing-pure'],
             'ai-api': ['ai-store','ai-profile','ai-routing'],
-            'ai-task-settings': ['ai-routing','ai-models'],
+            'ai-task-settings': ['ai-model-visual','ai-routing','ai-models'],
+            'ai-provider-manager': ['ai-profile','ai-model-cache','ai-models','ai-routing','ai-task-settings'],
             'data-utils': ['render-safe'],
             'data-schema': ['data-records','action-identity'],
             'data-store': ['data-records','data-schema'],
@@ -791,7 +765,7 @@
             'advice-panel': ['lib/virtual-core.umd','advice-virtual-list','ai-model-cache','advice-template-manager','advice-rules','plan-analytics'],
             'coach-context': ['advice-panel'],
             'advice-attachments': ['advice-panel'],
-            'advice-render': ['advice-panel','coach-context'],
+            'advice-render': ['ai-model-visual','advice-panel','coach-context'],
             'advice-prompt': ['advice-panel','coach-context'],
             'advice-stream-renderer': ['advice-panel'],
             'workout-cardio': ['workout-cardio-pure'],
@@ -936,7 +910,7 @@
             const p = new Promise((res, rej) => {
                 const link = document.createElement('link');
                 link.rel = 'stylesheet';
-                link.href = `css-src/${name}.css?v=313`;
+                link.href = `css-src/${name}.css?v=314`;
                 link.dataset.appCss = name;
                 link.onload = () => {
                     link.dataset.loaded = 'true';
@@ -977,7 +951,7 @@
                 if (_loaded.has(name)) return res();
                 const s = document.createElement('script');
                 if (MODULE_SCRIPTS.has(name)) s.type = 'module';
-                s.src = `${name}${MJS_SCRIPTS.has(name) ? '.mjs' : '.js'}?v=313`;
+                s.src = `${name}${MJS_SCRIPTS.has(name) ? '.mjs' : '.js'}?v=314`;
                 s.onload = () => { _loaded.add(name); res(); };
                 s.onerror = rej;
                 document.head.appendChild(s);
@@ -1054,6 +1028,7 @@
                 await ensureDeps(id);
                 data._activePageId = id;
                 const activate = () => {
+                    document.documentElement.dataset.activePage = id;
                     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
                     document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
                     document.getElementById(id)?.classList.add('active');

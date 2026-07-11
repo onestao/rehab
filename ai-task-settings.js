@@ -60,14 +60,23 @@
         return withoutVendor.length > 18 ? `${withoutVendor.slice(0, 16)}\u2026` : withoutVendor;
     }
 
-    function connectionMark(model) {
-        const name = text(model?.profileName || model?.connectionName || model?.provider || 'AI').trim() || 'AI';
-        let hue = 0;
-        for (let index = 0; index < name.length; index += 1) hue = (hue * 31 + name.charCodeAt(index)) % 360;
-        const mark = el('span', 'ai-model-connection-mark', name.slice(0, 1).toUpperCase());
-        mark.style.setProperty('--ai-model-connection-hue', String(hue));
-        mark.setAttribute('aria-hidden', 'true');
-        return mark;
+    function modelVisualNode(model) {
+        const visual = root.aiModelVisual?.resolve?.({ modelId: model?.displayName || modelId(model), provider: model?.provider || model?.profileName || model?.connectionName, iconKey: model?.iconKey || model?.vendor }) || { mark: 'AI', iconSrcs: [] };
+        const slot = el('span', 'ai-model-connection-mark');
+        slot.setAttribute('aria-hidden', 'true');
+        if (!visual.iconSrcs?.length) { slot.textContent = visual.mark || 'AI'; return slot; }
+        const image = document.createElement('img');
+        image.className = 'ai-model-visual-icon';
+        image.alt = '';
+        let index = 0;
+        image.addEventListener('error', () => {
+            index += 1;
+            if (index < visual.iconSrcs.length) image.src = visual.iconSrcs[index];
+            else image.replaceWith(document.createTextNode(visual.mark || 'AI'));
+        });
+        image.src = visual.iconSrcs[0];
+        slot.append(image);
+        return slot;
     }
 
     function readJson(key, fallback) {
@@ -168,10 +177,13 @@
     function createCompactModelControl(taskId, models, route, save) {
         const selected = selectedModel(models, route);
         const button = el('button', 'ai-compact-model');
+        const selectedKey = selected ? modelKey(selected) : '';
+        const invalid = !!routePrimary(route) && !models.some(model => modelKey(model) === selectedKey);
+        if (invalid) button.classList.add('is-invalid');
         button.type = 'button';
-        button.append(connectionMark(selected), el('span', 'ai-compact-model-name', modelShortName(selected)), icon('expand_more'));
+        button.append(modelVisualNode(selected), invalid ? icon('error') : icon('expand_more'));
         button.setAttribute('aria-label', `\u9009\u62e9\u6a21\u578b\uff1a${modelOptionLabel(selected)}`);
-        button.addEventListener('click', () => openQuickSheet('\u9009\u62e9\u6a21\u578b', body => {
+        button.addEventListener('click', () => openQuickSheet(`\u9009\u62e9\u6a21\u578b \u00b7 ${modelOptionLabel(selected)}`, body => {
             const favorites = favoriteKeys();
             const recentKeys = readJson(RECENTS_KEY, {})[taskId] || [];
             const ordered = [...models];
@@ -204,7 +216,7 @@
                 row.dataset.search = modelOptionLabel(model);
                 const choose = el('button', 'ai-task-model-main');
                 choose.type = 'button';
-                choose.append(connectionMark(model));
+                choose.append(modelVisualNode(model));
                 const labels = el('span', 'ai-task-model-labels');
                 labels.append(el('strong', '', text(model?.displayName || modelId(model))), el('small', '', text(model?.profileName || model?.connectionName || model?.provider)));
                 choose.append(labels);
@@ -213,6 +225,7 @@
                     rememberRecent(taskId, model);
                     closeQuickSheet();
                     save({ ...route, primary: modelRef(model) });
+                    root.toast?.show?.(`\u5df2\u5207\u6362\u81f3 ${modelShortName(model)}`, 'success');
                 });
                 const isFavorite = favorites.has(modelKey(model));
                 const star = el('button', `model-picker-star ${isFavorite ? 'active' : ''}`);
@@ -323,8 +336,6 @@
 
     function openReasoningMenu(route, models, save) {
         const current = normalizeReasoningDepth(route?.reasoningDepth);
-        const model = selectedModel(models, route);
-        const explicitlyUnsupported = model?.capabilities?.reasoning === false;
         openQuickSheet('\u63a8\u7406\u5f3a\u5ea6', body => DEPTHS.forEach(depth => {
             const option = el('button', `ai-reasoning-menu-item is-${depth.value}`);
             option.type = 'button';
@@ -333,7 +344,6 @@
             labels.append(el('strong', '', depth.label), el('small', '', depth.title));
             option.append(labels);
             if (depth.value === current) option.append(icon('check'));
-            option.disabled = explicitlyUnsupported && !['auto', 'off'].includes(depth.value);
             option.addEventListener('click', () => { closeQuickSheet(); save({ ...route, reasoningDepth: depth.value }); });
             body.append(option);
         }));
@@ -366,6 +376,8 @@
     function createTaskRow(definition, route, models) {
         const row = el('section', 'ai-task-settings-row');
         row.dataset.taskId = definition.id;
+        const primary = routePrimary(route);
+        if (primary && !models.some(model => modelKey(model) === modelKey(primary))) row.classList.add('is-invalid');
         const meta = el('div', 'ai-task-meta');
         meta.append(el('strong', '', definition.label));
         if (definition.description) meta.append(el('small', '', definition.description));
@@ -544,7 +556,7 @@
         closeQuickSheet,
         openReasoningMenu,
         reasoningMeta,
-        _test: { modelKey, modelOptionLabel, normalizeReasoningDepth, normalizeTaskDefinitions, shouldMountInlinePicker, resolveInsertionTarget }
+        _test: { modelKey, modelOptionLabel, modelShortName, modelVisualNode, normalizeReasoningDepth, normalizeTaskDefinitions, shouldMountInlinePicker, resolveInsertionTarget }
     };
     root.aiTaskSettings = api;
     root.addEventListener?.('ai:catalog-changed', render);

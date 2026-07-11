@@ -6,10 +6,18 @@ import vm from 'node:vm';
 import {
     clearModelCatalog,
     endpointFingerprint,
+    inferModelFamily,
     migrateLegacyModelCatalog,
     normalizeCatalogModel,
     replaceDiscoveredModelsForProfile
 } from '../ai-model-catalog-pure.mjs';
+
+test('infers model families offline and falls back to provider metadata', () => {
+    assert.equal(inferModelFamily({ id: 'claude-sonnet-4' }), 'Claude');
+    assert.equal(inferModelFamily({ id: 'qwen3-coder' }), 'Qwen');
+    assert.equal(inferModelFamily({ id: 'private-model', owned_by: 'Lab' }), 'Lab');
+    assert.equal(inferModelFamily({ id: 'private-model' }), '其他');
+});
 
 test('refreshing a profile replaces only its discovered snapshot', () => {
     const existing = [

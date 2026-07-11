@@ -30,6 +30,13 @@ Object.assign(ai, {
         try { window.dispatchEvent(new CustomEvent('ai:catalog-changed')); } catch {}
     },
 
+    async persistModelCandidates() {
+        const payload = JSON.stringify(this.modelCandidates || {});
+        await this.idbSet(this.CANDIDATES_KEY, payload);
+        try { localStorage.setItem(this.CANDIDATES_KEY, payload); } catch {}
+        try { window.dispatchEvent(new CustomEvent('ai:candidates-changed')); } catch {}
+    },
+
     replaceModelSnapshot(profileId, incoming = [], context = {}) {
         const helper = window.aiModelCatalogPure;
         if (!helper?.replaceDiscoveredModelsForProfile) return this.models || [];

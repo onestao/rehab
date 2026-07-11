@@ -2,6 +2,7 @@
 const ai = {
     KEY: 'rehab_pro_ai_cfg',
     MODELS_KEY: 'rehab_pro_ai_models',
+    CANDIDATES_KEY: 'rehab_pro_ai_model_candidates',
     KEYS_KEY: 'rehab_pro_ai_keys',
     IDB_NAME: 'rehab_ai_store',
     IDB_VERSION: 1,
@@ -17,6 +18,7 @@ const ai = {
         enabled: false
     },
     models: [],
+    modelCandidates: {},
     keyMap: {},
     overrideModel: null,
     dbPromise: null,
@@ -34,6 +36,7 @@ const ai = {
             enabled: false
         };
         this.models = [];
+        this.modelCandidates = {};
         this.keyMap = {};
         this.overrideModel = null;
 
@@ -47,6 +50,10 @@ const ai = {
         try {
             const savedModels = await this.idbGet(this.MODELS_KEY);
             if (savedModels) this.models = JSON.parse(savedModels);
+        } catch {}
+        try {
+            const savedCandidates = await this.idbGet(this.CANDIDATES_KEY);
+            if (savedCandidates) this.modelCandidates = JSON.parse(savedCandidates);
         } catch {}
         try {
             const savedKeys = await this.idbGet(this.KEYS_KEY);
@@ -64,6 +71,12 @@ const ai = {
             try {
                 const savedModels = localStorage.getItem(this.MODELS_KEY);
                 if (savedModels) this.models = JSON.parse(savedModels);
+            } catch {}
+        }
+        if (!Object.keys(this.modelCandidates || {}).length) {
+            try {
+                const savedCandidates = localStorage.getItem(this.CANDIDATES_KEY);
+                if (savedCandidates) this.modelCandidates = JSON.parse(savedCandidates);
             } catch {}
         }
         if (!Object.keys(this.keyMap).length) {
@@ -90,6 +103,7 @@ const ai = {
 
         this.cfg.profiles = Array.isArray(this.cfg.profiles) ? this.cfg.profiles : [];
         this.models = Array.isArray(this.models) ? this.models : [];
+        this.modelCandidates = this.modelCandidates && typeof this.modelCandidates === 'object' ? this.modelCandidates : {};
         this.keyMap = this.keyMap && typeof this.keyMap === 'object' ? this.keyMap : {};
         this.cfg.taskRoutes = this.cfg.taskRoutes && typeof this.cfg.taskRoutes === 'object' ? this.cfg.taskRoutes : {};
         if (typeof this.migrateLegacyModelCache === 'function') await this.migrateLegacyModelCache();

@@ -9,3 +9,4 @@ coverage
 debug-backups/
 logs/
 docs/performance-optimization-plan.md
+AGENTS.disabled.md

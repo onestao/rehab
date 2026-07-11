@@ -29,7 +29,6 @@ Object.assign(ai, {
     async saveProfile(forceNew = false) {
         const profile = this.currentFormProfile(forceNew);
         if (!profile.baseUrl) return alert('请填写 Base URL');
-        if (!profile.model) return alert('请填写或选择模型');
         if (!profile.apiKey) return alert('请填写 API Key');
 
         const idx = this.cfg.profiles.findIndex(p => p.id === profile.id);
@@ -40,7 +39,10 @@ Object.assign(ai, {
             provider: profile.provider,
             baseUrl: profile.baseUrl,
             model: profile.model,
-            extraVisionKeywords: profile.extraVisionKeywords
+            extraVisionKeywords: profile.extraVisionKeywords,
+            enabled: previous?.enabled !== false,
+            archived: previous?.archived === true,
+            sortOrder: Number.isFinite(previous?.sortOrder) ? previous.sortOrder : this.cfg.profiles.length
         };
         if (idx >= 0) this.cfg.profiles[idx] = meta;
         else this.cfg.profiles.push(meta);
@@ -57,14 +59,11 @@ Object.assign(ai, {
             this.models = this.models.map(model => model.profileId === 'temp' ? { ...model, profileId: profile.id } : model);
             await this.persistModelCache?.();
         }
-        if (previous?.baseUrl && previous.baseUrl !== profile.baseUrl) {
-            await this.clearModelCache?.(profile.id, false);
-        }
         await this.persistKeyMap();
         await this.persist();
         this.persistDataDb(false);
         this.syncUI();
-        alert(forceNew ? '已另存为新档案' : 'AI 档案已保存');
+        alert(forceNew ? '已添加供应商' : '供应商已保存');
     },
 
     saveCurrentProfile() { return this.saveProfile(false); },
@@ -215,7 +214,14 @@ Object.assign(ai, {
         const password = document.getElementById('aiEncryptPass')?.value;
         if (!password || password.length < 4) return alert('请输入至少4位的加密密码');
         const profiles = this.cfg.profiles.map(p => ({ ...p, apiKey: this.apiKeyFor(p.id) }));
-        const payload = JSON.stringify({ activeProfileId: this.cfg.activeProfileId, profiles, taskRoutes: this.cfg.taskRoutes || {} });
+        const payload = JSON.stringify({
+            activeProfileId: this.cfg.activeProfileId,
+            profiles,
+            models: this.models || [],
+            modelCandidates: this.modelCandidates || {},
+            taskRoutes: this.cfg.taskRoutes || {},
+            supplierSchemaVersion: 1
+        });
         try {
             const cipher = await this.encryptData(payload, password);
             data.db.encryptedAi = cipher;
@@ -254,21 +260,27 @@ Object.assign(ai, {
         try {
             const plaintext = await this.decryptData(encrypted, password);
             const cfg = JSON.parse(plaintext);
-            this.cfg.profiles = (cfg.profiles || []).map(p => ({ id: p.id, name: p.name, provider: p.provider, baseUrl: p.baseUrl, model: p.model, extraVisionKeywords: p.extraVisionKeywords || '' }));
+            this.cfg.profiles = (cfg.profiles || []).map((p, index) => ({
+                id: p.id, name: p.name, provider: p.provider, baseUrl: p.baseUrl, model: p.model,
+                extraVisionKeywords: p.extraVisionKeywords || '', enabled: p.enabled !== false,
+                archived: p.archived === true, sortOrder: p.sortOrder ?? p.order ?? index
+            }));
             this.cfg.activeProfileId = cfg.activeProfileId || this.cfg.profiles[0]?.id || '';
             this.keyMap = {};
             (cfg.profiles || []).forEach(p => { if (p.apiKey) this.keyMap[p.id] = p.apiKey; });
             await this.persistKeyMap();
             this.models = cfg.models || this.models;
+            this.modelCandidates = cfg.modelCandidates || cfg.discoverySnapshots || this.modelCandidates || {};
             this.cfg.taskRoutes = cfg.taskRoutes && typeof cfg.taskRoutes === 'object' ? cfg.taskRoutes : (this.cfg.taskRoutes || {});
             await this.idbSet(this.MODELS_KEY, JSON.stringify(this.models));
             try { localStorage.setItem(this.MODELS_KEY, JSON.stringify(this.models)); } catch {}
+            await this.persistModelCandidates?.();
             this.loadActiveProfileToForm();
             await this.persist();
             this.persistDataDb(false);
             document.getElementById('aiDecryptPass').value = '';
             this.syncUI();
-            alert('AI 配置档案已恢复');
+            alert('AI 供应商已恢复');
         } catch {
             alert('解密失败：密码错误或数据损坏');
         }

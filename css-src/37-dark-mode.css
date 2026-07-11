@@ -56,6 +56,8 @@
         --glass-border: color-mix(in srgb, var(--md-sys-on-surface) 14%, transparent);
         --glass-shadow-inset: inset 0 1px 0 color-mix(in srgb, var(--md-sys-on-surface) 8%, transparent);
         --glass-shadow-out: 0 2px 14px rgba(0,0,0,0.42);
+        --glass-ai-surface: color-mix(in srgb, var(--md-sys-surface-container-highest) 72%, transparent);
+        --glass-ai-shadow: 0 12px 32px rgba(0,0,0,0.46);
     }
 
     body { background: var(--md-sys-surface); }
@@ -154,4 +156,6 @@
     --glass-border: color-mix(in srgb, var(--md-sys-on-surface) 14%, transparent);
     --glass-shadow-inset: inset 0 1px 0 color-mix(in srgb, var(--md-sys-on-surface) 8%, transparent);
     --glass-shadow-out: 0 2px 14px rgba(0,0,0,0.42);
+    --glass-ai-surface: color-mix(in srgb, var(--md-sys-surface-container-highest) 72%, transparent);
+    --glass-ai-shadow: 0 12px 32px rgba(0,0,0,0.46);
 }
