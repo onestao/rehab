@@ -1024,6 +1024,7 @@
             sheet.classList.remove('hidden');
             sheet.setAttribute('aria-hidden', 'false');
             window.navStack?.push?.({ type: 'modal', id: 'planAiSheet', close: () => this.closePlanAiSheet() });
+            window.aiTaskSettings?.mountPlanAiPicker?.();
         },
 
         closePlanAiSheet() {

@@ -4,6 +4,38 @@
 
     window.dataHealthWeight = {
         _miScaleReading: null,
+        _miScaleRuntimePromise: null,
+
+        openWeightModal(...args) {
+            const result = window.dataUiState?.openWeightModal?.apply(this, args);
+            if (this.isMiScaleExperimentEnabled()) {
+                const button = document.getElementById('miScaleScanBtn');
+                if (button) button.disabled = true;
+                this.prepareMiScaleRuntime()
+                    .catch((error) => window.errorBus?.report?.('mi-scale.runtime', error))
+                    .finally(() => { if (button) button.disabled = false; });
+            }
+            return result;
+        },
+
+        prepareMiScaleRuntime() {
+            if (window.miScalePure && window.miScaleBluetooth) return Promise.resolve();
+            if (this._miScaleRuntimePromise) return this._miScaleRuntimePromise;
+            if (typeof window.loadAppScript !== 'function') {
+                return Promise.reject(new Error('体重秤模块加载器尚未就绪'));
+            }
+            this._miScaleRuntimePromise = window.loadAppScript('mi-scale-web-bluetooth')
+                .then(() => {
+                    if (!window.miScalePure || !window.miScaleBluetooth) {
+                        throw new Error('体重秤模块未加载完成');
+                    }
+                })
+                .catch((error) => {
+                    this._miScaleRuntimePromise = null;
+                    throw error;
+                });
+            return this._miScaleRuntimePromise;
+        },
 
         isMiScaleExperimentEnabled() {
             return !!this.db?.prefs?.experiments?.miScaleBle;
@@ -74,10 +106,19 @@
             this.saveAndBackup();
         },
 
-        scanMiScale() {
+        async scanMiScale() {
             var self = this;
             if (!this.isMiScaleExperimentEnabled()) {
                 alert('小米体重秤读取仍是实验功能，请先在「我的 → 设置 → 实验功能」中开启。');
+                return;
+            }
+            var btn = document.getElementById('miScaleScanBtn');
+            if (btn) btn.disabled = true;
+            try {
+                await this.prepareMiScaleRuntime();
+            } catch (error) {
+                if (btn) btn.disabled = false;
+                if (window.toast) toast.show(error?.message || '蓝牙读取模块加载失败', 'error');
                 return;
             }
             var bt = window.miScaleBluetooth;
@@ -88,8 +129,6 @@
                 alert(support.reason || '此浏览器不支持蓝牙读取，请使用 Android Chrome');
                 return;
             }
-            var btn = document.getElementById('miScaleScanBtn');
-            if (btn) btn.disabled = true;
             var scanHandle = bt.scan(function (result, sourceId) {
                 self._miScaleReading = result;
                 if (sourceId) self._miScaleReading.sourceId = sourceId;

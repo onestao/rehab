@@ -1,5 +1,6 @@
 // @ts-nocheck
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 await import(`../ai-task-settings.js?test=${Date.now()}`);
@@ -33,4 +34,25 @@ test('unknown reasoning depth falls back to auto', () => {
     assert.equal(helpers.normalizeReasoningDepth('HIGH'), 'high');
     assert.equal(helpers.normalizeReasoningDepth('unsupported'), 'auto');
     assert.equal(helpers.normalizeReasoningDepth(null), 'auto');
+});
+
+test('inline picker mount guard suppresses duplicate observer mounts', () => {
+    const host = { dataset: {} };
+    assert.equal(helpers.shouldMountInlinePicker(host, 'plan.today'), true);
+    host.dataset.aiTaskPickerMountingFor = 'plan.today';
+    assert.equal(helpers.shouldMountInlinePicker(host, 'plan.today'), false);
+    delete host.dataset.aiTaskPickerMountingFor;
+    host.dataset.aiTaskPickerMountedFor = 'plan.today';
+    assert.equal(helpers.shouldMountInlinePicker(host, 'plan.today'), false);
+    assert.equal(helpers.shouldMountInlinePicker(host, 'plan.week'), true);
+});
+
+test('plan AI picker mounts explicitly instead of on every body mutation', () => {
+    const settingsSource = readFileSync(new URL('../ai-task-settings.js', import.meta.url), 'utf8');
+    const planSource = readFileSync(new URL('../plan-ai.js', import.meta.url), 'utf8');
+    const observerBody = settingsSource.match(/new MutationObserver\(records => \{([\s\S]*?)\n\s*\}\);/)?.[1] || '';
+
+    assert.doesNotMatch(observerBody, /mountPlanAiPicker/);
+    assert.match(settingsSource, /ai:ready[\s\S]*?mountInlinePickers\(document, \{ force: true \}\)/);
+    assert.match(planSource, /window\.aiTaskSettings\?\.mountPlanAiPicker\?\.\(\)/);
 });

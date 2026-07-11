@@ -161,7 +161,7 @@
     color: var(--md-sys-primary);
 }
 .weight-head small { color: var(--md-sys-on-surface-variant); }
-.weight-icon {
+.material-symbols-rounded.weight-icon {
     width: 52px;
     height: 52px;
     border-radius: 18px;
@@ -171,6 +171,7 @@
     background: var(--md-sys-tertiary-container);
     color: var(--md-sys-on-tertiary-container);
     font-size: 30px;
+    line-height: 1;
     font-variation-settings: 'FILL' 1;
 }
 .weight-input-row {

@@ -11,6 +11,7 @@ const swPath = path.join(root, 'sw.js');
 const htmlPath = path.join(root, 'index.html');
 const appUpdatePath = path.join(root, 'app-update.js');
 const iconsCsvPath = path.join(root, 'build', 'icons.csv');
+const materialIconsPath = path.join(root, 'assets', 'material-symbols-icons.txt');
 const collectIconsPath = path.join(root, 'scripts', 'collect-icons.mjs');
 
 const argv = new Set(process.argv.slice(2));
@@ -41,20 +42,11 @@ function runCollectIcons() {
 
 function syncIconSubset() {
     const iconList = fs.readFileSync(iconsCsvPath, 'utf8').trim();
-    let html = fs.readFileSync(htmlPath, 'utf8');
-    const withIconNames = /(https:\/\/fonts\.googleapis\.com\/css2\?family=Material\+Symbols\+Rounded[^"']*?)(&icon_names=)([^"']*)/;
-    const baseUrl = /(https:\/\/fonts\.googleapis\.com\/css2\?family=Material\+Symbols\+Rounded[^"']*?)(&display=swap)/;
-
-    if (withIconNames.test(html)) {
-        html = html.replace(withIconNames, `$1$2${iconList}`);
-    } else if (baseUrl.test(html)) {
-        html = html.replace(baseUrl, `$1&icon_names=${iconList}$2`);
-    } else {
-        console.error('Material Symbols font link not found');
+    const bundledIconList = fs.readFileSync(materialIconsPath, 'utf8').trim();
+    if (bundledIconList !== iconList) {
+        console.error('Material Symbols subset is stale. Regenerate assets/material-symbols-rounded.woff2 and update assets/material-symbols-icons.txt.');
         process.exit(1);
     }
-
-    fs.writeFileSync(htmlPath, html);
 }
 
 function readSwVersion(swText) {

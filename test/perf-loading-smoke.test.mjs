@@ -65,11 +65,25 @@ test('edge performance smoke script is available as an explicit npm script', () 
     assert.equal(packageJson.scripts['perf:edge'], 'node scripts/edge-perf-smoke.mjs');
 });
 
-test('material symbols font loading is deferred until after first render', () => {
+test('material symbols use a preloaded local font without a delayed remote swap', () => {
     const html = readRootFile('index.html');
-    const eagerHead = extractBlock(html, '<head>', '<noscript>');
+    const head = extractBlock(html, '<head>', '</head>');
+    const css = readRootFile('css-src/02-base.css');
 
-    assert.doesNotMatch(eagerHead, /fonts\.googleapis\.com/);
-    assert.match(html, /function scheduleMaterialSymbolsLoad\(\)/);
-    assert.match(html, /scheduleMaterialSymbolsLoad\(\);/);
+    assert.doesNotMatch(html, /fonts\.googleapis\.com|scheduleMaterialSymbolsLoad/);
+    assert.match(head, /rel="preload" href="assets\/material-symbols-rounded\.woff2" as="font"/);
+    assert.match(css, /@font-face[\s\S]*material-symbols-rounded\.woff2/);
+    assert.equal(
+        readRootFile('assets/material-symbols-icons.txt').trim(),
+        readRootFile('build/icons.csv').trim(),
+        'the bundled Material Symbols subset must cover every collected icon'
+    );
+});
+
+test('weight modal loads without pulling Bluetooth code into the interaction path', () => {
+    const html = readRootFile('index.html');
+
+    assert.doesNotMatch(html, /'health-weight':\s*\[[^\]]*mi-scale/);
+    assert.match(html, /'mi-scale-web-bluetooth':\s*\['mi-scale-pure'\]/);
+    assert.match(html, /MODULE_SCRIPTS[^;]*'mi-scale-pure'/);
 });

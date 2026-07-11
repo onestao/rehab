@@ -9,6 +9,11 @@ test('context AI icons keep flex centering after the Material Symbols stylesheet
     assert.match(css, /\.context-ai-icon\s*\{[^}]*display:\s*inline-flex !important;[^}]*align-items:\s*center;[^}]*justify-content:\s*center;[^}]*line-height:\s*1;/s);
 });
 
+test('weight overview icon keeps its flex centering contract', () => {
+    const css = read('css-src/17-record-tabs-health.css');
+    assert.match(css, /\.material-symbols-rounded\.weight-icon\s*\{[^}]*display:\s*inline-flex;[^}]*align-items:\s*center;[^}]*justify-content:\s*center;[^}]*line-height:\s*1;/s);
+});
+
 test('AI coach content fills the page and pushes the sticky composer to the nav edge', () => {
     assert.match(read('index.html'), /id="ai-coach" class="page ai-coach-page"/);
 

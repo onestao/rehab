@@ -3,13 +3,17 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 
-function loadHealthWeight() {
+function loadHealthWeightRuntime() {
     const code = readFileSync(new URL('../health-weight.js', import.meta.url), 'utf8');
     const context = { window: {}, console };
     context.globalThis = context;
     vm.createContext(context);
     vm.runInContext(code, context);
-    return context.window.dataHealthWeight;
+    return context.window;
+}
+
+function loadHealthWeight() {
+    return loadHealthWeightRuntime().dataHealthWeight;
 }
 
 function dateFromKey(value) {
@@ -45,6 +49,24 @@ function buildHost(weights = [], extra = {}) {
         ...extra
     };
 }
+
+test('weight module delegates modal opening to the eagerly loaded UI state', () => {
+    const runtime = loadHealthWeightRuntime();
+    let receiver = null;
+    runtime.dataUiState = {
+        openWeightModal() {
+            receiver = this;
+            return 'opened';
+        }
+    };
+    const host = {
+        ...runtime.dataHealthWeight,
+        isMiScaleExperimentEnabled: () => false
+    };
+
+    assert.equal(host.openWeightModal(), 'opened');
+    assert.equal(receiver, host);
+});
 
 test('weight chart defaults to weekly averages for year and monthly averages for all', () => {
     const data = buildHost();

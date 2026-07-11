@@ -211,8 +211,19 @@
         return row;
     }
 
-    async function mountInlinePicker(container, taskId) {
+    function shouldMountInlinePicker(container, taskId) {
+        const key = text(taskId).trim();
+        if (!container || !key) return false;
+        return container.dataset.aiTaskPickerMountingFor !== key
+            && container.dataset.aiTaskPickerMountedFor !== key;
+    }
+
+    async function mountInlinePicker(container, taskId, options = {}) {
         if (!container || !taskId) return;
+        const key = text(taskId).trim();
+        if (!options.force && !shouldMountInlinePicker(container, key)) return;
+        container.dataset.aiTaskPickerMountingFor = key;
+        delete container.dataset.aiTaskPickerMountedFor;
         container.replaceChildren(el('div', 'ai-task-settings-empty', '\u6b63\u5728\u52a0\u8f7d\u6a21\u578b\u2026'));
         try {
             const [definitions, route, models] = await Promise.all([
@@ -229,7 +240,7 @@
                 shell.classList.add('is-saving');
                 try {
                     await callAi(['setTaskRoute', 'saveTaskRoute'], taskId, nextRoute);
-                    await mountInlinePicker(container, taskId);
+                    await mountInlinePicker(container, taskId, { force: true });
                 } catch (error) {
                     shell.classList.remove('is-saving');
                     setStatus(error?.message || '\u4fdd\u5b58\u529f\u80fd\u6a21\u578b\u5931\u8d25', true);
@@ -241,17 +252,21 @@
             controls.append(createReasoningControl(taskId, route || {}, Array.isArray(models) ? models : [], save));
             shell.append(title, controls);
             container.replaceChildren(shell);
+            container.dataset.aiTaskPickerMountedFor = key;
         } catch (error) {
             container.replaceChildren(el('div', 'ai-task-settings-empty', error?.message || '\u529f\u80fd\u6a21\u578b\u52a0\u8f7d\u5931\u8d25'));
+            container.dataset.aiTaskPickerMountedFor = key;
+        } finally {
+            delete container.dataset.aiTaskPickerMountingFor;
         }
     }
 
-    function mountInlinePickers(scope) {
+    function mountInlinePickers(scope, options = {}) {
         const rootNode = scope?.querySelectorAll ? scope : document;
         const nodes = [];
         if (rootNode?.matches?.('[data-ai-task-picker]')) nodes.push(rootNode);
         rootNode?.querySelectorAll?.('[data-ai-task-picker]').forEach(node => nodes.push(node));
-        nodes.forEach(node => mountInlinePicker(node, text(node.dataset.aiTaskPicker).trim()));
+        nodes.forEach(node => mountInlinePicker(node, text(node.dataset.aiTaskPicker).trim(), options));
     }
 
     function mountPlanAiPicker() {
@@ -340,14 +355,14 @@
         refreshCurrentModels,
         clearCurrentModelCache,
         clearAllModelCaches,
-        _test: { modelKey, modelOptionLabel, normalizeReasoningDepth, normalizeTaskDefinitions }
+        _test: { modelKey, modelOptionLabel, normalizeReasoningDepth, normalizeTaskDefinitions, shouldMountInlinePicker }
     };
     root.aiTaskSettings = api;
     root.addEventListener?.('ai:catalog-changed', render);
     root.addEventListener?.('ai:task-routes-changed', render);
     root.addEventListener?.('ai:ready', () => {
         render();
-        mountInlinePickers(document);
+        mountInlinePickers(document, { force: true });
     });
     if (typeof document !== 'undefined') {
         const boot = () => {
@@ -359,7 +374,6 @@
                     records.forEach(record => record.addedNodes.forEach(node => {
                         if (node?.nodeType === 1) mountInlinePickers(node);
                     }));
-                    mountPlanAiPicker();
                 });
                 observer.observe(document.body, { childList: true, subtree: true });
             }
