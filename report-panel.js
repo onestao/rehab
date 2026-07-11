@@ -133,8 +133,10 @@
         },
 
         findWeightReport(kind, start, end) {
-            return this.activeRecords(this.db.health.reports || [])
+            const report = this.activeRecords(this.db.health.reports || [])
                 .find(r => r.kind === kind && r.periodStart === start && r.periodEnd === end) || null;
+            if (report) Object.assign(report, window.reportVersionPure.normalizeRecord(report));
+            return report;
         },
 
         hasNewWeightReport() {
@@ -162,19 +164,27 @@
                     ];
                     const taskId = kind === 'monthly' ? 'report.weight.monthly' : 'report.weight.weekly';
                     const result = window.ai?.run
-                        ? await window.ai.run({ taskId, messages, maxTokens: 1800 })
-                        : await ai.call(messages, 1800);
-                    ai = parseReportAiText(result, ai);
-                    ai.model = ai.model || (window.ai?.getEffectiveConfig?.()?.model) || 'ai';
+                        ? await window.ai.run({ taskId, messages, maxTokens: 1800, returnMeta: true, routeOverride: opts.routeOverride || null })
+                        : await window.ai.call(messages, 1800);
+                    const resultMeta = window.reportVersionPure.metaFromResult(result, window.ai?.resolveTaskConfig?.(taskId) || window.ai?.getEffectiveConfig?.() || {});
+                    ai = parseReportAiText(resultMeta.text, ai);
+                    ai.model = resultMeta.model || ai.model || 'ai';
+                    ai.profileId = resultMeta.profileId || '';
+                    ai.reasoningEffort = resultMeta.reasoningEffort || '';
+                    ai.fallback = resultMeta.fallback || null;
                     ai.prompt_id = kind === 'monthly' ? 'monthly_report' : 'weekly_report';
                 } catch (err) {
-                    window.toast?.show?.(String(err?.message || err || 'AI 复盘失败，已保留离线复盘'), 'error');
+                    const message = String(err?.message || err || 'AI 复盘失败');
+                    const action = err?.aiFallback?.target ? { timeout: 6000, action: '使用备用模型重试', onAction: () => this.generateReport(kind, metricAnchor, { useAi: true, routeOverride: err.aiFallback.target }) } : 4000;
+                    window.toast?.show?.(message, 'error', action);
+                    return;
                 }
             }
             this.db.health.reports = this.db.health.reports || [];
             const now = Date.now();
             const existing = this.findWeightReport(kind, metrics.periodStart, metrics.periodEnd);
-            const record = {
+            let record = {
+                ...(existing || {}),
                 id: existing?.id || this.generateRecordId(`weight-${kind}-report`),
                 kind,
                 periodStart: metrics.periodStart,
@@ -182,9 +192,11 @@
                 generatedAt: existing?.generatedAt || new Date(now).toISOString(),
                 updatedAt: now,
                 deleted: false,
-                metrics: metrics.metrics,
-                ai
+                metrics: metrics.metrics
             };
+            record = window.reportVersionPure.appendVersion(record, {
+                content: ai.summary || '', ai, metrics: metrics.metrics
+            }, now);
             if (existing) Object.assign(existing, record);
             else this.db.health.reports.push(record);
             this.saveAndBackup?.();
@@ -249,16 +261,23 @@
         },
 
         renderWeightReport(report) {
-            const ai = report.ai || {};
-            const m = report.metrics || {};
+            Object.assign(report, window.reportVersionPure.normalizeRecord(report));
+            const version = window.reportVersionPure.activeVersion(report) || {};
+            const ai = version.ai || report.ai || {};
+            const m = version.metrics || report.metrics || {};
             const w = m.weight || {};
             const t = m.training || {};
             const d = m.diet || {};
             const c = m.cardio || {};
             const highlights = Array.isArray(ai.highlights) ? ai.highlights : [];
             const suggestions = Array.isArray(ai.suggestions) ? ai.suggestions : [];
+            const index = Math.max(0, report.versions.findIndex(v => v.id === report.activeVersionId));
             return `<article class="weight-report-current">
                 <div class="weight-report-period"><b>${esc(report.periodStart)} 至 ${esc(report.periodEnd)}</b><small>${esc(report.kind === 'monthly' ? '月报' : '周报')}</small></div>
+                <div class="weight-report-version-row">
+                    ${this.renderReportVersionSwitcher(report, index)}
+                    <small>${esc(ai.model === 'offline' ? '离线规则' : ai.model || 'AI')}${ai.reasoningEffort ? ` · ${esc(ai.reasoningEffort)}` : ''} · ${esc(version.createdAt ? new Date(version.createdAt).toLocaleString() : '')}</small>
+                </div>
                 <div class="weight-report-metrics">
                     <div><b>${w.delta > 0 ? '+' : ''}${Number(w.delta || 0).toFixed(2)}kg</b><small>体重变化</small></div>
                     <div><b>${Math.round(t.totalMinutes || 0)}分</b><small>训练时长</small></div>
@@ -268,7 +287,41 @@
                 <section class="weight-report-ai"><h4>总结</h4><p>${esc(ai.summary || '暂无总结')}</p></section>
                 ${highlights.length ? `<section class="weight-report-ai"><h4>亮点</h4>${highlights.slice(0, 3).map(x => `<p>${esc(x)}</p>`).join('')}</section>` : ''}
                 ${suggestions.length ? `<section class="weight-report-ai"><h4>建议</h4>${suggestions.slice(0, 3).map(x => `<p>${esc(x)}</p>`).join('')}</section>` : ''}
+                <div data-ai-task-picker="${report.kind === 'monthly' ? 'report.weight.monthly' : 'report.weight.weekly'}"></div>
+                <div class="weight-report-actions">
+                    <button class="md-btn md-btn-tonal" onclick="data.generateReport('${esc(report.kind)}', '${esc(report.periodStart)}', { useAi: true })" type="button">用当前模型重新生成</button>
+                    <button class="md-btn md-btn-text" onclick="data.generateReport('${esc(report.kind)}', '${esc(report.periodStart)}', { useAi: false })" type="button">生成离线复盘</button>
+                </div>
             </article>`;
+        },
+
+        renderReportVersionSwitcher(report, index) {
+            const count = report.versions?.length || 0;
+            return `<div class="advice-version-switcher" aria-label="报告版本">
+                <button class="advice-version-btn" type="button" ${index <= 0 ? 'disabled' : ''} onclick="data.cycleWeightReportVersion('${esc(report.id)}', -1)" aria-label="上一个版本"><span class="material-symbols-rounded">chevron_left</span></button>
+                <span>${count ? index + 1 : 0}/${count}</span>
+                <button class="advice-version-btn" type="button" ${index >= count - 1 ? 'disabled' : ''} onclick="data.cycleWeightReportVersion('${esc(report.id)}', 1)" aria-label="下一个版本"><span class="material-symbols-rounded">chevron_right</span></button>
+                <button class="advice-version-btn" type="button" onclick="data.deleteWeightReportVersion('${esc(report.id)}')" aria-label="删除当前版本"><span class="material-symbols-rounded">delete</span></button>
+            </div>`;
+        },
+
+        cycleWeightReportVersion(id, delta) {
+            const report = this.activeRecords(this.db.health.reports || []).find(r => r.id === id);
+            if (!report) return;
+            Object.assign(report, window.reportVersionPure.cycle(report, delta), { updatedAt: Date.now() });
+            this.saveAndBackup?.();
+            const body = document.querySelector('#weightReportContent .weight-report-body');
+            if (body) body.innerHTML = this.renderWeightReport(report);
+        },
+
+        deleteWeightReportVersion(id) {
+            const report = this.activeRecords(this.db.health.reports || []).find(r => r.id === id);
+            if (!report) return;
+            const next = window.reportVersionPure.removeVersion(report, report.activeVersionId);
+            if (!next.versions.length) report.deleted = true;
+            else Object.assign(report, next, { updatedAt: Date.now() });
+            this.saveAndBackup?.();
+            this.renderWeightReportSheet();
         },
 
         renderReportArchive() {

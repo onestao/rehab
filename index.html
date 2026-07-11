@@ -712,11 +712,11 @@
         </div>
     </div>
     <div id="aiModelPickerSheet" class="md-modal md-modal-sheet hidden" aria-hidden="true">
-        <div class="md-modal-backdrop" onclick="data.closeAdviceModelPicker?.()"></div>
+        <div class="md-modal-backdrop" onclick="window.aiTaskSettings?.closeQuickSheet?.();data.closeAdviceModelPicker?.()"></div>
         <div class="md-modal-card md-modal-sheet-card">
             <div class="md-modal-head">
                 <strong>选择本次模型</strong>
-                <button class="icon-btn" onclick="data.closeAdviceModelPicker?.()" aria-label="&#20851;&#38381;" data-modal-close><span class="material-symbols-rounded">close</span></button>
+                <button class="icon-btn" onclick="window.aiTaskSettings?.closeQuickSheet?.();data.closeAdviceModelPicker?.()" aria-label="&#20851;&#38381;" data-modal-close><span class="material-symbols-rounded">close</span></button>
             </div>
             <div id="aiModelPickerContent"></div>
         </div>
@@ -794,7 +794,7 @@
         const CSS_DEPS = {
             profile: ['42-health-profile']
         };
-        const _loaded = new Set(['render-safe','nav-stack','data-utils-pure','action-identity','data-records','data-schema','data-utils','storage/idb','storage/migrate','advice-virtual-list','data-store','data-ui-state','data-views','data','voice-engine','voice-cache','voice-webspeech-adapter','voice-legado-adapter','workout-voice','workout-readiness','strength-form','weekly-plan','action-history','sync-pure','sync-status','credential-fields','sheet-drag','haptics','app-update','pwa-support']);
+        const _loaded = new Set(['render-safe','nav-stack','data-utils-pure','action-identity','data-records','data-schema','data-utils','storage/idb','storage/migrate','data-store','data-ui-state','data-views','data','sync-status']);
         const _loadingPromises = new Map();
         const _loadedCss = new Set();
         const _loadingCssPromises = new Map();
@@ -810,8 +810,10 @@
             'data-utils': ['render-safe'],
             'data-schema': ['data-records','action-identity'],
             'data-store': ['data-records','data-schema'],
+            'storage/idb-collections': ['storage/idb'],
+            'storage/idb-advice-collections': ['storage/idb'],
             'advice-template-manager': ['ai-templates'],
-            'advice-panel': ['lib/virtual-core.umd','ai-model-cache','advice-template-manager','advice-rules','plan-analytics'],
+            'advice-panel': ['lib/virtual-core.umd','advice-virtual-list','ai-model-cache','advice-template-manager','advice-rules','plan-analytics'],
             'coach-context': ['advice-panel'],
             'advice-attachments': ['advice-panel'],
             'advice-render': ['advice-panel','coach-context'],
@@ -824,8 +826,9 @@
             'workout-voice': ['voice-engine','voice-webspeech-adapter','voice-legado-adapter','voice-cache'],
             'workout-system': ['workout-voice'],
             'workout-readiness': ['workout-voice'],
+            'mi-scale-web-bluetooth': ['mi-scale-pure'],
             'backup': ['backup-ring-pure','backup-import-pure'],
-            'sync': ['backup','sync-ui','sync-adapters'],
+            'sync': ['sync-pure','backup','sync-ui','sync-adapters'],
             'routine-library': ['routine-plan'],
             'rehab-policy': [],
             'plan-store': ['plan-chains','plan-progression','rehab-policy'],
@@ -839,10 +842,92 @@
             'debug-tools': [],
             'debug-ai': [],
             'debug-plan-ai': []
-            ,'report-panel': ['report-metrics-pure']
+            ,'report-panel': ['report-metrics-pure','report-version-pure']
+            ,'weekly-summary': ['report-version-pure']
         };
 
+        function runWhenIdle(callback, options) {
+            const idle = window.requestIdleCallback || ((cb) => setTimeout(cb, options?.timeout || 1500));
+            return idle(callback, options);
+        }
+        function schedulePostRenderUtilityLoad() {
+            if (schedulePostRenderUtilityLoad._scheduled) return;
+            schedulePostRenderUtilityLoad._scheduled = true;
+            window.setTimeout(() => {
+                runWhenIdle(() => {
+                    Promise.allSettled([
+                        loadScript('haptics'),
+                        loadScript('a11y-focus-trap'),
+                        loadScript('sheet-drag')
+                    ]).catch(() => {});
+                }, { timeout: 6000 });
+            }, 2000);
+        }
+        function scheduleTodayEnhancementLoad() {
+            if (scheduleTodayEnhancementLoad._scheduled) return;
+            scheduleTodayEnhancementLoad._scheduled = true;
+            window.setTimeout(() => {
+                runWhenIdle(() => {
+                    if ((document.querySelector('.page.active')?.id || '') !== 'today') return;
+                    loadScript('plan-ui')
+                        .then(() => {
+                            data.refreshModules?.();
+                            if ((document.querySelector('.page.active')?.id || '') === 'today') data.render?.('today');
+                        })
+                        .catch((e) => errorBus?.report?.('today.planUi.lazyLoad', e));
+                }, { timeout: 5000 });
+            }, 1000);
+        }
+        function bootPerfDebugEnabled() {
+            try {
+                return new URLSearchParams(window.location.search).has('debugPerf') ||
+                    localStorage.getItem('rehab_debug_perf') === '1' ||
+                    localStorage.getItem('rehab_debug_tools') === '1';
+            } catch {
+                return false;
+            }
+        }
+        function bootMark(name) {
+            try { performance.mark(name); } catch {}
+        }
+        function bootMeasure(name, start, end) {
+            try {
+                if (performance.getEntriesByName(name, 'measure').length) performance.clearMeasures(name);
+                performance.measure(name, start, end);
+            } catch {}
+        }
+        function logBootPerfSummary() {
+            if (!bootPerfDebugEnabled()) return;
+            try {
+                const rows = performance.getEntriesByType('measure')
+                    .filter((entry) => entry.name.startsWith('boot:'))
+                    .map((entry) => ({ name: entry.name, ms: Math.round(entry.duration) }));
+                console.table(rows);
+            } catch (e) {
+                console.info('[boot:perf]', e);
+            }
+        }
+        function scheduleServiceWorkerRegistration() {
+            if (scheduleServiceWorkerRegistration._scheduled) return;
+            scheduleServiceWorkerRegistration._scheduled = true;
+            window.setTimeout(() => {
+                runWhenIdle(() => {
+                    loadScript('app-update')
+                        .then(() => appUpdate.registerServiceWorker?.())
+                        .catch((e) => errorBus?.report?.('appUpdate.lazyLoad', e));
+                }, { timeout: 6000 });
+            }, 8000);
+        }
+        function idlePreloadEnabled() {
+            try {
+                return new URLSearchParams(window.location.search).has('idlePreload') ||
+                    localStorage.getItem('rehab_idle_preload') === '1';
+            } catch {
+                return false;
+            }
+        }
         function idlePreloadBudget() {
+            if (!idlePreloadEnabled()) return 0;
             const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection || null;
             if (connection?.saveData) return 0;
             if (['slow-2g', '2g'].includes(connection?.effectiveType || '')) return 0;
@@ -1017,15 +1102,25 @@
         };
         window.ui = ui;
         window.onload = async () => {
+            bootMark('boot:start');
             try { await i18n?.init?.(); i18n?.applyDom?.(document); } catch {}
             const hadRouteHash = !!window.location.hash;
             window.navStack?.init?.();
             window.appRoute?.init?.();
             theme.init();
-            if (window.appUpdate) appUpdate.registerServiceWorker();
             try {
+                bootMark('boot:deps:start');
                 await ensureDeps(document.querySelector('.page.active')?.id || 'today');
+                bootMark('boot:deps:end');
+                bootMeasure('boot:deps', 'boot:deps:start', 'boot:deps:end');
+                bootMark('boot:data-init:start');
                 await data.init();
+                bootMark('boot:data-init:end');
+                bootMeasure('boot:data-init', 'boot:data-init:start', 'boot:data-init:end');
+                bootMark('boot:first-render:end');
+                bootMeasure('boot:first-render', 'boot:start', 'boot:first-render:end');
+                schedulePostRenderUtilityLoad();
+                scheduleTodayEnhancementLoad();
                 window.workoutVoice?.init?.();
                 window.workoutVoice?.renderSettingsUI?.();
             } catch (e) {
@@ -1035,24 +1130,34 @@
             }
             if (window.syncStatus) syncStatus.init();
             if (hadRouteHash) await window.appRoute?.applyCurrent?.();
-            else await window.pwaSupport?.openShortcut?.();
+            else {
+                const hasShortcut = (() => {
+                    try { return new URLSearchParams(window.location.search).has('shortcut'); } catch { return false; }
+                })();
+                if (hasShortcut) await loadScript('pwa-support');
+                await window.pwaSupport?.openShortcut?.();
+            }
+            scheduleServiceWorkerRegistration();
             try { document.getElementById('localeSelectSheet') && (document.getElementById('localeSelectSheet').value = i18n.currentLocale || 'auto'); } catch {}
             ui.syncSwitchAria(document.getElementById('isAlt'));
             window.addEventListener('scroll', () => {
                 document.querySelector('.md-top-app-bar')?.classList.toggle('scrolled', window.scrollY > 8);
             }, { passive: true });
-            const idle = window.requestIdleCallback || ((cb) => setTimeout(cb, 1500));
-            idle(() => {
+            runWhenIdle(() => {
+                bootMark('boot:idle-preload:start');
+                const idle = runWhenIdle;
                 const activeId = document.querySelector('.page.active')?.id || 'today';
-                const pages = Object.keys(PAGE_DEPS).filter(p => p !== activeId).slice(0, idlePreloadBudget());
+                const preloadBudget = idlePreloadBudget();
+                const pages = Object.keys(PAGE_DEPS).filter(p => p !== activeId).slice(0, preloadBudget);
                 let index = 0;
                 const warmNext = () => {
                     const page = pages[index++];
                     if (!page) return;
-                    ensureDeps(page, { includeCss: false }).catch(() => {}).finally(() => idle(warmNext, { timeout: 4000 }));
+                    ensureDeps(page, { includeCss: false }).catch(() => {}).finally(() => runWhenIdle(warmNext, { timeout: 4000 }));
                 };
                 warmNext();
-                idle(() => warmLazyCss('42-health-profile'), { timeout: 6000 });
+                if (preloadBudget > 0) idle(() => warmLazyCss('42-health-profile'), { timeout: 6000 });
+                logBootPerfSummary();
             });
         };
     </script>

@@ -1217,25 +1217,35 @@ const advicePanel = {
         this.rerenderAdvicePanel?.();
     },
 
-    adviceModelStarKey(provider = '', model = '') {
-        const normalizedProvider = ai.normalizeProvider ? ai.normalizeProvider(provider || 'openai') : String(provider || 'openai').trim();
-        return `${normalizedProvider || 'openai'}::${String(model || '').trim()}`;
+    adviceModelStarKey(profileId = '', model = '') {
+        return `${String(profileId || '').trim()}::${String(model || '').trim()}`;
     },
 
-    isAdviceModelStarred(provider = '', model = '') {
+    adviceModelStarProfileId(identity = '') {
+        const value = String(identity || '').trim();
+        if ((ai.cfg.profiles || []).some(profile => profile.id === value)) return value;
+        const matches = (ai.cfg.profiles || []).filter(profile => ai.normalizeProvider?.(profile.provider) === ai.normalizeProvider?.(value));
+        return matches.length === 1 ? matches[0].id : value;
+    },
+
+    isAdviceModelStarred(profileId = '', model = '') {
         if (!model) return false;
         const starred = new Set(Array.isArray(this.adviceStarredModels) ? this.adviceStarredModels : []);
-        return starred.has(this.adviceModelStarKey(provider, model));
+        try { (JSON.parse(localStorage.getItem('rehab.ai.modelFavorites.v2') || '[]') || []).forEach(key => starred.add(key)); } catch (_) { /* ignore invalid local preference */ }
+        const profile = (ai.cfg.profiles || []).find(item => item.id === profileId);
+        const legacy = profile ? `${ai.normalizeProvider?.(profile.provider) || profile.provider}::${String(model).trim()}` : '';
+        return starred.has(this.adviceModelStarKey(profileId, model)) || (legacy && starred.has(legacy));
     },
 
-    toggleAdviceModelStar(provider = '', model = '') {
+    toggleAdviceModelStar(profileId = '', model = '') {
         if (!model) return false;
-        const key = this.adviceModelStarKey(provider, model);
+        const key = this.adviceModelStarKey(advicePanel.adviceModelStarProfileId.call(this, profileId), model);
         const starred = new Set(Array.isArray(this.adviceStarredModels) ? this.adviceStarredModels : []);
         const next = !starred.has(key);
         if (next) starred.add(key);
         else starred.delete(key);
         this.adviceStarredModels = Array.from(starred).slice(0, 100);
+        try { localStorage.setItem('rehab.ai.modelFavorites.v2', JSON.stringify(this.adviceStarredModels)); } catch (_) { /* storage may be unavailable */ }
         this.saveAdviceSettings();
         const content = document.getElementById('aiModelPickerContent');
         if (content) {
@@ -1290,6 +1300,14 @@ const advicePanel = {
         </button>`;
     },
 
+    renderAdviceReasoningChip() {
+        if (typeof ai === 'undefined') return '';
+        const taskId = this.advicePickerTaskId?.() || 'advice.chat';
+        const depth = ai.getTaskRoute?.(taskId)?.reasoningDepth || 'auto';
+        const visual = window.aiTaskSettings?.reasoningMeta?.(depth) || { icon: 'psychology', label: '\u63a8\u7406' };
+        return `<button class="advice-reasoning-chip is-${this.escapeHtml(depth)}" onclick="window.advicePanel?.openAdviceReasoningPicker?.call(data)" type="button" aria-label="\u63a8\u7406\u5f3a\u5ea6\uff1a${visual.label}" title="\u63a8\u7406\u5f3a\u5ea6\uff1a${visual.label}"><span class="material-symbols-rounded">${visual.icon}</span></button>`;
+    },
+
     advicePickerTaskId() {
         return (this._adviceAttachments || []).some(att => att?.kind === 'image' && att.status !== 'failed') ? 'advice.vision' : 'advice.chat';
     },
@@ -1304,6 +1322,9 @@ const advicePanel = {
         const modal = document.getElementById('aiModelPickerSheet');
         const content = document.getElementById('aiModelPickerContent');
         if (!modal || !content) return;
+        const heading = modal.querySelector('.md-modal-head strong');
+        if (heading) heading.textContent = '\u9009\u62e9\u672c\u6b21\u6a21\u578b';
+        content.className = '';
         content.innerHTML = this.renderAdviceModelPicker();
         this.bindAdviceModelPickerActions(content);
         modal.classList.remove('hidden');
@@ -1335,7 +1356,7 @@ const advicePanel = {
                 event.preventDefault();
                 event.stopPropagation?.();
                 this.toggleAdviceModelStar(
-                    star.getAttribute('data-provider') || '',
+                    star.getAttribute('data-profile-id') || star.getAttribute('data-provider') || '',
                     star.getAttribute('data-model') || ''
                 );
                 return;
@@ -1368,19 +1389,24 @@ const advicePanel = {
         });
     },
 
+    openAdviceReasoningPicker() {
+        const route = ai.getTaskRoute?.(this.advicePickerTaskId()) || {};
+        window.aiTaskSettings?.openReasoningMenu?.(route, [], next => this.setAdviceReasoningDepth(next.reasoningDepth));
+    },
+
     setAdviceReasoningDepth(depth = 'auto') {
         const taskId = this.advicePickerTaskId();
         const current = ai.getTaskRoute?.(taskId) || {};
         Promise.resolve(ai.setTaskRoute?.(taskId, { ...current, reasoningDepth: depth })).then(() => {
-            this.openAdviceModelPicker?.();
+            this.closeAdviceModelPicker?.();
             this.refreshAdviceModelChip?.();
+            this.rerenderAdvicePanel?.();
         });
     },
 
     renderAdviceModelPicker() {
         const taskId = this.advicePickerTaskId();
         const effective = ai.resolveTaskConfig?.(taskId) || ai.getEffectiveConfig?.() || ai.cfg;
-        const taskRoute = ai.getTaskRoute?.(taskId) || { reasoningDepth: 'auto' };
         const scope = this.adviceModelPickerScope || 'current';
         const normalizeProvider = ai.normalizeProvider.bind(ai);
         const activeProfileId = String(effective.profileId || ai.cfg.activeProfileId || '');
@@ -1429,17 +1455,13 @@ const advicePanel = {
         });
         const deduped = rows
             .filter((row, index, all) => row.model && all.findIndex(x => x.profileId === row.profileId && x.model === row.model) === index)
-            .map((row, index) => ({ ...row, starred: this.isAdviceModelStarred(row.provider, row.model), order: index }))
+            .map((row, index) => ({ ...row, starred: this.isAdviceModelStarred(row.profileId, row.model), order: index }))
             .sort((a, b) => Number(b.starred) - Number(a.starred) || a.order - b.order);
-        const reasoningOptions = [['auto', '自动'], ['off', '关闭'], ['low', '低'], ['medium', '中'], ['high', '高']]
-            .map(([value, label]) => `<button class="model-picker-tab ${taskRoute.reasoningDepth === value ? 'active' : ''}" onclick="data.setAdviceReasoningDepth('${value}')" type="button" aria-pressed="${taskRoute.reasoningDepth === value}">${label}</button>`)
-            .join('');
         const restore = `<button class="md-btn md-btn-tonal" onclick="ai.resetTaskRoute?.('${this.escapeHtml(taskId)}').then(()=>{data.closeAdviceModelPicker?.();data.rerenderAdvicePanel?.();})" type="button">恢复默认</button>`;
         const emptyText = scope === 'cached'
             ? '暂无启用模型'
             : (scope === 'others' ? '暂无其他启用模型' : '当前暂无启用模型');
         return `<div class="model-picker-body">
-            <div class="model-picker-tabs advice-reasoning-tabs" role="group" aria-label="推理深度">${reasoningOptions}</div>
             <div class="model-picker-tabs" role="tablist" aria-label="模型范围">
                 <button class="model-picker-tab ${scope === 'current' ? 'active' : ''}" onclick="data.setAdviceModelPickerScope('current')" type="button" aria-selected="${scope === 'current'}">当前连接</button>
                 <button class="model-picker-tab ${scope === 'others' ? 'active' : ''}" onclick="data.setAdviceModelPickerScope('others')" type="button" aria-selected="${scope === 'others'}">其他连接</button>
@@ -1452,7 +1474,7 @@ const advicePanel = {
                 return `<div class="model-picker-row advice-model-${visual.key} ${row.model === effective.model && row.profileId === activeProfileId ? 'is-selected' : ''} ${row.starred ? 'is-starred' : ''}" ${style ? `style="${this.escapeHtml(style)}"` : ''} role="button" tabindex="0" aria-disabled="${row.disabled}" title="${row.disabled ? '未配置 API Key' : ''}" data-advice-model-action="choose" data-profile-id="${this.escapeHtml(row.profileId)}" data-provider="${this.escapeHtml(row.provider)}" data-model="${this.escapeHtml(row.model)}">
                     <span class="advice-model-mark">${this.adviceModelIconHtml(visual)}</span>
                     <span class="model-picker-main"><strong>${this.escapeHtml(row.label)}</strong><small>${this.escapeHtml(row.profileName || row.provider)} · ${this.escapeHtml(row.tag)}</small></span>
-                    <button class="model-picker-star ${row.starred ? 'active' : ''}" type="button" aria-label="${starLabel}：${this.escapeHtml(row.label)}" title="${starLabel}" data-advice-model-action="star" data-provider="${this.escapeHtml(row.provider)}" data-model="${this.escapeHtml(row.model)}"><span class="material-symbols-rounded">${row.starred ? 'star' : 'star_border'}</span></button>
+                    <button class="model-picker-star ${row.starred ? 'active' : ''}" type="button" aria-label="${starLabel}：${this.escapeHtml(row.label)}" title="${starLabel}" data-advice-model-action="star" data-profile-id="${this.escapeHtml(row.profileId)}" data-provider="${this.escapeHtml(row.provider)}" data-model="${this.escapeHtml(row.model)}"><span class="material-symbols-rounded">${row.starred ? 'star' : 'star_border'}</span></button>
                     ${row.model === effective.model && row.profileId === activeProfileId ? '<span class="material-symbols-rounded">check</span>' : ''}
                 </div>`;
             }).join('') || `<div class="ai-model-empty">${this.escapeHtml(emptyText)}</div>`}
@@ -2981,6 +3003,7 @@ const advicePanel = {
                 <div class="ai-input">
                     ${this.renderAdviceAttachmentInputs?.() || ''}
                     ${this.renderAdviceModelChip()}
+                    ${advicePanel.renderAdviceReasoningChip.call(this)}
                     ${this.renderAdviceAttachmentControls?.() || ''}
                     <textarea id="advicePrompt" class="advice-composer-input" rows="1" placeholder="问 AI 关于训练 / 饮食..." oninput="data.onAdvicePromptInput(this)" onkeydown="data.onAdvicePromptKeydown(event)">${draft}</textarea>
                     <button id="adviceSendBtn" class="ai-send ${isSendingAdvice ? 'is-stopping' : ''}" onclick="${isSendingAdvice ? 'data.cancelAiAdvice()' : 'data.sendAiAdvice()'}" type="button" ${isSendingAdvice || canSend ? '' : 'disabled'} aria-label="${isSendingAdvice ? '停止生成' : '发送问题'}" title="${isSendingAdvice ? '停止生成' : '发送问题'}"><span class="material-symbols-rounded">${isSendingAdvice ? 'stop' : 'send'}</span></button>

@@ -1,5 +1,6 @@
 // @ts-nocheck
 export const REASONING_DEPTHS = Object.freeze(['auto', 'off', 'low', 'medium', 'high']);
+export const FALLBACK_MODES = Object.freeze(['manual', 'automatic']);
 
 const EXPLICIT_REASONING_DEPTHS = new Set(['low', 'medium', 'high']);
 const PROTOCOL_ALIASES = Object.freeze({
@@ -28,6 +29,11 @@ function normalizeId(value) {
 function normalizeDepth(value, fallback = 'auto') {
   const depth = String(value || '').trim().toLowerCase();
   return REASONING_DEPTHS.includes(depth) ? depth : fallback;
+}
+
+function normalizeFallbackMode(value, fallback = 'manual') {
+  const mode = String(value || '').trim().toLowerCase();
+  return FALLBACK_MODES.includes(mode) ? mode : fallback;
 }
 
 function normalizeTarget(value, defaultDepth = null) {
@@ -87,6 +93,7 @@ export function normalizeTaskRoute(route = {}, defaults = {}) {
     route.reasoningDepth,
     normalizeDepth(defaults.reasoningDepth, 'auto')
   );
+  const fallbackMode = normalizeFallbackMode(route.fallbackMode, normalizeFallbackMode(defaults.fallbackMode, 'manual'));
   const fallbacks = [];
   const seen = new Set(primary ? [targetKey({ ...primary, reasoningDepth })] : []);
   const rawFallbacks = Array.isArray(route.fallbacks)
@@ -101,7 +108,7 @@ export function normalizeTaskRoute(route = {}, defaults = {}) {
     seen.add(key);
     fallbacks.push(fallback);
   }
-  return { primary, reasoningDepth, fallbacks };
+  return { primary, reasoningDepth, fallbackMode, fallbacks };
 }
 
 function normalizeOverride(override) {
@@ -116,7 +123,8 @@ function normalizeOverride(override) {
   return {
     target,
     reasoningDepth: source.reasoningDepth == null ? null : normalizeDepth(source.reasoningDepth, 'auto'),
-    fallbacks: Array.isArray(override.fallbacks) ? override.fallbacks : null
+    fallbacks: Array.isArray(override.fallbacks) ? override.fallbacks : null,
+    fallbackMode: override.fallbackMode == null ? null : normalizeFallbackMode(override.fallbackMode, 'manual')
   };
 }
 
@@ -137,6 +145,7 @@ export function resolveTaskRoute(cfg = {}, taskId, override = null) {
   const normalizedOverride = normalizeOverride(override);
   if (normalizedOverride?.target) route.primary = normalizedOverride.target;
   if (normalizedOverride?.reasoningDepth) route.reasoningDepth = normalizedOverride.reasoningDepth;
+  if (normalizedOverride?.fallbackMode) route.fallbackMode = normalizedOverride.fallbackMode;
   if (normalizedOverride?.fallbacks) {
     route.fallbacks = normalizeTaskRoute({
       primary: route.primary,
@@ -157,8 +166,10 @@ export function buildFallbackSequence(route = {}) {
   if (normalized.primary) {
     sequence.push({ ...normalized.primary, reasoningDepth: normalized.reasoningDepth });
   }
-  for (const fallback of normalized.fallbacks) {
-    sequence.push({ ...fallback, reasoningDepth: fallback.reasoningDepth || normalized.reasoningDepth });
+  if (normalized.fallbackMode === 'automatic') {
+    for (const fallback of normalized.fallbacks) {
+      sequence.push({ ...fallback, reasoningDepth: fallback.reasoningDepth || normalized.reasoningDepth });
+    }
   }
   return sequence;
 }
@@ -271,6 +282,7 @@ export function isRetryableAiError(errorLike) {
 
 if (typeof window !== 'undefined') {
   window.aiRoutingPure = {
+    FALLBACK_MODES,
     REASONING_DEPTHS,
     buildFallbackSequence,
     buildReasoningOptions,

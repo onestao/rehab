@@ -121,6 +121,7 @@ const ASSETS = [
     'swipe-actions.js?v=311',
     'health-profile.js?v=311',
     'report-metrics-pure.js?v=311',
+    'report-version-pure.js?v=311',
     'report-panel.js?v=311',
     'assets/vision-models.json',
     'assets/heic2any.min.js',
@@ -141,6 +142,9 @@ const ASSETS = [
 ];
 
 let voiceTtsHosts = new Set();
+const RUNTIME_CACHE_FIRST_ASSETS = new Set([
+    'assets/heic2any.min.js'
+]);
 
 self.addEventListener('install', (e) => {
     e.waitUntil((async () => {
@@ -178,12 +182,36 @@ function normalizeVersionedAsset(url) {
     return next.toString();
 }
 
+function isRuntimeCacheFirstAsset(url) {
+    const pathname = url.pathname.replace(/^\/+/, '');
+    if (RUNTIME_CACHE_FIRST_ASSETS.has(pathname)) return true;
+    return [...RUNTIME_CACHE_FIRST_ASSETS].some((asset) => pathname.endsWith('/' + asset));
+}
+
+async function fetchRuntimeCacheFirst(request) {
+    const cached = await caches.match(request);
+    if (cached) return cached;
+    try {
+        const res = await fetch(request, { credentials: 'same-origin', cache: 'no-store' });
+        if (res && res.ok) {
+            const clone = res.clone();
+            const cache = await caches.open(CACHE);
+            await cache.put(request, clone).catch(() => {});
+        }
+        return res;
+    } catch (err) {
+        const fallback = await caches.match(request);
+        if (fallback) return fallback;
+        throw err;
+    }
+}
+
 async function fetchNavigation(request) {
     try {
         const res = await fetch(request, { cache: 'no-store' });
         if (res && res.ok) {
             const cache = await caches.open(CACHE);
-            cache.put('index.html', res.clone()).catch(() => {});
+            await cache.put('index.html', res.clone()).catch(() => {});
         }
         return res;
     } catch (err) {
@@ -207,6 +235,11 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
+    if (isRuntimeCacheFirstAsset(url)) {
+        event.respondWith(fetchRuntimeCacheFirst(event.request));
+        return;
+    }
+
     if (isVersionedAsset(url)) {
         // Cache-first for hashed assets: avoids slow waterfall on tab switch.
         event.respondWith((async () => {
@@ -218,7 +251,7 @@ self.addEventListener('fetch', (event) => {
                 if (res && res.ok) {
                     const clone = res.clone();
                     const cache = await caches.open(CACHE);
-                    cache.put(cacheKey, clone).catch(() => {});
+                    await cache.put(cacheKey, clone).catch(() => {});
                 }
                 return res;
             } catch (err) {
@@ -237,7 +270,7 @@ self.addEventListener('fetch', (event) => {
             if (res && res.ok) {
                 const clone = res.clone();
                 const cache = await caches.open(CACHE);
-                cache.put(event.request, clone).catch(() => {});
+                await cache.put(event.request, clone).catch(() => {});
             }
             return res;
         } catch (err) {

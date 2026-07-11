@@ -49,6 +49,7 @@ test('task route normalization removes invalid and duplicate fallbacks', () => {
   }), {
     primary,
     reasoningDepth: 'high',
+    fallbackMode: 'manual',
     fallbacks: [{ profileId: 'claude', modelId: 'claude-sonnet', reasoningDepth: 'medium' }]
   });
 });
@@ -73,6 +74,7 @@ test('resolveTaskRoute applies task, registry default, global default, then requ
     taskId: 'plan.week',
     primary: { profileId: 'claude', modelId: 'claude-sonnet' },
     reasoningDepth: 'high',
+    fallbackMode: 'manual',
     fallbacks: [{ profileId: 'gemini', modelId: 'gemini-pro', reasoningDepth: 'high' }]
   });
   assert.deepEqual(resolveTaskRoute(cfg, 'plan.week', {
@@ -88,6 +90,7 @@ test('fallback sequence is ordered, immutable and inherits route reasoning depth
   const route = normalizeTaskRoute({
     primary,
     reasoningDepth: 'high',
+    fallbackMode: 'automatic',
     fallbacks: [
       { profileId: 'claude', modelId: 'sonnet' },
       { profileId: 'gemini', modelId: 'pro', reasoningDepth: 'low' }
@@ -101,6 +104,16 @@ test('fallback sequence is ordered, immutable and inherits route reasoning depth
   ]);
   sequence[0].modelId = 'mutated';
   assert.equal(route.primary.modelId, 'gpt-5-mini');
+});
+
+test('fallback routes default to manual and require explicit automatic authorization', () => {
+  const manual = normalizeTaskRoute({ primary, fallbacks: [{ profileId: 'backup', modelId: 'backup-model' }] });
+  assert.equal(manual.fallbackMode, 'manual');
+  assert.deepEqual(buildFallbackSequence(manual), [
+    { ...primary, reasoningDepth: 'auto' }
+  ]);
+  assert.equal(normalizeTaskRoute({ ...manual, fallbackMode: 'invalid' }).fallbackMode, 'manual');
+  assert.equal(normalizeTaskRoute({ ...manual, fallbackMode: 'AUTOMATIC' }).fallbackMode, 'automatic');
 });
 
 test('off reasoning sends no provider options and keeps temperature', () => {
