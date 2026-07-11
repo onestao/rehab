@@ -587,7 +587,7 @@ media (prefers-color-scheme: dark)
   08-components-cards.css, 16-history-hero-calendar.css, 37-dark-mode.css, 51-v6-today.css
 
 media (prefers-reduced-motion: reduce)
-  36-responsive.css, 50-v6-ui.css, 40-a11y.css
+  36-responsive.css, 48-advice-model-picker.css, 50-v6-ui.css, 40-a11y.css
 
 to
   06-layout-page.css, 18-health-diet.css, 38-record-page.css, 43-identity-card.css, 46-advice-ai.css, 47-view-transitions.css, 50-v6-ui.css, 54-v6-ai.css, 57-weight-report.css, 41-m3e-effects.css

@@ -1,5 +1,19 @@
 // @ts-nocheck
+const ADVICE_MODEL_SCOPES = ['current', 'others', 'cached'];
+
+function resolveAdviceModelSwipeScope(scope = 'current', deltaX = 0, width = 0, velocityX = 0) {
+    const currentIndex = Math.max(0, ADVICE_MODEL_SCOPES.indexOf(scope));
+    const viewportWidth = Math.max(1, Number(width) || 320);
+    const distanceThreshold = Math.min(72, viewportWidth * 0.22);
+    const deliberate = Math.abs(deltaX) >= distanceThreshold || Math.abs(velocityX) >= 0.55;
+    if (!deliberate) return ADVICE_MODEL_SCOPES[currentIndex];
+    const direction = deltaX < 0 ? 1 : -1;
+    const nextIndex = Math.max(0, Math.min(ADVICE_MODEL_SCOPES.length - 1, currentIndex + direction));
+    return ADVICE_MODEL_SCOPES[nextIndex];
+}
+
 const advicePanel = {
+    _test: { resolveAdviceModelSwipeScope },
     DRAFT_KEY: 'rehab_advice_draft',
     SETTINGS_KEY: 'rehab_advice_settings',
     SCROLL_KEY: 'rehab_advice_scroll_top',
@@ -1322,9 +1336,14 @@ const advicePanel = {
         const modal = document.getElementById('aiModelPickerSheet');
         const content = document.getElementById('aiModelPickerContent');
         if (!modal || !content) return;
+        const card = modal.querySelector('.md-modal-sheet-card');
         const heading = modal.querySelector('.md-modal-head strong');
         if (heading) heading.textContent = '\u9009\u62e9\u672c\u6b21\u6a21\u578b';
-        content.className = '';
+        modal.classList.remove('ai-task-quick-sheet');
+        modal.classList.add('advice-model-picker-sheet');
+        card?.classList.remove('ai-task-quick-card');
+        card?.classList.add('advice-model-picker-card');
+        content.className = 'advice-model-picker-content';
         content.innerHTML = this.renderAdviceModelPicker();
         this.bindAdviceModelPickerActions(content);
         modal.classList.remove('hidden');
@@ -1334,23 +1353,54 @@ const advicePanel = {
     closeAdviceModelPicker() {
         const modal = document.getElementById('aiModelPickerSheet');
         modal?.classList.add('hidden');
+        modal?.classList.remove('advice-model-picker-sheet');
         modal?.setAttribute('aria-hidden', 'true');
+        modal?.querySelector('.md-modal-sheet-card')?.classList.remove('advice-model-picker-card');
+        document.getElementById('aiModelPickerContent')?.classList.remove('advice-model-picker-content');
     },
 
     setAdviceModelPickerScope(scope = 'current') {
-        const allowed = new Set(['current', 'others', 'cached']);
-        this.adviceModelPickerScope = allowed.has(scope) ? scope : 'current';
+        this.adviceModelPickerScope = ADVICE_MODEL_SCOPES.includes(scope) ? scope : 'current';
         const content = document.getElementById('aiModelPickerContent');
-        if (content) {
-            content.innerHTML = this.renderAdviceModelPicker();
-            this.bindAdviceModelPickerActions(content);
-        }
+        const body = content?.querySelector('.model-picker-body');
+        if (!body) return;
+        const index = ADVICE_MODEL_SCOPES.indexOf(this.adviceModelPickerScope);
+        body.style.setProperty('--model-picker-scope-index', String(index));
+        body.style.setProperty('--model-picker-tab-progress', String(index));
+        body.style.setProperty('--model-picker-drag-x', '0px');
+        body.querySelectorAll('[data-advice-model-scope]').forEach(tab => {
+            const active = tab.getAttribute('data-advice-model-scope') === this.adviceModelPickerScope;
+            tab.classList.toggle('active', active);
+            tab.setAttribute('aria-selected', String(active));
+            tab.tabIndex = active ? 0 : -1;
+        });
+        body.querySelectorAll('[data-advice-model-page]').forEach(page => {
+            const active = page.getAttribute('data-advice-model-page') === this.adviceModelPickerScope;
+            page.setAttribute('aria-hidden', String(!active));
+            page.toggleAttribute('inert', !active);
+        });
+        const region = body.querySelector('[data-advice-model-swipe]');
+        const page = body.querySelector(`[data-advice-model-page="${this.adviceModelPickerScope}"]`);
+        if (region && page) region.style.height = `${page.scrollHeight}px`;
     },
 
     bindAdviceModelPickerActions(root) {
-        if (!root || root.dataset.adviceModelPickerActionsBound === '1') return;
+        if (!root) return;
+        requestAnimationFrame(() => this.setAdviceModelPickerScope(this.adviceModelPickerScope || 'current'));
+        if (root.dataset.adviceModelPickerActionsBound === '1') return;
         root.dataset.adviceModelPickerActionsBound = '1';
         root.addEventListener('click', (event) => {
+            if (Date.now() < (this._adviceModelPickerSuppressClickUntil || 0)) {
+                event.preventDefault();
+                event.stopPropagation?.();
+                return;
+            }
+            const tab = event.target?.closest?.('[data-advice-model-scope]');
+            if (tab && root.contains(tab)) {
+                event.preventDefault();
+                this.setAdviceModelPickerScope(tab.getAttribute('data-advice-model-scope') || 'current');
+                return;
+            }
             const star = event.target?.closest?.('[data-advice-model-action="star"]');
             if (star && root.contains(star)) {
                 event.preventDefault();
@@ -1371,6 +1421,76 @@ const advicePanel = {
                 row.getAttribute('data-model') || ''
             );
         });
+        root.addEventListener('keydown', (event) => {
+            const row = event.target?.closest?.('[data-advice-model-action="choose"]');
+            if (!row || !root.contains(row) || !['Enter', ' '].includes(event.key)) return;
+            event.preventDefault();
+            row.click();
+        });
+
+        let swipe = null;
+        root.addEventListener('pointerdown', (event) => {
+            const region = event.target?.closest?.('[data-advice-model-swipe]');
+            if (!region || !root.contains(region) || (event.button !== undefined && event.button !== 0)) return;
+            const body = region.closest('.model-picker-body');
+            const rect = region.getBoundingClientRect();
+            swipe = {
+                pointerId: event.pointerId,
+                region,
+                body,
+                scope: this.adviceModelPickerScope || 'current',
+                startX: event.clientX,
+                startY: event.clientY,
+                lastX: event.clientX,
+                lastAt: performance.now(),
+                velocityX: 0,
+                width: Math.max(1, rect.width),
+                axis: '',
+                deltaX: 0
+            };
+            region.setPointerCapture?.(event.pointerId);
+        });
+        root.addEventListener('pointermove', (event) => {
+            if (!swipe || event.pointerId !== swipe.pointerId) return;
+            const rawX = event.clientX - swipe.startX;
+            const rawY = event.clientY - swipe.startY;
+            if (!swipe.axis && Math.max(Math.abs(rawX), Math.abs(rawY)) >= 6) {
+                swipe.axis = Math.abs(rawX) > Math.abs(rawY) * 1.15 ? 'x' : 'y';
+            }
+            if (swipe.axis !== 'x') return;
+            event.preventDefault();
+            const now = performance.now();
+            const dt = Math.max(1, now - swipe.lastAt);
+            swipe.velocityX = (event.clientX - swipe.lastX) / dt;
+            swipe.lastX = event.clientX;
+            swipe.lastAt = now;
+            const index = ADVICE_MODEL_SCOPES.indexOf(swipe.scope);
+            const atBoundary = (index === 0 && rawX > 0) || (index === ADVICE_MODEL_SCOPES.length - 1 && rawX < 0);
+            swipe.deltaX = atBoundary ? rawX * 0.28 : rawX;
+            swipe.region.classList.add('is-dragging');
+            swipe.body.classList.add('is-dragging');
+            swipe.body.style.setProperty('--model-picker-drag-x', `${swipe.deltaX}px`);
+            const progress = Math.max(0, Math.min(ADVICE_MODEL_SCOPES.length - 1, index - swipe.deltaX / swipe.width));
+            swipe.body.style.setProperty('--model-picker-tab-progress', String(progress));
+        }, { passive: false });
+        const finishSwipe = (event, cancelled = false) => {
+            if (!swipe || event.pointerId !== swipe.pointerId) return;
+            const current = swipe;
+            swipe = null;
+            current.region.classList.remove('is-dragging');
+            current.body.classList.remove('is-dragging');
+            try { current.region.releasePointerCapture?.(event.pointerId); } catch (_) { /* pointer capture may already be released */ }
+            const next = cancelled || current.axis !== 'x'
+                ? current.scope
+                : resolveAdviceModelSwipeScope(current.scope, current.deltaX, current.width, current.velocityX);
+            if (current.axis === 'x' && Math.abs(current.deltaX) > 8) {
+                this._adviceModelPickerSuppressClickUntil = Date.now() + 350;
+            }
+            this.setAdviceModelPickerScope(next);
+            if (next !== current.scope) window.haptics?.selection?.();
+        };
+        root.addEventListener('pointerup', event => finishSwipe(event));
+        root.addEventListener('pointercancel', event => finishSwipe(event, true));
     },
 
     chooseAdviceModel(profileId, provider, model) {
@@ -1447,38 +1567,48 @@ const advicePanel = {
                 disabled: !effective.apiKey
             });
         }
-        const rows = rawRows.filter(row => {
-            if (!row.model) return false;
-            if (scope === 'current') return row.profileId === activeProfileId;
-            if (scope === 'others') return row.profileId !== activeProfileId;
-            return true;
-        });
-        const deduped = rows
-            .filter((row, index, all) => row.model && all.findIndex(x => x.profileId === row.profileId && x.model === row.model) === index)
-            .map((row, index) => ({ ...row, starred: this.isAdviceModelStarred(row.profileId, row.model), order: index }))
-            .sort((a, b) => Number(b.starred) - Number(a.starred) || a.order - b.order);
         const restore = `<button class="md-btn md-btn-tonal" onclick="ai.resetTaskRoute?.('${this.escapeHtml(taskId)}').then(()=>{data.closeAdviceModelPicker?.();data.rerenderAdvicePanel?.();})" type="button">恢复默认</button>`;
-        const emptyText = scope === 'cached'
-            ? '暂无启用模型'
-            : (scope === 'others' ? '暂无其他启用模型' : '当前暂无启用模型');
-        return `<div class="model-picker-body">
+        const scopeIndex = Math.max(0, ADVICE_MODEL_SCOPES.indexOf(scope));
+        const scopeLabels = { current: '当前连接', others: '其他连接', cached: '全部缓存' };
+        const renderPage = pageScope => {
+            const rows = rawRows.filter(row => {
+                if (!row.model) return false;
+                if (pageScope === 'current') return row.profileId === activeProfileId;
+                if (pageScope === 'others') return row.profileId !== activeProfileId;
+                return true;
+            });
+            const deduped = rows
+                .filter((row, index, all) => row.model && all.findIndex(x => x.profileId === row.profileId && x.model === row.model) === index)
+                .map((row, index) => ({ ...row, starred: this.isAdviceModelStarred(row.profileId, row.model), order: index }))
+                .sort((a, b) => Number(b.starred) - Number(a.starred) || a.order - b.order);
+            const emptyText = pageScope === 'cached'
+                ? '暂无启用模型'
+                : (pageScope === 'others' ? '暂无其他启用模型' : '当前暂无启用模型');
+            return `<section class="model-picker-page" data-advice-model-page="${pageScope}" role="tabpanel" aria-label="${scopeLabels[pageScope]}" aria-hidden="${pageScope !== scope}" ${pageScope !== scope ? 'inert' : ''}>
+                <div class="model-picker-list">
+                    ${deduped.map(row => {
+                        const visual = this.adviceModelVisual(row.model, row.provider, row.iconKey);
+                        const style = this.adviceModelThemeStyle(visual);
+                        const starLabel = row.starred ? '取消星标' : '加星标';
+                        return `<div class="model-picker-row advice-model-${visual.key} ${row.model === effective.model && row.profileId === activeProfileId ? 'is-selected' : ''} ${row.starred ? 'is-starred' : ''}" ${style ? `style="${this.escapeHtml(style)}"` : ''} role="button" tabindex="0" aria-disabled="${row.disabled}" title="${row.disabled ? '未配置 API Key' : ''}" data-advice-model-action="choose" data-profile-id="${this.escapeHtml(row.profileId)}" data-provider="${this.escapeHtml(row.provider)}" data-model="${this.escapeHtml(row.model)}">
+                            <span class="advice-model-mark">${this.adviceModelIconHtml(visual)}</span>
+                            <span class="model-picker-main"><strong>${this.escapeHtml(row.label)}</strong><small>${this.escapeHtml(row.profileName || row.provider)} · ${this.escapeHtml(row.tag)}</small></span>
+                            <button class="model-picker-star ${row.starred ? 'active' : ''}" type="button" aria-label="${starLabel}：${this.escapeHtml(row.label)}" title="${starLabel}" data-advice-model-action="star" data-profile-id="${this.escapeHtml(row.profileId)}" data-provider="${this.escapeHtml(row.provider)}" data-model="${this.escapeHtml(row.model)}"><span class="material-symbols-rounded">${row.starred ? 'star' : 'star_border'}</span></button>
+                            ${row.model === effective.model && row.profileId === activeProfileId ? '<span class="material-symbols-rounded model-picker-check">check</span>' : ''}
+                        </div>`;
+                    }).join('') || `<div class="ai-model-empty">${this.escapeHtml(emptyText)}</div>`}
+                </div>
+                <div class="model-picker-actions">${restore}</div>
+            </section>`;
+        };
+        return `<div class="model-picker-body" style="--model-picker-scope-index:${scopeIndex};--model-picker-tab-progress:${scopeIndex};--model-picker-drag-x:0px">
             <div class="model-picker-tabs" role="tablist" aria-label="模型范围">
-                <button class="model-picker-tab ${scope === 'current' ? 'active' : ''}" onclick="data.setAdviceModelPickerScope('current')" type="button" aria-selected="${scope === 'current'}">当前连接</button>
-                <button class="model-picker-tab ${scope === 'others' ? 'active' : ''}" onclick="data.setAdviceModelPickerScope('others')" type="button" aria-selected="${scope === 'others'}">其他连接</button>
-                <button class="model-picker-tab ${scope === 'cached' ? 'active' : ''}" onclick="data.setAdviceModelPickerScope('cached')" type="button" aria-selected="${scope === 'cached'}">全部缓存</button>
+                <span class="model-picker-tab-indicator" aria-hidden="true"></span>
+                ${ADVICE_MODEL_SCOPES.map(item => `<button class="model-picker-tab ${scope === item ? 'active' : ''}" data-advice-model-scope="${item}" role="tab" type="button" aria-selected="${scope === item}" tabindex="${scope === item ? '0' : '-1'}">${scopeLabels[item]}</button>`).join('')}
             </div>
-            ${deduped.map(row => {
-                const visual = this.adviceModelVisual(row.model, row.provider, row.iconKey);
-                const style = this.adviceModelThemeStyle(visual);
-                const starLabel = row.starred ? '取消星标' : '加星标';
-                return `<div class="model-picker-row advice-model-${visual.key} ${row.model === effective.model && row.profileId === activeProfileId ? 'is-selected' : ''} ${row.starred ? 'is-starred' : ''}" ${style ? `style="${this.escapeHtml(style)}"` : ''} role="button" tabindex="0" aria-disabled="${row.disabled}" title="${row.disabled ? '未配置 API Key' : ''}" data-advice-model-action="choose" data-profile-id="${this.escapeHtml(row.profileId)}" data-provider="${this.escapeHtml(row.provider)}" data-model="${this.escapeHtml(row.model)}">
-                    <span class="advice-model-mark">${this.adviceModelIconHtml(visual)}</span>
-                    <span class="model-picker-main"><strong>${this.escapeHtml(row.label)}</strong><small>${this.escapeHtml(row.profileName || row.provider)} · ${this.escapeHtml(row.tag)}</small></span>
-                    <button class="model-picker-star ${row.starred ? 'active' : ''}" type="button" aria-label="${starLabel}：${this.escapeHtml(row.label)}" title="${starLabel}" data-advice-model-action="star" data-profile-id="${this.escapeHtml(row.profileId)}" data-provider="${this.escapeHtml(row.provider)}" data-model="${this.escapeHtml(row.model)}"><span class="material-symbols-rounded">${row.starred ? 'star' : 'star_border'}</span></button>
-                    ${row.model === effective.model && row.profileId === activeProfileId ? '<span class="material-symbols-rounded">check</span>' : ''}
-                </div>`;
-            }).join('') || `<div class="ai-model-empty">${this.escapeHtml(emptyText)}</div>`}
-            ${restore}
+            <div class="model-picker-swipe-region" data-advice-model-swipe>
+                <div class="model-picker-track">${ADVICE_MODEL_SCOPES.map(renderPage).join('')}</div>
+            </div>
         </div>`;
     },
 

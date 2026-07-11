@@ -140,8 +140,11 @@
         if (!modal) return;
         modal.classList.add('hidden');
         modal.classList.remove('ai-task-quick-sheet');
+        modal.classList.remove('advice-model-picker-sheet');
         modal.setAttribute('aria-hidden', 'true');
-        modal.querySelector('.md-modal-sheet-card')?.classList.remove('ai-task-quick-card');
+        const card = modal.querySelector('.md-modal-sheet-card');
+        card?.classList.remove('ai-task-quick-card');
+        card?.classList.remove('advice-model-picker-card');
         const content = document.getElementById('aiModelPickerContent');
         if (content) { content.replaceChildren(); content.className = ''; }
         const heading = modal.querySelector('.md-modal-head strong');

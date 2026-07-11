@@ -148,6 +148,18 @@ test('today AI types use selected plan first and include other daily plan types'
   assert.deepEqual(Array.from(api.todayPlanAiTypes.call(ctx)), ['bulk', 'rehab', 'cut']);
 });
 
+test('multiple-plan tabs call the loaded plan UI module directly', () => {
+  const api = loadPlanUi();
+  const plans = [
+    { id: 'rehab', type: 'rehab', title: '康复计划', items: [] },
+    { id: 'bulk', type: 'bulk', title: '增肌日程', items: [] }
+  ];
+  const html = api.renderPlanTodaySection.call(createContext(api, plans));
+
+  assert.match(html, /window\.dataPlanUi\.selectTodayPlan\.call\(data,/);
+  assert.doesNotMatch(html, /onclick="data\.selectTodayPlan\(/);
+});
+
 test('new plan AI entry opens generator without creating a manual placeholder', () => {
   const api = loadPlanUi();
   const ctx = {

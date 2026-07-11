@@ -23,14 +23,24 @@ function loadWindowModule(filename, exportExpr, extra = {}) {
 }
 
 function fakeRoot() {
-    /** @type {{ dataset: Record<string, string>, listener: null | ((event: any) => void), addEventListener: (type: string, fn: (event: any) => void) => void, contains: () => boolean }} */
+    /** @type {{ dataset: Record<string, string>, listener: null | ((event: any) => void), listeners: Record<string, (event: any) => void>, addEventListener: (type: string, fn: (event: any) => void) => void, contains: () => boolean }} */
     const root = {
         dataset: {},
         listener: null,
-        addEventListener(_type, fn) { this.listener = fn; },
+        listeners: {},
+        addEventListener(type, fn) {
+            this.listeners[type] = fn;
+            if (type === 'click') this.listener = fn;
+        },
         contains() { return true; }
     };
     return root;
+}
+
+function modelPickerPage(html, scope) {
+    const start = html.indexOf(`<section class="model-picker-page" data-advice-model-page="${scope}"`);
+    const end = html.indexOf('</section>', start);
+    return start >= 0 && end >= start ? html.slice(start, end) : '';
 }
 
 function fakeEvent(attrs) {
@@ -38,6 +48,8 @@ function fakeEvent(attrs) {
         closest(selector = '') {
             const expected = String(selector).match(/\[([^=\]]+)="([^"]+)"\]/);
             if (expected && attrs[expected[1]] !== expected[2]) return null;
+            const present = String(selector).match(/^\[([^=\]]+)\]$/);
+            if (present && !(present[1] in attrs)) return null;
             return {
                 getAttribute(name) { return attrs[name] ?? ''; }
             };
@@ -285,14 +297,16 @@ test('model picker aggregates only enabled cached models by provider scope', () 
 
     api.adviceModelPickerScope = 'cached';
     const cachedHtml = api.renderAdviceModelPicker();
-    assert.match(cachedHtml, /enabled-openai/);
-    assert.match(cachedHtml, /enabled-claude/);
-    assert.doesNotMatch(cachedHtml, /hidden-openai/);
+    const cachedPage = modelPickerPage(cachedHtml, 'cached');
+    assert.match(cachedPage, /enabled-openai/);
+    assert.match(cachedPage, /enabled-claude/);
+    assert.doesNotMatch(cachedPage, /hidden-openai/);
 
     api.adviceModelPickerScope = 'others';
     const othersHtml = api.renderAdviceModelPicker();
-    assert.doesNotMatch(othersHtml, /enabled-openai/);
-    assert.match(othersHtml, /enabled-claude/);
+    const othersPage = modelPickerPage(othersHtml, 'others');
+    assert.doesNotMatch(othersPage, /enabled-openai/);
+    assert.match(othersPage, /enabled-claude/);
 });
 
 test('model picker stars models and sorts starred rows first', () => {
@@ -329,7 +343,7 @@ test('model picker stars models and sorts starred rows first', () => {
     api.adviceModelPickerScope = 'cached';
     api.adviceStarredModels = ['claude::claude-model'];
 
-    const html = api.renderAdviceModelPicker();
+    const html = modelPickerPage(api.renderAdviceModelPicker(), 'cached');
     assert.ok(html.indexOf('claude-model') < html.indexOf('openai-model'));
     assert.match(html, /data-advice-model-action="star"/);
     assert.match(html, /star/);

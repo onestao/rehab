@@ -30,6 +30,14 @@ test('model labels include connection identity for duplicate model ids', () => {
     assert.equal(helpers.modelOptionLabel(second), 'SiliconFlow \u00b7 shared-model');
 });
 
+test('compact model control shows the selected model name beside the shared icon', () => {
+    const source = readFileSync(new URL('../ai-task-settings.js', import.meta.url), 'utf8');
+    const block = source.match(/function createCompactModelControl[\s\S]*?return button;/)?.[0] || '';
+    assert.match(block, /(?:modelVisualNode|connectionMark)\(selected\)/);
+    assert.match(block, /ai-compact-model-name/);
+    assert.match(block, /modelShortName\(selected\)/);
+});
+
 test('unknown reasoning depth falls back to auto', () => {
     assert.equal(helpers.normalizeReasoningDepth('HIGH'), 'high');
     assert.equal(helpers.normalizeReasoningDepth('unsupported'), 'auto');
