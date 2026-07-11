@@ -47,6 +47,21 @@ test('inline picker mount guard suppresses duplicate observer mounts', () => {
     assert.equal(helpers.shouldMountInlinePicker(host, 'plan.week'), true);
 });
 
+test('plan AI picker inserts beside nested modal actions', () => {
+    const body = {};
+    const actionParent = {};
+    const actions = { parentElement: actionParent };
+
+    assert.deepEqual(helpers.resolveInsertionTarget(body, actions), {
+        parent: actionParent,
+        before: actions
+    });
+    assert.deepEqual(helpers.resolveInsertionTarget(body, null), {
+        parent: body,
+        before: null
+    });
+});
+
 test('plan AI picker mounts explicitly instead of on every body mutation', () => {
     const settingsSource = readFileSync(new URL('../ai-task-settings.js', import.meta.url), 'utf8');
     const planSource = readFileSync(new URL('../plan-ai.js', import.meta.url), 'utf8');

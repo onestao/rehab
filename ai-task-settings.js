@@ -269,6 +269,13 @@
         nodes.forEach(node => mountInlinePicker(node, text(node.dataset.aiTaskPicker).trim(), options));
     }
 
+    function resolveInsertionTarget(container, reference) {
+        return {
+            parent: reference?.parentElement || container,
+            before: reference || null
+        };
+    }
+
     function mountPlanAiPicker() {
         const body = document.getElementById('planAiSheetBody');
         if (!body || !body.childElementCount) return;
@@ -278,7 +285,8 @@
             host = el('div');
             host.id = 'planAiTaskPicker';
             const actions = body.querySelector('.modal-actions');
-            body.insertBefore(host, actions || null);
+            const target = resolveInsertionTarget(body, actions);
+            target.parent.insertBefore(host, target.before);
         }
         if (host.dataset.aiTaskPicker === taskId && host.childElementCount) return;
         host.dataset.aiTaskPicker = taskId;
@@ -355,7 +363,7 @@
         refreshCurrentModels,
         clearCurrentModelCache,
         clearAllModelCaches,
-        _test: { modelKey, modelOptionLabel, normalizeReasoningDepth, normalizeTaskDefinitions, shouldMountInlinePicker }
+        _test: { modelKey, modelOptionLabel, normalizeReasoningDepth, normalizeTaskDefinitions, shouldMountInlinePicker, resolveInsertionTarget }
     };
     root.aiTaskSettings = api;
     root.addEventListener?.('ai:catalog-changed', render);
