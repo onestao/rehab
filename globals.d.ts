@@ -66,6 +66,9 @@ interface Window {
   adviceTemplateManager: any;
   adviceAttachments: any;
   aiPricing: any;
+  aiRoutingPure: any;
+  aiModelCatalogPure: any;
+  aiTaskSettings: any;
   syncPure: any;
   syncUi: any;
   syncAdapters: any;

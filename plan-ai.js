@@ -52,14 +52,27 @@
         return Array.from(document.querySelectorAll(selector));
     }
 
-    function planAiTargetDates(ctx, mode = 'today') {
-        const today = ctx.logicalDateKey?.() || ctx.dateKey?.(new Date()) || new Date().toISOString().slice(0, 10);
+    function formatPlanAiDateKey(date) {
+        if (!(date instanceof Date) || Number.isNaN(date.getTime())) return '';
+        return [
+            date.getFullYear(),
+            String(date.getMonth() + 1).padStart(2, '0'),
+            String(date.getDate()).padStart(2, '0')
+        ].join('-');
+    }
+
+    function planAiTargetDates(ctx, mode = 'today', options = {}) {
+        const explicitDates = Array.isArray(options.targetDates)
+            ? options.targetDates.map((date) => String(date || '').trim()).filter(Boolean)
+            : [];
+        if (explicitDates.length) return explicitDates.slice(0, mode === 'week' ? 7 : 1);
+        const today = String(options.startDate || options.targetDate || ctx.logicalDateKey?.() || ctx.dateKey?.(new Date()) || new Date().toISOString().slice(0, 10));
         const start = ctx.dateFromKey?.(today) || new Date(`${today}T00:00:00`);
         const length = mode === 'week' ? 7 : 1;
         return Array.from({ length }, (_, index) => {
             const date = new Date(start);
             date.setDate(date.getDate() + index);
-            return ctx.dateKey ? ctx.dateKey(date) : date.toISOString().slice(0, 10);
+            return formatPlanAiDateKey(date);
         });
     }
 
@@ -769,7 +782,7 @@
             this.togglePlanAiCondition(id);
         },
 
-        buildPlanAiContext(mode = 'today', userText = '', typesInput = 'rehab') {
+        buildPlanAiContext(mode = 'today', userText = '', typesInput = 'rehab', options = {}) {
             const prefs = this.ensurePlanPrefs?.() || {};
             const tpl = window.dataAiTemplates;
             const prefResult = tpl?.buildPromptMessages('plan_generate', {}, this.db) || {};
@@ -812,7 +825,7 @@
                     userOverride: !!item.userOverride
                 }))
             }));
-            const targetDates = planAiTargetDates(this, mode);
+            const targetDates = planAiTargetDates(this, mode, options);
             const currentTargetPlans = this.activeRecords(this.db.dailyPlans || [])
                 .filter((plan) => targetDates.includes(plan.date) && types.includes(plan.type || 'rehab'))
                 .map((plan) => ({
@@ -1011,6 +1024,7 @@
             sheet.classList.remove('hidden');
             sheet.setAttribute('aria-hidden', 'false');
             window.navStack?.push?.({ type: 'modal', id: 'planAiSheet', close: () => this.closePlanAiSheet() });
+            window.aiTaskSettings?.mountPlanAiPicker?.();
         },
 
         closePlanAiSheet() {
@@ -1179,14 +1193,10 @@
                     if (attempt > 0) {
                         this.setPlanAiStatus?.(`第 ${attempt + 1} 次尝试：AI 正在修正 spec 字段…`, 'busy');
                     }
-                    if (typeof window.ai.callStream === 'function') {
-                        text = await window.ai.callStream(messages, outputTokenBudget, (_delta, accumulated) => {
-                            const length = String(accumulated || '').length;
-                            this.setPlanAiStatus?.(length ? `正在接收计划草稿：${length} 字` : 'AI 已响应，正在等待内容…', 'busy');
-                        });
-                    } else {
-                        text = await window.ai.call(messages, outputTokenBudget);
-                    }
+                    text = await ai.runStream(mode === 'week' ? 'plan.week' : 'plan.today', messages, outputTokenBudget, (_delta, accumulated) => {
+                        const length = String(accumulated || '').length;
+                        this.setPlanAiStatus?.(length ? `正在接收计划草稿：${length} 字` : 'AI 已响应，正在等待内容…', 'busy');
+                    });
                     this.setPlanAiStatus?.('已收到计划草稿，正在校验 JSON…', 'busy');
                     validation = this.validatePlanAiPayload(text, types, mode === 'week' ? targetDates : []);
                     if (validation.ok) break;

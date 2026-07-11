@@ -66,11 +66,13 @@ const advicePanel = {
             providerKeyForModel: this.providerKeyForModel,
             providerIcon: this.providerIcon,
             modelShortName: this.modelShortName,
+            advicePickerTaskId: this.advicePickerTaskId,
             bindAdviceModelPickerActions: this.bindAdviceModelPickerActions,
             openAdviceModelPicker: this.openAdviceModelPicker,
             closeAdviceModelPicker: this.closeAdviceModelPicker,
             chooseAdviceModel: this.chooseAdviceModel,
             setAdviceModelPickerScope: this.setAdviceModelPickerScope,
+            setAdviceReasoningDepth: this.setAdviceReasoningDepth,
             renderAdviceModelPicker: this.renderAdviceModelPicker,
             setAdviceRange: this.setAdviceRange,
             toggleAdviceContext: this.toggleAdviceContext,
@@ -1203,8 +1205,13 @@ const advicePanel = {
     },
 
     setAdviceModel(model) {
-        if (!model || model === '__current__') ai.clearOverride?.();
-        else ai.setOverride?.({ model, provider: (ai.models || []).find(m => m.id === model)?.provider || ai.cfg.provider || 'openai' });
+        if (!model || model === '__current__') ai.resetTaskRoute?.('advice.chat');
+        else {
+            const cached = (ai.models || []).find(item => item.id === model && item.profileId) || null;
+            const profileId = cached?.profileId || ai.cfg.activeProfileId || '';
+            const current = ai.getTaskRoute?.('advice.chat') || {};
+            ai.setTaskRoute?.('advice.chat', { ...current, primary: { profileId, modelId: model } });
+        }
         this.captureAdviceDraft();
         this.refreshAdviceModelPicker?.();
         this.rerenderAdvicePanel?.();
@@ -1268,16 +1275,23 @@ const advicePanel = {
     },
 
     renderAdviceModelChip() {
-        const effective = ai.getEffectiveConfig?.() || ai.cfg;
-        const isOverride = !!ai.overrideModel;
+        const taskId = this.advicePickerTaskId?.() || 'advice.chat';
+        const effective = ai.resolveTaskConfig?.(taskId) || ai.getEffectiveConfig?.() || ai.cfg;
+        const route = ai.getTaskRoute?.(taskId) || {};
+        const isOverride = !!ai.cfg.taskRoutes?.[taskId];
         const model = effective.model || '模型';
         const label = `${effective.provider || 'AI'} ${model}`;
-        const visual = this.adviceModelVisual(model);
+        const cached = (ai.models || []).find(item => item.profileId === effective.profileId && item.id === model) || null;
+        const visual = this.adviceModelVisual(model, effective.provider, cached?.iconKey || cached?.vendor || '');
         const style = this.adviceModelThemeStyle(visual);
         return `<button class="advice-model-picker advice-model-chip advice-model-${visual.key} ${isOverride ? 'is-override' : ''}" ${style ? `style="${this.escapeHtml(style)}"` : ''} onclick="data.openAdviceModelPicker()" type="button" aria-label="切换分析模型：${this.escapeHtml(label)}" title="切换分析模型：${this.escapeHtml(label)}">
             <span class="advice-model-mark">${this.adviceModelIconHtml(visual)}</span>
-            ${isOverride ? '<span class="advice-model-chip-x" onclick="event.stopPropagation();ai.clearOverride?.();data.refreshAdviceModelChip?.()" role="button" aria-label="恢复默认">×</span>' : ''}
+            ${isOverride ? `<span class="advice-model-chip-x" onclick="event.stopPropagation();ai.resetTaskRoute?.('${this.escapeHtml(taskId)}').then(()=>data.rerenderAdvicePanel?.())" role="button" aria-label="恢复默认">×</span>` : ''}
         </button>`;
+    },
+
+    advicePickerTaskId() {
+        return (this._adviceAttachments || []).some(att => att?.kind === 'image' && att.status !== 'failed') ? 'advice.vision' : 'advice.chat';
     },
 
     refreshAdviceModelChip() {
@@ -1344,83 +1358,102 @@ const advicePanel = {
             toast.show('该提供商未配置 API Key', 'error');
             return;
         }
-        ai.setOverride?.({ profileId, provider, model });
-        this.closeAdviceModelPicker();
-        window.haptics?.light?.();
-        this.refreshAdviceModelChip?.();
-        this.rerenderAdvicePanel?.();
+        const taskId = this.advicePickerTaskId();
+        const current = ai.getTaskRoute?.(taskId) || {};
+        Promise.resolve(ai.setTaskRoute?.(taskId, { ...current, primary: { profileId, modelId: model } })).then(() => {
+            this.closeAdviceModelPicker();
+            window.haptics?.light?.();
+            this.refreshAdviceModelChip?.();
+            this.rerenderAdvicePanel?.();
+        });
+    },
+
+    setAdviceReasoningDepth(depth = 'auto') {
+        const taskId = this.advicePickerTaskId();
+        const current = ai.getTaskRoute?.(taskId) || {};
+        Promise.resolve(ai.setTaskRoute?.(taskId, { ...current, reasoningDepth: depth })).then(() => {
+            this.openAdviceModelPicker?.();
+            this.refreshAdviceModelChip?.();
+        });
     },
 
     renderAdviceModelPicker() {
-        const effective = ai.getEffectiveConfig?.() || ai.cfg;
-        const profiles = ai.cfg.profiles || [];
+        const taskId = this.advicePickerTaskId();
+        const effective = ai.resolveTaskConfig?.(taskId) || ai.getEffectiveConfig?.() || ai.cfg;
+        const taskRoute = ai.getTaskRoute?.(taskId) || { reasoningDepth: 'auto' };
         const scope = this.adviceModelPickerScope || 'current';
         const normalizeProvider = ai.normalizeProvider.bind(ai);
-        const activeProvider = normalizeProvider(effective.provider || ai.cfg.provider || 'openai');
-        const profileForProvider = (provider) => {
-            const normalized = normalizeProvider(provider);
-            const active = profiles.find(p => p.id === effective.profileId && normalizeProvider(p.provider) === normalized && ai.apiKeyFor(p.id));
-            return active || profiles.find(p => normalizeProvider(p.provider) === normalized && ai.apiKeyFor(p.id)) || null;
-        };
-        const cachedModelEnabled = (provider, modelId) => {
-            const cached = (ai.models || []).find(model => normalizeProvider(model.provider) === normalizeProvider(provider) && String(model.id || '') === String(modelId || ''));
-            return !cached || ai.isModelEnabled(cached);
-        };
-        const rawRows = [];
-        if (effective.model && cachedModelEnabled(activeProvider, effective.model)) {
+        const activeProfileId = String(effective.profileId || ai.cfg.activeProfileId || '');
+        const selectableModels = typeof ai.listSelectableModels === 'function'
+            ? ai.listSelectableModels(taskId)
+            : (ai.models || []).filter(model => ai.isModelEnabled?.(model) !== false).map(model => {
+                const profile = (ai.cfg.profiles || []).find(item => item.id === model.profileId)
+                    || (ai.cfg.profiles || []).find(item => normalizeProvider(item.provider) === normalizeProvider(model.provider));
+                return {
+                    profileId: profile?.id || '',
+                    profileName: profile?.name || '',
+                    provider: model.provider || profile?.provider || 'openai',
+                    modelId: model.id,
+                    displayName: model.displayName || model.id,
+                    capabilities: model.capabilities || { vision: !!model.vision },
+                    sizeTier: model.sizeTier || 'unknown',
+                    iconKey: model.iconKey || ''
+                };
+            });
+        const rawRows = selectableModels.map(model => ({
+            profileId: model.profileId,
+            profileName: model.profileName || '',
+            provider: normalizeProvider(model.provider || 'openai'),
+            model: model.modelId || model.model,
+            label: model.displayName || model.modelId || model.model,
+            iconKey: model.iconKey || '',
+            tag: model.capabilities?.vision ? 'vision' : (model.sizeTier && model.sizeTier !== 'unknown' ? model.sizeTier : 'cached'),
+            disabled: false
+        }));
+        if (effective.model && !rawRows.some(row => row.profileId === activeProfileId && row.model === effective.model)) {
             rawRows.push({
-                profileId: effective.profileId || profileForProvider(activeProvider)?.id || '',
-                provider: activeProvider,
+                profileId: activeProfileId,
+                profileName: (ai.cfg.profiles || []).find(profile => profile.id === activeProfileId)?.name || '',
+                provider: normalizeProvider(effective.provider || ai.cfg.provider || 'openai'),
                 model: effective.model,
                 label: effective.model,
-                tag: ai.overrideModel ? '临时模型' : '默认模型',
-                disabled: !profileForProvider(activeProvider)
+                tag: '默认模型',
+                disabled: !effective.apiKey
             });
         }
-        (ai.models || []).forEach(model => {
-            if (!ai.isModelEnabled(model)) return;
-            const provider = normalizeProvider(model.provider || activeProvider);
-            const profile = profileForProvider(provider);
-            rawRows.push({
-                profileId: profile?.id || '',
-                provider,
-                model: model.id,
-                label: model.displayName || model.id,
-                tag: model.vision ? 'vision' : 'cached',
-                disabled: !profile
-            });
-        });
         const rows = rawRows.filter(row => {
             if (!row.model) return false;
-            row.provider = normalizeProvider(row.provider || activeProvider);
-            if (scope === 'current') return row.provider === activeProvider;
-            if (scope === 'others') return row.provider !== activeProvider;
+            if (scope === 'current') return row.profileId === activeProfileId;
+            if (scope === 'others') return row.profileId !== activeProfileId;
             return true;
         });
         const deduped = rows
-            .filter((row, index, all) => row.model && all.findIndex(x => x.provider === row.provider && x.model === row.model) === index)
+            .filter((row, index, all) => row.model && all.findIndex(x => x.profileId === row.profileId && x.model === row.model) === index)
             .map((row, index) => ({ ...row, starred: this.isAdviceModelStarred(row.provider, row.model), order: index }))
             .sort((a, b) => Number(b.starred) - Number(a.starred) || a.order - b.order);
-        const restore = `<button class="md-btn md-btn-tonal" onclick="ai.clearOverride?.();data.closeAdviceModelPicker?.();data.rerenderAdvicePanel?.()" type="button">恢复默认</button>`;
-        const selectedProvider = normalizeProvider(effective.provider || activeProvider);
+        const reasoningOptions = [['auto', '自动'], ['off', '关闭'], ['low', '低'], ['medium', '中'], ['high', '高']]
+            .map(([value, label]) => `<button class="model-picker-tab ${taskRoute.reasoningDepth === value ? 'active' : ''}" onclick="data.setAdviceReasoningDepth('${value}')" type="button" aria-pressed="${taskRoute.reasoningDepth === value}">${label}</button>`)
+            .join('');
+        const restore = `<button class="md-btn md-btn-tonal" onclick="ai.resetTaskRoute?.('${this.escapeHtml(taskId)}').then(()=>{data.closeAdviceModelPicker?.();data.rerenderAdvicePanel?.();})" type="button">恢复默认</button>`;
         const emptyText = scope === 'cached'
             ? '暂无启用模型'
             : (scope === 'others' ? '暂无其他启用模型' : '当前暂无启用模型');
         return `<div class="model-picker-body">
+            <div class="model-picker-tabs advice-reasoning-tabs" role="group" aria-label="推理深度">${reasoningOptions}</div>
             <div class="model-picker-tabs" role="tablist" aria-label="模型范围">
-                <button class="model-picker-tab ${scope === 'current' ? 'active' : ''}" onclick="data.setAdviceModelPickerScope('current')" type="button" aria-selected="${scope === 'current'}">当前提供商</button>
-                <button class="model-picker-tab ${scope === 'others' ? 'active' : ''}" onclick="data.setAdviceModelPickerScope('others')" type="button" aria-selected="${scope === 'others'}">其他提供商</button>
+                <button class="model-picker-tab ${scope === 'current' ? 'active' : ''}" onclick="data.setAdviceModelPickerScope('current')" type="button" aria-selected="${scope === 'current'}">当前连接</button>
+                <button class="model-picker-tab ${scope === 'others' ? 'active' : ''}" onclick="data.setAdviceModelPickerScope('others')" type="button" aria-selected="${scope === 'others'}">其他连接</button>
                 <button class="model-picker-tab ${scope === 'cached' ? 'active' : ''}" onclick="data.setAdviceModelPickerScope('cached')" type="button" aria-selected="${scope === 'cached'}">全部缓存</button>
             </div>
             ${deduped.map(row => {
-                const visual = this.adviceModelVisual(row.model);
+                const visual = this.adviceModelVisual(row.model, row.provider, row.iconKey);
                 const style = this.adviceModelThemeStyle(visual);
                 const starLabel = row.starred ? '取消星标' : '加星标';
-                return `<div class="model-picker-row advice-model-${visual.key} ${row.model === effective.model && row.provider === selectedProvider ? 'is-selected' : ''} ${row.starred ? 'is-starred' : ''}" ${style ? `style="${this.escapeHtml(style)}"` : ''} role="button" tabindex="0" aria-disabled="${row.disabled}" title="${row.disabled ? '未配置 API Key' : ''}" data-advice-model-action="choose" data-profile-id="${this.escapeHtml(row.profileId)}" data-provider="${this.escapeHtml(row.provider)}" data-model="${this.escapeHtml(row.model)}">
+                return `<div class="model-picker-row advice-model-${visual.key} ${row.model === effective.model && row.profileId === activeProfileId ? 'is-selected' : ''} ${row.starred ? 'is-starred' : ''}" ${style ? `style="${this.escapeHtml(style)}"` : ''} role="button" tabindex="0" aria-disabled="${row.disabled}" title="${row.disabled ? '未配置 API Key' : ''}" data-advice-model-action="choose" data-profile-id="${this.escapeHtml(row.profileId)}" data-provider="${this.escapeHtml(row.provider)}" data-model="${this.escapeHtml(row.model)}">
                     <span class="advice-model-mark">${this.adviceModelIconHtml(visual)}</span>
-                    <span class="model-picker-main"><strong>${this.escapeHtml(row.label)}</strong><small>${this.escapeHtml(row.provider)} · ${this.escapeHtml(row.tag)}</small></span>
+                    <span class="model-picker-main"><strong>${this.escapeHtml(row.label)}</strong><small>${this.escapeHtml(row.profileName || row.provider)} · ${this.escapeHtml(row.tag)}</small></span>
                     <button class="model-picker-star ${row.starred ? 'active' : ''}" type="button" aria-label="${starLabel}：${this.escapeHtml(row.label)}" title="${starLabel}" data-advice-model-action="star" data-provider="${this.escapeHtml(row.provider)}" data-model="${this.escapeHtml(row.model)}"><span class="material-symbols-rounded">${row.starred ? 'star' : 'star_border'}</span></button>
-                    ${row.model === effective.model && row.provider === effective.provider ? '<span class="material-symbols-rounded">check</span>' : ''}
+                    ${row.model === effective.model && row.profileId === activeProfileId ? '<span class="material-symbols-rounded">check</span>' : ''}
                 </div>`;
             }).join('') || `<div class="ai-model-empty">${this.escapeHtml(emptyText)}</div>`}
             ${restore}
@@ -2093,8 +2126,6 @@ const advicePanel = {
     },
 
     async sendAiAdvice(promptOverride = '', options = {}) {
-        const effective = ai.getEffectiveConfig ? ai.getEffectiveConfig() : { ...ai.cfg, profileId: ai.cfg.activeProfileId };
-        if (!effective.enabled) return alert('请先在设置中配置 AI');
         if (this._adviceSending) return;
         const input = document.getElementById('advicePrompt');
         const prompt = (promptOverride || input?.value || '').trim();
@@ -2105,9 +2136,12 @@ const advicePanel = {
             window.toast?.show?.('附件仍在处理中，请稍后发送', 'info');
             return;
         }
+        const hasImageAttachment = attachments.some(att => att.kind === 'image');
+        const adviceTaskId = hasImageAttachment ? 'advice.vision' : 'advice.chat';
+        const effective = ai.resolveTaskConfig ? ai.resolveTaskConfig(adviceTaskId) : (ai.getEffectiveConfig ? ai.getEffectiveConfig() : { ...ai.cfg, profileId: ai.cfg.activeProfileId });
+        if (!effective.enabled) return alert('请先在设置中配置 AI');
         const model = effective.model || ai.cfg.model;
         const provider = effective.provider || ai.cfg.provider || 'openai';
-        const hasImageAttachment = attachments.some(att => att.kind === 'image');
         if (hasImageAttachment) {
             const verdict = window.ai?.analyzeVisionModel?.(model, provider) || { vision: false, isImageGen: false };
             if (verdict.isImageGen) {
@@ -2121,11 +2155,7 @@ const advicePanel = {
         const scroller = this._adviceScrollContainer?.();
         this._adviceFollowStream = !scroller || (this._adviceMaxScrollY(scroller) - this._adviceCurrentScrollY(scroller)) < 180;
         this._adviceUserScrollPaused = false;
-        const isOverride = !!ai.overrideModel && (
-            ai.overrideModel.model !== ai.cfg.model ||
-            ai.overrideModel.provider !== ai.cfg.provider ||
-            ai.overrideModel.profileId !== ai.cfg.activeProfileId
-        );
+        const isOverride = !!ai.cfg.taskRoutes?.[adviceTaskId];
         const now = new Date().toISOString();
         const pendingId = this.generateRecordId('advice-pending');
         this._activeAdvicePendingId = pendingId;
@@ -2290,7 +2320,11 @@ const advicePanel = {
             };
             const onToken = createOnToken();
             full = hasImageAttachment
-                ? await ai.callAdviceWithAttachments(messages, attachments, outputTokenBudget, {
+                ? (typeof ai.run === 'function' ? await ai.run({
+                    taskId: 'advice.vision',
+                    messages,
+                    attachments,
+                    maxTokens: outputTokenBudget,
                     signal: controller.signal,
                     timeoutMs: 45000,
                     onProgress: ({ stage, message }) => {
@@ -2301,8 +2335,10 @@ const advicePanel = {
                         this.db.health.aiAdviceChat[idx].pending = true;
                         this.rerenderAdvicePanel?.();
                     }
-                })
-                : await ai.callStream(messages, outputTokenBudget, onToken, { signal: controller.signal });
+                }) : await ai.callAdviceWithAttachments(messages, attachments, outputTokenBudget, { signal: controller.signal, timeoutMs: 45000 }))
+                : (typeof ai.run === 'function'
+                    ? await ai.run({ taskId: 'advice.chat', messages, maxTokens: outputTokenBudget, stream: true, onToken, signal: controller.signal })
+                    : await ai.callStream(messages, outputTokenBudget, onToken, { signal: controller.signal }));
             finishRequestUsage();
             const autoContinueLimit = Math.max(0, Number(this.ADVICE_AUTO_CONTINUE_LIMIT || advicePanel.ADVICE_AUTO_CONTINUE_LIMIT) || 0);
             let autoContinueCount = 0;
@@ -2321,7 +2357,9 @@ const advicePanel = {
                         { role: 'assistant', content: continuedFrom },
                         { role: 'user', content: '继续上一条回复：从断点处直接续写剩余内容，不要重复前文，不要重新开头，优先把结尾补完整。' }
                     ];
-                    const continued = await ai.callStream(continuationMessages, outputTokenBudget, createOnToken(continuedFrom), { signal: controller.signal });
+                    const continued = typeof ai.run === 'function'
+                        ? await ai.run({ taskId: 'advice.chat', messages: continuationMessages, maxTokens: outputTokenBudget, stream: true, onToken: createOnToken(continuedFrom), signal: controller.signal })
+                        : await ai.callStream(continuationMessages, outputTokenBudget, createOnToken(continuedFrom), { signal: controller.signal });
                     finishRequestUsage();
                     full = continuedFrom + String(continued || '');
                 } catch (continueError) {
@@ -2985,7 +3023,9 @@ const advicePanel = {
 PR:${a.prLift || '无'} 1RM${a.prDistance || '--'} ${a.prWeight || '--'}kg${a.prReps ? 'x' + a.prReps : ''} 进阶:${ctx.progression?.suggestion || 'maintain'} ${ctx.progression?.reason || ''}
 规则:${ctx.diag ? `${ctx.diag.title || ''} ${ctx.diag.subtitle || ''}` : '无告警'}` }
             ];
-            const text = await ai.call(messages, 700);
+            const text = typeof ai.run === 'function'
+                ? await ai.run({ taskId: 'insight.quick', messages, maxTokens: 700 })
+                : await ai.call(messages, 700);
             const parsed = this.parseTrainingClassificationResponse?.(text) || { advice: text, classifications: [] };
             this.cacheTrainingClassifications?.(parsed.classifications);
             const updatedCtx = parsed.classifications?.length && this.buildPlanAnalytics ? { ...ctx, ...this.buildPlanAnalytics() } : ctx;

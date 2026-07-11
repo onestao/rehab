@@ -97,6 +97,7 @@
             this.db.aiProfiles = this.db.aiProfiles || [];
             this.db.aiActiveId = this.db.aiActiveId || '';
             this.db.aiModels = this.db.aiModels || [];
+            this.db.aiTaskRoutes = this.db.aiTaskRoutes && typeof this.db.aiTaskRoutes === 'object' ? this.db.aiTaskRoutes : {};
             this.db.libraryView = ['actions', 'prescriptionActions', 'routines'].includes(this.db.libraryView) ? this.db.libraryView : 'actions';
             this.db.libraryFilterTag = typeof this.db.libraryFilterTag === 'string' ? this.db.libraryFilterTag : '';
             this.db.syncMeta = this.db.syncMeta || {};

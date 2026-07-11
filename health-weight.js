@@ -5,6 +5,10 @@
     window.dataHealthWeight = {
         _miScaleReading: null,
 
+        openWeightModal(...args) {
+            return window.dataUiState?.openWeightModal?.apply(this, args);
+        },
+
         isMiScaleExperimentEnabled() {
             return !!this.db?.prefs?.experiments?.miScaleBle;
         },

@@ -97,6 +97,8 @@
                         <button id="dietPhotoButton" class="md-btn md-btn-tonal" type="button" title="${photoTitle}"><span class="material-symbols-rounded">visibility</span> 图片识别</button>
                         <input id="dietPhotoInput" class="hidden" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif">
                     </div>
+                    <div data-ai-task-picker="food.text"></div>
+                    <div data-ai-task-picker="food.vision"></div>
                     <small id="foodAiStatus" class="food-ai-status"></small>
                     <div id="foodAiResults"></div>
                 </div>
@@ -175,10 +177,31 @@
             return !!this.getDietPhotoSupportInfo().supported;
         },
 
-        triggerDietPhoto() {
+        async triggerDietPhoto() {
             if (_aiPhotoBusy) {
                 this.setDietPhotoStatus('busy', '上一张照片仍在识别中');
                 return;
+            }
+            const button = document.getElementById('dietPhotoButton');
+            if (typeof this.ensureAiRuntime === 'function') {
+                this.setDietPhotoStatus('loading', '正在加载 AI 识别模块...');
+                if (button) {
+                    button.disabled = true;
+                    setButtonContent(button, 'progress_activity', '加载中…', true);
+                }
+                try {
+                    await this.ensureAiRuntime({ vision: true });
+                } catch (e) {
+                    window.errorBus?.report?.('diet.photo.aiRuntime', e);
+                    this.setDietPhotoStatus('failed', 'AI 识别模块加载失败，请稍后重试');
+                    window.toast?.show?.('AI 识别模块加载失败，请稍后重试', 'error');
+                    return;
+                } finally {
+                    if (button) {
+                        button.disabled = false;
+                        setButtonContent(button, 'visibility', '图片识别');
+                    }
+                }
             }
             const info = this.getDietPhotoSupportInfo();
             if (!info.supported) {
@@ -220,6 +243,15 @@
             }
             if (_aiPhotoBusy) {
                 this.setDietPhotoStatus('busy', '上一张照片仍在识别中');
+                return;
+            }
+            try {
+                await this.ensureAiRuntime?.({ vision: true });
+            } catch (e) {
+                window.errorBus?.report?.('diet.photo.aiRuntime', e);
+                this.setDietPhotoStatus('failed', 'AI 识别模块加载失败，请稍后重试');
+                window.toast?.show?.('AI 识别模块加载失败，请稍后重试', 'error');
+                if (inputEl) inputEl.value = '';
                 return;
             }
             const support = this.getDietPhotoSupportInfo();

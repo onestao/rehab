@@ -317,6 +317,7 @@
                     <button class="summary-ai-btn" ${hasAi ? '' : 'disabled'} onclick="data.askWeeklySummaryAi('${safe(insight.weekKey)}', false)" type="button"><span class="material-symbols-rounded">auto_awesome</span>${safe(insight.weekKey)}总结</button>
                     <button class="summary-ai-btn" ${hasAi ? '' : 'disabled'} onclick="data.askWeeklySummaryAi('${safe(insight.weekKey)}', true)" type="button"><span class="material-symbols-rounded">trending_down</span>判断降载</button>
                 </div>
+                <div data-ai-task-picker="summary.weekly"></div>
             </div>
             <div class="summary-glass-card">
                 <div class="summary-kicker">周概览</div>
@@ -372,17 +373,18 @@
                     { role: 'user', content: prompt }
                 ];
                 const renderMd = this.renderAdviceMarkdown ? (t) => this.renderAdviceMarkdown(t) : (t) => `<p>${safe(t)}</p>`;
-                if (window.ai?.callStream) {
+                const taskId = kind === 'monthly' ? 'summary.monthly' : 'summary.weekly';
+                if (window.ai?.run) {
                     let accumulated = '';
                     let _lastRender = 0;
-                    const result = await ai.callStream(messages, 1800, (delta, acc) => {
+                    const result = await ai.run({ taskId, messages, maxTokens: 1800, stream: true, onToken: (delta, acc) => {
                         accumulated = acc;
                         const now = Date.now();
                         if (now - _lastRender > 60) {
                             _lastRender = now;
                             responseEl.innerHTML = `<div class="summary-ai-result">${renderMd(accumulated)}</div>`;
                         }
-                    });
+                    } });
                     const finalText = typeof result === 'string' ? result : accumulated;
                     responseEl.innerHTML = `<div class="summary-ai-result">${renderMd(finalText)}</div>`;
                     this._saveSummaryReport(kind, periodKey, finalText);
@@ -516,6 +518,7 @@
                 <div class="summary-ai-actions">
                     <button class="summary-ai-btn" ${hasAi ? '' : 'disabled'} onclick="data.askMonthlySummaryAi('${safe(m.monthKey)}')" type="button"><span class="material-symbols-rounded">auto_awesome</span>${safe(m.monthLabel)}总结</button>
                 </div>
+                <div data-ai-task-picker="summary.monthly"></div>
             </div>`;
         },
 

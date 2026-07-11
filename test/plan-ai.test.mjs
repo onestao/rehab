@@ -906,6 +906,31 @@ test('plan AI context includes current target plan and body part constraints', (
   assert.match(prompt, /安全\/健康禁忌\/疼痛阈值 > 最近3周康复处方 > 当前计划保留\/改造/);
 });
 
+test('plan AI context can target an overridden date for auto adjustment', () => {
+  const api = loadPlanAi();
+  const ctx = createContext(api);
+  ctx.db.dailyPlans = [{
+    id: 'today-rehab',
+    date: '2026-05-25',
+    type: 'rehab',
+    title: '今日康复',
+    items: [{ id: 'today-task', name: '今日靠墙蹲', category: 'main', status: 'done', spec: { sets: 2, reps: 10, work: 3 } }]
+  }, {
+    id: 'tomorrow-rehab',
+    date: '2026-05-26',
+    type: 'rehab',
+    source: 'ai',
+    title: '明日 AI 康复',
+    items: [{ id: 'tomorrow-task', name: '明日侧卧髋外展', category: 'main', status: 'todo', spec: { sets: 2, reps: 12, work: 3 } }]
+  }];
+
+  const prompt = api.buildPlanAiContext.call(ctx, 'today', '根据反馈调整明天', ['rehab'], { targetDate: '2026-05-26' });
+
+  assert.match(prompt, /目标当前计划完整摘要/);
+  assert.match(prompt, /明日 AI 康复/);
+  assert.match(prompt, /明日侧卧髋外展/);
+});
+
 test('plan AI context scopes rehab prescriptions to selected conditions', () => {
   const api = loadPlanAi();
   const ctx = createContext(api);

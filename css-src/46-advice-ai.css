@@ -7,13 +7,16 @@
     overflow-y: auto;
     overflow-x: hidden;
 }
-#ai-coach.page.active {
-    display: block;
+#ai-coach.ai-coach-page.active {
+    display: flex;
+    flex-direction: column;
 }
-#ai-coach.page.active > #aiCoachContent {
+#ai-coach.ai-coach-page.active > #aiCoachContent {
     width: 100%;
+    flex: 1 0 auto;
     min-height: 0;
-    display: block;
+    display: flex;
+    flex-direction: column;
 }
 .advice-main-card {
     flex: 1 1 auto;

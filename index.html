@@ -8,9 +8,9 @@
     <link rel="icon" href="assets/app-icon.svg" type="image/svg+xml">
     <meta name="theme-color" content="#0061a4">
     <style>
-        @import url("https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&icon_names=accessibility_new,add,add_circle,arrow_back,arrow_forward,assignment,auto_awesome,backup,badge,biotech,block,bookmark_add,bookmark_border,brightness_auto,bug_report,calendar_month,check,check_circle,checklist,chevron_left,chevron_right,clinical_notes,close,close_fullscreen,cloud_alert,cloud_done,cloud_off,cloud_sync,compare_arrows,compress,content_copy,dark_mode,data_thresholding,delete,diagnosis,directions_bike,directions_run,directions_walk,done,done_all,download,download_for_offline,edit,edit_note,edit_square,error,event,event_busy,event_note,exercise,expand_less,expand_more,fitness_center,flag,format_color_fill,forum,health_and_safety,help,history,info,inventory_2,keyboard,keyboard_arrow_down,keyboard_arrow_left,keyboard_arrow_right,keyboard_arrow_up,library_books,light_mode,linear_scale,link,local_fire_department,lock,lock_open,manage_search,mic,mic_off,monitor_heart,monitor_weight,monitoring,more_vert,no_food,notifications,notifications_active,palette,pause,pedal_bike,person,picture_in_picture_alt,play_arrow,play_circle,playlist_add,pool,progress_activity,psychology,radio_button_unchecked,record_voice_over,refresh,remove,remove_circle,replay,restart_alt,restaurant,rowing,rule,save,schedule,science,search,search_off,self_improvement,send,settings,shield,short_text,show_chart,skip_next,skip_previous,speed,sports,sports_gymnastics,star,star_border,stop,summarize,swap_horiz,sync,sync_problem,system_update,timeline,timer,tips_and_updates,today,toggle_off,toggle_on,trending_down,trending_flat,trending_up,tune,upload,upload_file,verified,vertical_align_bottom,vertical_align_top,vibration,visibility,visibility_off,volume_off,volume_up,warning,waterfall_chart") layer(fonts);
+        @import url("https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&icon_names=accessibility_new,add,add_circle,arrow_back,arrow_forward,assignment,auto_awesome,backup,badge,biotech,block,bookmark_add,bookmark_border,brightness_auto,bug_report,calendar_month,check,check_circle,checklist,chevron_left,chevron_right,clinical_notes,close,close_fullscreen,cloud_alert,cloud_done,cloud_off,cloud_sync,compare_arrows,compress,content_copy,dark_mode,data_thresholding,delete,delete_forever,delete_sweep,diagnosis,directions_bike,directions_run,directions_walk,done,done_all,download,download_for_offline,edit,edit_note,edit_square,error,event,event_busy,event_note,exercise,expand_less,expand_more,fitness_center,flag,format_color_fill,forum,health_and_safety,help,history,info,inventory_2,keyboard,keyboard_arrow_down,keyboard_arrow_left,keyboard_arrow_right,keyboard_arrow_up,library_books,light_mode,linear_scale,link,local_fire_department,lock,lock_open,manage_search,mic,mic_off,monitor_heart,monitor_weight,monitoring,more_vert,no_food,notifications,notifications_active,palette,pause,pedal_bike,person,picture_in_picture_alt,play_arrow,play_circle,playlist_add,pool,progress_activity,psychology,radio_button_unchecked,record_voice_over,refresh,remove,remove_circle,replay,restart_alt,restaurant,rowing,rule,save,schedule,science,search,search_off,self_improvement,send,settings,shield,short_text,show_chart,skip_next,skip_previous,speed,sports,sports_gymnastics,star,star_border,stop,summarize,swap_horiz,sync,sync_problem,system_update,timeline,timer,tips_and_updates,today,toggle_off,toggle_on,trending_down,trending_flat,trending_up,tune,upload,upload_file,verified,vertical_align_bottom,vertical_align_top,vibration,visibility,visibility_off,volume_off,volume_up,warning,waterfall_chart") layer(fonts);
     </style>
-    <link rel="stylesheet" href="build/generated.css?v=310">
+    <link rel="stylesheet" href="build/generated.css?v=311">
 </head>
 <body>
     <div id="appUpdateBanner" class="app-update-banner hidden">
@@ -209,7 +209,7 @@
         </section>
 
         <!-- AI coach page -->
-        <section id="ai-coach" class="page">
+        <section id="ai-coach" class="page ai-coach-page">
             <header class="md-top-app-bar">
                 <div class="bar-leading"><span class="material-symbols-rounded app-icon">psychology</span><span class="app-title">AI &#25945;&#32451;</span></div>
                 <div class="bar-trailing">
@@ -268,7 +268,36 @@
                     <div id="aiModelList" class="ai-model-list hidden"></div>
                     <div class="md-field"><input type="text" id="aiModel" placeholder=" " onfocus="ai.showCachedModels()"><label>&#27169;&#22411;&#21517;&#31216;</label></div>
                     <div class="md-field"><input type="text" id="aiExtraVisionKeywords" placeholder=" "><label>&#33258;&#23450;&#20041;&#35270;&#35273;&#27169;&#22411;&#20851;&#38190;&#23383;&#65288;&#36887;&#21495;&#20998;&#38548;&#65289;</label></div>
+                    <div class="ai-settings-section" aria-labelledby="aiModelCacheTitle">
+                        <div class="ai-settings-section-head">
+                            <div>
+                                <strong id="aiModelCacheTitle">&#27169;&#22411;&#32531;&#23384;&#31649;&#29702;</strong>
+                                <small>&#21047;&#26032;&#25110;&#28165;&#29702;&#24403;&#21069;&#36830;&#25509;&#30340;&#27169;&#22411;&#30446;&#24405;&#12290;</small>
+                            </div>
+                        </div>
+                        <div id="aiModelCacheActions" class="ai-cache-actions">
+                            <button class="md-btn md-btn-tonal" type="button" onclick="window.aiTaskSettings?.refreshCurrentModels()"><span class="material-symbols-rounded">refresh</span> &#21047;&#26032;&#24403;&#21069;</button>
+                            <button class="md-btn md-btn-tonal" type="button" onclick="window.aiTaskSettings?.clearCurrentModelCache()"><span class="material-symbols-rounded">delete_sweep</span> &#28165;&#29702;&#24403;&#21069;</button>
+                            <button class="md-btn md-btn-text ai-cache-danger" type="button" onclick="window.aiTaskSettings?.clearAllModelCaches()"><span class="material-symbols-rounded">delete_forever</span> &#28165;&#29702;&#20840;&#37096;</button>
+                        </div>
+                        <div id="aiModelCacheStatus" class="ai-task-settings-status" role="status" aria-live="polite"></div>
+                    </div>
                     <button class="md-btn md-btn-filled" onclick="ai.saveCurrentProfile()"><span class="material-symbols-rounded">save</span> &#20445;&#23384;&#24403;&#21069;&#37197;&#32622;</button>
+                    <div class="md-divider"></div>
+                    <div class="ai-settings-section" aria-labelledby="aiTaskSettingsTitle">
+                        <div class="ai-settings-section-head">
+                            <div>
+                                <strong id="aiTaskSettingsTitle">&#21151;&#33021;&#27169;&#22411;</strong>
+                                <small>&#20026;&#27599;&#20010; AI &#21151;&#33021;&#29420;&#31435;&#36873;&#25321;&#36830;&#25509;&#12289;&#27169;&#22411;&#21644;&#25512;&#29702;&#28145;&#24230;&#12290;</small>
+                            </div>
+                            <button class="ai-task-refresh" type="button" onclick="window.aiTaskSettings?.render()" aria-label="&#21047;&#26032;&#21151;&#33021;&#27169;&#22411;&#21015;&#34920;" title="&#21047;&#26032;">
+                                <span class="material-symbols-rounded">refresh</span>
+                            </button>
+                        </div>
+                        <div id="aiTaskSettingsMatrix" class="ai-task-settings-matrix" aria-live="polite">
+                            <div class="ai-task-settings-empty">&#27491;&#22312;&#21152;&#36733;&#21151;&#33021;&#37197;&#32622;&#8230;</div>
+                        </div>
+                    </div>
                     <div class="md-divider"></div>
                          <div class="ai-encrypt-section">
                              <div class="ai-encrypt-title"><span class="material-symbols-rounded">lock</span> &#21152;&#23494;&#21516;&#27493; AI &#37197;&#32622;</div>
@@ -382,49 +411,49 @@
     </nav>
     </div>
 
-    <script src="m3e-ripple.js?v=310"></script>
-    <script src="pwa-support.js?v=310"></script>
-    <script src="toast.js?v=310"></script>
-    <script src="haptics.js?v=310"></script>
-    <script src="error-bus.js?v=310"></script>
-    <script src="i18n.js?v=310"></script>
-    <script src="a11y-focus-trap.js?v=310"></script>
-    <script src="theme.js?v=310"></script>
-    <script src="fooddb.js?v=310"></script>
-    <script src="render-safe.js?v=310"></script>
-    <script src="nav-stack.js?v=310"></script>
-    <script src="app-route.js?v=310"></script>
-    <script type="module" src="data-utils-pure.js?v=310"></script>
-    <script type="module" src="action-identity.js?v=310"></script>
-    <script src="data-utils.js?v=310"></script>
-    <script src="storage/idb.js?v=310"></script>
-    <script src="storage/idb-collections.js?v=310"></script>
-    <script src="storage/idb-advice-collections.js?v=310"></script>
-    <script src="storage/migrate.js?v=310"></script>
-    <script src="data-records.js?v=310"></script>
-    <script src="data-schema.js?v=310"></script>
-    <script src="advice-virtual-list.js?v=310"></script>
-    <script src="data-store.js?v=310"></script>
-    <script src="data-ui-state.js?v=310"></script>
-    <script src="data-views.js?v=310"></script>
-    <script src="routine-plan.js?v=310"></script>
-    <script src="data.js?v=310"></script>
-    <script type="module" src="voice-engine.js?v=310"></script>
-    <script src="voice-cache.js?v=310"></script>
-    <script src="voice-webspeech-adapter.js?v=310"></script>
-    <script src="voice-legado-adapter.js?v=310"></script>
-    <script src="workout-voice.js?v=310"></script>
-    <script src="workout-readiness.js?v=310"></script>
-    <script src="strength-form.js?v=310"></script>
-    <script src="weekly-plan.js?v=310"></script>
-    <script src="action-history.js?v=310"></script>
-    <script type="module" src="sync-pure.js?v=310"></script>
-    <script src="sync-status.js?v=310"></script>
-    <script src="credential-fields.js?v=310"></script>
-    <script src="sheet-drag.js?v=310"></script>
-    <script src="app-update.js?v=310"></script>
-    <script type="module" src="mi-scale-pure.js?v=310"></script>
-    <script src="mi-scale-web-bluetooth.js?v=310"></script>
+    <script src="m3e-ripple.js?v=311"></script>
+    <script src="pwa-support.js?v=311"></script>
+    <script src="toast.js?v=311"></script>
+    <script src="haptics.js?v=311"></script>
+    <script src="error-bus.js?v=311"></script>
+    <script src="i18n.js?v=311"></script>
+    <script src="a11y-focus-trap.js?v=311"></script>
+    <script src="theme.js?v=311"></script>
+    <script src="fooddb.js?v=311"></script>
+    <script src="render-safe.js?v=311"></script>
+    <script src="nav-stack.js?v=311"></script>
+    <script src="app-route.js?v=311"></script>
+    <script type="module" src="data-utils-pure.js?v=311"></script>
+    <script type="module" src="action-identity.js?v=311"></script>
+    <script src="data-utils.js?v=311"></script>
+    <script src="storage/idb.js?v=311"></script>
+    <script src="storage/idb-collections.js?v=311"></script>
+    <script src="storage/idb-advice-collections.js?v=311"></script>
+    <script src="storage/migrate.js?v=311"></script>
+    <script src="data-records.js?v=311"></script>
+    <script src="data-schema.js?v=311"></script>
+    <script src="advice-virtual-list.js?v=311"></script>
+    <script src="data-store.js?v=311"></script>
+    <script src="data-ui-state.js?v=311"></script>
+    <script src="data-views.js?v=311"></script>
+    <script src="routine-plan.js?v=311"></script>
+    <script src="data.js?v=311"></script>
+    <script type="module" src="voice-engine.js?v=311"></script>
+    <script src="voice-cache.js?v=311"></script>
+    <script src="voice-webspeech-adapter.js?v=311"></script>
+    <script src="voice-legado-adapter.js?v=311"></script>
+    <script src="workout-voice.js?v=311"></script>
+    <script src="workout-readiness.js?v=311"></script>
+    <script src="strength-form.js?v=311"></script>
+    <script src="weekly-plan.js?v=311"></script>
+    <script src="action-history.js?v=311"></script>
+    <script type="module" src="sync-pure.js?v=311"></script>
+    <script src="sync-status.js?v=311"></script>
+    <script src="credential-fields.js?v=311"></script>
+    <script src="sheet-drag.js?v=311"></script>
+    <script src="app-update.js?v=311"></script>
+    <script type="module" src="mi-scale-pure.js?v=311"></script>
+    <script src="mi-scale-web-bluetooth.js?v=311"></script>
     <div id="weightModal" class="md-modal md-modal-sheet hidden" aria-hidden="true">
         <div class="md-modal-backdrop" onclick="data.closeWeightModal()"></div>
         <div class="md-modal-card md-modal-sheet-card">
@@ -756,11 +785,11 @@
     </div>
     <script>
         const PAGE_DEPS = {
-            workout: ['voice-engine','voice-cache','voice-webspeech-adapter','voice-legado-adapter','workout-voice','workout-readiness','strength-form','weekly-plan','action-history','plan-chains','plan-progression','plan-store','plan-feedback','plan-cooldown','plan-auto-adjust','plan-weekly','plan-equipment','plan-ui','workout-system','workout-pip','workout-core','workout-cardio-pure','workout-cardio','workout-engine','workout-state','swipe-actions','routine-plan','routine-library','workout-wakelock','workout-media-session','ai-store','ai-profile','ai-api'],
-            'ai-coach': ['lib/virtual-core.umd','ai-store','ai-profile','ai-model-cache','ai-models','ai-api','ai-pricing','ai-templates','advice-template-manager','advice-rules','plan-analytics','advice-panel','coach-context','advice-attachments','advice-render','advice-prompt','advice-stream-renderer','routine-library','plan-chains','plan-progression','plan-store','plan-ai-pure','plan-ai'],
-            profile: ['voice-engine','voice-cache','voice-webspeech-adapter','voice-legado-adapter','workout-voice','credential-fields','weekly-plan','backup','sync-ui','sync-adapters','sync','routine-library','goal-plan','weekly-summary','plan-chains','plan-progression','plan-store','plan-equipment','plan-ui','ai-store','ai-profile','ai-model-cache','ai-models'],
-            records: ['history-view','weekly-summary','health-diet','health-weight','health-profile','health-exercise','goal-plan','routine-library','food-log','pr-tracker','volume-heatmap','action-history','report-metrics-pure','report-panel','plan-chains','plan-progression','plan-store','plan-weekly','plan-ui','ai-store','ai-profile','ai-model-cache','ai-models','ai-api'],
-            today: ['health-diet','health-weight','health-exercise','food-log','history-view','weekly-summary','report-metrics-pure','report-panel','routine-library','plan-chains','plan-progression','plan-store','plan-feedback','plan-cooldown','plan-auto-adjust','plan-weekly','plan-equipment','plan-ui','ai-store','ai-profile','ai-model-cache','ai-models','ai-api']
+            workout: ['voice-engine','voice-cache','voice-webspeech-adapter','voice-legado-adapter','workout-voice','workout-readiness','strength-form','weekly-plan','action-history','plan-chains','plan-progression','plan-store','plan-feedback','plan-cooldown','plan-auto-adjust','plan-weekly','plan-equipment','plan-ui','workout-system','workout-pip','workout-core','workout-cardio-pure','workout-cardio','workout-engine','workout-state','swipe-actions','routine-plan','routine-library','workout-wakelock','workout-media-session','ai-store','ai-profile','ai-routing-pure','ai-routing','ai-api','ai-task-settings'],
+            'ai-coach': ['lib/virtual-core.umd','ai-store','ai-profile','ai-model-catalog-pure','ai-model-cache','ai-models','ai-routing-pure','ai-routing','ai-api','ai-task-settings','ai-pricing','ai-templates','advice-template-manager','advice-rules','plan-analytics','advice-panel','coach-context','advice-attachments','advice-render','advice-prompt','advice-stream-renderer','routine-library','plan-chains','plan-progression','plan-store','plan-ai-pure','plan-ai'],
+            profile: ['voice-engine','voice-cache','voice-webspeech-adapter','voice-legado-adapter','workout-voice','credential-fields','weekly-plan','backup','sync-ui','sync-adapters','sync','routine-library','goal-plan','weekly-summary','plan-chains','plan-progression','plan-store','plan-equipment','plan-ui','ai-store','ai-profile','ai-model-catalog-pure','ai-model-cache','ai-models','ai-routing-pure','ai-routing','ai-task-settings'],
+            records: ['history-view','weekly-summary','health-diet','health-weight','health-profile','health-exercise','goal-plan','routine-library','food-log','pr-tracker','volume-heatmap','action-history','report-metrics-pure','report-panel','plan-chains','plan-progression','plan-store','plan-weekly','plan-ui','ai-store','ai-profile','ai-model-catalog-pure','ai-model-cache','ai-models','ai-routing-pure','ai-routing','ai-api','ai-task-settings'],
+            today: ['health-diet','health-weight','health-exercise','food-log','history-view','weekly-summary','report-metrics-pure','report-panel','routine-library','plan-chains','plan-progression','plan-store','plan-feedback','plan-cooldown','plan-auto-adjust','plan-weekly','plan-equipment','plan-ui','ai-store','ai-profile','ai-model-catalog-pure','ai-model-cache','ai-models','ai-routing-pure','ai-routing','ai-api','ai-task-settings']
         };
         const CSS_DEPS = {
             profile: ['42-health-profile']
@@ -769,12 +798,15 @@
         const _loadingPromises = new Map();
         const _loadedCss = new Set();
         const _loadingCssPromises = new Map();
-        const MODULE_SCRIPTS = new Set(['data-utils-pure','action-identity','sync-pure','workout-cardio-pure','voice-engine','report-metrics-pure','ai-vision-pure','backup-ring-pure','backup-import-pure']);
+        const MODULE_SCRIPTS = new Set(['data-utils-pure','action-identity','sync-pure','workout-cardio-pure','voice-engine','report-metrics-pure','ai-vision-pure','ai-model-catalog-pure','ai-routing-pure','backup-ring-pure','backup-import-pure']);
+        const MJS_SCRIPTS = new Set(['ai-vision-pure','ai-model-catalog-pure','ai-routing-pure']);
         const SCRIPT_PREREQUISITES = {
             'ai-profile': ['ai-store'],
-            'ai-model-cache': ['ai-store'],
-            'ai-models': ['ai-store','ai-model-cache','ai-vision-pure'],
-            'ai-api': ['ai-store'],
+            'ai-model-cache': ['ai-store','ai-model-catalog-pure'],
+            'ai-models': ['ai-store','ai-profile','ai-model-cache','ai-vision-pure'],
+            'ai-routing': ['ai-store','ai-profile','ai-model-cache','ai-routing-pure'],
+            'ai-api': ['ai-store','ai-profile','ai-routing'],
+            'ai-task-settings': ['ai-routing','ai-models'],
             'data-utils': ['render-safe'],
             'data-schema': ['data-records','action-identity'],
             'data-store': ['data-records','data-schema'],
@@ -802,7 +834,7 @@
             'plan-auto-adjust': ['plan-store','plan-feedback','plan-cooldown','rehab-policy','ai-api'],
             'plan-weekly': ['plan-store'],
             'plan-equipment': ['plan-store'],
-            'plan-ai': ['plan-store','rehab-policy','ai-api','plan-ai-pure'],
+            'plan-ai': ['plan-store','rehab-policy','ai-api','ai-task-settings','plan-ai-pure'],
             'plan-ui': ['plan-store','plan-feedback','plan-cooldown','plan-weekly','plan-equipment'],
             'debug-tools': [],
             'debug-ai': [],
@@ -844,7 +876,7 @@
             const p = new Promise((res, rej) => {
                 const link = document.createElement('link');
                 link.rel = 'stylesheet';
-                link.href = `css-src/${name}.css?v=310`;
+                link.href = `css-src/${name}.css?v=311`;
                 link.dataset.appCss = name;
                 link.onload = () => {
                     link.dataset.loaded = 'true';
@@ -885,7 +917,7 @@
                 if (_loaded.has(name)) return res();
                 const s = document.createElement('script');
                 if (MODULE_SCRIPTS.has(name)) s.type = 'module';
-                s.src = `${name}${name === 'ai-vision-pure' ? '.mjs' : '.js'}?v=310`;
+                s.src = `${name}${MJS_SCRIPTS.has(name) ? '.mjs' : '.js'}?v=311`;
                 s.onload = () => { _loaded.add(name); res(); };
                 s.onerror = rej;
                 document.head.appendChild(s);
@@ -903,8 +935,9 @@
             const pending = deps.filter(name => !_loaded.has(name));
             if (pending.length) await Promise.all(pending.map(loadScript));
             data.refreshModules?.();
-            if (page === 'ai-coach' && window.ai && typeof ai.init === 'function' && !_loaded.has('_aiInit')) {
+            if (['ai-coach', 'profile', 'records', 'workout', 'today'].includes(page) && window.ai && typeof ai.init === 'function' && !data._aiRuntimeReady && !_loaded.has('_aiInit')) {
                 await ai.init({ saveData: true, renderData: false });
+                data._aiRuntimeReady = true;
                 _loaded.add('_aiInit');
             }
             if (page === 'ai-coach' && window.advicePanel) {

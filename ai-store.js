@@ -13,6 +13,7 @@ const ai = {
         model: '',
         baseUrl: '',
         extraVisionKeywords: '',
+        taskRoutes: {},
         enabled: false
     },
     models: [],
@@ -29,6 +30,7 @@ const ai = {
             model: '',
             baseUrl: '',
             extraVisionKeywords: '',
+            taskRoutes: {},
             enabled: false
         };
         this.models = [];
@@ -76,8 +78,8 @@ const ai = {
             this.cfg.profiles = data.db.aiProfiles;
             this.cfg.activeProfileId = data.db.aiActiveId || this.cfg.profiles[0]?.id || '';
         }
-        if ((!this.models || !this.models.length) && typeof data !== 'undefined' && data.db?.aiModels?.length) {
-            this.models = data.db.aiModels;
+        if ((!this.cfg.taskRoutes || !Object.keys(this.cfg.taskRoutes).length) && typeof data !== 'undefined' && data.db?.aiTaskRoutes) {
+            this.cfg.taskRoutes = data.db.aiTaskRoutes;
         }
 
         // 4) 兼容旧 per-profile localStorage key
@@ -89,6 +91,8 @@ const ai = {
         this.cfg.profiles = Array.isArray(this.cfg.profiles) ? this.cfg.profiles : [];
         this.models = Array.isArray(this.models) ? this.models : [];
         this.keyMap = this.keyMap && typeof this.keyMap === 'object' ? this.keyMap : {};
+        this.cfg.taskRoutes = this.cfg.taskRoutes && typeof this.cfg.taskRoutes === 'object' ? this.cfg.taskRoutes : {};
+        if (typeof this.migrateLegacyModelCache === 'function') await this.migrateLegacyModelCache();
         if (!this.cfg.activeProfileId && this.cfg.profiles.length) {
             this.cfg.activeProfileId = this.cfg.profiles[0].id;
         }

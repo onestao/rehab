@@ -17,6 +17,7 @@ function loadPlanAutoAdjust(options = {}) {
     };
     vm.runInNewContext(policyCode, sandbox);
     vm.runInNewContext(code, sandbox);
+    sandbox.window.dataPlanAutoAdjust.__testWindow = sandbox.window;
     return sandbox.window.dataPlanAutoAdjust;
 }
 
@@ -300,6 +301,122 @@ test('auto-adjust applies future-only progression suggestion to cloned future ta
     assert.equal(plan.items[0].progressionGroup, 'bridge-adduction');
     assert.equal(plan.items[0].progressionLevel, 2);
     assert.match(plan.items[0].aiReasoning, /下次建议/);
+});
+
+test('auto-adjust AI prompt uses confirmed target AI plan as adjustment baseline', async () => {
+    const api = loadPlanAutoAdjust();
+    const db = {
+        dailyPlans: [{
+            id: 'source-plan',
+            date: '2026-06-22',
+            type: 'rehab',
+            title: '今日康复计划',
+            items: [
+                doneItem({ name: '基础臀桥', spec: { sets: 2, reps: 12, work: 3 }, rpe: 4 })
+            ]
+        }, {
+            id: 'target-ai',
+            date: '2026-06-23',
+            type: 'rehab',
+            source: 'ai',
+            title: '明日 AI 康复计划',
+            items: [{
+                id: 'target-task',
+                name: '明日侧卧髋外展',
+                category: 'main',
+                status: 'todo',
+                spec: { sets: 2, reps: 12, work: 3 },
+                requiresUserConfirm: true,
+                userConfirmed: true
+            }]
+        }],
+        health: { rehabWeekly: [] }
+    };
+    const ctx = createContext(api, db);
+    let prompt = '';
+    let contextCall = null;
+    ctx.buildPlanAiContext = (mode, extra, types, options) => {
+        contextCall = { mode, extra, types, options };
+        return extra;
+    };
+    ctx.parsePlanAiPayload = () => ({
+        ok: true,
+        plans: [{ date: '2026-06-23', type: 'rehab', title: '明日 AI 康复计划', items: [{ name: '明日侧卧髋外展', category: 'main', spec: { sets: 2, reps: 10, work: 3 } }] }]
+    });
+    api.__testWindow.ai = {
+        runStream: async (_taskId, messages) => {
+            prompt = messages[1].content;
+            return '{}';
+        }
+    };
+
+    const plans = await api.generateAutoAdjustedPlans.call(ctx, {
+        sourceDate: '2026-06-22',
+        targetDate: '2026-06-23',
+        sourcePlans: [db.dailyPlans[0]],
+        types: ['rehab']
+    });
+
+    assert.equal(plans.length, 1);
+    assert.equal(contextCall.options.targetDate, '2026-06-23');
+    assert.match(prompt, /已有已确认AI/);
+    assert.match(prompt, /禁整套重写/);
+    assert.match(prompt, /目标AI/);
+    assert.match(prompt, /明日侧卧髋外展/);
+});
+
+test('auto-adjust AI prompt includes surrounding body-part schedule when generating new target plan', async () => {
+    const api = loadPlanAutoAdjust();
+    const db = {
+        dailyPlans: [{
+            id: 'past-core',
+            date: '2026-06-20',
+            type: 'bulk',
+            source: 'manual',
+            items: [{ name: '平板支撑', category: 'main', status: 'done', spec: { sets: 3, reps: 0, work: 40 } }]
+        }, {
+            id: 'source-plan',
+            date: '2026-06-22',
+            type: 'rehab',
+            title: '今日康复计划',
+            items: [
+                doneItem({ name: '靠墙深蹲', spec: { sets: 2, reps: 10, work: 3 }, rpe: 2 })
+            ]
+        }, {
+            id: 'future-upper',
+            date: '2026-06-25',
+            type: 'bulk',
+            source: 'ai',
+            items: [{ name: '俯卧撑', category: 'main', status: 'todo', spec: { sets: 3, reps: 12, work: 3 } }]
+        }],
+        health: { rehabWeekly: [] }
+    };
+    const ctx = createContext(api, db);
+    let prompt = '';
+    ctx.buildPlanAiContext = (_mode, extra) => extra;
+    ctx.parsePlanAiPayload = () => ({
+        ok: true,
+        plans: [{ date: '2026-06-23', type: 'rehab', title: '康复计划', items: [{ name: '臀桥', category: 'main', spec: { sets: 2, reps: 12, work: 3 } }] }]
+    });
+    api.__testWindow.ai = {
+        runStream: async (_taskId, messages) => {
+            prompt = messages[1].content;
+            return '{}';
+        }
+    };
+
+    await api.generateAutoAdjustedPlans.call(ctx, {
+        sourceDate: '2026-06-22',
+        targetDate: '2026-06-23',
+        sourcePlans: [db.dailyPlans[1]],
+        types: ['rehab']
+    });
+
+    assert.match(prompt, /无AI基线/);
+    assert.match(prompt, /部位排程/);
+    assert.match(prompt, /平板支撑/);
+    assert.match(prompt, /俯卧撑/);
+    assert.match(prompt, /核心\/躯干|上肢推\/肩胸/);
 });
 
 test('auto-adjust skips same-type manual target plans', () => {

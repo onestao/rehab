@@ -160,7 +160,10 @@
                         { role: 'system', content: '你是严谨的体重、饮食和训练复盘助手。必须只依据用户提供的周期数据。返回严格 JSON：{"summary":"≤100字","highlights":["≤3条"],"suggestions":["≤3条"]}。不要编造不存在的数据。' },
                         { role: 'user', content: `请生成${kind === 'monthly' ? '月' : '周'}体重复盘。\n\n【聚合指标】\n${JSON.stringify(metrics.metrics, null, 2)}\n\n${context}` }
                     ];
-                    const result = await ai.call(messages, 1800);
+                    const taskId = kind === 'monthly' ? 'report.weight.monthly' : 'report.weight.weekly';
+                    const result = window.ai?.run
+                        ? await window.ai.run({ taskId, messages, maxTokens: 1800 })
+                        : await ai.call(messages, 1800);
                     ai = parseReportAiText(result, ai);
                     ai.model = ai.model || (window.ai?.getEffectiveConfig?.()?.model) || 'ai';
                     ai.prompt_id = kind === 'monthly' ? 'monthly_report' : 'weekly_report';
@@ -237,6 +240,7 @@
                 <span class="material-symbols-rounded">assignment</span>
                 <b>尚未生成 ${esc(label)}</b>
                 <small>${esc(period.start)} 至 ${esc(period.end)}</small>
+                <div data-ai-task-picker="${kind === 'monthly' ? 'report.weight.monthly' : 'report.weight.weekly'}"></div>
                 <div class="weight-report-actions">
                     <button class="md-btn md-btn-filled" onclick="data.generateReport('${kind}', data.weightReportMetricAnchor('${kind}'), { useAi: false })" type="button">生成离线复盘</button>
                     <button class="md-btn md-btn-tonal" onclick="data.generateReport('${kind}', data.weightReportMetricAnchor('${kind}'), { useAi: true })" type="button">尝试 AI 复盘</button>

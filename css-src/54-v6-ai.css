@@ -1,6 +1,6 @@
 /* --- V6 AI Coach (ai-insight / ai-msg / ai-input / advice-v6 / today quick actions tweaks) --- */
 
-.advice-v6-page { display: grid; gap: 12px; min-width: 0; }
+.advice-v6-page { display: flex; flex: 1 0 auto; flex-direction: column; gap: 12px; min-width: 0; }
 
 /* ── AI Insight card (collapsible) ── */
 .ai-insight {
@@ -208,7 +208,7 @@
 .advice-v6-suggestions button { padding: 8px 12px; border-radius: 12px; background: var(--glass-bg); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid var(--glass-border); font-size: 12px; font-weight: 500; color: var(--md-sys-on-surface); cursor: pointer; text-align: left; transition: transform 0.15s var(--md-sys-motion-spring); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .advice-v6-suggestions button:active { transform: scale(0.95); }
 
-.advice-composer-stack { position: sticky; bottom: 0; z-index: 20; display: grid; gap: 0; margin: 0 -14px -14px; background: var(--md-sys-surface-container); box-shadow: 0 -10px 24px color-mix(in srgb, var(--md-sys-surface) 84%, transparent); }
+.advice-composer-stack { position: sticky; bottom: 0; z-index: 20; display: grid; gap: 0; margin: auto -14px -14px; background: var(--md-sys-surface-container); box-shadow: 0 -10px 24px color-mix(in srgb, var(--md-sys-surface) 84%, transparent); }
 .ai-input { display: flex; gap: 6px; align-items: center; background: transparent; padding: 8px 14px max(8px, env(safe-area-inset-bottom)); margin: 0; }
 .ai-input .advice-model-picker.advice-model-chip { width: 36px; height: 36px; min-height: 36px; padding: 0; border: none; display: inline-flex; justify-content: center; gap: 0; flex: none; box-shadow: var(--md-sys-elevation-1); }
 .ai-input .advice-model-picker.advice-model-chip.is-override { width: auto; min-width: 54px; padding: 0 5px 0 5px; gap: 3px; }
