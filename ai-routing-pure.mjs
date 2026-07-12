@@ -231,20 +231,15 @@ export function buildReasoningOptions(options = {}) {
   if (requestedDepth === 'auto' && (explicitlyUnsupported || (!protocol || (capabilities.reasoning !== true && !inferredSupport)))) {
     return { ...base, supported: !explicitlyUnsupported };
   }
-  if (!protocol || explicitlyUnsupported) throw unsupportedReasoning(protocol, modelId);
+  // Explicit user choices are sent to the provider. Capability metadata is advisory
+  // and frequently incomplete for OpenAI-compatible endpoints.
+  if (!protocol) throw unsupportedReasoning(protocol, modelId);
 
   const modes = supportedModes(capabilities);
   let effectiveDepth = requestedDepth;
   if (requestedDepth === 'auto') {
     const preferred = normalizeDepth(capabilities.defaultReasoningDepth, 'medium');
     effectiveDepth = modes?.includes(preferred) ? preferred : (modes?.[0] || preferred);
-  }
-  if (modes && !modes.includes(effectiveDepth)) {
-    throw routingError(
-      'AI_REASONING_DEPTH_UNSUPPORTED',
-      `Reasoning depth ${effectiveDepth} is not supported by this model`,
-      { protocol, modelId, reasoningDepth: effectiveDepth, supportedModes: modes }
-    );
   }
 
   const result = { ...base, effectiveDepth, omitTemperature: true };

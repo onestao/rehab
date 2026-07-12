@@ -71,7 +71,11 @@ Object.assign(advicePanel, {
             const allHistory = this.activeRecords(this.db.history || []);
             const allFoods = this.activeRecords(this.db.health.foodLogs || []);
             const allExerciseLogs = this.activeRecords(this.db.health.exerciseLogs || []);
-            const allWeights = this.sortedWeights();
+            const allWeights = typeof this.sortedWeights === 'function'
+                ? this.sortedWeights()
+                : [...this.activeRecords(this.db.health?.weights || [])].sort(
+                    (a, b) => this.dateFromKey(a.date) - this.dateFromKey(b.date)
+                );
             const allDailyPlans = this.activeRecords(this.db.dailyPlans || []);
             const allReports = this.activeRecords(this.db.health?.reports || []);
             const allActions = this.activeRecords(this.db.actions || []);

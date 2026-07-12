@@ -763,3 +763,6 @@
 .ai-provider-empty { padding: 24px 8px; text-align: center; color: var(--md-sys-on-surface-variant); }
 .ai-icon-btn.is-danger { color: var(--md-sys-error); }
 .ai-compact-model.is-invalid, .ai-task-settings-row.is-invalid { color: var(--md-sys-error); }
+.ai-task-model-invalid, .ai-task-invalid-reason { color: var(--md-sys-error); }
+.ai-task-model-invalid { padding: 10px 12px; border: 1px solid var(--md-sys-error); border-radius: 6px; background: var(--md-sys-error-container); }
+.ai-provider-toolbar .ai-icon-btn.is-active { background: var(--md-sys-secondary-container); color: var(--md-sys-on-secondary-container); }

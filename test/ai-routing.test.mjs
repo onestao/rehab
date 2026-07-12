@@ -171,14 +171,13 @@ test('Gemini thinking budget does not consume visible output token setting', () 
   assert.equal(result.omitTemperature, true);
 });
 
-test('explicit unsupported reasoning fails while auto may safely degrade to off', () => {
-  assert.throws(
-    () => buildReasoningOptions({
-      protocol: 'openai-chat', modelId: 'plain-model', reasoningDepth: 'high',
-      capabilities: { reasoning: false }
-    }),
-    error => error.code === 'AI_REASONING_UNSUPPORTED'
-  );
+test('explicit reasoning remains user-controlled while auto may safely degrade to off', () => {
+  const explicit = buildReasoningOptions({
+    protocol: 'openai-chat', modelId: 'plain-model', reasoningDepth: 'high',
+    capabilities: { reasoning: false }
+  });
+  assert.equal(explicit.effectiveDepth, 'high');
+  assert.deepEqual(explicit.params, { reasoning_effort: 'high' });
   const auto = buildReasoningOptions({
     protocol: 'openai-chat', modelId: 'plain-model', reasoningDepth: 'auto',
     capabilities: { reasoning: false }, maxOutputTokens: 1000
@@ -192,20 +191,18 @@ test('explicit unsupported reasoning fails while auto may safely degrade to off'
   );
 });
 
-test('auto uses model capability default and respects supported reasoning modes', () => {
+test('auto uses model capability default while explicit depth remains user-controlled', () => {
   const auto = buildReasoningOptions({
     protocol: 'openai-chat', modelId: 'custom-reasoner', reasoningDepth: 'auto',
     capabilities: { reasoning: true, reasoningModes: ['low', 'high'], defaultReasoningDepth: 'high' }
   });
   assert.equal(auto.effectiveDepth, 'high');
   assert.deepEqual(auto.params, { reasoning_effort: 'high' });
-  assert.throws(
-    () => buildReasoningOptions({
-      protocol: 'openai-chat', modelId: 'custom-reasoner', reasoningDepth: 'medium',
-      capabilities: { reasoning: true, reasoningModes: ['low', 'high'] }
-    }),
-    error => error.code === 'AI_REASONING_DEPTH_UNSUPPORTED'
-  );
+  const explicit = buildReasoningOptions({
+    protocol: 'openai-chat', modelId: 'custom-reasoner', reasoningDepth: 'medium',
+    capabilities: { reasoning: true, reasoningModes: ['low', 'high'] }
+  });
+  assert.equal(explicit.effectiveDepth, 'medium');
 });
 
 test('only transient transport and service errors are retryable', () => {

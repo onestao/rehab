@@ -71,6 +71,10 @@ Object.assign(ai, {
                 return withMeta(text, effective, index);
             } catch (error) {
                 lastError = error;
+                const reasoningDepth = String(effective.reasoningDepth || 'auto');
+                if (!['auto', 'off'].includes(reasoningDepth) && [400, 415, 422].includes(Number(error?.status || 0))) {
+                    error.message = `${error.message || '请求失败'}；当前模型可能不支持所选推理强度，请切换模型或改为自动/关闭`;
+                }
                 const retryable = window.aiRoutingPure?.isRetryableAiError?.(error) === true;
                 if (!retryable || emitted || index >= sequence.length - 1) {
                     const route = this.getTaskRoute?.(taskId) || {};

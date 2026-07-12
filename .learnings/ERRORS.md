@@ -29,6 +29,34 @@ Use the fixed-axis Google Fonts subset directly, or install the Python Brotli ex
 
 ---
 
+## [ERR-20260712-001] codegraph-transport
+
+**Logged**: 2026-07-12T00:00:00+08:00
+**Priority**: low
+**Status**: pending
+**Area**: tests
+
+### Summary
+CodeGraph exploration failed before the AI coach model-picker investigation could begin.
+
+### Error
+```
+tool call failed for codegraph/codegraph_explore: Transport closed
+```
+
+### Context
+- Queried both `perfrom` and `ui-mockup` worktrees for the AI coach model-picker flow.
+- Fell back to focused literal source search after the structural index transport closed.
+
+### Suggested Fix
+Retry CodeGraph in a later session; use targeted file reads only when the transport is unavailable.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: advice-panel.js, css-src/48-advice-model-picker.css
+
+---
+
 ## [ERR-20260711-002] npm-run-ci-nested-worktree
 
 **Logged**: 2026-07-11T10:43:00+08:00

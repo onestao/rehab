@@ -8,7 +8,7 @@
     <link rel="icon" href="assets/app-icon.svg" type="image/svg+xml">
     <meta name="theme-color" content="#0061a4">
     <link rel="preload" href="assets/material-symbols-rounded.woff2" as="font" type="font/woff2" crossorigin>
-    <link rel="stylesheet" href="build/generated.css?v=318">
+    <link rel="stylesheet" href="build/generated.css?v=321">
 </head>
 <body>
     <div id="appUpdateBanner" class="app-update-banner hidden">
@@ -349,7 +349,7 @@
         </section>
         <section id="aiProviderManager" class="ai-provider-manager hidden" aria-hidden="true" aria-label="AI &#20379;&#24212;&#21830;&#31649;&#29702;">
             <header class="ai-provider-manager-bar">
-                <button class="ai-icon-btn" type="button" onclick="window.aiProviderManager?.panel === 'detail' ? (window.aiProviderManager.panel='list',window.aiProviderManager.render()) : window.aiProviderManager?.close()" aria-label="&#36820;&#22238;"><span class="material-symbols-rounded">arrow_back</span></button>
+                <button class="ai-icon-btn" type="button" onclick="window.aiProviderManager?.panel !== 'list' ? (window.aiProviderManager.panel='list',window.aiProviderManager.render()) : window.aiProviderManager?.close()" aria-label="&#36820;&#22238;"><span class="material-symbols-rounded">arrow_back</span></button>
                 <strong id="aiProviderManagerTitle">&#20379;&#24212;&#21830;</strong>
                 <button class="ai-icon-btn" type="button" onclick="window.aiProviderManager?.close()" aria-label="&#20851;&#38381;"><span class="material-symbols-rounded">close</span></button>
             </header>
@@ -381,26 +381,26 @@
     </nav>
     </div>
 
-    <script src="m3e-ripple.js?v=318"></script>
-    <script src="toast.js?v=318"></script>
-    <script src="error-bus.js?v=318"></script>
-    <script src="i18n.js?v=318"></script>
-    <script src="theme.js?v=318"></script>
-    <script src="render-safe.js?v=318"></script>
-    <script src="nav-stack.js?v=318"></script>
-    <script src="app-route.js?v=318"></script>
-    <script type="module" src="data-utils-pure.js?v=318"></script>
-    <script type="module" src="action-identity.js?v=318"></script>
-    <script src="data-utils.js?v=318"></script>
-    <script src="storage/idb.js?v=318"></script>
-    <script src="storage/migrate.js?v=318"></script>
-    <script src="data-records.js?v=318"></script>
-    <script src="data-schema.js?v=318"></script>
-    <script src="data-store.js?v=318"></script>
-    <script src="data-ui-state.js?v=318"></script>
-    <script src="data-views.js?v=318"></script>
-    <script src="data.js?v=318"></script>
-    <script src="sync-status.js?v=318"></script>
+    <script src="m3e-ripple.js?v=321"></script>
+    <script src="toast.js?v=321"></script>
+    <script src="error-bus.js?v=321"></script>
+    <script src="i18n.js?v=321"></script>
+    <script src="theme.js?v=321"></script>
+    <script src="render-safe.js?v=321"></script>
+    <script src="nav-stack.js?v=321"></script>
+    <script src="app-route.js?v=321"></script>
+    <script type="module" src="data-utils-pure.js?v=321"></script>
+    <script type="module" src="action-identity.js?v=321"></script>
+    <script src="data-utils.js?v=321"></script>
+    <script src="storage/idb.js?v=321"></script>
+    <script src="storage/migrate.js?v=321"></script>
+    <script src="data-records.js?v=321"></script>
+    <script src="data-schema.js?v=321"></script>
+    <script src="data-store.js?v=321"></script>
+    <script src="data-ui-state.js?v=321"></script>
+    <script src="data-views.js?v=321"></script>
+    <script src="data.js?v=321"></script>
+    <script src="sync-status.js?v=321"></script>
     <div id="weightModal" class="md-modal md-modal-sheet hidden" aria-hidden="true">
         <div class="md-modal-backdrop" onclick="data.closeWeightModal()"></div>
         <div class="md-modal-card md-modal-sheet-card">
@@ -912,7 +912,7 @@
             const p = new Promise((res, rej) => {
                 const link = document.createElement('link');
                 link.rel = 'stylesheet';
-                link.href = `css-src/${name}.css?v=318`;
+                link.href = `css-src/${name}.css?v=321`;
                 link.dataset.appCss = name;
                 link.onload = () => {
                     link.dataset.loaded = 'true';
@@ -953,7 +953,7 @@
                 if (_loaded.has(name)) return res();
                 const s = document.createElement('script');
                 if (MODULE_SCRIPTS.has(name)) s.type = 'module';
-                s.src = `${name}${MJS_SCRIPTS.has(name) ? '.mjs' : '.js'}?v=318`;
+                s.src = `${name}${MJS_SCRIPTS.has(name) ? '.mjs' : '.js'}?v=321`;
                 s.onload = () => { _loaded.add(name); res(); };
                 s.onerror = rej;
                 document.head.appendChild(s);

@@ -31,20 +31,25 @@
         ];
         return rules.find(([pattern]) => pattern.test(id))?.[1] || '其他';
     };
-    const profileList = () => [...(root.ai?.cfg?.profiles || [])]
-        .filter(profile => profile.archived !== true)
-        .sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0) || text(a.name).localeCompare(text(b.name)));
+    const profileList = (archived = false) => [...(root.ai?.cfg?.profiles || [])]
+        .filter(profile => (profile.archived === true) === archived)
+        .sort((a, b) => Number(a.enabled === false) - Number(b.enabled === false)
+            || Number(a.sortOrder || 0) - Number(b.sortOrder || 0)
+            || text(a.name).localeCompare(text(b.name)));
+    const pendingModels = () => (root.ai?.models || []).filter(model => !text(model?.profileId).trim());
 
     const manager = {
         profileId: '',
         panel: 'list',
         detailTab: 'config',
         dragId: '',
+        showArchived: false,
 
         open(profileId = '') {
             this.profileId = text(profileId);
             this.panel = this.profileId ? 'detail' : 'list';
             this.detailTab = 'config';
+            this.showArchived = false;
             byId('aiProviderManager')?.classList.remove('hidden');
             byId('aiProviderManager')?.setAttribute('aria-hidden', 'false');
             this.render();
@@ -78,6 +83,7 @@
             if (!body) return;
             body.replaceChildren();
             if (this.panel === 'detail') this.renderDetail(body, title);
+            else if (this.panel === 'migration') this.renderMigration(body, title);
             else this.renderList(body, title);
         },
 
@@ -92,10 +98,17 @@
             const refresh = button('', 'cloud_sync', 'ai-icon-btn');
             refresh.title = '刷新全部已启用供应商';
             refresh.addEventListener('click', () => this.refreshAll(refresh));
+            const archivedCount = profileList(true).length;
+            const archived = button('', 'inventory_2', `ai-icon-btn ${this.showArchived ? 'is-active' : ''}`);
+            archived.title = this.showArchived ? '返回供应商' : `已归档供应商 (${archivedCount})`;
+            archived.addEventListener('click', () => { this.showArchived = !this.showArchived; this.render(); });
+            const pending = button('', 'rule', 'ai-icon-btn');
+            pending.title = `待确认模型 (${pendingModels().length})`;
+            pending.addEventListener('click', () => { this.panel = 'migration'; this.render(); });
             const add = button('', 'add', 'ai-icon-btn');
             add.title = '添加供应商';
             add.addEventListener('click', () => this.startNew());
-            toolbar.append(search, refresh, add);
+            toolbar.append(search, refresh, pending, archived, add);
             const status = document.createElement('div');
             status.id = 'aiProviderBulkStatus';
             status.className = 'ai-provider-bulk-status';
@@ -104,7 +117,7 @@
             const renderRows = () => {
                 const query = search.value.trim().toLowerCase();
                 list.replaceChildren();
-                profileList().filter(profile => `${profile.name} ${profile.provider}`.toLowerCase().includes(query)).forEach(profile => {
+                profileList(this.showArchived).filter(profile => `${profile.name} ${profile.provider}`.toLowerCase().includes(query)).forEach(profile => {
                     const row = document.createElement('div');
                     row.className = 'ai-provider-row';
                     row.draggable = true;
@@ -124,21 +137,86 @@
                     labels.append(strong, small);
                     open.append(mark, labels);
                     open.addEventListener('click', () => { this.profileId = profile.id; this.panel = 'detail'; this.detailTab = 'config'; this.render(); });
-                    const state = button(profile.enabled === false ? '已禁用' : '已启用', '', `ai-provider-state ${profile.enabled === false ? 'is-off' : 'is-on'}`);
-                    state.addEventListener('click', () => this.toggle(profile.id));
+                    const state = button(profile.archived ? '恢复' : (profile.enabled === false ? '已禁用' : '已启用'), '', `ai-provider-state ${profile.enabled === false ? 'is-off' : 'is-on'}`);
+                    state.addEventListener('click', () => profile.archived ? this.restore(profile.id) : this.toggle(profile.id));
                     row.append(open, state, icon('chevron_right'));
                     list.append(row);
                 });
                 if (!list.childElementCount) {
                     const empty = document.createElement('div');
                     empty.className = 'ai-provider-empty';
-                    empty.textContent = query ? '未找到供应商' : '尚未添加供应商';
+                    empty.textContent = query ? '未找到供应商' : (this.showArchived ? '没有已归档供应商' : '尚未添加供应商');
                     list.append(empty);
                 }
             };
             search.addEventListener('input', renderRows);
             renderRows();
             body.append(toolbar, status, list);
+        },
+
+        renderMigration(body, title) {
+            if (title) title.textContent = '待确认模型';
+            const models = pendingModels();
+            const profiles = profileList(false);
+            const selected = new Set();
+            const toolbar = document.createElement('div');
+            toolbar.className = 'ai-provider-toolbar';
+            const target = document.createElement('select');
+            target.setAttribute('aria-label', '指定供应商');
+            const placeholder = document.createElement('option');
+            placeholder.value = '';
+            placeholder.textContent = '选择目标供应商';
+            target.append(placeholder);
+            profiles.forEach(profile => {
+                const option = document.createElement('option');
+                option.value = profile.id;
+                option.textContent = profile.name || profile.id;
+                target.append(option);
+            });
+            const assign = button('指定所选', 'assignment', 'md-btn md-btn-filled');
+            assign.disabled = true;
+            const update = () => { assign.disabled = !target.value || !selected.size; };
+            target.addEventListener('change', update);
+            assign.addEventListener('click', async () => {
+                root.ai.models = (root.ai.models || []).map(model => selected.has(model) && !model.profileId
+                    ? { ...model, profileId: target.value, migrationStatus: 'confirmed' }
+                    : model);
+                await root.ai.persistModelCache();
+                this.render();
+            });
+            toolbar.append(target, assign);
+            const list = document.createElement('div');
+            list.className = 'ai-provider-list';
+            models.forEach(model => {
+                const row = document.createElement('div');
+                row.className = 'ai-provider-model-row';
+                const check = document.createElement('input');
+                check.type = 'checkbox';
+                check.setAttribute('aria-label', `选择 ${model.id}`);
+                check.addEventListener('change', () => { if (check.checked) selected.add(model); else selected.delete(model); update(); });
+                const labels = document.createElement('span');
+                labels.className = 'ai-provider-model-labels';
+                const strong = document.createElement('strong'); strong.textContent = model.displayName || model.id;
+                const small = document.createElement('small'); small.textContent = `${model.provider || '未知类型'} · ${model.id}`;
+                labels.append(strong, small);
+                const remove = button('', 'delete', 'ai-icon-btn is-danger');
+                remove.title = '删除待确认模型';
+                remove.addEventListener('click', async () => {
+                    if (!confirm(`删除待确认模型 ${model.id}？`)) return;
+                    root.ai.models = (root.ai.models || []).filter(item => item !== model);
+                    await root.ai.persistModelCache();
+                    this.render();
+                });
+                row.append(check, labels, remove);
+                list.append(row);
+            });
+            if (!models.length) {
+                const empty = document.createElement('div');
+                empty.className = 'ai-provider-empty';
+                empty.textContent = '没有待确认模型';
+                list.append(empty);
+            }
+            body.append(toolbar, list);
         },
 
         startNew() {
@@ -200,8 +278,8 @@
             save.addEventListener('click', () => this.saveDetails({ profile, name: name.input.value, provider: provider.value, baseUrl: baseUrl.input.value, apiKey: apiKey.input.value }, save));
             actions.append(save);
             if (profile) {
-                const archive = button('归档', 'inventory_2', 'md-btn md-btn-tonal');
-                archive.addEventListener('click', () => this.archive(profile.id));
+                const archive = button(profile.archived ? '恢复' : '归档', profile.archived ? 'restart_alt' : 'inventory_2', 'md-btn md-btn-tonal');
+                archive.addEventListener('click', () => profile.archived ? this.restore(profile.id) : this.archive(profile.id));
                 const remove = button('永久删除', 'delete_forever', 'md-btn md-btn-text ai-cache-danger');
                 remove.addEventListener('click', () => this.removeProvider(profile.id));
                 actions.append(archive, remove);
@@ -233,10 +311,16 @@
             root.ai.persistDataDb(false);
             this.profileId = id;
             try {
-                await this.discover(id);
-                alert('供应商已保存，已获取候选模型');
-                this.detailTab = 'models';
-                this.render();
+                if (values.profile) {
+                    await this.validateProvider(id);
+                    alert('供应商已保存，连接验证成功');
+                    this.render();
+                } else {
+                    await this.discover(id);
+                    alert('供应商已保存，已获取候选模型');
+                    this.detailTab = 'models';
+                    this.render();
+                }
             } catch (error) {
                 const status = byId('aiProviderDetailStatus');
                 if (status) status.textContent = `供应商已保存，验证失败：${text(error?.message || error)}`;
@@ -260,6 +344,15 @@
             root.ai.modelCandidates = { ...(root.ai.modelCandidates || {}), [profileId]: { fetchedAt, models: normalized } };
             await root.ai.persistModelCandidates();
             return normalized;
+        },
+
+        async validateProvider(profileId) {
+            const profile = root.ai.findProfile(profileId);
+            if (!profile) throw new Error('供应商不存在');
+            const key = root.ai.apiKeyFor(profileId);
+            if (profile.provider === 'gemini') return root.ai.fetchGeminiModels(profile.baseUrl, key);
+            if (profile.provider === 'claude') return root.ai.fetchClaudeModels(profile.baseUrl, key);
+            return root.ai.fetchOpenAIModels(profile.baseUrl, key);
         },
 
         renderModelsDirect() {
@@ -294,12 +387,18 @@
             });
             toolbar.append(refresh, manual, clear);
             const added = (root.ai.models || []).filter(model => model.profileId === profile.id);
-            const candidates = root.ai.modelCandidates?.[profile.id]?.models || [];
+            const snapshot = root.ai.modelCandidates?.[profile.id] || {};
+            const candidates = snapshot.models || [];
+            const snapshotMeta = document.createElement('div');
+            snapshotMeta.className = 'ai-provider-bulk-status';
+            snapshotMeta.textContent = snapshot.fetchedAt
+                ? `上次成功刷新：${new Date(snapshot.fetchedAt).toLocaleString()}`
+                : '尚无成功刷新记录';
             const candidateSection = this.modelSection('候选模型', candidates, added, profile, true, content);
             const candidateIds = new Set(candidates.map(model => model.id));
             const addedRows = added.map(model => ({ ...model, notDiscovered: candidates.length > 0 && !candidateIds.has(model.id) }));
             const addedSection = this.modelSection('已添加模型', addedRows, addedRows, profile, false, content);
-            content.append(toolbar, candidateSection, addedSection);
+            content.append(toolbar, snapshotMeta, candidateSection, addedSection);
         },
 
         modelSection(titleText, models, added, profile, selectable, host) {
@@ -321,6 +420,28 @@
             if (!models.length) {
                 const empty = document.createElement('div'); empty.className = 'ai-provider-empty'; empty.textContent = selectable ? '暂无候选快照' : '尚未添加模型'; section.append(empty); return section;
             }
+            let searchInput = null;
+            if (selectable) {
+                const searchBar = document.createElement('div');
+                searchBar.className = 'ai-provider-toolbar ai-provider-model-search';
+                searchInput = document.createElement('input');
+                searchInput.type = 'search';
+                searchInput.placeholder = '搜索候选模型';
+                const selectVisible = button('全选结果', 'checklist', 'md-btn md-btn-tonal');
+                selectVisible.addEventListener('click', () => {
+                    section.querySelectorAll('.ai-provider-model-row').forEach(row => {
+                        if (row.hidden) return;
+                        const input = row.querySelector('input[type="checkbox"]');
+                        if (!input || input.disabled) return;
+                        input.checked = true;
+                        const model = models.find(item => item.id === row.dataset.modelId);
+                        if (model) selected.add(model.id);
+                    });
+                    section._updateCommit?.();
+                });
+                searchBar.append(searchInput, selectVisible);
+                section.append(searchBar);
+            }
             groups.forEach((rows, family) => {
                 const group = document.createElement('div'); group.className = 'ai-model-family';
                 const groupHead = document.createElement('div'); groupHead.className = 'ai-model-family-title';
@@ -338,6 +459,8 @@
                 group.append(groupHead);
                 rows.forEach(model => {
                     const row = document.createElement('div'); row.className = 'ai-provider-model-row';
+                    row.dataset.modelId = model.id;
+                    row.dataset.search = `${model.displayName || ''} ${model.id || ''} ${family}`.toLowerCase();
                     if (selectable) {
                         const check = document.createElement('input'); check.type = 'checkbox';
                         check.disabled = added.some(item => item.id === model.id);
@@ -360,6 +483,17 @@
                 });
                 section.append(group);
             });
+            searchInput?.addEventListener('input', () => {
+                const query = searchInput.value.trim().toLowerCase();
+                section.querySelectorAll('.ai-model-family').forEach(group => {
+                    let visible = 0;
+                    group.querySelectorAll('.ai-provider-model-row').forEach(row => {
+                        row.hidden = !!query && !text(row.dataset.search).includes(query);
+                        if (!row.hidden) visible += 1;
+                    });
+                    group.hidden = visible === 0;
+                });
+            });
             return section;
         },
 
@@ -381,7 +515,10 @@
             const id = text(prompt('输入原始模型 ID')).trim();
             if (!id) return;
             const displayName = text(prompt('显示名称（可留空）', id)).trim() || id;
-            await this.addCandidates(profileId, [{ id, displayName, source: 'manual' }], host);
+            const family = text(prompt('模型分组（可留空）', '')).trim();
+            const capabilityInput = text(prompt('能力标签（可留空，逗号分隔，如 vision,reasoning,json）', '')).trim();
+            const capabilities = Object.fromEntries(capabilityInput.split(',').map(item => item.trim()).filter(Boolean).map(item => [item, true]));
+            await this.addCandidates(profileId, [{ id, displayName, family, capabilities, source: 'manual' }], host);
         },
 
         impactedTasks(profileId, modelId) {
@@ -420,17 +557,38 @@
         async archive(profileId) {
             if (!confirm('归档后已有功能绑定将保留并标红。继续吗？')) return;
             const profile = root.ai.findProfile(profileId); if (!profile) return;
+            profile.enabledBeforeArchive = profile.enabled !== false;
             profile.archived = true; profile.enabled = false;
             this.panel = 'list'; this.profileId = '';
             await this.persist();
         },
 
+        async restore(profileId) {
+            const profile = root.ai.findProfile(profileId); if (!profile) return;
+            profile.archived = false;
+            profile.enabled = profile.enabledBeforeArchive !== false;
+            delete profile.enabledBeforeArchive;
+            this.showArchived = false;
+            this.panel = 'list';
+            this.profileId = '';
+            await this.persist();
+        },
+
         async removeProvider(profileId) {
-            const impacted = Object.keys(root.ai.cfg.taskRoutes || {}).filter(taskId => this.impactedTasks(profileId, root.ai.cfg.taskRoutes[taskId]?.primary?.modelId).length);
+            const impacted = Object.entries(root.ai.cfg.taskRoutes || {}).filter(([, route]) => {
+                const refs = [route?.primary, ...(route?.fallbacks || [])];
+                return refs.some(ref => ref?.profileId === profileId);
+            }).map(([taskId]) => root.ai.getTaskDefinition?.(taskId)?.label || taskId);
             if (!confirm(`永久删除供应商、凭据和模型？${impacted.length ? `\n将影响 ${impacted.length} 个功能绑定。` : ''}`)) return;
             root.ai.cfg.profiles = root.ai.cfg.profiles.filter(profile => profile.id !== profileId);
             root.ai.models = (root.ai.models || []).filter(model => model.profileId !== profileId);
             delete root.ai.modelCandidates[profileId]; delete root.ai.keyMap[profileId];
+            await root.ai.idbDelete(root.ai.apiKeyKey(profileId));
+            try { localStorage.removeItem(root.ai.apiKeyKey(profileId)); } catch {}
+            if (root.ai.cfg.activeProfileId === profileId) {
+                root.ai.cfg.activeProfileId = profileList(false)[0]?.id || '';
+                root.ai.loadActiveProfileToForm();
+            }
             await Promise.all([root.ai.persistKeyMap(), root.ai.persistModelCache(), root.ai.persistModelCandidates()]);
             this.panel = 'list'; this.profileId = '';
             await this.persist();

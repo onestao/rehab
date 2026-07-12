@@ -347,6 +347,23 @@ test('AI advice prompt includes manual exercise records without health-exercise 
     assert.match(userContent, /右肩无痛/);
 });
 
+test('AI advice prompt builds weight context before the lazy weight feature loads', () => {
+    const { data } = loadCoachContextHarness({
+        sortedWeights: undefined,
+        adviceContexts: { diet: false, training: false, weight: true, goal: false }
+    });
+    data.db.health.weights = [
+        { id: 'weight-1', date: '2026-05-29', weight: 72.4, deleted: false },
+        { id: 'weight-2', date: '2026-05-30', weight: 72.1, deleted: false }
+    ];
+
+    const messages = data.buildAdviceMessages('分析我的体重趋势', 'test-model');
+    const userContent = messages.find(message => message.role === 'user')?.content || '';
+
+    assert.match(userContent, /72\.40 kg/);
+    assert.match(userContent, /72\.10 kg/);
+});
+
 test('AI advice auto context keeps plain weight questions focused', () => {
     const { data } = loadCoachContextHarness({
         adviceRange: 'month',

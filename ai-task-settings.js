@@ -113,6 +113,17 @@
         return Array.isArray(route?.fallbacks) ? route.fallbacks[0] || null : null;
     }
 
+    function unavailableReason(route, models) {
+        const primary = routePrimary(route);
+        if (!primary) return models.length ? '' : '尚未选择模型';
+        const profile = root.ai?.findProfile?.(modelProfileId(primary));
+        if (!profile) return '供应商已删除';
+        if (profile.archived === true) return '供应商已归档';
+        if (profile.enabled === false) return '供应商已禁用';
+        if (!models.some(model => modelKey(model) === modelKey(primary))) return '模型已删除或未添加';
+        return '';
+    }
+
     function modelRef(model) {
         if (!model) return null;
         return {
@@ -153,8 +164,11 @@
         if (!modal) return;
         modal.classList.add('hidden');
         modal.classList.remove('ai-task-quick-sheet');
+        modal.classList.remove('advice-model-picker-sheet');
         modal.setAttribute('aria-hidden', 'true');
-        modal.querySelector('.md-modal-sheet-card')?.classList.remove('ai-task-quick-card');
+        const card = modal.querySelector('.md-modal-sheet-card');
+        card?.classList.remove('ai-task-quick-card');
+        card?.classList.remove('advice-model-picker-card');
         const content = document.getElementById('aiModelPickerContent');
         if (content) { content.replaceChildren(); content.className = ''; }
         const heading = modal.querySelector('.md-modal-head strong');
@@ -182,8 +196,8 @@
         const selected = selectedModel(models, route);
         const button = el('button', 'ai-compact-model');
         const visual = resolveModelVisual(selected);
-        const selectedKey = selected ? modelKey(selected) : '';
-        const invalid = !!routePrimary(route) && !models.some(model => modelKey(model) === selectedKey);
+        const invalidReason = unavailableReason(route, models);
+        const invalid = !!invalidReason && !!routePrimary(route);
         if (invalid) button.classList.add('is-invalid');
         button.type = 'button';
         if (visual.theme?.bg) button.style.setProperty('--ai-model-control-bg', visual.theme.bg);
@@ -198,6 +212,18 @@
             const favorites = favoriteKeys();
             const recentKeys = readJson(RECENTS_KEY, {})[taskId] || [];
             const ordered = [...models];
+            if (invalidReason) body.append(el('div', 'ai-task-model-invalid', invalidReason));
+            if (!ordered.length) {
+                const empty = el('div', 'ai-task-settings-empty', '暂无可用模型');
+                const manage = el('button', 'md-btn md-btn-filled', '管理供应商');
+                manage.type = 'button';
+                manage.addEventListener('click', () => {
+                    closeQuickSheet();
+                    root.aiProviderManager?.open?.();
+                });
+                body.append(empty, manage);
+                return;
+            }
             if (ordered.length > 8) {
                 const searchToggle = el('button', 'ai-task-model-search-toggle');
                 searchToggle.type = 'button';
@@ -257,8 +283,9 @@
             const groups = new Map();
             ordered.filter(model => !promoted.has(modelKey(model))).forEach(model => {
                 const group = text(model?.profileName || model?.connectionName || model?.provider || '\u5176\u4ed6\u8fde\u63a5');
-                if (!groups.has(group)) groups.set(group, []);
-                groups.get(group).push(model);
+                const familyGroup = `${group} · ${text(model?.family || '其他')}`;
+                if (!groups.has(familyGroup)) groups.set(familyGroup, []);
+                groups.get(familyGroup).push(model);
             });
             groups.forEach((rows, label) => appendRows(label, rows));
         }));
@@ -388,10 +415,12 @@
         const row = el('section', 'ai-task-settings-row');
         row.dataset.taskId = definition.id;
         const primary = routePrimary(route);
-        if (primary && !models.some(model => modelKey(model) === modelKey(primary))) row.classList.add('is-invalid');
+        const invalidReason = unavailableReason(route, models);
+        if (primary && invalidReason) row.classList.add('is-invalid');
         const meta = el('div', 'ai-task-meta');
         meta.append(el('strong', '', definition.label));
         if (definition.description) meta.append(el('small', '', definition.description));
+        if (invalidReason) meta.append(el('small', 'ai-task-invalid-reason', invalidReason));
 
         const controls = el('div', 'ai-task-controls');
         const save = nextRoute => saveRoute(definition.id, nextRoute, row);

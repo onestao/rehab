@@ -1323,7 +1323,7 @@ mark.ai-hit
   files: 49-plan.css, 49-plan-ai.css
     color: var(--md-sys-on-surface-variant) (49-plan.css / 49-plan-ai.css)
 
-## COMPLEMENTS (same selector, disjoint properties): 119
+## COMPLEMENTS (same selector, disjoint properties): 124
 .bar-leading
   files: 04-layout-appbar.css, 50-v6-ui.css
 
@@ -1388,6 +1388,9 @@ mark.ai-hit
   files: 20-settings-ai.css
 
 .ai-model-family-title
+  files: 20-settings-ai.css
+
+.ai-task-model-invalid
   files: 20-settings-ai.css
 
 .mode-tab:active
@@ -1485,6 +1488,18 @@ body.is-paused .fab-play
 
 .advice-error-actions button
   files: 46-advice-ai.css
+
+.model-picker-tab-indicator
+  files: 48-advice-model-picker.css
+
+.model-picker-swipe-region
+  files: 48-advice-model-picker.css
+
+.model-picker-track
+  files: 48-advice-model-picker.css
+
+.model-picker-page
+  files: 48-advice-model-picker.css
 
 .plan-progress-ring
   files: 49-plan.css

@@ -4,7 +4,7 @@ import path from 'node:path';
 const REVIEWED_HTML_SINK_FILES = new Map([
   ['action-history.js', { sinks: 1, review: 'rendered action history rows escape record text through renderSafe.' }],
   ['advice-attachments.js', { sinks: 2, review: 'attachment preview markup is controlled; user captions use textContent.' }],
-  ['advice-panel.js', { sinks: 11, review: 'AI advice HTML funnels through renderAdviceMarkdown/render helpers before DOM insertion.' }],
+  ['advice-panel.js', { sinks: 10, review: 'AI advice HTML funnels through renderAdviceMarkdown/render helpers before DOM insertion.' }],
   ['advice-render.js', { sinks: 4, review: 'markdown/table helpers sanitize with escapeHtml before returning HTML.' }],
   ['advice-stream-renderer.js', { sinks: 5, review: 'stream chunks are rendered through the supplied markdown renderer.' }],
   ['advice-template-manager.js', { sinks: 2, review: 'template manager HTML comes from renderTemplateManagerContent with escaped fields.' }],
