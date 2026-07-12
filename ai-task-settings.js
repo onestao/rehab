@@ -50,18 +50,31 @@
 
     function modelOptionLabel(model) {
         const connection = text(model?.profileName || model?.connectionName || model?.provider || '\u672a\u547d\u540d\u8fde\u63a5').trim();
-        const name = text(model?.displayName || modelId(model) || '\u672a\u547d\u540d\u6a21\u578b').trim();
+        const labels = modelLabelCandidates(model);
+        const name = labels.custom && labels.id ? `${labels.full} \u00b7 ${labels.id}` : labels.full;
         return `${connection} \u00b7 ${name}`;
     }
 
-    function modelShortName(model) {
-        const raw = text(model?.displayName || modelId(model) || '\u6a21\u578b').trim();
-        const withoutVendor = raw.replace(/^(?:claude|anthropic|openai|google|gemini)[-_]/i, '');
-        return withoutVendor.length > 18 ? `${withoutVendor.slice(0, 16)}\u2026` : withoutVendor;
+    function modelLabelCandidates(model) {
+        return root.aiModelVisual.modelLabelCandidates(model);
+    }
+
+    function compactModelName(model) {
+        return modelLabelCandidates(model).compact;
     }
 
     function resolveModelVisual(model) {
-        return root.aiModelVisual?.resolve?.({ modelId: model?.displayName || modelId(model), provider: model?.provider || model?.profileName || model?.connectionName, iconKey: model?.iconKey || model?.vendor }) || { mark: 'AI', iconSrcs: [], theme: {} };
+        return root.aiModelVisual.resolve({ modelId: modelId(model) || model?.displayName, provider: model?.provider || model?.profileName || model?.connectionName, iconKey: model?.iconKey || model?.vendor, local: true });
+    }
+
+    function registerCompactModelLabel(button, label) {
+        const fit = () => [12, 11, 10].some(size => {
+            label.style.fontSize = `${size}px`;
+            return label.scrollWidth <= label.clientWidth + 1;
+        });
+        new root.ResizeObserver(fit).observe(button);
+        root.requestAnimationFrame(fit);
+        root.document.fonts.ready.then(fit);
     }
 
     function modelVisualNode(model, visual = resolveModelVisual(model)) {
@@ -198,17 +211,23 @@
         const visual = resolveModelVisual(selected);
         const invalidReason = unavailableReason(route, models);
         const invalid = !!invalidReason && !!routePrimary(route);
+        const stateLabel = models.length ? '\u9009\u62e9\u6a21\u578b' : '\u6682\u65e0\u6a21\u578b';
+        const labels = selected ? modelLabelCandidates(selected) : { compact: stateLabel };
+        const name = el('span', 'ai-compact-model-name', labels.compact);
         if (invalid) button.classList.add('is-invalid');
         button.type = 'button';
         if (visual.theme?.bg) button.style.setProperty('--ai-model-control-bg', visual.theme.bg);
         if (visual.theme?.color) button.style.setProperty('--ai-model-control-color', visual.theme.color);
         button.append(
             modelVisualNode(selected, visual),
-            el('span', 'ai-compact-model-name', modelShortName(selected)),
+            name,
             invalid ? icon('error') : icon('expand_more')
         );
-        button.setAttribute('aria-label', `\u9009\u62e9\u6a21\u578b\uff1a${modelOptionLabel(selected)}`);
-        button.addEventListener('click', () => openQuickSheet(`\u9009\u62e9\u6a21\u578b \u00b7 ${modelOptionLabel(selected)}`, body => {
+        const fullIdentity = selected ? modelOptionLabel(selected) : stateLabel;
+        button.setAttribute('aria-label', `\u9009\u62e9\u6a21\u578b\uff1a${fullIdentity}`);
+        button.title = fullIdentity;
+        registerCompactModelLabel(button, name);
+        button.addEventListener('click', () => openQuickSheet(selected ? `\u9009\u62e9\u6a21\u578b \u00b7 ${fullIdentity}` : '\u9009\u62e9\u6a21\u578b', body => {
             const favorites = favoriteKeys();
             const recentKeys = readJson(RECENTS_KEY, {})[taskId] || [];
             const ordered = [...models];
@@ -255,14 +274,17 @@
                 choose.type = 'button';
                 choose.append(modelVisualNode(model));
                 const labels = el('span', 'ai-task-model-labels');
-                labels.append(el('strong', '', text(model?.displayName || modelId(model))), el('small', '', text(model?.profileName || model?.connectionName || model?.provider)));
+                const modelLabels = modelLabelCandidates(model);
+                const connection = text(model?.profileName || model?.connectionName || model?.provider);
+                const secondary = modelLabels.custom && modelLabels.id ? `${connection} \u00b7 ${modelLabels.id}` : connection;
+                labels.append(el('strong', '', modelLabels.full), el('small', '', secondary));
                 choose.append(labels);
                 if (modelKey(model) === modelKey(selected)) choose.append(icon('check'));
                 choose.addEventListener('click', () => {
                     rememberRecent(taskId, model);
                     closeQuickSheet();
                     save({ ...route, primary: modelRef(model) });
-                    root.toast?.show?.(`\u5df2\u5207\u6362\u81f3 ${modelShortName(model)}`, 'success');
+                    root.toast?.show?.(`\u5df2\u5207\u6362\u81f3 ${compactModelName(model)}`, 'success');
                 });
                 const isFavorite = favorites.has(modelKey(model));
                 const star = el('button', `model-picker-star ${isFavorite ? 'active' : ''}`);
@@ -596,7 +618,7 @@
         closeQuickSheet,
         openReasoningMenu,
         reasoningMeta,
-        _test: { modelKey, modelOptionLabel, modelShortName, modelVisualNode, normalizeReasoningDepth, normalizeTaskDefinitions, shouldMountInlinePicker, resolveInsertionTarget }
+        _test: { modelKey, modelOptionLabel, modelLabelCandidates, compactModelName, modelVisualNode, normalizeReasoningDepth, normalizeTaskDefinitions, shouldMountInlinePicker, resolveInsertionTarget }
     };
     root.aiTaskSettings = api;
     root.addEventListener?.('ai:catalog-changed', render);

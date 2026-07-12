@@ -63,13 +63,14 @@ const foodLog = {
 
     formatAiDraft(item = {}) {
         const entry = this.foodEntry(item);
+        const numberOrBlank = value => Number.isFinite(Number(value)) ? value : '';
         return {
             ...entry,
             grams: entry.grams || '',
-            cal: entry.cal || '',
-            pro: entry.pro || '',
-            carb: entry.carb || '',
-            fat: entry.fat || ''
+            cal: numberOrBlank(entry.cal),
+            pro: numberOrBlank(entry.pro),
+            carb: numberOrBlank(entry.carb),
+            fat: numberOrBlank(entry.fat)
         };
     },
 
@@ -541,7 +542,11 @@ const foodLog = {
     },
 
     normalizeAiFoodItems(items = []) {
-        const normKey = value => String(value || '').trim().toLowerCase().replace(/[\s_\-./()（）\[\]【】]/g, '');
+        const normKey = value => String(value || '')
+            .trim()
+            .toLowerCase()
+            .replace(/[\s_\-./()（）\[\]【】]/g, '')
+            .replace(/(?:kcal|千卡|kj|千焦耳|千焦|mg|毫克|g|克)$/i, '');
         const val = (sources, aliases = []) => {
             const keys = new Set(aliases.map(normKey));
             for (const source of sources || []) {
@@ -585,13 +590,18 @@ const foodLog = {
                 const base = num(per100(aliases), field);
                 return base ? Number((base * grams / 100).toFixed(field === 'cal' ? 0 : 1)) : 0;
             };
-            return {
+            const calAliases = ['cal', 'kcal', 'calorie', 'calories', 'totalCalories', 'energy', 'totalEnergy', '热量', '卡路里', '千卡', '能量'];
+            const carbAliases = ['carb', 'carbs', 'carbohydrate', 'carbohydrates', 'carbohydrateG', 'totalCarb', 'totalCarbs', 'totalCarbohydrate', 'netCarb', 'netCarbs', '碳水', '碳水化合物'];
+            const rawCal = get(calAliases);
+            const rawCarb = get(carbAliases);
+            const hasValue = value => value !== undefined && value !== null && value !== '';
+            const normalized = {
                 ...item,
                 name: str(get(['name', 'food', 'foodName', 'dish', '食物', '食物名', '名称', '名字'])) || str(item.name),
                 grams,
-                cal: total(['cal', 'kcal', 'calories', 'energy', '热量', '卡路里', '千卡', '能量'], 'cal'),
+                cal: total(calAliases, 'cal'),
                 pro: total(['pro', 'protein', 'proteinG', '蛋白', '蛋白质'], 'pro'),
-                carb: total(['carb', 'carbs', 'carbohydrate', 'carbohydrateG', '碳水', '碳水化合物'], 'carb'),
+                carb: total(carbAliases, 'carb'),
                 fat: total(['fat', 'totalFat', 'fatG', '脂肪'], 'fat'),
                 fiber: total(['fiber', 'dietaryFiber', '膳食纤维', '纤维'], 'fiber'),
                 sugar: total(['sugar', '糖', '糖分'], 'sugar'),
@@ -603,6 +613,15 @@ const foodLog = {
                 confidence: num(get(['confidence', 'score', '置信度']), 'confidence') || '',
                 note: str(get(['note', 'remark', '备注', '健康性备注']))
             };
+            if (!hasValue(rawCarb) && hasValue(rawCal) && normalized.cal > 0 && (normalized.pro || normalized.fat)) {
+                const residual = (normalized.cal - normalized.pro * 4 - normalized.fat * 9) / 4;
+                if (Number.isFinite(residual) && residual >= 0) normalized.carb = Number(residual.toFixed(1));
+            }
+            if (!normalized.cal && (normalized.pro || normalized.carb || normalized.fat)) {
+                normalized.cal = Number((normalized.pro * 4 + normalized.carb * 4 + normalized.fat * 9).toFixed(1));
+                if (!normalized.note) normalized.note = '热量按已识别的宏量营养素估算';
+            }
+            return normalized;
         }).filter(item => item.name || item.grams || item.cal || item.pro || item.carb || item.fat);
     },
 
@@ -670,16 +689,19 @@ const foodLog = {
         const el = document.getElementById('foodAiResults');
         if (!el) return;
         if (items.length === 0) { el.innerHTML = ''; return; }
+        const drafts = items.map((item, idx) => this._aiFoodDrafts?.[idx] || this.formatAiDraft(item));
+        const totalCal = drafts.reduce((sum, item) => sum + Number(item.cal || 0), 0);
         el.innerHTML = `
-            <button class="food-result-item food-add-all" onclick="data.addAllAiFoods()"><span class="material-symbols-rounded">done_all</span><span>全部添加</span><small>${items.filter((_, idx) => !(this._aiFoodAdded && this._aiFoodAdded.has(idx))).length}/${items.length} 项 · ${items.reduce((s, i) => s + (i.cal || 0), 0)} kcal</small></button>
+            <button class="food-result-item food-add-all" onclick="data.addAllAiFoods()"><span class="material-symbols-rounded">done_all</span><span>全部添加</span><small>${items.filter((_, idx) => !(this._aiFoodAdded && this._aiFoodAdded.has(idx))).length}/${items.length} 项 · ${this.escapeHtml(String(totalCal))} kcal</small></button>
             ${items.map((item, idx) => {
                 const added = this._aiFoodAdded && this._aiFoodAdded.has(idx);
-                const draft = this._aiFoodDrafts?.[idx] || this.formatAiDraft(item);
+                const draft = drafts[idx];
                 const gramsText = draft.grams ? ' ' + this.escapeHtml(String(draft.grams)) + 'g' : '';
+                const summary = `${this.escapeHtml(String(draft.cal || 0))} kcal${draft.pro ? ' · 蛋白' + this.escapeHtml(String(draft.pro)) + 'g' : ''}`;
                 return `<div class="food-ai-result-card ${added ? 'food-added' : ''}">
                     <div class="food-result-item food-ai-result">
                         <span>${this.escapeHtml(draft.name || item.name)}${gramsText}</span>
-                        <small>${draft.cal || 0} kcal${draft.pro ? ' · 蛋白' + draft.pro + 'g' : ''}</small>
+                        <small>${summary}</small>
                         ${added
                             ? '<span class="food-added-badge">已添加</span>'
                             : `<button class="food-add-btn" onclick="data.addSingleAiFood(${idx})"><span class="material-symbols-rounded">add</span></button>`}

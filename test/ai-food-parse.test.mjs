@@ -117,6 +117,39 @@ test('converts kilojoule food energy values to kcal', async () => {
     assert.equal(item2.cal, 199.8);
 });
 
+test('normalizes unit-suffixed macro keys and derives missing energy from macros', async () => {
+    const foodLog = await loadFoodLog();
+
+    const [item] = foodLog.normalizeAiFoodItems([{
+        name: '去皮去骨纯鸡肉',
+        grams: '90 g',
+        '蛋白质（g）': '22g',
+        '脂肪（g）': '10g',
+        '碳水化合物（g）': '0g'
+    }]);
+
+    assert.equal(item.grams, 90);
+    assert.equal(item.pro, 22);
+    assert.equal(item.carb, 0);
+    assert.equal(item.fat, 10);
+    assert.equal(item.cal, 178);
+});
+
+test('derives omitted carbohydrate from a returned calorie total when possible', async () => {
+    const foodLog = await loadFoodLog();
+
+    const [item] = foodLog.normalizeAiFoodItems([{
+        name: '鸡胸肉饭',
+        grams: 350,
+        calories: 520,
+        protein: 38,
+        fat: 9
+    }]);
+
+    assert.equal(item.cal, 520);
+    assert.equal(item.carb, 71.8);
+});
+
 test('parseFood accepts fenced, wrapped, and noisy model JSON responses', async () => {
     const cases = [
         {

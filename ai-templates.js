@@ -570,12 +570,12 @@
 
     var SKELETON_BUILDERS = {
         food_parse_text: function (prefs) {
-            var sys = '你是营养师助手。用户描述了食物，请严格只返回 JSON 数组，不要其他文字。\n每个元素格式：{"name":"食物名","grams":克数,"cal":热量kcal,"pro":蛋白质g,"carb":碳水g,"fat":脂肪g,"fiber":膳食纤维g,"sugar":糖g,"sodium":钠mg,"saturatedFat":饱和脂肪g,"ingredients":["主要配料"],"cooking":"烹饪方式","source":"估算依据","confidence":0-100,"note":"健康性备注"}\n无法判断的可选字段用 0、空数组或空字符串。' + buildEstimateModeInstructions(prefs.estimateMode) + '。' + buildPortionStyleTag(prefs.portionStyle) + '。\n' + buildUncertaintyInstructions(prefs.uncertainty) + '。不要输出 markdown、不要解释。';
+            var sys = '你是营养师助手。用户描述了食物，请严格只返回 JSON 数组，不要其他文字。\n每个元素必须包含核心字段 name、grams、cal、pro、carb、fat，不能省略；这些字段的值必须是数字，即使为 0 也必须明确输出。格式：{"name":"食物名","grams":克数,"cal":热量kcal,"pro":蛋白质g,"carb":碳水g,"fat":脂肪g,"fiber":膳食纤维g,"sugar":糖g,"sodium":钠mg,"saturatedFat":饱和脂肪g,"ingredients":["主要配料"],"cooking":"烹饪方式","source":"估算依据","confidence":0-100,"note":"健康性备注"}\n无法判断的扩展字段用 0、空数组或空字符串；热量可按蛋白质、碳水和脂肪计算，但不要省略 cal。' + buildEstimateModeInstructions(prefs.estimateMode) + '。' + buildPortionStyleTag(prefs.portionStyle) + '。\n' + buildUncertaintyInstructions(prefs.uncertainty) + '。不要输出 markdown、不要解释。';
             var user = '用户描述：{text}' + buildCustomNoteSection(prefs.customNote);
             return { system: sys, user: user };
         },
         food_parse_image: function (prefs) {
-            var sys = '你是营养师助手。用户给出了一张食物照片。请你根据图片内容识别食物，并严格只返回 JSON 数组，不要其他文字。\n每个元素格式：{"name":"食物名","grams":克数,"cal":热量kcal,"pro":蛋白质g,"carb":碳水g,"fat":脂肪g,"fiber":膳食纤维g,"sugar":糖g,"sodium":钠mg,"saturatedFat":饱和脂肪g,"ingredients":["主要配料"],"cooking":"烹饪方式","source":"估算依据","confidence":0-100,"note":"健康性备注"}\n无法判断的可选字段用 0、空数组或空字符串。' + buildConservatismTag(prefs.conservatism) + '。\n' + buildPortionStyleTag(prefs.portionStyle) + '。\n' + buildSplitStrategyTag(prefs.splitStrategy) + '。\n如果图片中看不清或不确定，请不要编造，返回空数组 [] 或减少条目。不要输出 markdown、不要解释。';
+            var sys = '你是营养师助手。用户给出了一张食物照片。请你根据图片内容识别食物，并严格只返回 JSON 数组，不要其他文字。\n每个元素必须包含核心字段 name、grams、cal、pro、carb、fat，不能省略；这些字段的值必须是数字，即使为 0 也必须明确输出。格式：{"name":"食物名","grams":克数,"cal":热量kcal,"pro":蛋白质g,"carb":碳水g,"fat":脂肪g,"fiber":膳食纤维g,"sugar":糖g,"sodium":钠mg,"saturatedFat":饱和脂肪g,"ingredients":["主要配料"],"cooking":"烹饪方式","source":"估算依据","confidence":0-100,"note":"健康性备注"}\n无法判断的扩展字段用 0、空数组或空字符串；热量可按蛋白质、碳水和脂肪计算，但不要省略 cal。' + buildConservatismTag(prefs.conservatism) + '。\n' + buildPortionStyleTag(prefs.portionStyle) + '。\n' + buildSplitStrategyTag(prefs.splitStrategy) + '。\n如果图片中看不清或不确定，请不要编造，返回空数组 [] 或减少条目。不要输出 markdown、不要解释。';
             return { system: sys };
         },
         body_goal_plan_gain: function (prefs) {
