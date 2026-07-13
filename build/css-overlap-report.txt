@@ -268,23 +268,23 @@ mark.ai-hit
     margin-top: 12px | 8px (16-history-hero-calendar.css / 36-responsive.css)
 
 0%
-  files: 16-history-hero-calendar.css, 50-v6-ui.css, 54-v6-ai.css, 58-skeleton.css, 41-m3e-effects.css
-    transform: scale(1) | translate(0, 0) scale(1) | scale(1) rotate(-3deg) | scaleX(0.35) (16-history-hero-calendar.css / 50-v6-ui.css / 50-v6-ui.css / 50-v6-ui.css / 50-v6-ui.css / 41-m3e-effects.css)
+  files: 16-history-hero-calendar.css, 50-v6-ui.css, 51-v6-today.css, 52-v6-workout.css, 54-v6-ai.css, 58-skeleton.css, 41-m3e-effects.css
+    transform: scale(1) | translate(0, 0) scale(1) | scale(1) rotate(-3deg) | scaleX(0.35) | scale(0.96) | scale(0.92) (16-history-hero-calendar.css / 50-v6-ui.css / 50-v6-ui.css / 50-v6-ui.css / 50-v6-ui.css / 51-v6-today.css / 51-v6-today.css / 52-v6-workout.css / 41-m3e-effects.css)
     box-shadow: inset 0 1px 0 rgba(255,255,255,0.72), inset 0 -1px 2px rgba(0,29,54,0.06), 0 10px 28px color-mix(in srgb, var(--md-sys-primary) 16%, transparent) | 0 6px 18px color-mix(in srgb, var(--md-sys-primary) 35%, transparent) | 0 0 0 4px color-mix(in srgb, var(--md-sys-primary) 18%, transparent) | var(--md-sys-elevation-1) (50-v6-ui.css / 50-v6-ui.css / 50-v6-ui.css / 50-v6-ui.css / 54-v6-ai.css)
-    opacity: 0.55 | 0.3 | .35 (50-v6-ui.css / 50-v6-ui.css / 54-v6-ai.css)
+    opacity: 0.55 | 0.3 | 0 | .35 (50-v6-ui.css / 50-v6-ui.css / 51-v6-today.css / 51-v6-today.css / 51-v6-today.css / 52-v6-workout.css / 54-v6-ai.css)
 
 100%
-  files: 16-history-hero-calendar.css, 50-v6-ui.css, 54-v6-ai.css, 58-skeleton.css, 41-m3e-effects.css
-    transform: scale(1) | translate(0, 0) scale(1) | scale(1) rotate(-3deg) | scaleX(0.35) (16-history-hero-calendar.css / 50-v6-ui.css / 50-v6-ui.css / 50-v6-ui.css / 50-v6-ui.css / 41-m3e-effects.css)
+  files: 16-history-hero-calendar.css, 50-v6-ui.css, 51-v6-today.css, 52-v6-workout.css, 54-v6-ai.css, 58-skeleton.css, 41-m3e-effects.css
+    transform: scale(1) | translate(0, 0) scale(1) | scale(1) rotate(-3deg) | scaleX(0.35) | scale(0.96) | scale(0.92) (16-history-hero-calendar.css / 50-v6-ui.css / 50-v6-ui.css / 50-v6-ui.css / 50-v6-ui.css / 51-v6-today.css / 51-v6-today.css / 52-v6-workout.css / 41-m3e-effects.css)
     box-shadow: inset 0 1px 0 rgba(255,255,255,0.72), inset 0 -1px 2px rgba(0,29,54,0.06), 0 10px 28px color-mix(in srgb, var(--md-sys-primary) 16%, transparent) | 0 6px 18px color-mix(in srgb, var(--md-sys-primary) 35%, transparent) | 0 0 0 4px color-mix(in srgb, var(--md-sys-primary) 18%, transparent) | var(--md-sys-elevation-1) (50-v6-ui.css / 50-v6-ui.css / 50-v6-ui.css / 50-v6-ui.css / 54-v6-ai.css)
-    opacity: 0.55 | 0.3 | .35 (50-v6-ui.css / 50-v6-ui.css / 54-v6-ai.css)
+    opacity: 0.55 | 0.3 | 0 | .35 (50-v6-ui.css / 50-v6-ui.css / 51-v6-today.css / 51-v6-today.css / 51-v6-today.css / 52-v6-workout.css / 54-v6-ai.css)
 
 50%
-  files: 16-history-hero-calendar.css, 50-v6-ui.css, 54-v6-ai.css
-    transform: scale(1.03) | translate(8px, -12px) scale(1.08) | scale(1.15) rotate(3deg) | scaleX(0.85) | scale(1.05) (16-history-hero-calendar.css / 50-v6-ui.css / 50-v6-ui.css / 50-v6-ui.css / 50-v6-ui.css)
+  files: 16-history-hero-calendar.css, 50-v6-ui.css, 51-v6-today.css, 52-v6-workout.css, 54-v6-ai.css
+    transform: scale(1.03) | translate(8px, -12px) scale(1.08) | scale(1.15) rotate(3deg) | scaleX(0.85) | scale(1.05) | scale(1) | scale(1.02) (16-history-hero-calendar.css / 50-v6-ui.css / 50-v6-ui.css / 50-v6-ui.css / 50-v6-ui.css / 51-v6-today.css / 51-v6-today.css / 52-v6-workout.css)
     filter: saturate(1.15) drop-shadow(0 6px 18px var(--md-sys-primary-container)) | saturate(1.12) drop-shadow(0 6px 16px color-mix(in srgb, var(--md-sys-primary) 18%, transparent)) (16-history-hero-calendar.css / 50-v6-ui.css)
     box-shadow: inset 0 1px 0 rgba(255,255,255,0.86), inset 0 -1px 2px rgba(0,29,54,0.05), 0 14px 34px color-mix(in srgb, var(--md-sys-primary) 24%, transparent) | 0 8px 28px color-mix(in srgb, var(--md-sys-primary) 55%, transparent) | 0 0 0 9px color-mix(in srgb, var(--md-sys-primary) 6%, transparent) | 0 8px 24px color-mix(in srgb, var(--md-sys-primary) 55%, transparent) | 0 0 0 6px color-mix(in srgb, var(--md-sys-error) 18%, transparent) (50-v6-ui.css / 50-v6-ui.css / 50-v6-ui.css / 50-v6-ui.css / 54-v6-ai.css)
-    opacity: 0.95 | 1 (50-v6-ui.css / 54-v6-ai.css)
+    opacity: 0.95 | 1 (50-v6-ui.css / 51-v6-today.css / 51-v6-today.css / 51-v6-today.css / 52-v6-workout.css / 54-v6-ai.css)
 
 .record-tabs
   files: 17-record-tabs-health.css, 53-v6-records.css, 41-m3e-effects.css
@@ -1169,7 +1169,7 @@ mark.ai-hit
   files: 57-weight-report.css
     animation: none | weight-chart-range-zoom var(--md-sys-motion-duration-medium, 220ms) var(--md-sys-motion-emphasized, cubic-bezier(0.2, 0, 0, 1)) both (57-weight-report.css / 57-weight-report.css)
 
-## DUPLICATES (same selector + same property + same value): 33
+## DUPLICATES (same selector + same property + same value): 35
 .md-top-app-bar
   files: 04-layout-appbar.css, 37-dark-mode.css
     background: transparent (04-layout-appbar.css / 37-dark-mode.css)
@@ -1292,6 +1292,14 @@ mark.ai-hit
 .health-swipe-page
   files: 38-record-page.css, 53-v6-records.css
     min-width: 0 (38-record-page.css / 53-v6-records.css)
+
+.health-swipe-deck.is-swiping .health-swipe-page
+  files: 38-record-page.css, 53-v6-records.css
+    will-change: transform, opacity (38-record-page.css / 53-v6-records.css)
+
+.health-swipe-page:not(.is-active) .md-card
+  files: 38-record-page.css, 53-v6-records.css
+    animation: none !important (38-record-page.css / 53-v6-records.css)
 
 .advice-model-generic
   files: 37-dark-mode.css, 46-advice-ai.css

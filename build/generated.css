@@ -5453,8 +5453,13 @@ body.is-training .fab-pip.active {
     transition:
         transform var(--md-sys-motion-duration-medium) var(--md-sys-motion-emphasized-decelerate),
         opacity var(--md-sys-motion-duration-short) var(--md-sys-motion-emphasized);
-    will-change: transform, opacity;
     padding-bottom: 4px;
+}
+.health-swipe-deck.is-swiping .health-swipe-page {
+    will-change: transform, opacity;
+}
+.health-swipe-page:not(.is-active) .md-card {
+    animation: none !important;
 }
 .health-swipe-page > .md-card:first-child { margin-top: 4px; }
 
@@ -10787,9 +10792,33 @@ body.is-training .fab-pip.active {
     box-shadow:
         inset 0 1px 0 rgba(255,255,255,0.72),
         inset 0 -1px 2px rgba(0,29,54,0.06),
-        0 10px 28px color-mix(in srgb, var(--md-sys-primary) 18%, transparent);
-    animation: glass-breathe 6s var(--md-sys-motion-emphasized) infinite;
+        0 10px 28px color-mix(in srgb, var(--md-sys-primary) 16%, transparent);
     transition: background 0.6s var(--md-sys-motion-emphasized), box-shadow 0.6s var(--md-sys-motion-emphasized);
+}
+.hero-motion-aura {
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    z-index: 0;
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.86),
+        inset 0 -1px 2px rgba(0,29,54,0.05),
+        0 14px 34px color-mix(in srgb, var(--md-sys-primary) 24%, transparent);
+    opacity: 0;
+    animation: hero-aura-breathe 6s var(--md-sys-motion-emphasized) infinite;
+}
+[data-theme-mode="dark"] .hero-motion-aura {
+    box-shadow:
+        inset 0 1px 0 color-mix(in srgb, var(--md-sys-on-surface) 14%, transparent),
+        0 16px 36px rgba(0,0,0,0.42);
+}
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme-mode="light"]) .hero-motion-aura {
+        box-shadow:
+            inset 0 1px 0 color-mix(in srgb, var(--md-sys-on-surface) 14%, transparent),
+            0 16px 36px rgba(0,0,0,0.42);
+    }
 }
 .hero::before {
     content: '';
@@ -10838,8 +10867,20 @@ body.is-training .fab-pip.active {
 [data-theme-mode="dark"] .hero .plan-type-tab { background: color-mix(in srgb, var(--md-sys-surface-container-high) 60%, transparent); color: var(--md-sys-on-surface); }
 [data-theme-mode="dark"] .hero .plan-type-tab.active { background: var(--md-sys-primary); color: var(--md-sys-on-primary); }
 
-.ring { width: 108px; height: 108px; border-radius: 50%; border: 0; padding: 0; position: relative; cursor: pointer; display: grid; place-items: center; background: transparent; transition: transform 0.3s var(--md-sys-motion-spring); -webkit-tap-highlight-color: transparent; animation: ring-breathe 5.4s var(--md-sys-motion-emphasized) infinite; }
-.ring-diet { animation-delay: 0.6s; }
+.ring { width: 108px; height: 108px; border-radius: 50%; border: 0; padding: 0; position: relative; cursor: pointer; display: grid; place-items: center; background: transparent; transition: transform 0.3s var(--md-sys-motion-spring); -webkit-tap-highlight-color: transparent; }
+.ring-motion-aura {
+    position: absolute;
+    inset: -8px;
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 0;
+    background: radial-gradient(circle, color-mix(in srgb, var(--md-sys-primary) 18%, transparent) 0%, transparent 68%);
+    filter: saturate(1.12) drop-shadow(0 6px 16px color-mix(in srgb, var(--md-sys-primary) 18%, transparent));
+    opacity: 0;
+    transform: scale(0.96);
+    animation: ring-aura-breathe 5.4s var(--md-sys-motion-emphasized) infinite;
+}
+.ring-diet .ring-motion-aura { animation-delay: 0.6s; }
 .ring:hover { transform: scale(1.04); }
 .ring:active { transform: scale(0.97); }
 .ring b { font-size: 22px; font-weight: 700; letter-spacing: -0.5px; line-height: 1; color: var(--md-sys-on-primary-container); }
@@ -10931,7 +10972,18 @@ body.is-training .fab-pip.active {
 .tl-item.weight .tl-dot { background: var(--md-sys-secondary-container); color: var(--md-sys-on-secondary-container); }
 .tl-item.diet .tl-dot { background: var(--md-sys-tertiary-container); color: var(--md-sys-on-tertiary-container); }
 .tl-item.training .tl-dot, .tl-item.now .tl-dot { background: var(--md-sys-primary-container); color: var(--md-sys-on-primary-container); }
-.tl-item.now .tl-dot { background: var(--md-sys-primary); color: var(--md-sys-on-primary); animation: pulse 2s ease-in-out infinite; }
+.tl-item.now .tl-dot { background: var(--md-sys-primary); color: var(--md-sys-on-primary); position: relative; box-shadow: 0 0 0 4px color-mix(in srgb, var(--md-sys-primary) 18%, transparent); }
+.tl-item.now .tl-dot::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    pointer-events: none;
+    box-shadow: 0 0 0 9px color-mix(in srgb, var(--md-sys-primary) 6%, transparent);
+    opacity: 0;
+    transform: scale(0.92);
+    animation: tl-dot-aura-pulse 2s ease-in-out infinite;
+}
 .tl-item.warn .tl-dot { background: var(--md-sys-amber-container, #fff3e0); color: var(--md-sys-on-amber-container, #e65100); }
 .tl-item.exercise .tl-dot { background: var(--md-sys-amber-container, #fff3e0); color: var(--md-sys-on-amber-container, #e65100); }
 .tl-item.plan .tl-dot { background: color-mix(in srgb, #22c55e 20%, var(--md-sys-surface-container-lowest)); color: #22c55e; }
@@ -10951,6 +11003,20 @@ body.is-training .fab-pip.active {
     margin-top: 12px;
 }
 
+
+@keyframes hero-aura-breathe {
+    0%, 100% { opacity: 0; }
+    50% { opacity: 1; }
+}
+@keyframes ring-aura-breathe {
+    0%, 100% { opacity: 0; transform: scale(0.96); }
+    50% { opacity: 1; transform: scale(1); }
+}
+@keyframes tl-dot-aura-pulse {
+    0%, 100% { opacity: 0; transform: scale(0.92); }
+    50% { opacity: 1; transform: scale(1); }
+}
+
 @media (max-width: 380px) {
     .ring { width: 96px; height: 96px; }
     .ring-divider { height: 52px; }
@@ -10968,6 +11034,8 @@ body.is-training .fab-pip.active {
     color: var(--md-sys-on-primary);
     position: relative;
     overflow: hidden;
+    isolation: isolate;
+    contain: paint;
     box-shadow: 0 12px 32px color-mix(in srgb, var(--md-sys-primary) 35%, transparent);
     transition: background 0.6s var(--md-sys-motion-emphasized);
 }
@@ -10992,7 +11060,7 @@ body.is-training .fab-pip.active {
 .timer-panel .timer-wakelock-btn {
     right: 10px;
 }
-.timer-panel::before, .timer-panel::after { content: ''; position: absolute; border-radius: 50%; pointer-events: none; }
+.timer-panel::before, .timer-panel::after { content: ''; position: absolute; border-radius: 50%; pointer-events: none; will-change: transform; transform: translateZ(0); backface-visibility: hidden; }
 .timer-panel::before { width: 120px; height: 120px; background: color-mix(in srgb, var(--md-sys-on-primary) 8%, transparent); top: -30px; right: -20px; animation: orb 8s ease-in-out infinite; }
 .timer-panel::after { width: 80px; height: 80px; background: color-mix(in srgb, var(--md-sys-on-primary) 6%, transparent); bottom: -20px; left: 20px; animation: orb 10s ease-in-out infinite reverse; }
 .status-text,
@@ -11027,9 +11095,53 @@ body.is-training .fab-pip.active {
 .workout-controls { display: inline-flex; justify-content: center; align-items: center; gap: 14px; margin: 12px auto; padding: 10px 16px; border-radius: 999px; background: var(--glass-bg); backdrop-filter: blur(18px) saturate(1.45); -webkit-backdrop-filter: blur(18px) saturate(1.45); border: 1px solid var(--glass-border); box-shadow: var(--glass-shadow-inset); }
 .md-fab { width: 56px; height: 56px; border-radius: 50%; border: none; background: var(--glass-bg); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); border: 1px solid var(--glass-border); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: var(--md-sys-elevation-2); transition: transform 0.2s var(--md-sys-motion-spring); -webkit-tap-highlight-color: transparent; }
 .md-fab:active { transform: scale(0.94); }
-.fab-play { width: auto; min-width: 132px; height: 56px; border-radius: 28px; background: var(--md-sys-primary); color: var(--md-sys-on-primary); gap: 6px; padding-inline: 18px; font-size: 13px; font-weight: 600; animation: fab-glow 2.5s ease-in-out infinite; }
+.fab-play-shell {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    width: auto;
+    --fab-play-shell-min-width: 132px;
+    min-width: var(--fab-play-shell-min-width);
+    height: 56px;
+}
+.fab-play-aura {
+    position: absolute;
+    inset: 0;
+    border-radius: 28px;
+    pointer-events: none;
+    z-index: 0;
+    box-shadow: 0 8px 28px color-mix(in srgb, var(--md-sys-primary) 55%, transparent);
+    opacity: 0;
+    animation: fab-aura-glow 2.5s ease-in-out infinite;
+}
+.fab-play-shell > .fab-play {
+    position: relative;
+    z-index: 1;
+}
+.fab-play { width: auto; min-width: 132px; height: 56px; border-radius: 28px; background: var(--md-sys-primary); color: var(--md-sys-on-primary); gap: 6px; padding-inline: 18px; font-size: 13px; font-weight: 600; box-shadow: 0 6px 18px color-mix(in srgb, var(--md-sys-primary) 35%, transparent); }
 .fab-play .material-symbols-rounded { flex: none; }
 .fab-play .fab-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+body.is-training .fab-play-shell {
+    width: 56px;
+    min-width: 56px;
+    height: 56px;
+}
+body.is-training .fab-play-aura {
+    border-radius: 28px;
+}
+body.is-paused .fab-play-shell {
+    width: 72px;
+    min-width: 72px;
+}
+body.is-paused .fab-play-aura {
+    border-radius: 18px 30px 18px 30px;
+}
+@keyframes fab-aura-glow {
+    0%, 100% { opacity: 0; transform: scale(1); }
+    50% { opacity: 1; transform: scale(1.02); }
+}
 
 .workout-plan-toolbar,
 .strength-presets {
@@ -11045,6 +11157,7 @@ body.is-training .fab-pip.active {
     .mode-tab .material-symbols-rounded { font-size: 16px; }
     .workout-controls { gap: 10px; padding-inline: 12px; }
     .fab-play { min-width: 116px; padding-inline: 12px; }
+    .workout-controls .fab-play-shell { --fab-play-shell-min-width: 116px; }
 }
 
 }
@@ -11103,6 +11216,12 @@ body.is-training .fab-pip.active {
 .library-swipe-page {
     min-width: 0;
     max-width: 100%;
+}
+.health-swipe-page:not(.is-active) .md-card {
+    animation: none !important;
+}
+.health-swipe-deck.is-swiping .health-swipe-page {
+    will-change: transform, opacity;
 }
 
 .health-swipe-page[data-health-page="training"] .health-profile-card {
@@ -11702,11 +11821,32 @@ body.is-training .fab-pip.active {
 @layer components {
 /* --- V6 Bottom Navigation Rail --- */
 
-.md-nav-rail { background: color-mix(in srgb, var(--md-sys-surface-container) 80%, transparent); backdrop-filter: blur(24px) saturate(180%); -webkit-backdrop-filter: blur(24px) saturate(180%); border-top: 1px solid color-mix(in srgb, var(--md-sys-surface-container-lowest) 50%, transparent); box-shadow: 0 -1px 0 var(--md-sys-outline-variant); }
-[data-theme-mode="dark"] .md-nav-rail { background: color-mix(in srgb, var(--md-sys-surface-container-high) 85%, transparent); }
-.nav-item .nav-content > .material-symbols-rounded { transition: transform 350ms var(--md-sys-motion-spring), font-variation-settings 350ms var(--md-sys-motion-emphasized); }
-.nav-item.active .nav-content > .material-symbols-rounded { transform: translateY(-1px) scale(1.08); width: 54px; border-radius: 18px; background: var(--md-sys-primary-container); }
-.nav-item.active .nav-content small { font-weight: 700; color: var(--md-sys-on-secondary-container); }
+.md-nav-rail {
+    background: color-mix(in srgb, var(--md-sys-surface-container) 80%, transparent);
+    backdrop-filter: blur(24px) saturate(180%);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    border-top: 1px solid color-mix(in srgb, var(--md-sys-surface-container-lowest) 50%, transparent);
+    box-shadow: 0 -1px 0 var(--md-sys-outline-variant);
+    isolation: isolate;
+    contain: paint;
+    backface-visibility: hidden;
+}
+[data-theme-mode="dark"] .md-nav-rail {
+    background: color-mix(in srgb, var(--md-sys-surface-container-high) 85%, transparent);
+}
+.nav-item .nav-content > .material-symbols-rounded {
+    transition: transform 350ms var(--md-sys-motion-spring), font-variation-settings 350ms var(--md-sys-motion-emphasized);
+}
+.nav-item.active .nav-content > .material-symbols-rounded {
+    transform: translateY(-1px) scale(1.08);
+    width: 54px;
+    border-radius: 18px;
+    background: var(--md-sys-primary-container);
+}
+.nav-item.active .nav-content small {
+    font-weight: 700;
+    color: var(--md-sys-on-secondary-container);
+}
 
 }
 @layer components {

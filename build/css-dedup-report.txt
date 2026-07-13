@@ -163,7 +163,13 @@
 .health-swipe-deck
   38-record-page.css, 53-v6-records.css
 
+.health-swipe-deck.is-swiping .health-swipe-page
+  38-record-page.css, 53-v6-records.css
+
 .health-swipe-page
+  38-record-page.css, 53-v6-records.css
+
+.health-swipe-page:not(.is-active) .md-card
   38-record-page.css, 53-v6-records.css
 
 .hero
@@ -554,13 +560,13 @@
   09-workout-timer.css, 37-dark-mode.css
 
 0%
-  16-history-hero-calendar.css, 50-v6-ui.css, 54-v6-ai.css, 58-skeleton.css, 41-m3e-effects.css
+  16-history-hero-calendar.css, 50-v6-ui.css, 51-v6-today.css, 52-v6-workout.css, 54-v6-ai.css, 58-skeleton.css, 41-m3e-effects.css
 
 100%
-  16-history-hero-calendar.css, 50-v6-ui.css, 54-v6-ai.css, 58-skeleton.css, 41-m3e-effects.css
+  16-history-hero-calendar.css, 50-v6-ui.css, 51-v6-today.css, 52-v6-workout.css, 54-v6-ai.css, 58-skeleton.css, 41-m3e-effects.css
 
 50%
-  16-history-hero-calendar.css, 50-v6-ui.css, 54-v6-ai.css
+  16-history-hero-calendar.css, 50-v6-ui.css, 51-v6-today.css, 52-v6-workout.css, 54-v6-ai.css
 
 body
   02-base.css, 06-layout-page.css, 37-dark-mode.css
