@@ -8,7 +8,6 @@
     box-shadow: 0 -1px 0 var(--md-sys-outline-variant);
     isolation: isolate;
     contain: paint;
-    transform: translateZ(0);
     backface-visibility: hidden;
 }
 [data-theme-mode="dark"] .md-nav-rail {

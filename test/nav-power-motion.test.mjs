@@ -8,7 +8,8 @@ test('nav keeps blur and gains compositor isolation', () => {
   assert.match(css, /backdrop-filter:\s*blur\(24px\)\s+saturate\(180%\)/);
   assert.match(css, /-webkit-backdrop-filter:\s*blur\(24px\)\s+saturate\(180%\)/);
   assert.match(css, /isolation:\s*isolate/);
-  assert.match(css, /contain:\s*paint|transform:\s*translateZ\(0\)/);
+  assert.match(css, /contain:\s*paint/);
+  assert.doesNotMatch(css, /transform:\s*translateZ\(0\)/);
 });
 
 test('nav transitions stay narrow and continuous paint animations stay banned', () => {
