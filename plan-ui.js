@@ -89,6 +89,7 @@
             const prefs = this.ensurePlanPrefs?.() || {};
             const weeklySummary = window.planWeekly?.summary?.() || { done: 0, total: 0 };
             return `<div class="hero">
+                <span class="hero-motion-aura" aria-hidden="true"></span>
                 <div class="hero-head">
                     <div>
                         <div class="hero-label">今日概览</div>
@@ -104,6 +105,7 @@
                     ${this.renderPlanIntakeRing?.() || ''}
                     <span class="ring-divider"></span>
                     <button class="ring ring-train ${plan ? planStatusClass(plan.type) : 'is-empty'}" style="--plan-progress:${percent * 3.6}deg" type="button" onclick="${plan ? `data.openPlanTaskDrawer('${plan.id}')` : 'data.openNewPlanSheet()'}">
+                        <span class="ring-motion-aura" aria-hidden="true"></span>
                         <div>
                             <b>${aggregate.total ? `${aggregate.done}/${aggregate.total}` : '+'}</b>
                             <small>训练</small>
@@ -229,8 +231,8 @@
                 carb: 120 + Math.min(120, this.ratio(macros.carb, goals.carb) * 1.2),
                 fat: 240 + Math.min(120, this.ratio(macros.fat, goals.fat) * 1.2)
             };
-            if (!goalCal) return '<div class="ring ring-diet"><div><b>--</b><small>饮食</small></div></div>';
-            return `<div class="ring ring-diet" style="--progress:${ringProgress};--pro-stop:${macroStops.pro}deg;--carb-stop:${macroStops.carb}deg;--fat-stop:${macroStops.fat}deg"><div><b>${displayPercent}%</b><small>饮食</small><em>${intake}/${goalCal}</em></div></div>`;
+            if (!goalCal) return '<div class="ring ring-diet"><span class="ring-motion-aura" aria-hidden="true"></span><div><b>--</b><small>饮食</small></div></div>';
+            return `<div class="ring ring-diet" style="--progress:${ringProgress};--pro-stop:${macroStops.pro}deg;--carb-stop:${macroStops.carb}deg;--fat-stop:${macroStops.fat}deg"><span class="ring-motion-aura" aria-hidden="true"></span><div><b>${displayPercent}%</b><small>饮食</small><em>${intake}/${goalCal}</em></div></div>`;
         },
 
         selectTodayPlan(planId) {
