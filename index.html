@@ -118,7 +118,10 @@
             <div class="workout-controls" aria-label="&#35757;&#32451;&#25511;&#21046;">
                 <button class="md-fab fab-stop hidden" id="stopBtn" onclick="workout.stop()" aria-label="&#32467;&#26463;&#35757;&#32451;" aria-keyshortcuts="Escape"><span class="material-symbols-rounded">stop</span></button>
                 <button class="md-fab fab-prev hidden" id="prevBtn" onclick="workout.prevAction?.()" aria-label="&#22238;&#21040;&#19978;&#19968;&#38454;&#27573;" aria-keyshortcuts="ArrowLeft"><span class="material-symbols-rounded">restart_alt</span></button>
-                <button class="md-fab fab-play" id="playBtn" onclick="workout.toggle()" aria-label="&#24320;&#22987;&#25110;&#26242;&#20572;&#24403;&#21069;&#35745;&#26102;" aria-keyshortcuts="Space"><span class="material-symbols-rounded" id="playIcon">play_arrow</span><span class="fab-label">&#24320;&#22987;&#35757;&#32451;</span></button>
+                <span class="fab-play-shell">
+                    <span class="fab-play-aura" aria-hidden="true"></span>
+                    <button class="md-fab fab-play" id="playBtn" onclick="workout.toggle()" aria-label="&#24320;&#22987;&#25110;&#26242;&#20572;&#24403;&#21069;&#35745;&#26102;" aria-keyshortcuts="Space"><span class="material-symbols-rounded" id="playIcon">play_arrow</span><span class="fab-label">&#24320;&#22987;&#35757;&#32451;</span></button>
+                </span>
                 <button class="md-fab fab-pip" id="pipBtn" onclick="workout.togglePip()" aria-label="&#25171;&#24320;&#30011;&#20013;&#30011;"><span class="material-symbols-rounded" id="pipIcon">picture_in_picture_alt</span></button>
             </div>
             <div class="md-card cardio-card hidden">
