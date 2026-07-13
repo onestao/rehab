@@ -521,8 +521,9 @@
                     return `<div class="md-card" style="padding:16px"><strong>${view} 面板加载失败</strong><p style="margin-top:8px;color:var(--md-sys-on-surface-variant);font-size:12px">请下拉刷新页面，或在控制台查看 [render] 错误日志</p></div>`;
                 }
             };
+            const activeView = this.healthView || this.healthViewOrder()[0];
             return `<div id="healthSwipeDeck" class="health-swipe-deck" onscroll="data.onHealthDeckScroll(this)">
-            ${this.healthViewOrder().map(view => `<section class="health-swipe-page" data-health-page="${view}">${renderOne(view)}</section>`).join('')}
+            ${this.healthViewOrder().map(view => `<section class="health-swipe-page${view === activeView ? ' is-active' : ''}" data-health-page="${view}" data-health-active="${view === activeView ? 'true' : 'false'}">${renderOne(view)}</section>`).join('')}
         </div>`;
         },
 
@@ -545,6 +546,7 @@
             this.ensureHealthViewCss(view);
             this.syncHealthSubtabNav(view);
             this.updateHealthTabActive();
+            this.syncHealthSwipeActive(view);
             const deck = document.getElementById('healthSwipeDeck');
             if (!deck) {
                 this.renderRecordsPage();
@@ -587,18 +589,23 @@
 
         onHealthDeckScroll(deck) {
             this.updateHealthSwipeEffects(deck);
+            deck.classList.add('is-swiping');
             clearTimeout(this._healthDeckScrollTimer);
             this._healthDeckScrollTimer = setTimeout(() => {
+                deck.classList.remove('is-swiping');
                 const order = this.healthViewOrder();
                 const index = Math.max(0, Math.min(order.length - 1, Math.round(deck.scrollLeft / deck.clientWidth)));
                 const nextView = order[index];
-                if (!nextView || nextView === this.healthView) return;
-                this.healthView = nextView;
-                this.ensureHealthViewCss(nextView);
-                this.syncHealthSubtabNav(nextView);
-                this.updateHealthTabActive();
-                if (nextView === 'diet') requestAnimationFrame(() => this.autoResizeDietInput?.());
-                window.appRoute?.syncFromState?.();
+                if (!nextView) return;
+                if (nextView !== this.healthView) {
+                    this.healthView = nextView;
+                    this.ensureHealthViewCss(nextView);
+                    this.syncHealthSubtabNav(nextView);
+                    this.updateHealthTabActive();
+                    if (nextView === 'diet') requestAnimationFrame(() => this.autoResizeDietInput?.());
+                    window.appRoute?.syncFromState?.();
+                }
+                this.syncHealthSwipeActive(nextView);
             }, 80);
         },
 
@@ -619,6 +626,18 @@
                 const translateY = distance * 4;
                 page.style.transform = `scale(${scale}) translateY(${translateY}px)`;
                 page.style.opacity = String(opacity);
+            });
+        },
+
+
+        syncHealthSwipeActive(view = this.healthView) {
+            const deck = document.getElementById('healthSwipeDeck');
+            if (!deck) return;
+            const active = view || this.healthViewOrder()[0];
+            deck.querySelectorAll('.health-swipe-page').forEach((page) => {
+                const isActive = page.dataset.healthPage === active;
+                page.classList.toggle('is-active', isActive);
+                page.dataset.healthActive = isActive ? 'true' : 'false';
             });
         },
 

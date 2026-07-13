@@ -124,8 +124,13 @@
     transition:
         transform var(--md-sys-motion-duration-medium) var(--md-sys-motion-emphasized-decelerate),
         opacity var(--md-sys-motion-duration-short) var(--md-sys-motion-emphasized);
-    will-change: transform, opacity;
     padding-bottom: 4px;
+}
+.health-swipe-deck.is-swiping .health-swipe-page {
+    will-change: transform, opacity;
+}
+.health-swipe-page:not(.is-active) .md-card {
+    animation: none !important;
 }
 .health-swipe-page > .md-card:first-child { margin-top: 4px; }
 

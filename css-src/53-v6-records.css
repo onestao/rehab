@@ -53,6 +53,12 @@
     min-width: 0;
     max-width: 100%;
 }
+.health-swipe-page:not(.is-active) .md-card {
+    animation: none !important;
+}
+.health-swipe-deck.is-swiping .health-swipe-page {
+    will-change: transform, opacity;
+}
 
 .health-swipe-page[data-health-page="training"] .health-profile-card {
     display: block;
