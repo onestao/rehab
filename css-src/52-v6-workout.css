@@ -76,7 +76,8 @@
     justify-content: center;
     flex: none;
     width: auto;
-    min-width: 132px;
+    --fab-play-shell-min-width: 132px;
+    min-width: var(--fab-play-shell-min-width);
     height: 56px;
 }
 .fab-play-aura {
@@ -129,6 +130,6 @@ body.is-paused .fab-play-aura {
     .mode-tab { font-size: 11px; gap: 2px; }
     .mode-tab .material-symbols-rounded { font-size: 16px; }
     .workout-controls { gap: 10px; padding-inline: 12px; }
-    .fab-play-shell { min-width: 116px; }
     .fab-play { min-width: 116px; padding-inline: 12px; }
+    .workout-controls .fab-play-shell { --fab-play-shell-min-width: 116px; }
 }
