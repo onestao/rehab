@@ -27,6 +27,13 @@
         return ctx._adviceAttachmentPreviewUrls;
     }
 
+    function payloadRegistry(ctx) {
+        ctx._adviceAttachmentPayloads = ctx._adviceAttachmentPayloads instanceof Map
+            ? ctx._adviceAttachmentPayloads
+            : new Map();
+        return ctx._adviceAttachmentPayloads;
+    }
+
     function fmt(bytes = 0) {
         const n = Math.max(0, Number(bytes) || 0);
         return n < 1024 ? `${n} B` : n < 1048576 ? `${(n / 1024).toFixed(n < 10240 ? 1 : 0)} KB` : `${(n / 1048576).toFixed(n < 10485760 ? 1 : 0)} MB`;
@@ -281,6 +288,30 @@
             this.refreshAdviceAttachmentUi?.();
         },
 
+        registerAdviceAttachmentPayload(id = '', attachments = []) {
+            const key = String(id || '').trim();
+            if (!key) return null;
+            const retained = (Array.isArray(attachments) ? attachments : []).filter(att => att?.kind === 'image' && att.file);
+            if (!retained.length) return null;
+            const payload = Object.freeze({ attachments: Object.freeze(retained.slice()) });
+            payloadRegistry(this).set(key, payload);
+            return payload;
+        },
+
+        getAdviceAttachmentPayload(id = '') {
+            const key = String(id || '').trim();
+            return key ? (payloadRegistry(this).get(key) || null) : null;
+        },
+
+        releaseAdviceAttachmentPayload(id = '') {
+            const key = String(id || '').trim();
+            return key ? payloadRegistry(this).delete(key) : false;
+        },
+
+        releaseAdviceAttachmentPayloads() {
+            payloadRegistry(this).clear();
+        },
+
         adviceAttachmentMetadata(attachments = getAttachmentList(this)) {
             return attachments.map(att => ({
                 id: att.id,
@@ -290,7 +321,6 @@
                 name: att.name,
                 mime: att.mime,
                 size: att.size,
-                thumb: att.kind === 'image' ? (att.thumb || '') : '',
                 readable: !!att.readable,
                 status: att.status,
                 truncated: !!att.truncated,
@@ -376,4 +406,5 @@
     };
 
     window.adviceAttachments = adviceAttachments;
+    window.addEventListener?.('pagehide', () => window.data?.releaseAdviceAttachmentPayloads?.());
 })();

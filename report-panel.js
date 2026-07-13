@@ -175,7 +175,9 @@
                     ai.prompt_id = kind === 'monthly' ? 'monthly_report' : 'weekly_report';
                 } catch (err) {
                     const message = String(err?.message || err || 'AI 复盘失败');
-                    const action = err?.aiFallback?.target ? { timeout: 6000, action: '使用备用模型重试', onAction: () => this.generateReport(kind, metricAnchor, { useAi: true, routeOverride: err.aiFallback.target }) } : 4000;
+                    const target = window.aiRoutingPure?.manualFallbackTarget?.(err?.aiFallback?.target);
+                    let retryPromise;
+                    const action = target ? { timeout: 6000, action: '使用备用模型重试', onAction: () => retryPromise ||= this.generateReport(kind, metricAnchor, { useAi: true, routeOverride: target }) } : 4000;
                     window.toast?.show?.(message, 'error', action);
                     return;
                 }

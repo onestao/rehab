@@ -37,6 +37,8 @@ test('AI coach picker binds live pointer tracking and a sliding scope indicator'
     assert.match(source, /advice-model-picker-content/);
     assert.match(source, /data-advice-model-swipe/);
     assert.match(source, /model-picker-tab-indicator/);
+    assert.match(source, /model-picker-track/);
+    assert.match(source, /ADVICE_MODEL_SCOPES\.map\(renderPage\)/);
     assert.match(source, /pointermove/);
     assert.match(source, /--model-picker-drag-x/);
     assert.match(source, /--model-picker-tab-progress/);
@@ -47,5 +49,6 @@ test('AI coach picker owns one vertical scroller while its page follows horizont
     assert.match(css, /\.advice-model-picker-content\s*\{[^}]*overflow-y:\s*auto/s);
     assert.match(css, /\.model-picker-swipe-region\s*\{[^}]*touch-action:\s*pan-y/s);
     assert.match(css, /\.model-picker-page\s*\{[^}]*translate3d\(var\(--model-picker-drag-x/s);
+    assert.match(css, /\.model-picker-track\s*\{[^}]*translate3d\(calc\(var\(--model-picker-scope-index/s);
     assert.match(css, /\.model-picker-swipe-region\.is-dragging \.model-picker-page\s*\{[^}]*transition:\s*none/s);
 });

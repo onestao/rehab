@@ -60,22 +60,41 @@
         return withoutVendor.length > 18 ? `${withoutVendor.slice(0, 16)}\u2026` : withoutVendor;
     }
 
-    function connectionMark(model) {
-        const name = text(model?.profileName || model?.connectionName || model?.provider || 'AI').trim() || 'AI';
-        let hue = 0;
-        for (let index = 0; index < name.length; index += 1) hue = (hue * 31 + name.charCodeAt(index)) % 360;
-        const mark = el('span', 'ai-model-connection-mark', name.slice(0, 1).toUpperCase());
-        mark.style.setProperty('--ai-model-connection-hue', String(hue));
-        mark.setAttribute('aria-hidden', 'true');
-        return mark;
+    function resolveModelVisual(model) {
+        return root.aiModelVisual.resolve({ modelId: modelId(model) || model?.displayName, provider: model?.provider || model?.profileName || model?.connectionName, iconKey: model?.iconKey || model?.vendor, local: true });
+    }
+
+    function modelVisualNode(model, visual = resolveModelVisual(model)) {
+        const slot = el('span', 'ai-model-connection-mark');
+        slot.setAttribute('aria-hidden', 'true');
+        if (visual.theme?.markBg) slot.style.setProperty('--ai-model-mark-bg', visual.theme.markBg);
+        if (!visual.iconSrcs?.length) { slot.textContent = visual.mark || 'AI'; return slot; }
+        const image = document.createElement('img');
+        image.className = 'ai-model-visual-icon';
+        image.alt = '';
+        let index = 0;
+        image.addEventListener('error', () => {
+            index += 1;
+            if (index < visual.iconSrcs.length) image.src = visual.iconSrcs[index];
+            else image.replaceWith(document.createTextNode(visual.mark || 'AI'));
+        });
+        image.src = visual.iconSrcs[0];
+        slot.append(image);
+        return slot;
     }
 
     function readJson(key, fallback) {
         try { return JSON.parse(localStorage.getItem(key) || '') || fallback; } catch (_) { return fallback; }
     }
 
+    function preferredModelKeys(storageKey, taskId, limit) {
+        const stored = readJson(storageKey, taskId ? {} : []);
+        const values = taskId && stored && typeof stored === 'object' && !Array.isArray(stored) ? stored[taskId] : stored;
+        return [...new Set(Array.isArray(values) ? values.filter(value => typeof value === 'string' && /^[^:]+::[^:]+$/.test(value)) : [])].slice(0, limit);
+    }
+
     function favoriteKeys() {
-        return new Set(readJson(FAVORITES_KEY, []));
+        return new Set(preferredModelKeys(FAVORITES_KEY, '', 100));
     }
 
     function toggleFavorite(model) {
@@ -86,10 +105,17 @@
     }
 
     function rememberRecent(taskId, model) {
-        const all = readJson(RECENTS_KEY, {});
+        const task = typeof taskId === 'string' ? taskId.trim() : '';
         const key = modelKey(model);
-        all[taskId] = [key, ...(all[taskId] || []).filter(item => item !== key)].slice(0, 3);
+        if (!task || !/^[^:]+::[^:]+$/.test(key)) return;
+        const stored = readJson(RECENTS_KEY, {});
+        const all = stored && typeof stored === 'object' && !Array.isArray(stored) ? stored : {};
+        all[task] = [key, ...preferredModelKeys(RECENTS_KEY, task, 3).filter(item => item !== key)].slice(0, 3);
         try { localStorage.setItem(RECENTS_KEY, JSON.stringify(all)); } catch (_) { /* storage may be unavailable */ }
+    }
+
+    function recentKeysForTask(taskId) {
+        return typeof taskId === 'string' ? preferredModelKeys(RECENTS_KEY, taskId.trim(), 3) : [];
     }
 
     function routePrimary(route) {
@@ -106,6 +132,13 @@
             profileId: modelProfileId(model),
             modelId: modelId(model)
         };
+    }
+
+    function modelCapabilityMeta(model) {
+        const state = text(model?.capabilityState?.status || model?.capabilityState).trim().toLowerCase();
+        if (state === 'compatible') return { state, label: '\u80fd\u529b\u517c\u5bb9', description: '\u5df2\u786e\u8ba4\u6ee1\u8db3\u6b64\u529f\u80fd\u6240\u9700\u80fd\u529b' };
+        if (state === 'incompatible') return { state, label: '\u80fd\u529b\u4e0d\u517c\u5bb9', description: '\u672a\u786e\u8ba4\u6ee1\u8db3\u6b64\u529f\u80fd\u6240\u9700\u80fd\u529b\uff0c\u4ecd\u53ef\u7ee7\u7eed\u9009\u62e9' };
+        return { state: 'unknown', label: '\u80fd\u529b\u672a\u77e5', description: '\u5c1a\u672a\u9a8c\u8bc1\u662f\u5426\u6ee1\u8db3\u6b64\u529f\u80fd\u6240\u9700\u80fd\u529b\uff0c\u4ecd\u53ef\u9009\u62e9' };
     }
 
     function el(tag, className, content) {
@@ -168,17 +201,40 @@
         modal.querySelector('[data-modal-close]')?.focus();
     }
 
+    function openIncompatibleModelConfirmation(model, onConfirm) {
+        const capability = modelCapabilityMeta(model);
+        openQuickSheet('\u786e\u8ba4\u4f7f\u7528\u4e0d\u517c\u5bb9\u6a21\u578b', body => {
+            const notice = el('div', 'ai-task-model-capability-notice');
+            notice.append(el('strong', '', capability.label), el('p', '', `${modelOptionLabel(model)}\uff1a${capability.description}`));
+            const actions = el('div', 'ai-task-compatibility-actions');
+            const cancel = el('button', 'md-btn ai-task-compatibility-cancel', '\u53d6\u6d88');
+            const confirm = el('button', 'md-btn md-btn-filled ai-task-compatibility-confirm', '\u4ecd\u7136\u4f7f\u7528');
+            let confirming = false;
+            cancel.type = 'button';
+            confirm.type = 'button';
+            cancel.addEventListener('click', closeQuickSheet);
+            confirm.addEventListener('click', () => {
+                if (confirming) return;
+                confirming = true;
+                confirm.disabled = true;
+                onConfirm();
+            });
+            actions.append(cancel, confirm);
+            body.append(notice, actions);
+        });
+    }
+
     function createCompactModelControl(taskId, models, route, save) {
         const selected = selectedModel(models, route);
         const selectedKey = selected ? modelKey(selected) : '';
         const unavailable = Boolean(selectedKey) && !models.some(model => modelKey(model) === selectedKey);
         const button = el('button', `ai-compact-model ${unavailable ? 'is-unavailable' : ''}`);
         button.type = 'button';
-        button.append(connectionMark(selected), el('span', 'ai-compact-model-name', unavailable ? `${modelShortName(selected)} · 已失效` : modelShortName(selected)), icon('expand_more'));
+        button.append(modelVisualNode(selected), el('span', 'ai-compact-model-name', unavailable ? `${modelShortName(selected)} · 已失效` : modelShortName(selected)), icon('expand_more'));
         button.setAttribute('aria-label', `\u9009\u62e9\u6a21\u578b\uff1a${modelOptionLabel(selected)}`);
         button.addEventListener('click', () => openQuickSheet('\u9009\u62e9\u6a21\u578b', body => {
             const favorites = favoriteKeys();
-            const recentKeys = readJson(RECENTS_KEY, {})[taskId] || [];
+            const recentKeys = recentKeysForTask(taskId);
             const ordered = [...models];
             if (ordered.length > 8) {
                 const searchToggle = el('button', 'ai-task-model-search-toggle');
@@ -209,15 +265,34 @@
                 row.dataset.search = modelOptionLabel(model);
                 const choose = el('button', 'ai-task-model-main');
                 choose.type = 'button';
-                choose.append(connectionMark(model));
+                choose.append(modelVisualNode(model));
                 const labels = el('span', 'ai-task-model-labels');
                 labels.append(el('strong', '', text(model?.displayName || modelId(model))), el('small', '', text(model?.profileName || model?.connectionName || model?.provider)));
                 choose.append(labels);
+                const capability = modelCapabilityMeta(model);
+                const capabilityLabel = el('span', `ai-task-model-capability is-${capability.state}`, capability.label);
+                capabilityLabel.title = capability.description;
+                choose.dataset.capabilityState = capability.state;
+                choose.setAttribute('aria-label', `\u9009\u62e9\u6a21\u578b\uff1a${modelOptionLabel(model)}\uff1b${capability.label}\uff0c${capability.description}`);
+                choose.append(capabilityLabel);
                 if (modelKey(model) === modelKey(selected)) choose.append(icon('check'));
+                let selectionPromise = null;
+                const selectModel = () => {
+                    if (selectionPromise) return selectionPromise;
+                    choose.disabled = true;
+                    selectionPromise = Promise.resolve(save({ ...route, primary: modelRef(model) })).then(() => {
+                        rememberRecent(taskId, model);
+                        closeQuickSheet();
+                        root.toast?.show?.(`\u5df2\u5207\u6362\u81f3 ${modelShortName(model)}`, 'success');
+                    }).finally(() => {
+                        choose.disabled = false;
+                        selectionPromise = null;
+                    });
+                    return selectionPromise;
+                };
                 choose.addEventListener('click', () => {
-                    rememberRecent(taskId, model);
-                    closeQuickSheet();
-                    save({ ...route, primary: modelRef(model) });
+                    if (capability.state === 'incompatible') return openIncompatibleModelConfirmation(model, selectModel);
+                    return selectModel();
                 });
                 const isFavorite = favorites.has(modelKey(model));
                 const star = el('button', `model-picker-star ${isFavorite ? 'active' : ''}`);
@@ -368,6 +443,7 @@
         } catch (error) {
             row.classList.remove('is-saving');
             setStatus(error?.message || '\u4fdd\u5b58\u529f\u80fd\u6a21\u578b\u5931\u8d25', true);
+            throw error;
         }
     }
 
@@ -407,16 +483,15 @@
         if (!container || !taskId) return;
         const key = text(taskId).trim();
         if (!options.force && !shouldMountInlinePicker(container, key)) return;
-        container.dataset.aiTaskPickerMountingFor = key;
-        delete container.dataset.aiTaskPickerMountedFor;
-        container.replaceChildren(el('div', 'ai-task-settings-empty', '\u6b63\u5728\u52a0\u8f7d\u6a21\u578b\u2026'));
         try {
-            const [definitions, route, models] = await Promise.all([
-                callAi(['getTaskDefinitions']),
+            const definition = normalizeTaskDefinitions(await callAi(['getTaskDefinitions'])).find(item => item.id === key);
+            if (!definition || definition.localPicker === false) return;
+            container.dataset.aiTaskPickerMountingFor = key;
+            delete container.dataset.aiTaskPickerMountedFor;
+            const [route, models] = await Promise.all([
                 callAi(['getTaskRoute'], taskId),
                 callAi(['listSelectableModels'], taskId)
             ]);
-            const definition = normalizeTaskDefinitions(definitions).find(item => item.id === taskId) || { id: taskId, label: taskId };
             const shell = el('div', 'ai-task-inline-picker');
             const title = el('div', 'ai-task-inline-title');
             title.append(icon('tune'), el('strong', '', `${definition.label} \u6a21\u578b`));
@@ -429,6 +504,7 @@
                 } catch (error) {
                     shell.classList.remove('is-saving');
                     setStatus(error?.message || '\u4fdd\u5b58\u529f\u80fd\u6a21\u578b\u5931\u8d25', true);
+                    throw error;
                 }
             };
             const quick = el('div', 'ai-task-quick-controls');
@@ -493,8 +569,17 @@
             })));
             if (version !== renderVersion) return;
             const fragment = document.createDocumentFragment();
+            const groups = new Map();
             for (const entry of entries) {
-                fragment.append(createTaskRow(entry.definition, entry.route, Array.isArray(entry.models) ? entry.models : []));
+                const name = text(entry.definition.group).trim() || '\u5176\u4ed6';
+                let group = groups.get(name);
+                if (!group) {
+                    group = el('section', 'ai-task-settings-group');
+                    group.append(el('h3', 'ai-task-settings-group-title', name));
+                    groups.set(name, group);
+                    fragment.append(group);
+                }
+                group.append(createTaskRow(entry.definition, entry.route, Array.isArray(entry.models) ? entry.models : []));
             }
             container.replaceChildren(fragment);
             if (!entries.length) {
@@ -552,7 +637,10 @@
         closeQuickSheet,
         openReasoningMenu,
         reasoningMeta,
-        _test: { modelKey, modelOptionLabel, normalizeReasoningDepth, normalizeTaskDefinitions, shouldMountInlinePicker, resolveInsertionTarget }
+        favoriteKeys,
+        recentKeysForTask,
+        rememberRecent,
+        _test: { modelKey, modelOptionLabel, modelVisualNode, normalizeReasoningDepth, normalizeTaskDefinitions, shouldMountInlinePicker, resolveInsertionTarget }
     };
     root.aiTaskSettings = api;
     root.addEventListener?.('ai:catalog-changed', render);

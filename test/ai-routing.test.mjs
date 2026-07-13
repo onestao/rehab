@@ -2,6 +2,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import * as routingPure from '../ai-routing-pure.mjs';
+
 import {
   REASONING_DEPTHS,
   buildFallbackSequence,
@@ -34,6 +36,74 @@ test('task registry normalizes defaults and rejects duplicate task ids', () => {
     () => registerTaskDefinitions(registry, [{ id: 'food.text' }]),
     error => error.code === 'AI_TASK_DUPLICATE'
   );
+});
+
+test('required capabilities report compatible, incompatible, and unknown states without filtering a model', () => {
+  const requiredCapabilityState = routingPure.requiredCapabilityState;
+  assert.equal(typeof requiredCapabilityState, 'function');
+  assert.deepEqual(requiredCapabilityState(['vision', 'json'], { vision: true, json: true }), { status: 'compatible', missing: [], incompatible: [] });
+  assert.deepEqual(requiredCapabilityState(['vision', 'json'], { vision: false, json: true }), { status: 'incompatible', missing: [], incompatible: ['vision'] });
+  assert.deepEqual(requiredCapabilityState(['vision', 'json'], { vision: true }), { status: 'unknown', missing: ['json'], incompatible: [] });
+  assert.deepEqual(requiredCapabilityState(['vision'], null), { status: 'unknown', missing: ['vision'], incompatible: [] });
+});
+
+test('required capability state normalizes malformed inputs without mutating or treating unknown as false', () => {
+  const required = [' vision ', null, 'json', 'vision', 42];
+  const capabilities = Object.create(null);
+  capabilities.vision = false;
+  capabilities.json = undefined;
+  const state = routingPure.requiredCapabilityState(required, capabilities);
+  assert.deepEqual(state, { status: 'incompatible', missing: ['json'], incompatible: ['vision'] });
+  assert.deepEqual(required, [' vision ', null, 'json', 'vision', 42]);
+  assert.equal(Object.isFrozen(state), true);
+  assert.equal(Object.isFrozen(state.missing), true);
+  assert.equal(Object.isFrozen(state.incompatible), true);
+  assert.deepEqual(routingPure.requiredCapabilityState(' vision ', ['vision']), { status: 'compatible', missing: [], incompatible: [] });
+  assert.deepEqual(routingPure.requiredCapabilityState(['vision', 'json'], 'vision'), { status: 'unknown', missing: ['json'], incompatible: [] });
+});
+
+test('model reference normalization returns only canonical own string identifiers', () => {
+  const source = Object.create({ profileId: 'inherited-profile', modelId: 'inherited-model' });
+  source.profileId = ' lab-profile ';
+  source.modelId = ' vision-model ';
+  source.apiKey = 'must-not-propagate';
+  Object.defineProperty(source, '__proto__', { value: 'ignored', enumerable: true });
+  const reference = routingPure.normalizeModelRef(source);
+  assert.deepEqual(reference, { profileId: 'lab-profile', modelId: 'vision-model' });
+  assert.notEqual(reference, source);
+  assert.equal(Object.isFrozen(reference), true);
+  assert.equal(Object.hasOwn(reference, 'apiKey'), false);
+  assert.equal(Object.hasOwn(reference, '__proto__'), false);
+  assert.equal(routingPure.normalizeModelRef({ profileId: 42, modelId: 'model' }), null);
+  assert.equal(routingPure.normalizeModelRef({ profileId: 'profile', modelId: '   ' }), null);
+  assert.equal(routingPure.normalizeModelRef(Object.create({ profileId: 'profile', modelId: 'model' })), null);
+});
+
+test('manual fallback target is a frozen credential-free plain reference', () => {
+  const source = { profileId: ' backup-profile ', modelId: ' backup/model ', apiKey: 'secret', token: 'secret', baseUrl: 'https://secret.invalid', headers: { Authorization: 'secret' }, provider: 'openai' };
+  const target = routingPure.manualFallbackTarget(source);
+  assert.deepEqual(target, { profileId: 'backup-profile', modelId: 'backup/model' });
+  assert.notEqual(target, source);
+  assert.equal(Object.getPrototypeOf(target), Object.prototype);
+  assert.equal(Object.isFrozen(target), true);
+  assert.equal(JSON.stringify(target), '{"profileId":"backup-profile","modelId":"backup/model"}');
+});
+
+test('manual fallback target rejects accessors, inherited ids, pollution keys and malformed values', () => {
+  let getterCalls = 0;
+  const accessor = {};
+  Object.defineProperty(accessor, 'profileId', { get() { getterCalls += 1; return 'profile'; } });
+  Object.defineProperty(accessor, 'modelId', { value: 'model' });
+  assert.equal(routingPure.manualFallbackTarget(accessor), null);
+  assert.equal(getterCalls, 0);
+  assert.equal(routingPure.manualFallbackTarget(Object.create({ profileId: 'profile', modelId: 'model' })), null);
+  assert.equal(routingPure.manualFallbackTarget({ profileId: 'profile', modelId: 'model\u0000bad' }), null);
+  assert.equal(routingPure.manualFallbackTarget({ profileId: 'p'.repeat(257), modelId: 'model' }), null);
+  const protoKey = { profileId: 'profile', modelId: 'model' };
+  Object.defineProperty(protoKey, '__proto__', { value: { polluted: true }, enumerable: true });
+  assert.equal(routingPure.manualFallbackTarget(protoKey), null);
+  assert.equal(routingPure.manualFallbackTarget({ profileId: 'profile', modelId: 'model', constructor: 'blocked' }), null);
+  assert.equal({}.polluted, undefined);
 });
 
 test('task route normalization removes invalid and duplicate fallbacks', () => {
@@ -171,14 +241,13 @@ test('Gemini thinking budget does not consume visible output token setting', () 
   assert.equal(result.omitTemperature, true);
 });
 
-test('explicit unsupported reasoning fails while auto may safely degrade to off', () => {
-  assert.throws(
-    () => buildReasoningOptions({
-      protocol: 'openai-chat', modelId: 'plain-model', reasoningDepth: 'high',
-      capabilities: { reasoning: false }
-    }),
-    error => error.code === 'AI_REASONING_UNSUPPORTED'
-  );
+test('explicit reasoning treats capability metadata as advisory while auto may safely degrade to off', () => {
+  const explicit = buildReasoningOptions({
+    protocol: 'openai-chat', modelId: 'plain-model', reasoningDepth: 'high',
+    capabilities: { reasoning: false }
+  });
+  assert.equal(explicit.effectiveDepth, 'high');
+  assert.deepEqual(explicit.params, { reasoning_effort: 'high' });
   const auto = buildReasoningOptions({
     protocol: 'openai-chat', modelId: 'plain-model', reasoningDepth: 'auto',
     capabilities: { reasoning: false }, maxOutputTokens: 1000
@@ -192,20 +261,19 @@ test('explicit unsupported reasoning fails while auto may safely degrade to off'
   );
 });
 
-test('auto uses model capability default and respects supported reasoning modes', () => {
+test('auto uses model capability default while explicit depth treats mode metadata as advisory', () => {
   const auto = buildReasoningOptions({
     protocol: 'openai-chat', modelId: 'custom-reasoner', reasoningDepth: 'auto',
     capabilities: { reasoning: true, reasoningModes: ['low', 'high'], defaultReasoningDepth: 'high' }
   });
   assert.equal(auto.effectiveDepth, 'high');
   assert.deepEqual(auto.params, { reasoning_effort: 'high' });
-  assert.throws(
-    () => buildReasoningOptions({
-      protocol: 'openai-chat', modelId: 'custom-reasoner', reasoningDepth: 'medium',
-      capabilities: { reasoning: true, reasoningModes: ['low', 'high'] }
-    }),
-    error => error.code === 'AI_REASONING_DEPTH_UNSUPPORTED'
-  );
+  const explicit = buildReasoningOptions({
+    protocol: 'openai-chat', modelId: 'custom-reasoner', reasoningDepth: 'medium',
+    capabilities: { reasoning: true, reasoningModes: ['low', 'high'] }
+  });
+  assert.equal(explicit.effectiveDepth, 'medium');
+  assert.deepEqual(explicit.params, { reasoning_effort: 'medium' });
 });
 
 test('only transient transport and service errors are retryable', () => {

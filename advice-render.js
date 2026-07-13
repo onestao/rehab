@@ -41,62 +41,6 @@ function highlightRenderedHtml(html, keyword) {
 }
 
 Object.assign(advicePanel, {
-    MODEL_ICON_CDN_BASES: [
-        'https://registry.npmmirror.com/@lobehub/icons-static-svg/latest/files/icons/',
-        'https://unpkg.com/@lobehub/icons-static-svg@latest/icons/'
-    ],
-    MODEL_ICON_SLUGS: {
-        openai: 'openai',
-        gemini: 'gemini',
-        grok: 'grok',
-        deepseek: 'deepseek',
-        claude: 'claude',
-        qwen: 'qwen',
-        doubao: 'doubao',
-        kimi: 'kimi',
-        minimax: 'minimax',
-        mimo: 'xiaomimimo',
-        glm: 'zhipu',
-        mistral: 'mistral',
-        meta: 'meta',
-        llama: 'meta',
-        ollama: 'ollama',
-        perplexity: 'perplexity',
-        cohere: 'cohere',
-        baichuan: 'baichuan',
-        yi: 'zeroone',
-        stepfun: 'stepfun',
-        siliconflow: 'siliconcloud',
-        openrouter: 'openrouter',
-        azure: 'azure',
-        huggingface: 'huggingface'
-    },
-    MODEL_ICONS: {
-        openai: 'assets/model-icons/openai.svg',
-        gemini: 'assets/model-icons/gemini.svg',
-        grok: 'assets/model-icons/grok.svg',
-        deepseek: 'assets/model-icons/deepseek.svg',
-        claude: 'assets/model-icons/claude.svg',
-        qwen: 'assets/model-icons/qwen.svg',
-        doubao: 'assets/model-icons/doubao.svg',
-        kimi: 'assets/model-icons/kimi.svg',
-        minimax: 'assets/model-icons/minimax.svg',
-        mimo: 'assets/model-icons/mimo.svg',
-        glm: 'assets/model-icons/glm.svg',
-        generic: 'assets/model-icons/generic.svg'
-    },
-    iconFallbackSrcs(key = 'generic') {
-        const slug = this.MODEL_ICON_SLUGS?.[key] || key;
-        if (key === 'kimi') {
-            const mono = (this.MODEL_ICON_CDN_BASES || []).map(base => `${base}${slug}.svg`);
-            return Array.from(new Set([...mono, this.MODEL_ICONS?.kimi, this.MODEL_ICONS?.generic].filter(Boolean)));
-        }
-        const cdn = (this.MODEL_ICON_CDN_BASES || []).map(base => [`${base}${slug}-color.svg`, `${base}${slug}.svg`]).flat();
-        const local = [this.MODEL_ICONS?.[key], this.MODEL_ICONS?.generic].filter(Boolean);
-        const unique = new Set([...cdn, ...local]);
-        return Array.from(unique);
-    },
-
     adviceModelIconHtml(visual = {}) {
         const srcs = visual.iconSrcs || [];
         const mark = this.escapeHtml(visual.mark || 'AI');
@@ -116,56 +60,8 @@ Object.assign(advicePanel, {
         ].filter(Boolean).join(';');
     },
 
-    providerHashHue(key = 'generic') {
-        const s = String(key || 'generic');
-        let h = 0;
-        for (let i = 0; i < s.length; i++) {
-            h = ((h << 5) - h + s.charCodeAt(i)) | 0;
-        }
-        return Math.abs(h) % 360;
-    },
-
-    modelThemeFor(key = 'generic') {
-        const hue = this.providerHashHue(key);
-        const dark = !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
-        return dark
-            ? {
-                bg: `linear-gradient(135deg, hsl(${hue} 28% 22%), hsl(${(hue + 28) % 360} 24% 16%))`,
-                color: `hsl(${hue} 62% 90%)`,
-                markBg: `color-mix(in srgb, hsl(${hue} 36% 36%) 58%, var(--md-sys-surface-container-highest))`
-            }
-            : {
-                bg: `linear-gradient(135deg, hsl(${hue} 64% 93%), hsl(${(hue + 28) % 360} 60% 90%))`,
-                color: `hsl(${hue} 52% 22%)`,
-                markBg: `color-mix(in srgb, hsl(${hue} 72% 80%) 56%, white)`
-            };
-    },
-
-    detectAdviceModelProvider(model = '') {
-        const text = String(model || '').toLowerCase();
-        if (/grok|x-ai|\bxai\b/.test(text)) return { key: 'grok', label: 'Grok', mark: 'G' };
-        if (/gemini|google/.test(text)) return { key: 'gemini', label: 'Gemini', mark: 'Gem' };
-        if (/deepseek/.test(text)) return { key: 'deepseek', label: 'DeepSeek', mark: 'DS' };
-        if (/claude|anthropic/.test(text)) return { key: 'claude', label: 'Claude', mark: 'C' };
-        if (/qwen|通义|tongyi/.test(text)) return { key: 'qwen', label: 'Qwen', mark: 'Q' };
-        if (/doubao|豆包|volc|火山/.test(text)) return { key: 'doubao', label: '豆包', mark: '豆' };
-        if (/kimi|moonshot|moon/.test(text)) return { key: 'kimi', label: 'Kimi', mark: 'K' };
-        if (/minimax/.test(text)) return { key: 'minimax', label: 'MiniMax', mark: 'MM' };
-        if (/mimo/.test(text)) return { key: 'mimo', label: 'Mimo', mark: 'Mi' };
-        if (/glm|chatglm|zhipu|智谱/.test(text)) return { key: 'glm', label: 'GLM', mark: 'GLM' };
-        if (/gpt|openai|chatgpt|\bo[134]\b|o1|o3|o4/.test(text)) return { key: 'openai', label: 'OpenAI', mark: 'GPT' };
-        return { key: 'generic', label: 'AI 模型', mark: 'AI' };
-    },
-
     adviceModelVisual(model = '', provider = '', iconKey = '') {
-        const detected = this.detectAdviceModelProvider(model);
-        const explicitKey = String(iconKey || '').trim().toLowerCase();
-        const providerKey = this.providerKeyForModel?.(provider, model) || '';
-        const key = explicitKey || (detected.key !== 'generic' ? detected.key : providerKey) || 'generic';
-        const marks = { openai: 'GPT', gemini: 'Gem', grok: 'G', deepseek: 'DS', claude: 'C', qwen: 'Q', doubao: '豆', kimi: 'K', minimax: 'MM', mimo: 'Mi', glm: 'GLM' };
-        const iconSrcs = this.iconFallbackSrcs(key);
-        const theme = this.modelThemeFor(key);
-        const visual = { ...detected, key, mark: marks[key] || detected.mark || 'AI', iconSrcs, theme };
+        const visual = window.aiModelVisual.resolve({ modelId: model, provider, iconKey });
         this._lastVisual = visual;
         return visual;
     },

@@ -14,6 +14,7 @@ const PROTOCOL_ALIASES = Object.freeze({
   gemini: 'gemini'
 });
 const THINKING_BUDGETS = Object.freeze({ low: 1024, medium: 4096, high: 8192 });
+const freeze = Object.freeze;
 
 function routingError(code, message, details = {}) {
   const error = new Error(message);
@@ -24,6 +25,55 @@ function routingError(code, message, details = {}) {
 
 function normalizeId(value) {
   return String(value || '').trim();
+}
+
+function own(value, key) {
+  try {
+    return value && typeof value === 'object' && !Array.isArray(value) && Object.getOwnPropertyDescriptor(value, key)?.value;
+  } catch {}
+}
+
+function capNames(value) {
+  const list = typeof value === 'string' ? [value] : Array.isArray(value) ? value : [];
+  return [...new Set(list.map(item => typeof item === 'string' && item.trim().toLowerCase()).filter(Boolean))];
+}
+
+export function normalizeModelRef(value) {
+  let profile = own(value, 'profileId');
+  let model = own(value, 'modelId');
+  return typeof profile === 'string' && typeof model === 'string' && (profile = profile.trim()) && (model = model.trim())
+    ? freeze({ profileId: profile, modelId: model }) : null;
+}
+
+export function manualFallbackTarget(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  try {
+    const prototype = Object.getPrototypeOf(value);
+    if ((prototype && Object.getPrototypeOf(prototype))
+        || Object.getOwnPropertyDescriptor(value, '__proto__')
+        || Object.getOwnPropertyDescriptor(value, 'constructor')) return null;
+  } catch { return null; }
+  let profile = own(value, 'profileId');
+  let model = own(value, 'modelId');
+  if (typeof profile !== 'string' || typeof model !== 'string') return null;
+  profile = profile.trim();
+  model = model.trim();
+  if (!profile || !model || profile.length > 256 || model.length > 256 || /[\u0000-\u001f\u007f]/.test(profile + model)) return null;
+  return freeze({ profileId: profile, modelId: model });
+}
+
+export function requiredCapabilityState(required, available) {
+  const missing = [];
+  const incompatible = [];
+  const listed = typeof available === 'string' || Array.isArray(available) ? capNames(available) : null;
+  for (const capability of capNames(required)) {
+    const value = listed ? (listed.includes(capability) || undefined) : own(available, capability);
+    (value === false ? incompatible : value === true ? null : missing)?.push(capability);
+  }
+  return freeze({
+    status: incompatible.length ? 'incompatible' : (missing.length ? 'unknown' : 'compatible'),
+    missing: freeze(missing), incompatible: freeze(incompatible)
+  });
 }
 
 function normalizeDepth(value, fallback = 'auto') {
@@ -231,7 +281,9 @@ export function buildReasoningOptions(options = {}) {
   if (requestedDepth === 'auto' && (explicitlyUnsupported || (!protocol || (capabilities.reasoning !== true && !inferredSupport)))) {
     return { ...base, supported: !explicitlyUnsupported };
   }
-  if (!protocol || explicitlyUnsupported) throw unsupportedReasoning(protocol, modelId);
+  // Explicit user choices are sent to the provider. Capability metadata is advisory
+  // and frequently incomplete for OpenAI-compatible endpoints.
+  if (!protocol) throw unsupportedReasoning(protocol, modelId);
 
   const modes = supportedModes(capabilities);
   let effectiveDepth = requestedDepth;
@@ -239,14 +291,6 @@ export function buildReasoningOptions(options = {}) {
     const preferred = normalizeDepth(capabilities.defaultReasoningDepth, 'medium');
     effectiveDepth = modes?.includes(preferred) ? preferred : (modes?.[0] || preferred);
   }
-  if (modes && !modes.includes(effectiveDepth)) {
-    throw routingError(
-      'AI_REASONING_DEPTH_UNSUPPORTED',
-      `Reasoning depth ${effectiveDepth} is not supported by this model`,
-      { protocol, modelId, reasoningDepth: effectiveDepth, supportedModes: modes }
-    );
-  }
-
   const result = { ...base, effectiveDepth, omitTemperature: true };
   if (protocol === 'openai-responses') {
     result.params = { reasoning: { effort: effectiveDepth } };
@@ -287,9 +331,12 @@ if (typeof window !== 'undefined') {
     buildFallbackSequence,
     buildReasoningOptions,
     isRetryableAiError,
+    manualFallbackTarget,
+    normalizeModelRef,
     normalizeTaskRegistry,
     normalizeTaskRoute,
     registerTaskDefinitions,
+    requiredCapabilityState,
     resolveTaskRoute
   };
 }

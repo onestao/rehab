@@ -1,4 +1,16 @@
 ﻿// @ts-nocheck
+const MANUAL_MODEL_CAPABILITIES = new Set(['text', 'vision', 'streaming', 'json', 'reasoning']);
+
+function normalizeManualModelCapabilities(value) {
+    const capabilities = {};
+    String(value || '').split(',').forEach(item => {
+        const name = String(item || '').trim().toLowerCase();
+        if (!name || Object.hasOwn(capabilities, name)) return;
+        capabilities[name] = MANUAL_MODEL_CAPABILITIES.has(name) ? true : null;
+    });
+    return capabilities;
+}
+
 Object.assign(ai, {
     VISION_MODELS_URL: 'assets/vision-models.json',
 
@@ -104,7 +116,10 @@ Object.assign(ai, {
         if (!profileId || !id) return alert('请先选择供应商并填写模型 ID');
         if ((this.models || []).some(model => model.profileId === profileId && model.id === id)) return alert('该模型已添加');
         const helper = await this.loadModelCatalogPure(); const profile = this.findProfile(profileId);
-        this.models.push(helper.normalizeCatalogModel({ id, displayName: id }, { profileId, provider: profile?.provider, baseUrl: profile?.baseUrl, source: 'manual' }));
+        const displayName = String(prompt('显示名称（可留空）', id) || '').trim() || id;
+        const family = String(prompt('模型分组（可留空）', '') || '').trim();
+        const capabilities = normalizeManualModelCapabilities(prompt('能力标签（可留空，逗号分隔，如 vision,reasoning,json）', '') || '');
+        this.models.push(helper.normalizeCatalogModel({ id, displayName, family, capabilities }, { profileId, provider: profile?.provider, baseUrl: profile?.baseUrl, source: 'manual' }));
         await this.persistModelCache(); this.renderAddedModels(profileId); window.aiTaskSettings?.render?.();
     },
 

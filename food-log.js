@@ -595,10 +595,11 @@ const foodLog = {
         }).filter(item => item.name || item.grams || item.cal || item.pro || item.carb || item.fat);
     },
 
-    async aiParseFood() {
+    async aiParseFood(options = {}) {
+        if (this._aiFoodParseBusy) return;
         const textarea = document.getElementById('foodAiText');
         const manualInput = document.getElementById('foodName');
-        const text = (textarea?.value?.trim() || manualInput?.value?.trim() || '');
+        const text = String(options?.text ?? textarea?.value?.trim() ?? manualInput?.value?.trim() ?? '').trim();
         if (!text) {
             if (textarea) { textarea.focus(); textarea.placeholder = '请先输入食物描述'; }
             const statusEl = document.getElementById('foodAiStatus');
@@ -606,11 +607,22 @@ const foodLog = {
             setTimeout(() => { if (textarea) textarea.placeholder = '说说你这顿吃了什么，例如：鸡胸肉饭加一杯豆浆'; }, 3000);
             return;
         }
-        if (!ai.cfg.enabled) return alert('请先在设置中配置 AI 接口');
         const statusEl = document.getElementById('foodAiStatus');
-        if (statusEl) statusEl.textContent = 'AI 分析中...';
+        if (statusEl) statusEl.textContent = '正在加载 AI 模块...';
+        this._aiFoodParseBusy = true;
         try {
-            const items = this.normalizeAiFoodItems(await ai.parseFood(text));
+            const aiClient = await this.ensureAiRuntime?.() || window.ai;
+            const effective = aiClient?.resolveTaskConfig?.('food.text', options?.routeOverride || null)
+                || aiClient?.getEffectiveConfig?.()
+                || aiClient?.cfg
+                || {};
+            if (!effective.enabled || typeof aiClient?.parseFood !== 'function') {
+                if (statusEl) statusEl.textContent = '请先在设置中配置 AI 接口';
+                return alert('请先在设置中配置 AI 接口');
+            }
+            if (statusEl) statusEl.textContent = 'AI 分析中...';
+            const parseOptions = options?.routeOverride ? { routeOverride: options.routeOverride } : undefined;
+            const items = this.normalizeAiFoodItems(await aiClient.parseFood(text, parseOptions));
             if (!items.length) throw new Error('未识别到食物');
             this._aiFoodResults = items;
             this._aiFoodAdded = new Set();
@@ -626,6 +638,23 @@ const foodLog = {
                 rawSnippet: String(e?.body || '').slice(0, 240)
             });
             if (statusEl) statusEl.textContent = 'AI 识别失败: ' + message;
+            const fallback = e?.aiFallback;
+            const target = fallback?.taskId === 'food.text'
+                ? window.aiRoutingPure?.manualFallbackTarget?.(fallback.target)
+                : null;
+            if (target && window.toast?.show) {
+                let used = false;
+                toast.show('主模型不可用，可使用备用模型重试', 'error', 8000, {
+                    label: '使用备用模型重试',
+                    onClick: () => {
+                        if (used) return Promise.resolve();
+                        used = true;
+                        return this.aiParseFood({ text, routeOverride: target });
+                    }
+                });
+            }
+        } finally {
+            this._aiFoodParseBusy = false;
         }
     },
 

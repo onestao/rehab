@@ -8,7 +8,7 @@ const pureCode = readFileSync(new URL('../ai-routing-pure.mjs', import.meta.url)
   .replace(/export\s+(const|function)\s+/g, '$1 ');
 const runtimeCode = readFileSync(new URL('../ai-routing.js', import.meta.url), 'utf8');
 
-function loadRuntime() {
+function loadRuntime({ withCapabilityHelper = true } = {}) {
   const ai = {
     cfg: {
       activeProfileId: 'p1',
@@ -36,7 +36,8 @@ function loadRuntime() {
     CustomEvent: class CustomEvent { constructor(type, init) { this.type = type; this.detail = init?.detail; } }
   };
   sandbox.window.window = sandbox.window;
-  vm.runInNewContext(`${pureCode}\nwindow.aiRoutingPure = { REASONING_DEPTHS, FALLBACK_MODES, normalizeTaskRegistry, registerTaskDefinitions, normalizeTaskRoute, resolveTaskRoute, buildFallbackSequence, buildReasoningOptions, isRetryableAiError };`, sandbox);
+  vm.runInNewContext(`${pureCode}\nwindow.aiRoutingPure = { REASONING_DEPTHS, FALLBACK_MODES, normalizeTaskRegistry, registerTaskDefinitions, normalizeTaskRoute, resolveTaskRoute, buildFallbackSequence, buildReasoningOptions, isRetryableAiError, ...(typeof requiredCapabilityState === 'function' ? { requiredCapabilityState } : {}) };`, sandbox);
+  if (!withCapabilityHelper) delete sandbox.window.aiRoutingPure.requiredCapabilityState;
   vm.runInNewContext(runtimeCode, sandbox);
   return ai;
 }
@@ -73,6 +74,33 @@ test('feature model choice stays user-controlled even when capability metadata i
   ai.models[0].capabilities.vision = false;
   const rows = ai.listSelectableModels('food.vision');
   assert.deepEqual(Array.from(rows, row => row.profileId), ['p1', 'p2']);
+});
+
+test('selectable models expose family and advisory capability state for compatible, unknown, and incompatible rows', () => {
+  const ai = loadRuntime();
+  ai.models = [
+    { profileId: 'p1', id: 'claude-3-5-haiku', displayName: '实验室视觉助手', family: 'Claude', enabled: true, capabilities: { vision: true, json: true } },
+    { profileId: 'p1', id: 'manual-unknown', displayName: 'Claude branded manual entry', enabled: true, capabilities: { vision: true } },
+    { profileId: 'p1', id: 'text-only', family: 'Qwen', enabled: true, capabilities: { vision: false, json: true } }
+  ];
+  const rows = ai.listSelectableModels('food.vision');
+  assert.deepEqual(Array.from(rows, row => row.modelId), ['claude-3-5-haiku', 'manual-unknown', 'text-only']);
+  assert.deepEqual(Array.from(rows, row => ({
+    modelId: row.modelId,
+    displayName: row.displayName,
+    family: row.family,
+    capabilityState: {
+      status: row.capabilityState?.status,
+      missing: Array.from(row.capabilityState?.missing || []),
+      incompatible: Array.from(row.capabilityState?.incompatible || [])
+    }
+  })), [
+    { modelId: 'claude-3-5-haiku', displayName: '实验室视觉助手', family: 'Claude', capabilityState: { status: 'compatible', missing: [], incompatible: [] } },
+    { modelId: 'manual-unknown', displayName: 'Claude branded manual entry', family: '其他', capabilityState: { status: 'unknown', missing: ['json'], incompatible: [] } },
+    { modelId: 'text-only', displayName: 'text-only', family: 'Qwen', capabilityState: { status: 'incompatible', missing: [], incompatible: ['vision'] } }
+  ]);
+  const fallbackRows = loadRuntime({ withCapabilityHelper: false }).listSelectableModels('food.vision');
+  assert.deepEqual(Array.from(fallbackRows, row => row.capabilityState.status), ['unknown', 'unknown']);
 });
 
 test('disabled and archived suppliers do not contribute new selectable models', () => {

@@ -1,11 +1,12 @@
 // @ts-nocheck
 (function () {
     window.dataGoalPlan = {
-        async requestWeightLossPlan() {
+        async requestWeightLossPlan(options = {}) {
             const goalType = this.db.health.goalType || 'loss';
             const isGain = goalType === 'gain';
             const profile = this.db.health?.profile || {};
-            const latest = this.sortedWeights().slice(-1)[0];
+            const routeOverride = window.aiRoutingPure?.manualFallbackTarget?.(options?.routeOverride) || null;
+            const latest = window.healthSummaryPure?.latestWeight?.(this.db.health?.weights) || this.sortedWeights?.().slice(-1)[0];
             const currentWeight = parseFloat(document.getElementById('planCurrentWeight')?.value) || latest?.weight;
             const targetWeight = parseFloat(document.getElementById('planTargetWeight')?.value);
             const height = parseFloat(document.getElementById('planHeight')?.value);
@@ -25,7 +26,7 @@
                 const conditions = profile.conditions || [];
                 const examResults = profile.examResults || [];
                 const allergies = profile.allergies || [];
-                const plan = await ai.bodyGoalPlan({ goalType, currentWeight, targetWeight, activityLevel, dailyTrainMin, height, weeklyFreq, intensity, sportType, experience, gender: profile.gender, age: profile.age, conditions, examResults, allergies });
+                const plan = await ai.bodyGoalPlan({ goalType, currentWeight, targetWeight, activityLevel, dailyTrainMin, height, weeklyFreq, intensity, sportType, experience, gender: profile.gender, age: profile.age, conditions, examResults, allergies }, { routeOverride });
                 const normalized = this.normalizeBodyPlan(plan, { currentWeight, targetWeight }, goalType);
                 this.db.health.bodyPlan = normalized;
                 this.db.health.weightPlan = normalized;
@@ -33,8 +34,20 @@
                 if (statusEl) statusEl.textContent = 'AI 方案已生成，请选择';
                 this.renderHistory();
             } catch (e) {
-                if (statusEl) statusEl.textContent = '生成失败: ' + (window.toast ? toast.sanitize(e) : e.message);
-                alert('AI 方案生成失败: ' + (window.toast ? toast.sanitize(e) : e.message));
+                const message = window.toast ? toast.sanitize(e) : e.message;
+                if (statusEl) statusEl.textContent = '生成失败: ' + message;
+                const target = e?.aiFallback?.taskId === 'goal.body'
+                    ? window.aiRoutingPure?.manualFallbackTarget?.(e.aiFallback.target)
+                    : null;
+                if (target && window.toast?.show) {
+                    let retryPromise = null;
+                    toast.show('主模型不可用，可使用备用模型重试', 'error', 8000, {
+                        label: '使用备用模型重试',
+                        onClick: () => retryPromise ||= this.requestWeightLossPlan({ routeOverride: target })
+                    });
+                } else {
+                    alert('AI 方案生成失败: ' + message);
+                }
             }
         },
 

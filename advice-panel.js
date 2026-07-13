@@ -12,6 +12,25 @@ function resolveAdviceModelSwipeScope(scope = 'current', deltaX = 0, width = 0, 
     return ADVICE_MODEL_SCOPES[nextIndex];
 }
 
+function safeAdviceFallbackTarget(meta, expectedTaskId = 'advice.chat') {
+    if (!meta || typeof meta !== 'object' || Array.isArray(meta)) return null;
+    try {
+        const prototype = Object.getPrototypeOf(meta);
+        if ((prototype && Object.getPrototypeOf(prototype))
+            || Object.getOwnPropertyDescriptor(meta, '__proto__')
+            || Object.getOwnPropertyDescriptor(meta, 'constructor')) return null;
+        const taskDescriptor = Object.getOwnPropertyDescriptor(meta, 'taskId');
+        const targetDescriptor = Object.getOwnPropertyDescriptor(meta, 'target');
+        if (!targetDescriptor || !Object.prototype.hasOwnProperty.call(targetDescriptor, 'value')) return null;
+        if (taskDescriptor && !Object.prototype.hasOwnProperty.call(taskDescriptor, 'value')) return null;
+        const taskId = typeof taskDescriptor?.value === 'string' ? taskDescriptor.value.trim() : '';
+        if ((taskDescriptor && typeof taskDescriptor.value !== 'string') || (taskId && taskId !== expectedTaskId)) return null;
+        return window.aiRoutingPure?.manualFallbackTarget?.(targetDescriptor.value) || null;
+    } catch {
+        return null;
+    }
+}
+
 const advicePanel = {
     _test: { resolveAdviceModelSwipeScope },
     DRAFT_KEY: 'rehab_advice_draft',
@@ -28,7 +47,6 @@ const advicePanel = {
             SCROLL_KEY: this.SCROLL_KEY,
             PAGE_SCROLL_KEY: this.PAGE_SCROLL_KEY,
             ADVICE_OUTPUT_TOKEN_BUDGET: this.ADVICE_OUTPUT_TOKEN_BUDGET,
-            MODEL_ICONS: this.MODEL_ICONS,
             sendAiAdvice: this.sendAiAdvice,
             cancelAiAdvice: this.cancelAiAdvice,
             stopActiveAdviceReply: this.stopActiveAdviceReply,
@@ -73,12 +91,9 @@ const advicePanel = {
             onAdvicePromptInput: this.onAdvicePromptInput,
             onAdvicePromptKeydown: this.onAdvicePromptKeydown,
             updateAdviceSendState: this.updateAdviceSendState,
-            setAdviceModel: this.setAdviceModel,
             adviceModelStarKey: this.adviceModelStarKey,
             isAdviceModelStarred: this.isAdviceModelStarred,
             toggleAdviceModelStar: this.toggleAdviceModelStar,
-            providerKeyForModel: this.providerKeyForModel,
-            providerIcon: this.providerIcon,
             modelShortName: this.modelShortName,
             advicePickerTaskId: this.advicePickerTaskId,
             bindAdviceModelPickerActions: this.bindAdviceModelPickerActions,
@@ -142,12 +157,8 @@ const advicePanel = {
             resetAdviceRenderWindow: this.resetAdviceRenderWindow,
             expandAdviceRenderWindow: this.expandAdviceRenderWindow,
             adviceMessageSummary: this.adviceMessageSummary,
-            iconFallbackSrcs: this.iconFallbackSrcs,
             adviceModelIconHtml: this.adviceModelIconHtml,
             adviceModelThemeStyle: this.adviceModelThemeStyle,
-            providerHashHue: this.providerHashHue,
-            modelThemeFor: this.modelThemeFor,
-            detectAdviceModelProvider: this.detectAdviceModelProvider,
             adviceModelVisual: this.adviceModelVisual,
             adviceConversationContext: this.adviceConversationContext,
             detectAdviceFocus: this.detectAdviceFocus,
@@ -1218,19 +1229,6 @@ const advicePanel = {
         el.classList.toggle('is-scrollable', el.scrollHeight > nextHeight + 1);
     },
 
-    setAdviceModel(model) {
-        if (!model || model === '__current__') ai.resetTaskRoute?.('advice.chat');
-        else {
-            const cached = (ai.models || []).find(item => item.id === model && item.profileId) || null;
-            const profileId = cached?.profileId || ai.cfg.activeProfileId || '';
-            const current = ai.getTaskRoute?.('advice.chat') || {};
-            ai.setTaskRoute?.('advice.chat', { ...current, primary: { profileId, modelId: model } });
-        }
-        this.captureAdviceDraft();
-        this.refreshAdviceModelPicker?.();
-        this.rerenderAdvicePanel?.();
-    },
-
     adviceModelStarKey(profileId = '', model = '') {
         return `${String(profileId || '').trim()}::${String(model || '').trim()}`;
     },
@@ -1270,29 +1268,6 @@ const advicePanel = {
         return next;
     },
 
-    providerKeyForModel(provider = '', model = '') {
-        const modelText = String(model || '').toLowerCase();
-        if (/grok|x-ai|\bxai\b/.test(modelText)) return 'grok';
-        if (/gemini|google/.test(modelText)) return 'gemini';
-        if (/deepseek/.test(modelText)) return 'deepseek';
-        if (/claude|anthropic/.test(modelText)) return 'claude';
-        if (/qwen|通义|tongyi/.test(modelText)) return 'qwen';
-        if (/doubao|豆包|volc|火山/.test(modelText)) return 'doubao';
-        if (/kimi|moonshot|moon/.test(modelText)) return 'kimi';
-        if (/minimax/.test(modelText)) return 'minimax';
-        if (/mimo/.test(modelText)) return 'mimo';
-        if (/glm|chatglm|zhipu|智谱/.test(modelText)) return 'glm';
-        if (/gpt|openai|chatgpt|\bo[134]\b|o1|o3|o4/.test(modelText)) return 'openai';
-        const providerText = String(provider || 'generic').toLowerCase().split(':')[0].trim();
-        return providerText || 'generic';
-    },
-
-    providerIcon(provider = '', model = '') {
-        const key = this.providerKeyForModel(provider, model);
-        const known = ['openai','gemini','grok','deepseek','claude','qwen','doubao','kimi','minimax','mimo','glm'];
-        return `assets/model-icons/${known.includes(key) ? key : 'generic'}.svg`;
-    },
-
     modelShortName(model = '') {
         const text = String(model || '模型');
         return text.length > 18 ? `${text.slice(0, 16)}…` : text;
@@ -1310,7 +1285,6 @@ const advicePanel = {
         const style = this.adviceModelThemeStyle(visual);
         return `<button class="advice-model-picker advice-model-chip advice-model-${visual.key} ${isOverride ? 'is-override' : ''}" ${style ? `style="${this.escapeHtml(style)}"` : ''} onclick="data.openAdviceModelPicker()" type="button" aria-label="切换分析模型：${this.escapeHtml(label)}" title="切换分析模型：${this.escapeHtml(label)}">
             <span class="advice-model-mark">${this.adviceModelIconHtml(visual)}</span>
-            ${isOverride ? `<span class="advice-model-chip-x" onclick="event.stopPropagation();ai.resetTaskRoute?.('${this.escapeHtml(taskId)}').then(()=>data.rerenderAdvicePanel?.())" role="button" aria-label="恢复默认">×</span>` : ''}
         </button>`;
     },
 
@@ -1501,12 +1475,36 @@ const advicePanel = {
         }
         const taskId = this.advicePickerTaskId();
         const current = ai.getTaskRoute?.(taskId) || {};
-        Promise.resolve(ai.setTaskRoute?.(taskId, { ...current, primary: { profileId, modelId: model } })).then(() => {
+        const primary = { profileId, modelId: model };
+        const selectionKey = `${taskId}\u0000${profileId}\u0000${model}`;
+        this._adviceModelSelectionPromises = this._adviceModelSelectionPromises instanceof Map
+            ? this._adviceModelSelectionPromises
+            : new Map();
+        const activeSelection = this._adviceModelSelectionPromises.get(selectionKey);
+        if (activeSelection) return activeSelection;
+        let selectionPromise;
+        selectionPromise = Promise.resolve(ai.setTaskRoute?.(taskId, { ...current, primary })).then(() => {
+            const rememberRecent = window.aiTaskSettings?.rememberRecent;
+            if (typeof rememberRecent !== 'function') return false;
+            return Promise.resolve(rememberRecent(taskId, primary)).then(() => {
+                const recentKeysForTask = window.aiTaskSettings?.recentKeysForTask;
+                if (typeof recentKeysForTask !== 'function') return false;
+                const recentKeys = recentKeysForTask(taskId);
+                return Array.isArray(recentKeys) && recentKeys.includes(`${profileId}::${model}`);
+            });
+        }).then(recentRecorded => {
+            if (recentRecorded) window.toast?.show?.(`已切换至 ${this.modelShortName(model)}`, 'success');
             this.closeAdviceModelPicker();
             window.haptics?.light?.();
             this.refreshAdviceModelChip?.();
             this.rerenderAdvicePanel?.();
+        }).finally(() => {
+            if (this._adviceModelSelectionPromises?.get(selectionKey) === selectionPromise) {
+                this._adviceModelSelectionPromises.delete(selectionKey);
+            }
         });
+        this._adviceModelSelectionPromises.set(selectionKey, selectionPromise);
+        return selectionPromise;
     },
 
     openAdviceReasoningPicker() {
@@ -1528,6 +1526,8 @@ const advicePanel = {
         const taskId = this.advicePickerTaskId();
         const effective = ai.resolveTaskConfig?.(taskId) || ai.getEffectiveConfig?.() || ai.cfg;
         const scope = this.adviceModelPickerScope || 'current';
+        const favoriteOrder = new Map(Array.from(window.aiTaskSettings?.favoriteKeys?.() || [], (key, index) => [key, index]));
+        const recentOrder = new Map((window.aiTaskSettings?.recentKeysForTask?.(taskId) || []).map((key, index) => [key, index]));
         const normalizeProvider = ai.normalizeProvider.bind(ai);
         const activeProfileId = String(effective.profileId || ai.cfg.activeProfileId || '');
         const selectableModels = typeof ai.listSelectableModels === 'function'
@@ -1580,7 +1580,16 @@ const advicePanel = {
             const deduped = rows
                 .filter((row, index, all) => row.model && all.findIndex(x => x.profileId === row.profileId && x.model === row.model) === index)
                 .map((row, index) => ({ ...row, starred: this.isAdviceModelStarred(row.profileId, row.model), order: index }))
-                .sort((a, b) => Number(b.starred) - Number(a.starred) || a.order - b.order);
+                .sort((a, b) => {
+                    const aKey = this.adviceModelStarKey(a.profileId, a.model);
+                    const bKey = this.adviceModelStarKey(b.profileId, b.model);
+                    const rank = (row, key) => favoriteOrder.has(key)
+                        ? [0, favoriteOrder.get(key)]
+                        : (row.starred ? [0, favoriteOrder.size + row.order] : (recentOrder.has(key) ? [1, recentOrder.get(key)] : [2, row.order]));
+                    const aRank = rank(a, aKey);
+                    const bRank = rank(b, bKey);
+                    return aRank[0] - bRank[0] || aRank[1] - bRank[1] || a.order - b.order;
+                });
             const emptyText = pageScope === 'cached'
                 ? '暂无启用模型'
                 : (pageScope === 'others' ? '暂无其他启用模型' : '当前暂无启用模型');
@@ -2281,7 +2290,14 @@ const advicePanel = {
         if (this._adviceSending) return;
         const input = document.getElementById('advicePrompt');
         const prompt = (promptOverride || input?.value || '').trim();
-        const attachments = (!promptOverride && !options?.skipUserMessage) ? (this._adviceAttachments || []).filter(att => att && att.status !== 'failed').slice() : [];
+        const attachmentPayloadId = typeof options?.attachmentPayloadId === 'string' ? options.attachmentPayloadId.trim() : '';
+        const attachmentPayload = attachmentPayloadId ? this.getAdviceAttachmentPayload?.(attachmentPayloadId) : null;
+        if (attachmentPayloadId && !attachmentPayload) {
+            window.toast?.show?.('原图片仅在当前会话短期保留，请重新附图后再试。', 'info');
+            return;
+        }
+        const attachments = attachmentPayload?.attachments?.slice?.()
+            || ((!promptOverride && !options?.skipUserMessage) ? (this._adviceAttachments || []).filter(att => att && att.status !== 'failed').slice() : []);
         const effectivePrompt = prompt || (attachments.some(att => att.kind === 'image') ? '请结合附件内容进行分析，并给出可执行建议。' : '请分析附件内容，并给出可执行建议。');
         if (!(this.canSendAdviceWithAttachments?.(prompt, attachments) || prompt)) return;
         if (attachments.some(att => att.status === 'processing')) {
@@ -2290,7 +2306,8 @@ const advicePanel = {
         }
         const hasImageAttachment = attachments.some(att => att.kind === 'image');
         const adviceTaskId = hasImageAttachment ? 'advice.vision' : 'advice.chat';
-        const effective = ai.resolveTaskConfig ? ai.resolveTaskConfig(adviceTaskId) : (ai.getEffectiveConfig ? ai.getEffectiveConfig() : { ...ai.cfg, profileId: ai.cfg.activeProfileId });
+        const routeOverride = window.aiRoutingPure?.manualFallbackTarget?.(options?.routeOverride) || null;
+        const effective = ai.resolveTaskConfig ? ai.resolveTaskConfig(adviceTaskId, routeOverride) : (ai.getEffectiveConfig ? ai.getEffectiveConfig() : { ...ai.cfg, profileId: ai.cfg.activeProfileId });
         if (!effective.enabled) return alert('请先在设置中配置 AI');
         const model = effective.model || ai.cfg.model;
         const provider = effective.provider || ai.cfg.provider || 'openai';
@@ -2307,10 +2324,13 @@ const advicePanel = {
         const scroller = this._adviceScrollContainer?.();
         this._adviceFollowStream = !scroller || (this._adviceMaxScrollY(scroller) - this._adviceCurrentScrollY(scroller)) < 180;
         this._adviceUserScrollPaused = false;
-        const isOverride = !!ai.cfg.taskRoutes?.[adviceTaskId];
+        const isOverride = !!routeOverride || !!ai.cfg.taskRoutes?.[adviceTaskId];
         const now = new Date().toISOString();
         const pendingId = this.generateRecordId('advice-pending');
         this._activeAdvicePendingId = pendingId;
+        const activeAttachmentPayloadId = hasImageAttachment ? (attachmentPayloadId || pendingId) : '';
+        if (hasImageAttachment && !attachmentPayloadId) this.registerAdviceAttachmentPayload?.(activeAttachmentPayloadId, attachments);
+        let preserveAttachmentPayload = false;
         const replyToId = options?.replyToId || '';
         const baseVersionIdx = Number(options?.versionIdx || 0);
         this._adviceSending = true;
@@ -2381,6 +2401,7 @@ const advicePanel = {
         this._streamRenderers = this._streamRenderers || {};
         this.setAdviceStreamUiState('streaming');
         let requestMessages = [];
+        let hasStreamedContent = false;
         try {
             const contextMode = ['auto', 'light', 'none'].includes(options?.contextMode || this.adviceContextMode) ? (options?.contextMode || this.adviceContextMode) : 'auto';
             const baseMessages = this.buildAdviceMessages(effectivePrompt, model, { contextMode });
@@ -2420,6 +2441,7 @@ const advicePanel = {
                     const idx = this.db.health.aiAdviceChat.findIndex(msg => msg.id === pendingId);
                     if (idx < 0) return;
                     if (this.db.health.aiAdviceChat[idx].stopped) return;
+                    if (String(delta ?? '').length || String(accumulated ?? '').length) hasStreamedContent = true;
                     const displayAccumulated = prefix + accumulated;
                     this.db.health.aiAdviceChat[idx].content = displayAccumulated;
                     if (this.db.health.aiAdviceChat[idx].pending && displayAccumulated) this.db.health.aiAdviceChat[idx].pending = false;
@@ -2479,6 +2501,7 @@ const advicePanel = {
                     maxTokens: outputTokenBudget,
                     signal: controller.signal,
                     timeoutMs: 45000,
+                    routeOverride,
                     onProgress: ({ stage, message }) => {
                         const idx = this.db.health.aiAdviceChat.findIndex(msg => msg.id === pendingId);
                         if (idx < 0) return;
@@ -2487,10 +2510,12 @@ const advicePanel = {
                         this.db.health.aiAdviceChat[idx].pending = true;
                         this.rerenderAdvicePanel?.();
                     }
-                }) : await ai.callAdviceWithAttachments(messages, attachments, outputTokenBudget, { signal: controller.signal, timeoutMs: 45000 }))
-                : (typeof ai.run === 'function'
-                    ? await ai.run({ taskId: 'advice.chat', messages, maxTokens: outputTokenBudget, stream: true, onToken, signal: controller.signal })
-                    : await ai.callStream(messages, outputTokenBudget, onToken, { signal: controller.signal }));
+                }) : await ai.callAdviceWithAttachments(messages, attachments, outputTokenBudget, { signal: controller.signal, timeoutMs: 45000, routeOverride }))
+                : (typeof ai.runStream === 'function'
+                    ? await ai.runStream('advice.chat', messages, outputTokenBudget, onToken, { signal: controller.signal, routeOverride })
+                    : (typeof ai.run === 'function'
+                        ? await ai.run({ taskId: 'advice.chat', messages, maxTokens: outputTokenBudget, stream: true, onToken, signal: controller.signal, routeOverride })
+                        : await ai.callStream(messages, outputTokenBudget, onToken, { signal: controller.signal, routeOverride })));
             finishRequestUsage();
             const autoContinueLimit = Math.max(0, Number(this.ADVICE_AUTO_CONTINUE_LIMIT || advicePanel.ADVICE_AUTO_CONTINUE_LIMIT) || 0);
             let autoContinueCount = 0;
@@ -2510,8 +2535,8 @@ const advicePanel = {
                         { role: 'user', content: '继续上一条回复：从断点处直接续写剩余内容，不要重复前文，不要重新开头，优先把结尾补完整。' }
                     ];
                     const continued = typeof ai.run === 'function'
-                        ? await ai.run({ taskId: 'advice.chat', messages: continuationMessages, maxTokens: outputTokenBudget, stream: true, onToken: createOnToken(continuedFrom), signal: controller.signal })
-                        : await ai.callStream(continuationMessages, outputTokenBudget, createOnToken(continuedFrom), { signal: controller.signal });
+                        ? await ai.run({ taskId: adviceTaskId, messages: continuationMessages, maxTokens: outputTokenBudget, stream: true, onToken: createOnToken(continuedFrom), signal: controller.signal, routeOverride })
+                        : await ai.callStream(continuationMessages, outputTokenBudget, createOnToken(continuedFrom), { signal: controller.signal, routeOverride });
                     finishRequestUsage();
                     full = continuedFrom + String(continued || '');
                 } catch (continueError) {
@@ -2646,8 +2671,43 @@ const advicePanel = {
                 });
                 return;
             }
+            const previous = idx >= 0 ? this.db.health.aiAdviceChat[idx] : null;
+            if (!hasImageAttachment && hasStreamedContent && previous) {
+                const interrupted = {
+                    ...previous,
+                    role: 'assistant',
+                    content: String(previous.content || ''),
+                    model,
+                    provider,
+                    temporaryModel: isOverride,
+                    pending: false,
+                    error: true,
+                    errorInfo: {
+                        ...(this._adviceRequestMeta || {}),
+                        type: e?.code || e?.name || 'stream_interrupted',
+                        message: e?.message || String(e)
+                    },
+                    deleted: false,
+                    updatedAt: Date.now()
+                };
+                delete interrupted.aiFallback;
+                this.db.health.aiAdviceChat[idx] = interrupted;
+                window.errorBus?.event?.('advice.request', 'stream_interrupted', {
+                    provider,
+                    model,
+                    elapsedMs: Date.now() - requestStarted,
+                    outputChars: interrupted.content.length,
+                    type: interrupted.errorInfo.type
+                });
+                this.save();
+                return;
+            }
             const failure = this.classifyAdviceFailure?.(e, requestMessages || [], model) || { content: `分析失败：${window.toast ? toast.sanitize(e) : e.message}`, info: {} };
-            const failed = { id: pendingId, role: 'assistant', content: failure.content, at: new Date().toISOString(), model, provider, temporaryModel: isOverride, error: true, errorInfo: { ...(failure.info || {}), ...(this._adviceRequestMeta || {}) }, retryPrompt: prompt, deleted: false, updatedAt: Date.now(), replyToId, versionIdx: baseVersionIdx, versionActive: options?.versionActive !== false, versionPinned: !!options?.versionPinned };
+            const fallbackTarget = (hasImageAttachment || !String(previous?.content || '').trim())
+                ? safeAdviceFallbackTarget(e?.aiFallback, adviceTaskId)
+                : null;
+            preserveAttachmentPayload = !!(hasImageAttachment && fallbackTarget && !attachmentPayloadId);
+            const failed = { id: pendingId, role: 'assistant', content: failure.content, at: new Date().toISOString(), model, provider, temporaryModel: isOverride, error: true, errorInfo: { ...(failure.info || {}), ...(this._adviceRequestMeta || {}) }, retryPrompt: effectivePrompt, ...(fallbackTarget ? { aiFallback: { taskId: adviceTaskId, target: fallbackTarget } } : {}), deleted: false, updatedAt: Date.now(), replyToId, versionIdx: baseVersionIdx, versionActive: options?.versionActive !== false, versionPinned: !!options?.versionPinned };
             if (idx >= 0) this.db.health.aiAdviceChat[idx] = failed;
             else this.db.health.aiAdviceChat.push(failed);
             window.errorBus?.event?.('advice.request', 'failed', {
@@ -2668,6 +2728,9 @@ const advicePanel = {
                 }
             });
         } finally {
+            if (activeAttachmentPayloadId && !preserveAttachmentPayload) {
+                this.releaseAdviceAttachmentPayload?.(activeAttachmentPayloadId);
+            }
             this._adviceSending = false;
             this._activeStreamRenderer = null;
             this._activeAdvicePendingId = '';
@@ -2842,15 +2905,48 @@ const advicePanel = {
         const messages = this.activeRecords(this.db.health.aiAdviceChat || []);
         const msg = this.findAdviceMessage(idx, id);
         if (!msg) return;
+        this._adviceRetryPromises = this._adviceRetryPromises || new Map();
+        if (msg.id && this._adviceRetryPromises.has(msg.id)) return this._adviceRetryPromises.get(msg.id);
         const msgIndex = messages.findIndex(m => m.id === msg.id);
         const prompt = msg?.retryPrompt || messages.slice(0, Math.max(0, msgIndex)).reverse().find(m => m.role === 'user')?.content;
         if (!prompt) return;
+        let fallbackMeta = null;
+        let fallbackTaskId = 'advice.chat';
+        try {
+            const fallbackDescriptor = Object.getOwnPropertyDescriptor(msg, 'aiFallback');
+            if (fallbackDescriptor && !Object.prototype.hasOwnProperty.call(fallbackDescriptor, 'value')) return;
+            fallbackMeta = fallbackDescriptor?.value;
+            const taskDescriptor = fallbackMeta && typeof fallbackMeta === 'object'
+                ? Object.getOwnPropertyDescriptor(fallbackMeta, 'taskId')
+                : null;
+            if (taskDescriptor
+                && Object.prototype.hasOwnProperty.call(taskDescriptor, 'value')
+                && taskDescriptor.value === 'advice.vision') fallbackTaskId = 'advice.vision';
+        } catch {
+            return;
+        }
+        const routeOverride = fallbackMeta ? safeAdviceFallbackTarget(fallbackMeta, fallbackTaskId) : null;
+        if (fallbackMeta && !routeOverride) return;
+        const attachmentPayloadId = fallbackTaskId === 'advice.vision' ? msg.id : '';
+        if (attachmentPayloadId && !this.getAdviceAttachmentPayload?.(attachmentPayloadId)) {
+            window.toast?.show?.('原图片仅在当前会话短期保留，请重新附图后再试。', 'info');
+            return;
+        }
+        const startRetry = (sendOptions) => {
+            const retry = Promise.resolve(this.sendAiAdvice(prompt, { ...sendOptions, routeOverride, attachmentPayloadId }));
+            if (!msg.id) return retry;
+            this._adviceRetryPromises.set(msg.id, retry);
+            retry.finally(() => {
+                if (this._adviceRetryPromises?.get(msg.id) === retry) this._adviceRetryPromises.delete(msg.id);
+            });
+            return retry;
+        };
         if (msg.role === 'assistant') {
             if ((this.db.aiRetryMode || 'versioned') === 'replace') {
                 this.softDeleteById(this.db.health.aiAdviceChat, msg.id);
                 this.db.aiTrash.push({ id: msg.id, deletedAt: Date.now(), payload: { ...msg } });
                 this.save();
-                return this.sendAiAdvice(prompt, { skipUserMessage: true, contextMode });
+                return startRetry({ skipUserMessage: true, contextMode });
             }
             const rootId = msg.replyToId || msg.id;
             this.pruneEmptyAdviceAssistantMessages(rootId);
@@ -2863,7 +2959,7 @@ const advicePanel = {
                     s.updatedAt = Date.now();
                 }
             });
-            const result = this.sendAiAdvice(prompt, {
+            const result = startRetry({
                 replyToId: rootId,
                 versionIdx: nextIdx,
                 skipUserMessage: true,
@@ -2873,7 +2969,7 @@ const advicePanel = {
             this.pruneAdviceVersionGroup(rootId, 10);
             return result;
         }
-        return this.sendAiAdvice(prompt, { contextMode });
+        return startRetry({ contextMode });
     },
 
     regenerateAdvice() {
@@ -3146,16 +3242,20 @@ const advicePanel = {
         const ctx = this._lastInsightCtx || {};
         const a = ctx.analysis || {};
         const m = ctx.metrics || {};
+        const taskId = 'insight.quick';
+        const normalizeTarget = (target) => window.aiRoutingPure?.manualFallbackTarget?.(target) || null;
+        const routeOverride = normalizeTarget(options.routeOverride);
         const block = document.getElementById('aiInsightLlmBlock');
         if (!block) return;
         const today = this.logicalDateKey?.() || new Date().toISOString().slice(0, 10);
-        const cacheKey = this.insightCacheKey?.(ctx, today) || today;
+        const effective = ai.resolveTaskConfig?.(taskId, routeOverride) || ai.getEffectiveConfig?.() || ai.cfg || {};
+        const requestedIdentity = normalizeTarget(effective) || routeOverride;
+        const cacheKey = this.insightCacheKey?.(ctx, today, requestedIdentity) || today;
         const cached = !options.force ? this.getInsightCache?.(cacheKey, today) : null;
         if (cached?.html) {
             this.updateInsightAiBlock(cached.html);
             return;
         }
-        const effective = ai.getEffectiveConfig?.() || ai.cfg || {};
         if (!effective.enabled) {
             const local = ctx.diag ? (this.renderLocalAdvice?.(ctx.diag) || '') : '';
             this.updateInsightAiBlock(local || '<div class="ai-llm-label">本地建议</div><div>AI 未配置，已保留本地分析。</div>');
@@ -3176,15 +3276,19 @@ const advicePanel = {
 PR:${a.prLift || '无'} 1RM${a.prDistance || '--'} ${a.prWeight || '--'}kg${a.prReps ? 'x' + a.prReps : ''} 进阶:${ctx.progression?.suggestion || 'maintain'} ${ctx.progression?.reason || ''}
 规则:${ctx.diag ? `${ctx.diag.title || ''} ${ctx.diag.subtitle || ''}` : '无告警'}` }
             ];
-            const text = typeof ai.run === 'function'
-                ? await ai.run({ taskId: 'insight.quick', messages, maxTokens: 700 })
+            const result = typeof ai.run === 'function'
+                ? await ai.run({ taskId, messages, maxTokens: 700, routeOverride, returnMeta: true })
                 : await ai.call(messages, 700);
+            const text = typeof result === 'string' ? result : String(result?.text || '');
+            if (!text.trim()) throw new Error('AI 返回内容为空');
             const parsed = this.parseTrainingClassificationResponse?.(text) || { advice: text, classifications: [] };
             this.cacheTrainingClassifications?.(parsed.classifications);
             const updatedCtx = parsed.classifications?.length && this.buildPlanAnalytics ? { ...ctx, ...this.buildPlanAnalytics() } : ctx;
             this._lastInsightCtx = { ...updatedCtx };
             const html = `<div class="ai-llm-label">AI 跨域建议</div>${this.renderAdviceMarkdown(parsed.advice || text)}`;
-            this.setInsightCache?.(cacheKey, today, html, { text: parsed.advice || text, classifications: parsed.classifications || [], analysis: updatedCtx.analysis || {} });
+            const actualIdentity = normalizeTarget(result?.meta) || requestedIdentity;
+            const actualCacheKey = this.insightCacheKey?.(ctx, today, actualIdentity) || cacheKey;
+            this.setInsightCache?.(actualCacheKey, today, html, { text: parsed.advice || text, classifications: parsed.classifications || [], analysis: updatedCtx.analysis || {} });
             this.updateInsightAiBlock(html);
             if (parsed.classifications?.length && this._aiInsightExpanded) {
                 this._cachedInsightHtml = html;
@@ -3195,6 +3299,15 @@ PR:${a.prLift || '无'} 1RM${a.prDistance || '--'} ${a.prWeight || '--'}kg${a.pr
             const local = ctx.diag ? (this.renderLocalAdvice?.(ctx.diag) || '') : '';
             const msg = window.toast?.sanitize ? toast.sanitize(error) : (error?.message || 'AI 建议生成失败');
             this.updateInsightAiBlock(local || `<div class="ai-llm-label">本地建议</div><div>AI 暂不可用：${this.escapeHtml(msg)}。</div>`);
+            const target = error?.aiFallback?.taskId === taskId ? normalizeTarget(error.aiFallback.target) : null;
+            if (target) {
+                let retryPromise;
+                window.toast?.show?.(msg, 'error', {
+                    timeout: 6000,
+                    action: '使用备用模型重试',
+                    onAction: () => retryPromise ||= Promise.resolve(this.requestInsightAiAdvice({ force: true, routeOverride: target }))
+                });
+            }
         } finally {
             this._insightAiStreaming = false;
             this.resizeInsightBody?.();
@@ -3209,10 +3322,12 @@ PR:${a.prLift || '无'} 1RM${a.prDistance || '--'} ${a.prWeight || '--'}kg${a.pr
         this.resizeInsightBody?.();
     },
 
-    insightCacheKey(ctx = {}, today = '') {
+    insightCacheKey(ctx = {}, today = '', identity = null) {
         const a = ctx.analysis || {};
         return [
             today,
+            String(identity?.profileId || ''),
+            String(identity?.modelId || ''),
             ctx.planProgress || '',
             ctx.planTitle || '',
             ctx.nextItemName || '',

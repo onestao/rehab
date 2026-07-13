@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
+await import(`../ai-model-visual.js?test=${Date.now()}`);
 await import(`../ai-task-settings.js?test=${Date.now()}`);
 
 const helpers = globalThis.aiTaskSettings._test;
@@ -33,7 +34,7 @@ test('model labels include connection identity for duplicate model ids', () => {
 test('compact model control shows the selected model name beside the shared icon', () => {
     const source = readFileSync(new URL('../ai-task-settings.js', import.meta.url), 'utf8');
     const block = source.match(/function createCompactModelControl[\s\S]*?return button;/)?.[0] || '';
-    assert.match(block, /(?:modelVisualNode|connectionMark)\(selected\)/);
+    assert.match(block, /modelVisualNode\(selected\)/);
     assert.match(block, /ai-compact-model-name/);
     assert.match(block, /modelShortName\(selected\)/);
 });

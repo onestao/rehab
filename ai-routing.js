@@ -97,6 +97,26 @@
         },
 
         listSelectableModels(taskId = '') {
+            const definition = this.getTaskDefinition(taskId);
+            const helper = pure();
+            const requiredCapabilities = Array.isArray(definition?.requiredCapabilities) ? definition.requiredCapabilities : [];
+            const capabilityStateFor = capabilities => {
+                try {
+                    const state = helper?.requiredCapabilityState?.(requiredCapabilities, capabilities);
+                    if (state && ['compatible', 'unknown', 'incompatible'].includes(state.status)) {
+                        return {
+                            status: state.status,
+                            missing: Array.isArray(state.missing) ? [...state.missing] : [],
+                            incompatible: Array.isArray(state.incompatible) ? [...state.incompatible] : []
+                        };
+                    }
+                } catch {}
+                return {
+                    status: requiredCapabilities.length ? 'unknown' : 'compatible',
+                    missing: [...requiredCapabilities],
+                    incompatible: []
+                };
+            };
             const rows = [];
             const seen = new Set();
             const add = (profile, modelId, model = null) => {
@@ -116,7 +136,9 @@
                     model: modelId,
                     displayName: model?.displayName || modelId,
                     label: `${profile.name || profile.id} · ${model?.displayName || modelId}`,
+                    family: typeof model?.family === 'string' && model.family.trim() ? model.family.trim() : '其他',
                     capabilities,
+                    capabilityState: capabilityStateFor(capabilities),
                     sizeTier: model?.sizeTier || 'unknown',
                     iconKey: model?.iconKey || model?.vendor || ''
                 });
