@@ -792,7 +792,7 @@ mark.ai-hit
     --advice-model-mark-bg: rgba(199, 210, 254, 0.14) | rgba(35, 48, 163, 0.12) (37-dark-mode.css / 46-advice-ai.css)
 
 .advice-model-grok
-  files: 37-dark-mode.css, 46-advice-ai.css
+  files: 37-dark-mode.css, 46-advice-ai.css, 54-v6-ai.css
     --advice-model-bg: linear-gradient(135deg, #0b1120, #1f2937) | linear-gradient(135deg, #111827, #475569) (37-dark-mode.css / 46-advice-ai.css)
     --advice-model-mark-bg: rgba(248, 250, 252, 0.12) | rgba(255, 255, 255, 0.14) (37-dark-mode.css / 46-advice-ai.css)
 
@@ -821,7 +821,7 @@ mark.ai-hit
     --advice-model-mark-bg: rgba(254, 215, 170, 0.12) | rgba(124, 36, 18, 0.10) (37-dark-mode.css / 46-advice-ai.css)
 
 .advice-model-kimi
-  files: 37-dark-mode.css, 46-advice-ai.css
+  files: 37-dark-mode.css, 46-advice-ai.css, 54-v6-ai.css
     --advice-model-bg: linear-gradient(135deg, #0b1437, #122266) | linear-gradient(135deg, #dbeafe, #e7eaff) (37-dark-mode.css / 46-advice-ai.css)
     --advice-model-color: #e0eaff | #17397b (37-dark-mode.css / 46-advice-ai.css)
     --advice-model-mark-bg: rgba(224, 234, 255, 0.12) | rgba(23, 57, 123, 0.10) (37-dark-mode.css / 46-advice-ai.css)
@@ -833,7 +833,7 @@ mark.ai-hit
     --advice-model-mark-bg: rgba(204, 251, 241, 0.14) | rgba(15, 81, 50, 0.12) (37-dark-mode.css / 46-advice-ai.css)
 
 .advice-model-mimo
-  files: 37-dark-mode.css, 46-advice-ai.css
+  files: 37-dark-mode.css, 46-advice-ai.css, 54-v6-ai.css
     --advice-model-bg: linear-gradient(135deg, #230b23, #2c0e2e) | linear-gradient(135deg, #fbeefe, #eceaff) (37-dark-mode.css / 46-advice-ai.css)
     --advice-model-color: #f5d0fe | #6b1068 (37-dark-mode.css / 46-advice-ai.css)
     --advice-model-mark-bg: rgba(245, 208, 254, 0.14) | rgba(107, 16, 104, 0.12) (37-dark-mode.css / 46-advice-ai.css)
@@ -1169,7 +1169,7 @@ mark.ai-hit
   files: 57-weight-report.css
     animation: none | weight-chart-range-zoom var(--md-sys-motion-duration-medium, 220ms) var(--md-sys-motion-emphasized, cubic-bezier(0.2, 0, 0, 1)) both (57-weight-report.css / 57-weight-report.css)
 
-## DUPLICATES (same selector + same property + same value): 32
+## DUPLICATES (same selector + same property + same value): 33
 .md-top-app-bar
   files: 04-layout-appbar.css, 37-dark-mode.css
     background: transparent (04-layout-appbar.css / 37-dark-mode.css)
@@ -1322,6 +1322,10 @@ mark.ai-hit
 .plan-weekly-task-main small
   files: 49-plan.css, 49-plan-ai.css
     color: var(--md-sys-on-surface-variant) (49-plan.css / 49-plan-ai.css)
+
+.advice-model-generic) .advice-model-icon
+  files: 54-v6-ai.css
+    filter: invert(1) (54-v6-ai.css / 54-v6-ai.css)
 
 ## COMPLEMENTS (same selector, disjoint properties): 124
 .bar-leading

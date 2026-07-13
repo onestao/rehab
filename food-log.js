@@ -542,93 +542,24 @@ const foodLog = {
     },
 
     normalizeAiFoodItems(items = []) {
-        const normKey = value => String(value || '')
-            .trim()
-            .toLowerCase()
-            .replace(/[\s_\-./()（）\[\]【】]/g, '')
-            .replace(/(?:kcal|千卡|kj|千焦耳|千焦|mg|毫克|g|克)$/i, '');
-        const val = (sources, aliases = []) => {
-            const keys = new Set(aliases.map(normKey));
-            for (const source of sources || []) {
-                if (!source || typeof source !== 'object' || Array.isArray(source)) continue;
-                for (const key of Object.keys(source)) {
-                    const v = source[key];
-                    if (keys.has(normKey(key)) && v !== undefined && v !== null && v !== '') return v;
-                }
-            }
-            return undefined;
-        };
-        const num = (value, field = '') => {
-            if (value === undefined || value === null || value === '') return 0;
-            if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
-            if (typeof value === 'object') {
-                const nestedVal = val([value], ['value', 'amount', '数量', '数值']);
-                const nestedUnit = val([value], ['unit', '单位']);
-                return num(nestedUnit ? `${nestedVal} ${nestedUnit}` : nestedVal, field);
-            }
-            const text = String(value).replace(/,/g, '').trim();
-            const match = text.match(/-?\d+(?:\.\d+)?/);
-            const n = match ? Number(match[0]) : 0;
-            if (!Number.isFinite(n)) return 0;
-            return field === 'cal' && /\bkj\b|千焦/i.test(text) ? Number((n / 4.184).toFixed(1)) : n;
-        };
-        const str = value => {
-            if (value === undefined || value === null || typeof value === 'object') return '';
-            return String(value).trim();
-        };
-        const list = value => Array.isArray(value) ? value.map(v => String(v || '').trim()).filter(Boolean) : (str(value) ? str(value).split(/[、,，;；]/).map(v => v.trim()).filter(Boolean) : []);
-        return (Array.isArray(items) ? items : []).map(item => {
-            if (!item || typeof item !== 'object' || Array.isArray(item)) return { name: String(item || '').trim(), grams: 0, cal: 0, pro: 0, carb: 0, fat: 0 };
-            const sources = [item, ...['nutrition', 'nutrients', 'macros', 'macro', '营养', '营养素', '营养信息', '估算', 'estimate'].map(key => val([item], [key])).filter(v => v && typeof v === 'object' && !Array.isArray(v))];
-            const per100Sources = sources.map(source => val([source], ['per100g', 'per100', 'per_100g', 'nutritionPer100g', '每100g', '每100克'])).filter(v => v && typeof v === 'object' && !Array.isArray(v));
-            const get = aliases => val(sources, aliases);
-            const per100 = aliases => val(per100Sources, aliases);
-            const grams = num(get(['grams', 'g', 'weight', 'weightG', 'amountG', '重量', '克数', '克', '份量', '食用量']), 'grams');
-            const total = (aliases, field) => {
-                const direct = num(get(aliases), field);
-                if (direct || !grams) return direct;
-                const base = num(per100(aliases), field);
-                return base ? Number((base * grams / 100).toFixed(field === 'cal' ? 0 : 1)) : 0;
-            };
-            const calAliases = ['cal', 'kcal', 'calorie', 'calories', 'totalCalories', 'energy', 'totalEnergy', '热量', '卡路里', '千卡', '能量'];
-            const carbAliases = ['carb', 'carbs', 'carbohydrate', 'carbohydrates', 'carbohydrateG', 'totalCarb', 'totalCarbs', 'totalCarbohydrate', 'netCarb', 'netCarbs', '碳水', '碳水化合物'];
-            const rawCal = get(calAliases);
-            const rawCarb = get(carbAliases);
-            const hasValue = value => value !== undefined && value !== null && value !== '';
-            const normalized = {
-                ...item,
-                name: str(get(['name', 'food', 'foodName', 'dish', '食物', '食物名', '名称', '名字'])) || str(item.name),
-                grams,
-                cal: total(calAliases, 'cal'),
-                pro: total(['pro', 'protein', 'proteinG', '蛋白', '蛋白质'], 'pro'),
-                carb: total(carbAliases, 'carb'),
-                fat: total(['fat', 'totalFat', 'fatG', '脂肪'], 'fat'),
-                fiber: total(['fiber', 'dietaryFiber', '膳食纤维', '纤维'], 'fiber'),
-                sugar: total(['sugar', '糖', '糖分'], 'sugar'),
-                sodium: total(['sodium', 'sodiumMg', '钠'], 'sodium'),
-                saturatedFat: total(['saturatedFat', 'satFat', '饱和脂肪'], 'saturatedFat'),
-                ingredients: list(get(['ingredients', 'ingredient', '主要配料', '配料', '食材'])),
-                cooking: str(get(['cooking', 'cookingMethod', '烹饪方式', '做法'])),
-                source: str(get(['source', 'basis', '估算依据', '来源'])) || 'ai-food-parse',
-                confidence: num(get(['confidence', 'score', '置信度']), 'confidence') || '',
-                note: str(get(['note', 'remark', '备注', '健康性备注']))
-            };
-            if (!hasValue(rawCarb) && hasValue(rawCal) && normalized.cal > 0 && (normalized.pro || normalized.fat)) {
-                const residual = (normalized.cal - normalized.pro * 4 - normalized.fat * 9) / 4;
-                if (Number.isFinite(residual) && residual >= 0) normalized.carb = Number(residual.toFixed(1));
-            }
-            if (!normalized.cal && (normalized.pro || normalized.carb || normalized.fat)) {
-                normalized.cal = Number((normalized.pro * 4 + normalized.carb * 4 + normalized.fat * 9).toFixed(1));
-                if (!normalized.note) normalized.note = '热量按已识别的宏量营养素估算';
-            }
-            return normalized;
-        }).filter(item => item.name || item.grams || item.cal || item.pro || item.carb || item.fat);
+        const normalized = globalThis.foodAiNormalizer?.normalize?.(items) || [];
+        const details = normalized.normalizationDiagnostics;
+        const incomplete = details?.items?.filter(item => item.missingFields.length || item.recoveredFields.length) || [];
+        if ((incomplete.length || details?.outputCount !== details?.inputCount) && typeof window !== 'undefined') {
+            window.errorBus?.event?.('ai-food-schema', 'normalization-partial', {
+                inputCount: details?.inputCount || 0,
+                outputCount: details?.outputCount || 0,
+                items: incomplete
+            });
+        }
+        return normalized;
     },
 
-    async aiParseFood() {
+    async aiParseFood(options = {}) {
+        if (this._aiFoodParseBusy) return;
         const textarea = document.getElementById('foodAiText');
         const manualInput = document.getElementById('foodName');
-        const text = (textarea?.value?.trim() || manualInput?.value?.trim() || '');
+        const text = String(options?.text ?? textarea?.value?.trim() ?? manualInput?.value?.trim() ?? '').trim();
         if (!text) {
             if (textarea) { textarea.focus(); textarea.placeholder = '请先输入食物描述'; }
             const statusEl = document.getElementById('foodAiStatus');
@@ -638,6 +569,7 @@ const foodLog = {
         }
         const statusEl = document.getElementById('foodAiStatus');
         if (statusEl) statusEl.textContent = '正在加载 AI 模块...';
+        this._aiFoodParseBusy = true;
         try {
             const aiClient = await this.ensureAiRuntime?.() || window.ai;
             const effective = aiClient?.getEffectiveConfig?.() || aiClient?.cfg || {};
@@ -646,13 +578,17 @@ const foodLog = {
                 return alert('请先在设置中配置 AI 接口');
             }
             if (statusEl) statusEl.textContent = 'AI 分析中...';
-            const items = this.normalizeAiFoodItems(await aiClient.parseFood(text));
+            const parseOptions = options?.routeOverride ? { routeOverride: options.routeOverride } : undefined;
+            const items = this.normalizeAiFoodItems(await aiClient.parseFood(text, parseOptions));
             if (!items.length) throw new Error('未识别到食物');
+            const incompleteCount = items.normalizationDiagnostics?.items?.filter(item => item.missingFields.length)?.length || 0;
             this._aiFoodResults = items;
             this._aiFoodAdded = new Set();
             this._aiFoodDrafts = items.map(item => this.formatAiDraft(item));
             this.renderAiFoodResults();
-            if (statusEl) statusEl.textContent = `AI 已识别 ${items.length} 项，点击逐个添加或批量添加`;
+            if (statusEl) statusEl.textContent = incompleteCount
+                ? `AI 已识别 ${items.length} 项，其中 ${incompleteCount} 项有空字段，请检查后添加`
+                : `AI 已识别 ${items.length} 项，点击逐个添加或批量添加`;
         } catch (e) {
             const message = window.toast ? toast.sanitize(e) : String(e?.message || e);
             window.errorBus?.report?.('ai-food', e, {
@@ -662,6 +598,23 @@ const foodLog = {
                 rawSnippet: String(e?.body || '').slice(0, 240)
             });
             if (statusEl) statusEl.textContent = 'AI 识别失败: ' + message;
+            const fallback = e?.aiFallback;
+            const target = fallback?.taskId === 'food.text'
+                ? window.aiRoutingPure?.manualFallbackTarget?.(fallback.target)
+                : null;
+            if (target && window.toast?.show) {
+                let used = false;
+                toast.show('主模型不可用，可使用备用模型重试', 'error', 8000, {
+                    label: '使用备用模型重试',
+                    onClick: () => {
+                        if (used) return Promise.resolve();
+                        used = true;
+                        return this.aiParseFood({ text, routeOverride: target });
+                    }
+                });
+            }
+        } finally {
+            this._aiFoodParseBusy = false;
         }
     },
 

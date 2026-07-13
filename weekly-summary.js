@@ -399,7 +399,11 @@
             } catch (err) {
                 const message = String(err?.message || err || '请求失败');
                 responseEl.innerHTML = `<div class="summary-ai-error"><span class="material-symbols-rounded">error</span> ${safe(message)}</div>`;
-                if (err?.aiFallback?.target) window.toast?.show?.(message, 'error', { timeout: 6000, action: '使用备用模型重试', onAction: () => this._inlineSummaryAi(kind, periodKey, prompt, label, resultType, err.aiFallback.target) });
+                const target = window.aiRoutingPure?.manualFallbackTarget?.(err?.aiFallback?.target);
+                if (target) {
+                    let retryPromise;
+                    window.toast?.show?.(message, 'error', { timeout: 6000, action: '使用备用模型重试', onAction: () => retryPromise ||= this._inlineSummaryAi(kind, periodKey, prompt, label, resultType, target) });
+                }
             }
         },
 
@@ -416,13 +420,13 @@
                     resultType,
                     generatedAt: existing?.generatedAt || new Date(now).toISOString(),
                     updatedAt: now,
-                    deleted: false,
-                    content
+                    deleted: false
                 };
                 record = window.reportVersionPure.appendVersion(record, {
                     content,
                     ai: { summary: content, model: meta.model || 'ai', profileId: meta.profileId || '', reasoningEffort: meta.reasoningEffort || '', fallback: meta.fallback || null, prompt_id: `summary_${kind}_${resultType}` }
                 }, now);
+                record.content = content;
                 if (existing) Object.assign(existing, record);
                 else this.db.health.reports.push(record);
                 this.saveAndBackup?.();

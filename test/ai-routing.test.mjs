@@ -1,6 +1,9 @@
 // @ts-nocheck
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { readFileSync } from 'node:fs';
+
+import * as routingPure from '../ai-routing-pure.mjs';
 
 import {
   REASONING_DEPTHS,
@@ -34,6 +37,127 @@ test('task registry normalizes defaults and rejects duplicate task ids', () => {
     () => registerTaskDefinitions(registry, [{ id: 'food.text' }]),
     error => error.code === 'AI_TASK_DUPLICATE'
   );
+});
+
+test('required capabilities report compatible, incompatible, and unknown states without filtering a model', () => {
+  const requiredCapabilityState = routingPure.requiredCapabilityState;
+  assert.equal(typeof requiredCapabilityState, 'function');
+
+  assert.deepEqual(
+    requiredCapabilityState(['vision', 'json'], { vision: true, json: true }),
+    { status: 'compatible', missing: [], incompatible: [] }
+  );
+  assert.deepEqual(
+    requiredCapabilityState(['vision', 'json'], { vision: false, json: true }),
+    { status: 'incompatible', missing: [], incompatible: ['vision'] }
+  );
+  assert.deepEqual(
+    requiredCapabilityState(['vision', 'json'], { vision: true }),
+    { status: 'unknown', missing: ['json'], incompatible: [] }
+  );
+  assert.deepEqual(
+    requiredCapabilityState(['vision'], null),
+    { status: 'unknown', missing: ['vision'], incompatible: [] }
+  );
+});
+
+test('required capability state normalizes malformed inputs without mutating or treating unknown as false', () => {
+  const requiredCapabilityState = routingPure.requiredCapabilityState;
+  const required = [' vision ', null, 'json', 'vision', 42];
+  const capabilities = Object.create(null);
+  capabilities.vision = false;
+  capabilities.json = undefined;
+
+  const state = requiredCapabilityState(required, capabilities);
+  assert.deepEqual(state, {
+    status: 'incompatible',
+    missing: ['json'],
+    incompatible: ['vision']
+  });
+  assert.deepEqual(required, [' vision ', null, 'json', 'vision', 42]);
+  assert.equal(Object.isFrozen(state), true);
+  assert.equal(Object.isFrozen(state.missing), true);
+  assert.equal(Object.isFrozen(state.incompatible), true);
+  assert.deepEqual(
+    requiredCapabilityState(' vision ', ['vision']),
+    { status: 'compatible', missing: [], incompatible: [] }
+  );
+  assert.deepEqual(
+    requiredCapabilityState(['vision', 'json'], 'vision'),
+    { status: 'unknown', missing: ['json'], incompatible: [] }
+  );
+});
+
+test('model reference normalization returns only canonical own string identifiers', () => {
+  const source = Object.create({ profileId: 'inherited-profile', modelId: 'inherited-model' });
+  source.profileId = ' lab-profile ';
+  source.modelId = ' vision-model ';
+  source.apiKey = 'must-not-propagate';
+  Object.defineProperty(source, '__proto__', { value: 'ignored', enumerable: true });
+
+  const reference = routingPure.normalizeModelRef(source);
+  assert.deepEqual(reference, { profileId: 'lab-profile', modelId: 'vision-model' });
+  assert.notEqual(reference, source);
+  assert.equal(Object.isFrozen(reference), true);
+  assert.equal(Object.hasOwn(reference, 'apiKey'), false);
+  assert.equal(Object.hasOwn(reference, '__proto__'), false);
+  assert.equal(routingPure.normalizeModelRef({ profileId: 42, modelId: 'model' }), null);
+  assert.equal(routingPure.normalizeModelRef({ profileId: 'profile', modelId: '   ' }), null);
+  assert.equal(routingPure.normalizeModelRef(Object.create({ profileId: 'profile', modelId: 'model' })), null);
+});
+
+test('manual fallback target is a frozen credential-free plain reference', () => {
+  const source = {
+    profileId: ' backup-profile ',
+    modelId: ' backup/model ',
+    apiKey: 'secret',
+    key: 'secret',
+    token: 'secret',
+    baseUrl: 'https://secret.invalid',
+    headers: { Authorization: 'secret' },
+    provider: 'openai'
+  };
+
+  const target = routingPure.manualFallbackTarget(source);
+  assert.deepEqual(target, { profileId: 'backup-profile', modelId: 'backup/model' });
+  assert.notEqual(target, source);
+  assert.equal(Object.getPrototypeOf(target), Object.prototype);
+  assert.equal(Object.isFrozen(target), true);
+  assert.equal(JSON.stringify(target), '{"profileId":"backup-profile","modelId":"backup/model"}');
+  assert.deepEqual(source, {
+    profileId: ' backup-profile ', modelId: ' backup/model ', apiKey: 'secret', key: 'secret',
+    token: 'secret', baseUrl: 'https://secret.invalid', headers: { Authorization: 'secret' }, provider: 'openai'
+  });
+});
+
+test('manual fallback target rejects accessors, inherited ids, pollution keys and malformed values', () => {
+  let getterCalls = 0;
+  const accessor = {};
+  Object.defineProperty(accessor, 'profileId', { get() { getterCalls += 1; return 'profile'; } });
+  Object.defineProperty(accessor, 'modelId', { value: 'model' });
+  assert.equal(routingPure.manualFallbackTarget(accessor), null);
+  assert.equal(getterCalls, 0);
+
+  const inherited = Object.create({ profileId: 'profile', modelId: 'model' });
+  assert.equal(routingPure.manualFallbackTarget(inherited), null);
+  assert.equal(routingPure.manualFallbackTarget([]), null);
+  assert.equal(routingPure.manualFallbackTarget(null), null);
+  assert.equal(routingPure.manualFallbackTarget({ profileId: 'profile', modelId: 'model\u0000bad' }), null);
+  assert.equal(routingPure.manualFallbackTarget({ profileId: 'p'.repeat(257), modelId: 'model' }), null);
+  assert.equal(routingPure.manualFallbackTarget({ profileId: 'profile', modelId: 'm'.repeat(257) }), null);
+  assert.equal(routingPure.manualFallbackTarget({ profileId: 'profile', modelId: '' }), null);
+
+  const protoKey = { profileId: 'profile', modelId: 'model' };
+  Object.defineProperty(protoKey, '__proto__', { value: { polluted: true }, enumerable: true });
+  assert.equal(routingPure.manualFallbackTarget(protoKey), null);
+  const constructorKey = { profileId: 'profile', modelId: 'model', constructor: 'blocked' };
+  assert.equal(routingPure.manualFallbackTarget(constructorKey), null);
+  assert.equal({}.polluted, undefined);
+});
+
+test('manual fallback target is available to the browser adapter', () => {
+  assert.equal(typeof routingPure.manualFallbackTarget, 'function');
+  assert.match(readFileSync(new URL('../ai-routing-pure.mjs', import.meta.url), 'utf8'), /manualFallbackTarget,/);
 });
 
 test('task route normalization removes invalid and duplicate fallbacks', () => {

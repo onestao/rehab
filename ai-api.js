@@ -70,20 +70,32 @@ Object.assign(ai, {
                 const text = await this.call(options.messages || [], options.maxTokens || 2000, requestOpts);
                 return withMeta(text, effective, index);
             } catch (error) {
-                lastError = error;
-                const reasoningDepth = String(effective.reasoningDepth || 'auto');
-                if (!['auto', 'off'].includes(reasoningDepth) && [400, 415, 422].includes(Number(error?.status || 0))) {
-                    error.message = `${error.message || '请求失败'}；当前模型可能不支持所选推理强度，请切换模型或改为自动/关闭`;
+                let exposedError = error;
+                try {
+                    if (error && typeof error === 'object') Object.defineProperty(error, 'aiFallback', {
+                        value: undefined, writable: true, configurable: true, enumerable: true
+                    });
+                } catch {
+                    exposedError = new Error(String(error?.message || '请求失败'));
+                    exposedError.name = String(error?.name || 'Error');
+                    if (typeof error?.code === 'string') exposedError.code = error.code;
+                    if (Number.isFinite(Number(error?.status))) exposedError.status = Number(error.status);
                 }
-                const retryable = window.aiRoutingPure?.isRetryableAiError?.(error) === true;
+                lastError = exposedError;
+                const reasoningDepth = String(effective.reasoningDepth || 'auto');
+                if (!['auto', 'off'].includes(reasoningDepth) && [400, 415, 422].includes(Number(exposedError?.status || 0))) {
+                    exposedError.message = `${exposedError.message || '请求失败'}；当前模型可能不支持所选推理强度，请切换模型或改为自动/关闭`;
+                }
+                const retryable = window.aiRoutingPure?.isRetryableAiError?.(exposedError) === true;
                 if (!retryable || emitted || index >= sequence.length - 1) {
                     const route = this.getTaskRoute?.(taskId) || {};
-                    if (!emitted && route.fallbackMode !== 'automatic' && route.fallbacks?.[0]) {
-                        error.aiFallback = { taskId, target: route.fallbacks[0] };
-                    }
-                    throw error;
+                    const target = retryable && !emitted && (route.fallbackMode || 'manual') === 'manual'
+                        ? window.aiRoutingPure?.manualFallbackTarget?.(route.fallbacks?.[0])
+                        : null;
+                    if (target) exposedError.aiFallback = { taskId, target };
+                    throw exposedError;
                 }
-                try { window.dispatchEvent(new CustomEvent('ai:route-fallback', { detail: { taskId, index, error } })); } catch {}
+                try { window.dispatchEvent(new CustomEvent('ai:route-fallback', { detail: { taskId, index, error: exposedError } })); } catch {}
             }
         }
         throw lastError || new Error('AI 请求失败');
@@ -947,7 +959,7 @@ Object.assign(ai, {
          return full;
     },
 
-    async parseFood(text) {
+    async parseFood(text, opts = {}) {
         const tpl = window.dataAiTemplates;
         const prefResult = tpl?.buildPromptMessages('food_parse_text', { text: text }, window.data?.db) || {};
         const sysMsg = prefResult.messages?.find(m => m.role === 'system')?.content || '你是营养师助手，只返回纯 JSON 数组，不要 markdown，不要解释。';
@@ -959,7 +971,8 @@ Object.assign(ai, {
         const raw = this.resolveTaskConfig ? await this.run({
             taskId: 'food.text',
             messages,
-            maxTokens: 2000
+            maxTokens: 2000,
+            routeOverride: opts?.routeOverride || null
         }) : await this.call(messages, 2000);
         return this._parseAiJsonPayload(raw, {
             expected: 'array',
@@ -1015,9 +1028,11 @@ Object.assign(ai, {
         const prefResult = tpl?.buildPromptMessages('food_parse_image', {}, window.data?.db) || {};
         const sysMsg = prefResult.messages?.find(m => m.role === 'system')?.content || '你是营养师助手，只返回纯 JSON 数组，不要 markdown，不要解释。';
         const prompt = prefResult.messages?.find(m => m.role === 'user')?.content || `你是营养师助手。用户给出了一张"这顿饭/食物"的照片。请你根据图片内容识别食物，并严格只返回 JSON 数组，不要其他文字。\n每个元素必须包含核心字段 name、grams、cal、pro、carb、fat，不能省略；这些字段的值必须是数字，即使为 0 也必须明确输出。格式：{"name":"食物名","grams":克数,"cal":热量kcal,"pro":蛋白质g,"carb":碳水g,"fat":脂肪g,"fiber":膳食纤维g,"sugar":糖g,"sodium":钠mg,"saturatedFat":饱和脂肪g,"ingredients":["主要配料"],"cooking":"烹饪方式","source":"估算依据","confidence":0-100,"note":"健康性备注"}\n要求：\n- 如果无法判断克数，请用常见份量估算；\n- 热量可按蛋白质、碳水和脂肪计算，但不要省略 cal；\n- fiber/sugar/sodium/saturatedFat/ingredients/cooking/source/confidence/note 可根据可见信息合理填写，无法判断时使用 0、空数组或空字符串；\n- 如果图片中看不清或不确定，请不要编造，返回空数组 [] 或减少条目；\n- 不要输出 markdown、不要解释。`;
-        const raw = this.resolveTaskConfig
-            ? await this.run({ ...opts, taskId: 'food.vision', promptText: prompt, imageFile: file, systemText: sysMsg, maxTokens: 2000 })
+        const result = this.resolveTaskConfig
+            ? await this.run({ ...opts, taskId: 'food.vision', promptText: prompt, imageFile: file, systemText: sysMsg, maxTokens: 2000, returnMeta: true })
             : await this.callVisionTextImage(prompt, file, 2000, sysMsg, opts);
+        const raw = result && typeof result === 'object' && typeof result.text === 'string' ? result.text : result;
+        if (result?.meta) opts.onResolvedMeta?.(result.meta);
         opts.onProgress?.({ stage: 'parse' });
         try {
             return this._parseAiJsonPayload(raw, {
@@ -1030,12 +1045,13 @@ Object.assign(ai, {
         }
     },
 
-    async weightLossPlan(params) {
-        return this.bodyGoalPlan({ ...params, goalType: 'loss' });
+    async weightLossPlan(params, options = {}) {
+        return this.bodyGoalPlan({ ...params, goalType: 'loss' }, options);
     },
 
-    async bodyGoalPlan(params) {
+    async bodyGoalPlan(params, options = {}) {
         const { goalType = 'loss', currentWeight, targetWeight, activityLevel, dailyTrainMin, height, weeklyFreq, intensity, sportType, experience, gender = 'male', age = 30 } = params;
+        const routeOverride = window.aiRoutingPure?.manualFallbackTarget?.(options?.routeOverride) || null;
         const isGain = goalType === 'gain';
         const diff = isGain ? (targetWeight - currentWeight) : (currentWeight - targetWeight);
         const activityMap = {
@@ -1082,11 +1098,22 @@ Object.assign(ai, {
         const raw = this.resolveTaskConfig ? await this.run({
             taskId: 'goal.body',
             messages,
-            maxTokens: 2600
+            maxTokens: 2600,
+            routeOverride
         }) : await this.call(messages, 2600);
-        const match = raw.match(/\{[\s\S]*"tips"[\s\S]*\}/);
-        if (!match) throw new Error('AI 返回格式异常');
-        return JSON.parse(match[0]);
+        try {
+            const match = raw.match(/\{[\s\S]*"tips"[\s\S]*\}/);
+            if (!match) throw new Error('AI 返回格式异常');
+            return JSON.parse(match[0]);
+        } catch (error) {
+            if (error && typeof error === 'object' && !error.code) error.code = 'AI_JSON_PARSE_FAILED';
+            const route = routeOverride ? null : this.getTaskRoute?.('goal.body');
+            const target = (route?.fallbackMode || 'manual') === 'manual'
+                ? window.aiRoutingPure?.manualFallbackTarget?.(route?.fallbacks?.[0])
+                : null;
+            if (target && error && typeof error === 'object') error.aiFallback = { taskId: 'goal.body', target };
+            throw error;
+        }
     }
 });
 

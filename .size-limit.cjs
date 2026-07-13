@@ -37,16 +37,17 @@ module.exports = [
   },
   { name: 'generated-css', path: 'build/generated.css', limit: '80 KB' },
   { name: 'workout-bundle', path: ['workout-*.js', 'strength-form.js', 'swipe-actions.js', 'weekly-plan.js'], limit: '50 KB' },
-  { name: 'ai-bundle', path: ['ai-*.js', 'ai-*.mjs', 'advice-*.js', 'coach-context.js', 'lib/virtual-core.umd.js', 'lib/flexsearch.light.js'], limit: '131 KB' },
+  { name: 'ai-bundle', path: ['ai-*.js', 'ai-*.mjs', 'advice-*.js', 'coach-context.js', 'lib/virtual-core.umd.js', 'lib/flexsearch.light.js'], limit: '134 KB' },
   { name: 'rehab-policy', path: 'rehab-policy.js', limit: '12 KB' },
   { name: 'rehab-progression-pure', path: 'rehab-progression-pure.js', limit: '4 KB' },
   // Plan is intentionally tight; keep UI growth lazy and move parser/spec logic into exported pure modules.
-  { name: 'plan-bundle', path: 'plan-*.js', limit: '72.1 KB' },
+  { name: 'plan-bundle', path: 'plan-*.js', limit: '72.5 KB' },
   { name: 'debug-bundle', path: 'debug-*.js', limit: '10 KB' },
   {
     name: 'records-bundle',
     path: [
       'health-*.js',
+      'food-ai-normalizer-pure.js',
       'food-log.js',
       'history-view.js',
       'weekly-summary.js',

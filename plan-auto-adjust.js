@@ -400,6 +400,11 @@
 
         async autoAdjustNextDayPlans(options = {}) {
             if (this._autoAdjustInFlight) return null;
+            const routeOverride = window.aiRoutingPure?.manualFallbackTarget?.(options.routeOverride) || null;
+            const retryIntent = {};
+            if (options.sourceDate != null) retryIntent.sourceDate = String(options.sourceDate);
+            if (options.targetDate != null) retryIntent.targetDate = String(options.targetDate);
+            if (options.reason != null) retryIntent.reason = String(options.reason);
             const sourceDate = String(options.sourceDate || this.logicalDateKey?.() || this.dateKey?.(new Date()) || new Date().toISOString().slice(0, 10));
             const targetDate = String(options.targetDate || dateOffset(sourceDate, 1));
             const sourcePlans = (this.activeRecords?.(this.db.dailyPlans || []) || [])
@@ -413,12 +418,11 @@
 
             this._autoAdjustInFlight = true;
             window.toast?.show?.('正在根据今日反馈自动调整明天计划…', 'info', 3200);
-            const beforePlans = clone(this.db.dailyPlans || []);
             try {
                 await this.ensureAutoPlanAiReady?.();
-                const plans = await this.generateAutoAdjustedPlans?.({ sourceDate, targetDate, sourcePlans, types });
+                const plans = await this.generateAutoAdjustedPlans?.({ sourceDate, targetDate, sourcePlans, types, routeOverride });
                 const finalPlans = this.sanitizeAutoAdjustedPlans?.(plans, { sourceDate, targetDate, sourcePlans, types }) || [];
-                const applied = this.applyAutoAdjustedPlans?.(finalPlans, { sourceDate, targetDate, beforePlans, key, latestDoneAt });
+                const applied = this.applyAutoAdjustedPlans?.(finalPlans, { sourceDate, targetDate, key, latestDoneAt });
                 if (applied) {
                     window.toast?.show?.('已根据今日反馈自动调整明天计划', 'success', {
                         timeout: 7000,
@@ -429,14 +433,20 @@
                 return applied;
             } catch (error) {
                 const fallbackReason = errorSummary(error);
+                const fallbackTarget = window.aiRoutingPure?.manualFallbackTarget?.(error?.aiFallback?.target) || null;
                 const fallback = this.sanitizeAutoAdjustedPlans?.(buildFallbackPlans({ ...this, sourceDate, targetDate, db: this.db }, sourcePlans), { sourceDate, targetDate, sourcePlans, types }) || [];
-                const applied = this.applyAutoAdjustedPlans?.(fallback, { sourceDate, targetDate, beforePlans, key, latestDoneAt, fallback: true, fallbackReason });
+                const applied = this.applyAutoAdjustedPlans?.(fallback, { sourceDate, targetDate, key, latestDoneAt, fallback: true, fallbackReason });
                 if (applied) {
+                    let retryStarted = false;
                     window.toast?.show?.('AI 调整失败，已用本地规则保守调整明天计划', 'info', {
                         timeout: 8000,
                         actions: [
                             { label: '撤销', onClick: () => this.undoLastPlanAutoAdjust?.() },
-                            { label: '重试 AI', onClick: () => this.autoAdjustNextDayPlans?.({ sourceDate, targetDate, force: true }) }
+                            { label: '重试 AI', onClick: () => {
+                                if (retryStarted) return null;
+                                retryStarted = true;
+                                return this.autoAdjustNextDayPlans?.({ ...retryIntent, force: true, ...(fallbackTarget ? { routeOverride: fallbackTarget } : {}) });
+                            } }
                         ]
                     });
                 } else {
@@ -463,7 +473,7 @@
             if (typeof this.buildPlanAiContext !== 'function' || typeof this.parsePlanAiPayload !== 'function') throw new Error('训练计划 AI 模块未就绪');
         },
 
-        async generateAutoAdjustedPlans({ sourceDate, targetDate, sourcePlans, types }) {
+        async generateAutoAdjustedPlans({ sourceDate, targetDate, sourcePlans, types, routeOverride }) {
             const stats = feedbackStats(sourcePlans);
             const prescription = preferredPrescriptionActions(this.db || {});
             const cautiousPrescription = prescription.filter((action) => action.safetyLevel === 'cautious');
@@ -529,7 +539,8 @@
                 { role: 'system', content: '只输出严格JSON。' },
                 { role: 'user', content: `${this.buildPlanAiContext('today', extra, types, { targetDate })}\nplan.date=${targetDate}。` }
             ];
-            const text = await window.ai.runStream('plan.adjust', messages, 1800);
+            const safeOverride = window.aiRoutingPure?.manualFallbackTarget?.(routeOverride) || null;
+            const text = await window.ai.runStream('plan.adjust', messages, 1800, undefined, safeOverride ? { routeOverride: safeOverride } : {});
             const parsed = this.parsePlanAiPayload(text, types);
             if (!parsed.ok) throw new Error(parsed.reason || 'AI 返回计划无法解析');
             return parsed.plans.map((plan) => ({ ...plan, date: targetDate }));

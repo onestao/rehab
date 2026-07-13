@@ -8,7 +8,7 @@ const pureCode = readFileSync(new URL('../ai-routing-pure.mjs', import.meta.url)
   .replace(/export\s+(const|function)\s+/g, '$1 ');
 const runtimeCode = readFileSync(new URL('../ai-routing.js', import.meta.url), 'utf8');
 
-function loadRuntime() {
+function loadRuntime({ withCapabilityHelper = true } = {}) {
   const ai = {
     cfg: {
       activeProfileId: 'p1',
@@ -36,7 +36,8 @@ function loadRuntime() {
     CustomEvent: class CustomEvent { constructor(type, init) { this.type = type; this.detail = init?.detail; } }
   };
   sandbox.window.window = sandbox.window;
-  vm.runInNewContext(`${pureCode}\nwindow.aiRoutingPure = { REASONING_DEPTHS, FALLBACK_MODES, normalizeTaskRegistry, registerTaskDefinitions, normalizeTaskRoute, resolveTaskRoute, buildFallbackSequence, buildReasoningOptions, isRetryableAiError };`, sandbox);
+  vm.runInNewContext(`${pureCode}\nwindow.aiRoutingPure = { REASONING_DEPTHS, FALLBACK_MODES, normalizeTaskRegistry, registerTaskDefinitions, normalizeTaskRoute, resolveTaskRoute, buildFallbackSequence, buildReasoningOptions, isRetryableAiError, ...(typeof requiredCapabilityState === 'function' ? { requiredCapabilityState } : {}) };`, sandbox);
+  if (!withCapabilityHelper) delete sandbox.window.aiRoutingPure.requiredCapabilityState;
   vm.runInNewContext(runtimeCode, sandbox);
   return ai;
 }
@@ -65,14 +66,112 @@ test('task routes keep identical model ids isolated by profile', async () => {
 test('selectable model values include profile identity', () => {
   const ai = loadRuntime();
   const rows = ai.listSelectableModels('advice.chat');
-  assert.deepEqual(Array.from(rows, row => row.value), ['p1::shared-model', 'p2::shared-model']);
+  assert.deepEqual(
+    Array.from(rows, row => ({ key: row.key, value: row.value, profileId: row.profileId, modelId: row.modelId })),
+    [
+      { key: 'p1::shared-model', value: 'p1::shared-model', profileId: 'p1', modelId: 'shared-model' },
+      { key: 'p2::shared-model', value: 'p2::shared-model', profileId: 'p2', modelId: 'shared-model' }
+    ]
+  );
 });
 
 test('task pickers leave model capability choices to the user', () => {
   const ai = loadRuntime();
   ai.models[0].capabilities.vision = false;
+  ai.cfg.profiles.push(
+    { id: 'disabled', name: '已禁用接口', provider: 'openai', enabled: false, baseUrl: 'https://disabled.test/v1', model: 'hidden-model' },
+    { id: 'archived', name: '已归档接口', provider: 'openai', archived: true, baseUrl: 'https://archived.test/v1', model: 'hidden-model' }
+  );
+  ai.models.push(
+    { profileId: 'disabled', id: 'hidden-model', enabled: true, capabilities: { vision: true } },
+    { profileId: 'archived', id: 'hidden-model', enabled: true, capabilities: { vision: true } }
+  );
+  ai.apiKeyFor = () => 'available-key';
   const rows = ai.listSelectableModels('food.vision');
   assert.deepEqual(Array.from(rows, row => row.profileId), ['p1', 'p2']);
+});
+
+test('selectable models expose family and advisory capability state for compatible, unknown, and incompatible rows', () => {
+  const ai = loadRuntime();
+  ai.models = [
+    {
+      profileId: 'p1',
+      id: 'claude-3-5-haiku',
+      displayName: '实验室视觉助手',
+      family: 'Claude',
+      enabled: true,
+      capabilities: { vision: true, json: true }
+    },
+    {
+      profileId: 'p1',
+      id: 'manual-unknown',
+      displayName: 'Claude branded manual entry',
+      enabled: true,
+      capabilities: { vision: true }
+    },
+    {
+      profileId: 'p1',
+      id: 'text-only',
+      family: 'Qwen',
+      enabled: true,
+      capabilities: { vision: false, json: true }
+    }
+  ];
+
+  const rows = ai.listSelectableModels('food.vision');
+  assert.notEqual(rows[0].capabilityState, rows[1].capabilityState);
+  assert.notEqual(rows[0].capabilityState.missing, rows[1].capabilityState.missing);
+  assert.deepEqual(
+    Array.from(rows, row => row.modelId),
+    ['claude-3-5-haiku', 'manual-unknown', 'text-only'],
+    'capability metadata is advisory and must not hard-filter user-selectable models'
+  );
+  assert.deepEqual(
+    Array.from(rows, row => ({
+      modelId: row.modelId,
+      displayName: row.displayName,
+      family: row.family,
+      capabilityState: {
+        status: row.capabilityState?.status,
+        missing: Array.from(row.capabilityState?.missing || []),
+        incompatible: Array.from(row.capabilityState?.incompatible || [])
+      }
+    })),
+    [
+      {
+        modelId: 'claude-3-5-haiku',
+        displayName: '实验室视觉助手',
+        family: 'Claude',
+        capabilityState: { status: 'compatible', missing: [], incompatible: [] }
+      },
+      {
+        modelId: 'manual-unknown',
+        displayName: 'Claude branded manual entry',
+        family: '其他',
+        capabilityState: { status: 'unknown', missing: ['json'], incompatible: [] }
+      },
+      {
+        modelId: 'text-only',
+        displayName: 'text-only',
+        family: 'Qwen',
+        capabilityState: { status: 'incompatible', missing: [], incompatible: ['vision'] }
+      }
+    ]
+  );
+
+  const fallbackRows = loadRuntime({ withCapabilityHelper: false }).listSelectableModels('food.vision');
+  assert.deepEqual(
+    Array.from(fallbackRows, row => ({ value: row.value, capabilityState: {
+      status: row.capabilityState?.status,
+      missing: Array.from(row.capabilityState?.missing || []),
+      incompatible: Array.from(row.capabilityState?.incompatible || [])
+    } })),
+    [
+      { value: 'p1::shared-model', capabilityState: { status: 'unknown', missing: ['vision', 'json'], incompatible: [] } },
+      { value: 'p2::shared-model', capabilityState: { status: 'unknown', missing: ['vision', 'json'], incompatible: [] } }
+    ],
+    'a missing browser helper degrades capability labels without changing selectable model identities'
+  );
 });
 
 test('task fallback mode is persisted and controls the request sequence', async () => {

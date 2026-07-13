@@ -222,7 +222,7 @@ test('template manager delegates untrusted template ids instead of inline JS', (
 test('model picker delegates untrusted model metadata instead of inline JS', () => {
     const ai = {
         cfg: { provider: 'openai', profiles: [{ id: `profile');globalThis.pwned=1;//`, provider: 'openai', key: 'set' }] },
-        models: [{ provider: 'openai', id: `model');globalThis.pwned=1;//`, displayName: 'Model' }],
+        models: [{ provider: 'openai', id: `model');globalThis.pwned=1;//`, displayName: '<img src=x onerror=globalThis.pwned=1>' }],
         getEffectiveConfig() { return { profileId: `profile');globalThis.pwned=1;//`, provider: 'openai', model: 'base' }; },
         normalizeProvider(provider = '') { return String(provider || '').trim() || 'openai'; },
         isModelEnabled(model) { return model?.enabled !== false; },
@@ -242,6 +242,8 @@ test('model picker delegates untrusted model metadata instead of inline JS', () 
     const html = api.renderAdviceModelPicker();
 
     assert.doesNotMatch(html, /chooseAdviceModel\('/);
+    assert.doesNotMatch(html, /<img src=x/);
+    assert.match(html, /&lt;img src=x onerror=globalThis\.pwned=1&gt;/);
     assert.match(html, /data-profile-id="profile&#39;\);globalThis\.pwned=1;\/\//);
     assert.match(html, /data-model="model&#39;\);globalThis\.pwned=1;\/\//);
 

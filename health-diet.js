@@ -237,7 +237,7 @@
             }
         },
 
-        async handleDietPhoto(file) {
+        async handleDietPhoto(file, options = {}) {
             const inputEl = document.getElementById('dietPhotoInput');
             const button = document.getElementById('dietPhotoButton');
             if (!file) {
@@ -272,7 +272,10 @@
                 return;
             }
             _aiPhotoBusy = true;
-            const cfg = window.ai?.getEffectiveConfig?.() || {};
+            const cfg = window.ai?.resolveTaskConfig?.('food.vision', options?.routeOverride || null)
+                || window.ai?.getEffectiveConfig?.()
+                || {};
+            let requestMeta = { provider: cfg.provider, modelId: cfg.modelId || cfg.model };
             const isHeic = window.ai?._isHeicFile?.(file);
             const controller = new AbortController();
             this._dietPhotoAbortController = controller;
@@ -287,6 +290,8 @@
                 const rawItems = await window.ai.parseFoodFromImage(file, {
                     signal: controller.signal,
                     timeoutMs: isHeic ? 45000 : 30000,
+                    routeOverride: options?.routeOverride || null,
+                    onResolvedMeta: (meta) => { requestMeta = meta; },
                     onProgress: ({ stage }) => {
                         if (stage === 'heic') this.setDietPhotoStatus('decode', '正在处理 HEIC 照片…', () => controller.abort());
                         else if (stage === 'resize') this.setDietPhotoStatus('resize', '正在压缩照片…', () => controller.abort());
@@ -302,12 +307,12 @@
                 this._aiFoodDrafts = items.map(item => format(item));
                 this.renderAiFoodResults?.();
                 this.setDietPhotoStatus('done', `AI 已识别 ${items.length} 项，点击逐个添加或批量添加`);
-                window.ai?.clearVisionFailure?.(cfg.provider, cfg.model);
+                window.ai?.clearVisionFailure?.(requestMeta?.provider || cfg.provider, requestMeta?.modelId || cfg.model);
                 window.haptics?.success?.();
                 window.toast?.show?.(`识别到 ${items.length} 项食物`, 'success');
             } catch (e) {
                 const classified = window.aiVisionPure?.classifyVisionError?.(e) || { type: 'unknown', message: sanitizeMessage(e), isErrorToast: true };
-                if (classified.cacheVisionFailure) window.ai?.markVisionFailure?.(cfg.provider, cfg.model, classified.message);
+                if (classified.cacheVisionFailure) window.ai?.markVisionFailure?.(requestMeta?.provider || cfg.provider, requestMeta?.modelId || cfg.model, classified.message);
                 if (classified.type === 'cancelled') {
                     this.setDietPhotoStatus('cancelled', '已取消');
                     return;
@@ -315,7 +320,30 @@
                 const message = sanitizeMessage(classified.message || e);
                 this.setDietPhotoStatus(classified.type || 'failed', `识别失败：${message}`);
                 window.haptics?.error?.();
-                if (classified.isErrorToast !== false) window.toast?.show?.(`识别失败：${message}`, 'error');
+                if (classified.isErrorToast !== false) {
+                    const fallback = e?.aiFallback;
+                    const target = fallback?.taskId === 'food.vision'
+                        ? window.aiRoutingPure?.manualFallbackTarget?.(fallback.target)
+                        : null;
+                    if (target && window.toast?.show) {
+                        let retryFile = file;
+                        let used = false;
+                        const releaseTimer = setTimeout(() => { retryFile = null; }, 8000);
+                        window.toast.show(`识别失败：${message}`, 'error', 8000, {
+                            label: '使用备用模型重试',
+                            onClick: () => {
+                                if (used || !retryFile) return Promise.resolve();
+                                used = true;
+                                const nextFile = retryFile;
+                                retryFile = null;
+                                clearTimeout(releaseTimer);
+                                return this.handleDietPhoto(nextFile, { routeOverride: target });
+                            }
+                        });
+                    } else {
+                        window.toast?.show?.(`识别失败：${message}`, 'error');
+                    }
+                }
             } finally {
                 _aiPhotoBusy = false;
                 this._dietPhotoAbortController = null;

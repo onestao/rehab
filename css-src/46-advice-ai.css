@@ -937,8 +937,7 @@
     object-fit: contain;
     border-radius: 0;
 }
-.advice-model-picker-arrow,
-.advice-model-chip-arrow {
+.advice-model-picker-arrow {
     font-size: 16px;
     color: currentColor;
     opacity: 0.76;

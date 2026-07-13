@@ -57,7 +57,6 @@ const LEGACY_ADVICE_ATTACH_KEYS = [
     'deleteAiAdviceMessage',
     'deleteTemplateById',
     'detectAdviceFocus',
-    'detectAdviceModelProvider',
     'DRAFT_KEY',
     'editTemplateById',
     'expandAdviceRenderWindow',
@@ -74,7 +73,6 @@ const LEGACY_ADVICE_ATTACH_KEYS = [
     'handleTemplateImport',
     'hideAdviceNewMessageButton',
     'holdAdviceTopChrome',
-    'iconFallbackSrcs',
     'importTemplates',
     'insightCacheKey',
     'isAdviceModelStarred',
@@ -86,9 +84,7 @@ const LEGACY_ADVICE_ATTACH_KEYS = [
     'loadAdviceWindowFromColdStore',
     'measureAdviceTopChrome',
     'mergeAdviceSearchResults',
-    'MODEL_ICONS',
     'modelShortName',
-    'modelThemeFor',
     'mountAdviceVirtualList',
     'normalizeAdviceRoutine',
     'onAdvicePromptInput',
@@ -105,9 +101,6 @@ const LEGACY_ADVICE_ATTACH_KEYS = [
     'pinAdviceVersion',
     'prepareAdviceVirtualState',
     'preserveAdviceScroll',
-    'providerHashHue',
-    'providerIcon',
-    'providerKeyForModel',
     'pruneAdviceVersionGroup',
     'pruneEmptyAdviceAssistantMessages',
     'refreshAdviceModelChip',
@@ -158,7 +151,6 @@ const LEGACY_ADVICE_ATTACH_KEYS = [
     'sendAiAdvice',
     'setActiveAdviceVersion',
     'setAdviceContextMode',
-    'setAdviceModel',
     'setAdviceModelPickerScope',
     'setAdviceReasoningDepth',
     'setAdviceRange',
@@ -225,6 +217,14 @@ function getPath(root, pathParts) {
     return pathParts.reduce((value, part) => value?.[part], root);
 }
 
+function createMemoryStorage(initial = {}) {
+    const values = new Map(Object.entries(initial));
+    return {
+        getItem(key) { return values.has(key) ? values.get(key) : null; },
+        setItem(key, value) { values.set(key, String(value)); }
+    };
+}
+
 test('advice panel attach keeps the legacy flat function contract', () => {
     const { host } = attachPanel();
 
@@ -273,4 +273,85 @@ test('adviceApi facade exposes a small stable surface that forwards to legacy me
         assert.equal(typeof fn, 'function', `${apiPath.join('.')} should be a function`);
         assert.deepEqual(fn('x', 2), { legacyName, args: ['x', 2], thisValue: host });
     }
+});
+
+test('AI coach records profile-qualified recents only after each task route saves', async () => {
+    const storage = createMemoryStorage();
+    const { host, context } = attachPanel();
+    const routeCalls = [];
+    let taskId = 'advice.chat';
+    let resolveSave = null;
+    context.localStorage = storage;
+    context.window.localStorage = storage;
+    context.window.aiTaskSettings = {
+        rememberRecent(nextTaskId, model) {
+            const stored = JSON.parse(storage.getItem('rehab.ai.modelRecents.v1') || '{}');
+            stored[nextTaskId] = [`${model.profileId}::${model.modelId}`];
+            storage.setItem('rehab.ai.modelRecents.v1', JSON.stringify(stored));
+        }
+    };
+    context.ai = {
+        cfg: {
+            profiles: [
+                { id: 'p-chat', provider: 'chat' },
+                { id: 'p-vision', provider: 'vision' }
+            ]
+        },
+        apiKeyFor() { return 'configured'; },
+        getTaskRoute() { return { reasoningDepth: 'auto' }; },
+        setTaskRoute(nextTaskId, route) {
+            routeCalls.push({ taskId: nextTaskId, route });
+            return new Promise(resolve => { resolveSave = resolve; });
+        }
+    };
+    host.advicePickerTaskId = () => taskId;
+    host.rerenderAdvicePanel = () => {};
+    host.refreshAdviceModelChip = () => {};
+    const completeSave = () => {
+        if (typeof resolveSave !== 'function') throw new Error('route save was not scheduled');
+        resolveSave();
+    };
+
+    host.chooseAdviceModel('p-chat', 'chat', 'shared-model');
+    assert.equal(storage.getItem('rehab.ai.modelRecents.v1'), null, 'recent must wait for the route save');
+    completeSave();
+    await new Promise(resolve => setImmediate(resolve));
+
+    taskId = 'advice.vision';
+    host.chooseAdviceModel('p-vision', 'vision', 'shared-model');
+    assert.deepEqual(JSON.parse(storage.getItem('rehab.ai.modelRecents.v1') || '{}'), {
+        'advice.chat': ['p-chat::shared-model']
+    });
+    completeSave();
+    await new Promise(resolve => setImmediate(resolve));
+
+    assert.deepEqual(JSON.parse(JSON.stringify(routeCalls)), [
+        { taskId: 'advice.chat', route: { reasoningDepth: 'auto', primary: { profileId: 'p-chat', modelId: 'shared-model' } } },
+        { taskId: 'advice.vision', route: { reasoningDepth: 'auto', primary: { profileId: 'p-vision', modelId: 'shared-model' } } }
+    ]);
+    assert.deepEqual(JSON.parse(storage.getItem('rehab.ai.modelRecents.v1') || '{}'), {
+        'advice.chat': ['p-chat::shared-model'],
+        'advice.vision': ['p-vision::shared-model']
+    });
+});
+
+test('AI coach does not record a recent model when task route save rejects', async () => {
+    const { host, context } = attachPanel();
+    const recentCalls = [];
+    context.window.aiTaskSettings = {
+        rememberRecent(taskId, model) { recentCalls.push({ taskId, model }); }
+    };
+    context.ai = {
+        cfg: { profiles: [{ id: 'p-chat', provider: 'chat' }] },
+        apiKeyFor() { return 'configured'; },
+        getTaskRoute() { return {}; },
+        setTaskRoute() { return Promise.reject(new Error('route save failed')); }
+    };
+    host.advicePickerTaskId = () => 'advice.chat';
+
+    await assert.rejects(
+        host.chooseAdviceModel('p-chat', 'chat', 'shared-model'),
+        /route save failed/
+    );
+    assert.deepEqual(recentCalls, []);
 });

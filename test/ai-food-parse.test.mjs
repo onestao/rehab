@@ -4,8 +4,9 @@ import vm from 'node:vm';
 import { test } from 'node:test';
 
 async function loadFoodLog() {
+    const normalizer = await readFile(new URL('../food-ai-normalizer-pure.js', import.meta.url), 'utf8');
     const source = await readFile(new URL('../food-log.js', import.meta.url), 'utf8');
-    return vm.runInNewContext(`${source}\nfoodLog;`, {});
+    return vm.runInNewContext(`${normalizer}\n${source}\nfoodLog;`, {});
 }
 
 async function loadAiApi(raw) {
@@ -148,6 +149,89 @@ test('derives omitted carbohydrate from a returned calorie total when possible',
 
     assert.equal(item.cal, 520);
     assert.equal(item.carb, 71.8);
+});
+
+test('normalizes structurally varied food schemas without dropping core fields', async () => {
+    const foodLog = await loadFoodLog();
+
+    const items = foodLog.normalizeAiFoodItems([
+        {
+            food: {
+                title: '去皮鸡胸肉',
+                serving: { quantity: 90, unit: 'g' }
+            },
+            营养成分: {
+                '热量(kcal)': 178,
+                '蛋白质含量(g)': 22,
+                '碳水化合物含量(g)': 0,
+                '总脂肪(g)': 10
+            }
+        },
+        {
+            食品名称: '燕麦牛奶',
+            估算重量: '1杯（约260克）',
+            nutrients: [
+                { nutrient: 'energy', amount: 220, unit: 'kcal' },
+                { nutrient: 'protein', amount: 8, unit: 'g' },
+                { nutrient: 'total carbohydrates', amount: 32, unit: 'g' },
+                { nutrient: 'fat', amount: 7, unit: 'g' }
+            ]
+        },
+        {
+            item_name: '希腊酸奶',
+            serving_size: { amount: 200, unit: 'g' },
+            nutrition_facts: {
+                energy: { value: 500, unit: 'kJ' },
+                protein_content_g: 20,
+                total_carbohydrate_g: 15,
+                total_fat_g: 0
+            }
+        }
+    ]);
+
+    assert.deepEqual(
+        JSON.parse(JSON.stringify(items.map(({ name, grams, cal, pro, carb, fat }) => ({ name, grams, cal, pro, carb, fat })))),
+        [
+            { name: '去皮鸡胸肉', grams: 90, cal: 178, pro: 22, carb: 0, fat: 10 },
+            { name: '燕麦牛奶', grams: 260, cal: 220, pro: 8, carb: 32, fat: 7 },
+            { name: '希腊酸奶', grams: 200, cal: 119.5, pro: 20, carb: 15, fat: 0 }
+        ]
+    );
+});
+
+test('reports incomplete model fields instead of silently treating them as valid zeroes', async () => {
+    const foodLog = await loadFoodLog();
+    const items = foodLog.normalizeAiFoodItems([{
+        food_name: '豆腐',
+        serving_size_g: 100,
+        protein_g: 8,
+        carbohydrates_g: 'unknown'
+    }]);
+
+    assert.equal(items[0].name, '豆腐');
+    assert.equal(items[0].grams, 100);
+    assert.deepEqual(
+        [...items.normalizationDiagnostics.items[0].missingFields],
+        ['carb', 'fat']
+    );
+    assert.deepEqual(
+        [...items.normalizationDiagnostics.items[0].recoveredFields],
+        ['cal']
+    );
+});
+
+test('parseFood discovers food arrays inside unfamiliar nested wrappers', async () => {
+    const ai = await loadAiApi(JSON.stringify({
+        meal_analysis: {
+            detected_foods: [
+                { food_name: '米饭', serving_size_g: 150, carbohydrates_g: 39 }
+            ]
+        }
+    }));
+
+    const parsed = await ai.parseFood('一碗米饭');
+    assert.equal(parsed.length, 1);
+    assert.equal(parsed[0].food_name, '米饭');
 });
 
 test('parseFood accepts fenced, wrapped, and noisy model JSON responses', async () => {

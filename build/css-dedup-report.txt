@@ -29,16 +29,16 @@
   37-dark-mode.css, 46-advice-ai.css
 
 .advice-model-grok
-  37-dark-mode.css, 46-advice-ai.css
+  37-dark-mode.css, 46-advice-ai.css, 54-v6-ai.css
 
 .advice-model-kimi
-  37-dark-mode.css, 46-advice-ai.css
+  37-dark-mode.css, 46-advice-ai.css, 54-v6-ai.css
 
 .advice-model-mark
   37-dark-mode.css, 46-advice-ai.css
 
 .advice-model-mimo
-  37-dark-mode.css, 46-advice-ai.css
+  37-dark-mode.css, 46-advice-ai.css, 54-v6-ai.css
 
 .advice-model-minimax
   37-dark-mode.css, 46-advice-ai.css
@@ -587,7 +587,7 @@ media (min-width: 600px)
   06-layout-page.css, 36-responsive.css
 
 media (prefers-color-scheme: dark)
-  08-components-cards.css, 16-history-hero-calendar.css, 37-dark-mode.css, 51-v6-today.css
+  08-components-cards.css, 16-history-hero-calendar.css, 37-dark-mode.css, 51-v6-today.css, 54-v6-ai.css
 
 media (prefers-reduced-motion: reduce)
   36-responsive.css, 48-advice-model-picker.css, 50-v6-ui.css, 40-a11y.css

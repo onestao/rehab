@@ -25,3 +25,26 @@ AI 教练选择器现使用专属单滚动容器、三段式滑动指示器和 P
 - Tags: ai-coach, model-picker, touch, correction
 
 ---
+
+## [LRN-20260713-001] correction
+
+**Logged**: 2026-07-13T00:00:00+08:00
+**Priority**: high
+**Status**: resolved
+**Area**: frontend
+
+### Summary
+不要仅凭文件在代理执行期间变脏就认定为代理越权；用户可能同时修改同一工作树。
+
+### Details
+审查 3.9 时发现 Advice 附件、模型 chip 与 CSS 文件新增差异，错误地归因给子代理并发出了撤回指令。用户确认这些是其本人修改。撤回指令被及时中止，未产生文件修改。
+
+### Suggested Action
+审查子代理前记录任务起始文件快照；发现额外差异时先向子代理询问实际修改清单，并保留用户明确认领的改动，不能按时间相关性自动归因或回退。
+
+### Metadata
+- Source: user_feedback
+- Related Files: advice-attachments.js, advice-panel.js, css-src/46-advice-ai.css, css-src/54-v6-ai.css
+- Tags: multi-agent, dirty-worktree, ownership, correction
+
+---

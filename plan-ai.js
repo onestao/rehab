@@ -1163,7 +1163,7 @@
             return validation;
         },
 
-        async submitPlanAi(mode = '') {
+        async submitPlanAi(mode = '', options = {}) {
             mode = mode || this._planAiMode || 'today';
             mode = mode === 'week' ? 'week' : 'today';
             if (!window.ai?.call) {
@@ -1177,6 +1177,8 @@
             this._planAiAllowUserPlanMerge = hasUserPlanMergeIntent(prompt);
             const targetDates = planAiTargetDates(this, mode);
             const outputTokenBudget = mode === 'week' ? 5200 : 3600;
+            const taskId = mode === 'week' ? 'plan.week' : 'plan.today';
+            const routeOverride = window.aiRoutingPure?.manualFallbackTarget?.(options?.routeOverride) || null;
             const messages = [
                 { role: 'system', content: '你是训练排程助手，只输出 JSON。' },
                 { role: 'user', content: this.buildPlanAiContext(mode, prompt, types) }
@@ -1189,14 +1191,17 @@
                 let text = '';
                 let parsed = null;
                 let validation = null;
+                let requestMeta = null;
                 for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
                     if (attempt > 0) {
                         this.setPlanAiStatus?.(`第 ${attempt + 1} 次尝试：AI 正在修正 spec 字段…`, 'busy');
                     }
-                    text = await ai.runStream(mode==='week'?'plan.week':'plan.today', messages, outputTokenBudget, (_delta, accumulated) => {
+                    const result = await ai.runStream(taskId, messages, outputTokenBudget, (_delta, accumulated) => {
                         const length = String(accumulated || '').length;
                         this.setPlanAiStatus?.(length ? `正在接收计划草稿：${length} 字` : 'AI 已响应，正在等待内容…', 'busy');
-                    });
+                    }, { routeOverride, returnMeta: true });
+                    text = typeof result === 'string' ? result : String(result?.text || '');
+                    if (result?.meta) requestMeta = { ...result.meta };
                     this.setPlanAiStatus?.('已收到计划草稿，正在校验 JSON…', 'busy');
                     validation = this.validatePlanAiPayload(text, types, mode === 'week' ? targetDates : []);
                     if (validation.ok) break;
@@ -1224,6 +1229,7 @@
                     });
                     return;
                 }
+                if (requestMeta) this._lastPlanAiMeta = requestMeta;
                 this.setPlanAiStatus?.('计划草稿已生成，请在预览中确认。', 'success');
                 if (Array.isArray(parsed.warnings) && parsed.warnings.length) {
                     const head = parsed.warnings.slice(0, 3).join('；');
@@ -1231,8 +1237,22 @@
                 }
                 this.previewPlanAiPlans(parsed.plans);
             } catch (error) {
-                this.setPlanAiStatus?.(`生成失败：${window.toast?.sanitize ? toast.sanitize(error) : error?.message || error}`, 'error');
-                window.toast?.show?.(`AI 生成失败：${window.toast?.sanitize ? toast.sanitize(error) : error?.message || error}`, 'error');
+                const message = window.toast?.sanitize ? toast.sanitize(error) : error?.message || error;
+                this.setPlanAiStatus?.(`生成失败：${message}`, 'error');
+                const fallbackTarget = error?.aiFallback?.taskId === taskId
+                    ? window.aiRoutingPure?.manualFallbackTarget?.(error.aiFallback.target)
+                    : null;
+                let retried = false;
+                const retry = fallbackTarget ? {
+                    timeout: 6000,
+                    action: '使用备用模型重试',
+                    onAction: () => {
+                        if (retried) return;
+                        retried = true;
+                        return this.submitPlanAi(mode, { routeOverride: fallbackTarget });
+                    }
+                } : undefined;
+                window.toast?.show?.(`AI 生成失败：${message}`, 'error', retry);
             } finally {
                 this.setPlanAiPending?.(false);
             }

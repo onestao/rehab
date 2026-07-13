@@ -3,6 +3,20 @@
     'use strict';
 
     const text = value => String(value == null ? '' : value);
+    const KNOWN_MANUAL_CAPABILITIES = new Set(['text', 'vision', 'streaming', 'json', 'reasoning']);
+    const normalizeManualCapabilities = value => {
+        const known = {};
+        const custom = [];
+        const seen = new Set();
+        text(value).split(',').forEach(item => {
+            const capability = text(item).trim().toLowerCase();
+            if (!capability || seen.has(capability)) return;
+            seen.add(capability);
+            if (KNOWN_MANUAL_CAPABILITIES.has(capability)) known[capability] = true;
+            else custom.push(capability);
+        });
+        return { known, custom };
+    };
     const byId = id => document.getElementById(id);
     const icon = name => {
         const node = document.createElement('span');
@@ -501,9 +515,19 @@
             const helper = await root.ai.loadModelCatalogPure();
             const profile = root.ai.findProfile(profileId);
             const existing = new Map((root.ai.models || []).map(model => [`${model.profileId}::${model.id}`, model]));
-            models.forEach(model => {
+            models.forEach(candidate => {
+                const { manualUnknownCapabilities, ...model } = candidate || {};
                 const key = `${profileId}::${model.id}`;
-                if (!existing.has(key)) existing.set(key, helper.normalizeCatalogModel(model, { profileId, provider: profile.provider, baseUrl: profile.baseUrl, source: 'manual' }));
+                if (existing.has(key)) return;
+                const normalized = helper.normalizeCatalogModel(model, { profileId, provider: profile.provider, baseUrl: profile.baseUrl, source: 'manual' });
+                const unknown = Array.isArray(manualUnknownCapabilities)
+                    ? normalizeManualCapabilities(manualUnknownCapabilities.join(',')).custom
+                    : [];
+                if (unknown.length) normalized.capabilities = {
+                    ...normalized.capabilities,
+                    ...Object.fromEntries(unknown.map(capability => [capability, null]))
+                };
+                existing.set(key, normalized);
             });
             root.ai.models = Array.from(existing.values());
             await root.ai.persistModelCache();
@@ -517,8 +541,10 @@
             const displayName = text(prompt('显示名称（可留空）', id)).trim() || id;
             const family = text(prompt('模型分组（可留空）', '')).trim();
             const capabilityInput = text(prompt('能力标签（可留空，逗号分隔，如 vision,reasoning,json）', '')).trim();
-            const capabilities = Object.fromEntries(capabilityInput.split(',').map(item => item.trim()).filter(Boolean).map(item => [item, true]));
-            await this.addCandidates(profileId, [{ id, displayName, family, capabilities, source: 'manual' }], host);
+            const { known, custom } = normalizeManualCapabilities(capabilityInput);
+            await this.addCandidates(profileId, [{
+                id, displayName, family, capabilities: known, manualUnknownCapabilities: custom, source: 'manual'
+            }], host);
         },
 
         impactedTasks(profileId, modelId) {

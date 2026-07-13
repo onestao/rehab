@@ -41,10 +41,6 @@ function highlightRenderedHtml(html, keyword) {
 }
 
 Object.assign(advicePanel, {
-    iconFallbackSrcs(key = 'generic') {
-        return window.aiModelVisual.iconFallbackSrcs(key);
-    },
-
     adviceModelIconHtml(visual = {}) {
         const srcs = visual.iconSrcs || [];
         const mark = this.escapeHtml(visual.mark || 'AI');
@@ -62,18 +58,6 @@ Object.assign(advicePanel, {
             t.color ? `--advice-model-color:${t.color}` : '',
             t.markBg ? `--advice-model-mark-bg:${t.markBg}` : ''
         ].filter(Boolean).join(';');
-    },
-
-    providerHashHue(key = 'generic') {
-        return window.aiModelVisual.hashHue(key);
-    },
-
-    modelThemeFor(key = 'generic') {
-        return window.aiModelVisual.themeFor(key);
-    },
-
-    detectAdviceModelProvider(model = '') {
-        return window.aiModelVisual.detect(model);
     },
 
     adviceModelVisual(model = '', provider = '', iconKey = '') {
