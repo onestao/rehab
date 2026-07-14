@@ -109,3 +109,47 @@ test('appRoute syncFromState uses explicit active page during tab transitions', 
     window.appRoute.syncFromState();
     assert.equal(window.location.hash, '#/ai/advice?range=all');
 });
+
+function deferred() {
+    let resolve;
+    const promise = new Promise(done => { resolve = done; });
+    return { promise, resolve };
+}
+
+test('late completion from an older navigation cannot replace the latest page or hash', async () => {
+    const context = loadRouteHarness();
+    const { window } = context;
+    const gates = {
+        records: deferred(),
+        'ai-coach': deferred()
+    };
+    let navigationToken = 0;
+    window.ui = {
+        beginNavigation() {
+            navigationToken += 1;
+            return navigationToken;
+        },
+        isCurrentNavigation(token) {
+            return token === navigationToken;
+        },
+        async _activateTab(page, _nav, options) {
+            await gates[page].promise;
+            if (!this.isCurrentNavigation(options.navigationToken)) return false;
+            window.data._activePageId = page;
+            return true;
+        }
+    };
+
+    const older = window.appRoute.apply(window.appRoute.parseHash('#/records/calendar'));
+    const latest = window.appRoute.apply(window.appRoute.parseHash('#/ai/advice?range=all'));
+
+    gates['ai-coach'].resolve();
+    assert.equal(await latest, true);
+    assert.equal(window.data._activePageId, 'ai-coach');
+    assert.equal(window.location.hash, '#/ai/advice?range=all');
+
+    gates.records.resolve();
+    assert.equal(await older, false);
+    assert.equal(window.data._activePageId, 'ai-coach');
+    assert.equal(window.location.hash, '#/ai/advice?range=all');
+});
