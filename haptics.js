@@ -1,15 +1,24 @@
 // @ts-nocheck
 (function () {
-    if (window.haptics) return;
+    if (window.haptics) {
+        if (document.readyState === 'complete') window.haptics.syncToggle?.();
+        else window.addEventListener('load', () => window.haptics.syncToggle?.(), { once: true });
+        return;
+    }
 
     function enabled() {
         const prefs = window.data?.db?.prefs;
         return !prefs || prefs.haptics !== false;
     }
 
+    function supported() {
+        return typeof navigator !== 'undefined' &&
+            typeof navigator.vibrate === 'function';
+    }
+
     function pulse(pattern) {
-        if (!enabled()) return;
-        try { navigator.vibrate?.(pattern); } catch {}
+        if (!supported() || !enabled()) return;
+        try { navigator.vibrate(pattern); } catch {}
     }
 
     window.haptics = {
@@ -27,7 +36,10 @@
         syncToggle() {
             const input = document.getElementById('hapticsEnabled');
             if (!input) return;
+            const available = supported();
             input.checked = enabled();
+            input.disabled = !available;
+            input.setAttribute?.('aria-disabled', available ? 'false' : 'true');
             window.ui?.syncSwitchAria?.(input);
         }
     };
@@ -40,5 +52,9 @@
         window.haptics.light();
     });
 
-    window.addEventListener('load', () => window.haptics.syncToggle());
+    if (document.readyState === 'complete') {
+        window.haptics.syncToggle();
+    } else {
+        window.addEventListener('load', () => window.haptics.syncToggle(), { once: true });
+    }
 })();

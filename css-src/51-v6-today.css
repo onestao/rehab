@@ -244,3 +244,29 @@
     .ring { width: 96px; height: 96px; }
     .ring-divider { height: 52px; }
 }
+
+
+/* Static today shell placeholders (no shimmer / continuous animation) */
+.today-shell-skeleton,
+.today-quick-skeleton {
+    opacity: 0.92;
+}
+.record-quick-btn.is-placeholder {
+    cursor: default;
+    pointer-events: none;
+    user-select: none;
+    opacity: 0.72;
+}
+.record-quick-btn.is-placeholder:hover,
+.record-quick-btn.is-placeholder:active {
+    transform: none;
+}
+.ring.is-placeholder {
+    cursor: default;
+    pointer-events: none;
+    opacity: 0.7;
+}
+.ring.is-placeholder:hover,
+.ring.is-placeholder:active {
+    transform: none;
+}

@@ -347,7 +347,7 @@
         },
 
         renderPlanManualStrip() {
-            return `<div class="plan-manual-strip"><div class="record-quick-actions"><button class="record-quick-btn" type="button" data-plan-quick="diet" onclick="data.openDietModal()"><span class="material-symbols-rounded">restaurant</span><span>记饮食</span></button><button class="record-quick-btn" type="button" data-plan-quick="cardio" onclick="data.openExerciseModal()"><span class="material-symbols-rounded">fitness_center</span><span>记运动</span></button><button class="record-quick-btn" type="button" data-plan-quick="weight" onclick="data.openWeightModal()"><span class="material-symbols-rounded">monitor_weight</span><span>记体重</span></button><button class="record-quick-btn record-quick-btn-ai context-ai-btn" type="button" data-ai-ctx="today" data-ai-idx="0"><span class="material-symbols-rounded">psychology</span><span>问 AI</span></button></div></div>`;
+            return `<div class="plan-manual-strip"><div class="quick-dock"><button class="record-quick-btn" type="button" data-plan-quick="weight" onclick="data.openWeightModal()"><span class="material-symbols-rounded">monitor_weight</span><span>记体重</span></button><button class="record-quick-btn" type="button" data-plan-quick="diet" onclick="data.openDietModal()"><span class="material-symbols-rounded">restaurant</span><span>记饮食</span></button><button class="record-quick-btn" type="button" data-plan-quick="cardio" onclick="data.openExerciseModal()"><span class="material-symbols-rounded">fitness_center</span><span>记运动</span></button><button class="record-quick-btn record-quick-btn-ai context-ai-btn" type="button" data-plan-quick="ai" data-ai-ctx="today" data-ai-idx="0"><span class="material-symbols-rounded">psychology</span><span>问 AI</span></button></div></div>`;
         },
 
         togglePlanTodayExpanded() {
@@ -369,9 +369,36 @@
         },
 
         async openPlanTaskEdit(planId, taskId) {
-            if (typeof window.loadAppScript === 'function' && !window.dataPlanAi?.searchPlanActionChoices) {
-                await window.loadAppScript('plan-ai');
-                this.refreshModules?.();
+            const needsLoad = typeof window.loadAppScript === 'function' && !window.dataPlanAi?.searchPlanActionChoices;
+            if (needsLoad) {
+                if (this._planTaskEditBusy) return;
+                this._planTaskEditBusy = true;
+                document.querySelectorAll('[onclick*="openPlanTaskEdit"]').forEach((node) => {
+                    if (!(node instanceof HTMLElement)) return;
+                    if ('disabled' in node) node.disabled = true;
+                    node.setAttribute('aria-busy', 'true');
+                    node.classList.add('is-action-busy');
+                });
+            }
+            try {
+                if (needsLoad) {
+                    await window.loadAppScript('plan-ai');
+                    this.refreshModules?.();
+                }
+            } catch (e) {
+                window.errorBus?.report?.('lazy-plan.openPlanTaskEdit', e);
+                window.toast?.show?.('编辑计划模块加载失败，请稍后重试。', 'error');
+                return;
+            } finally {
+                if (needsLoad) {
+                    this._planTaskEditBusy = false;
+                    document.querySelectorAll('[onclick*="openPlanTaskEdit"]').forEach((node) => {
+                        if (!(node instanceof HTMLElement)) return;
+                        if ('disabled' in node) node.disabled = false;
+                        node.removeAttribute('aria-busy');
+                        node.classList.remove('is-action-busy');
+                    });
+                }
             }
             const { task } = this.findTask?.(planId, taskId) || {};
             if (!task) return;

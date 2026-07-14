@@ -104,13 +104,24 @@ function attachPlanAliases() {
         return window['planWeekly']?.open?.(...args);
     };
     data.openPlanAiSheet = data.openPlanAiSheet || async function (...args) {
-        if (typeof window.loadAppScript === 'function' && !window.dataPlanAi?.openPlanAiSheet) {
-            await window.loadAppScript('plan-ai');
+        if (typeof window.dataPlanAi?.openPlanAiSheet === 'function') {
+            return window.dataPlanAi.openPlanAiSheet.apply(data, args);
         }
-        data.refreshModules?.();
-        const open = window.dataPlanAi?.openPlanAiSheet;
-        if (typeof open === 'function') return open.apply(data, args);
-        window.toast?.show?.('AI 计划模块尚未加载完成，请稍后重试。', 'error');
+        if (!data.beginActionBusy?.('openPlanAiSheet', '加载中')) return;
+        try {
+            if (typeof window.loadAppScript === 'function' && !window.dataPlanAi?.openPlanAiSheet) {
+                await window.loadAppScript('plan-ai');
+            }
+            data.refreshModules?.();
+            const open = window.dataPlanAi?.openPlanAiSheet;
+            if (typeof open === 'function') return open.apply(data, args);
+            window.toast?.show?.('AI 计划模块尚未加载完成，请稍后重试。', 'error');
+        } catch (e) {
+            window.errorBus?.report?.('lazy-plan.openPlanAiSheet', e);
+            window.toast?.show?.('AI 计划加载失败，请稍后重试。', 'error');
+        } finally {
+            data.endActionBusy?.('openPlanAiSheet');
+        }
     };
     data.renderPlanEquipmentPanel = data.renderPlanEquipmentPanel || data.renderPlanEquipmentCard;
 }
@@ -122,6 +133,7 @@ function attachLazyRecordOpeners() {
             if (typeof window[cfg.owner]?.[method] === 'function') {
                 return window[cfg.owner][method].apply(this, args);
             }
+            if (!data.beginActionBusy?.(method, '加载中')) return;
             try {
                 data._lazyRecordLoadPromises = data._lazyRecordLoadPromises || {};
                 const key = cfg.scripts.join('|');
@@ -136,6 +148,8 @@ function attachLazyRecordOpeners() {
             } catch (e) {
                 window.errorBus?.report?.(`lazy-record.${method}`, e);
                 window.toast?.show?.(`${cfg.label}加载失败，请稍后重试。`, 'error');
+            } finally {
+                data.endActionBusy?.(method);
             }
         };
     });
@@ -143,6 +157,34 @@ function attachLazyRecordOpeners() {
 
 attachPlanAliases();
 attachLazyRecordOpeners();
+
+async function checkAppUpdate() {
+    if (!data.beginActionBusy?.('checkAppUpdate', '检测中...')) return;
+    try {
+        if (!window.appUpdate?.checkNow) {
+            if (typeof window.loadAppScript !== 'function') {
+                window.toast?.show?.('更新模块加载器尚未就绪，请稍后重试。', 'error');
+                return;
+            }
+            await window.loadAppScript('app-update');
+        }
+        if (window.appUpdate?.checkNow) {
+            return await window.appUpdate.checkNow();
+        }
+        window.toast?.show?.('更新模块尚未就绪，请稍后重试。', 'error');
+    } catch (e) {
+        window.errorBus?.report?.('lazy-update.checkAppUpdate', e);
+        window.toast?.show?.('更新模块加载失败，请稍后重试。', 'error');
+    } finally {
+        data.endActionBusy?.('checkAppUpdate');
+    }
+}
+
+function attachStableUpdateCheck() {
+    data.checkAppUpdate = checkAppUpdate;
+}
+
+attachStableUpdateCheck();
 
 data.ensureAiRuntime = async function (options = {}) {
     if (!data._aiRuntimePromise) {
@@ -250,6 +292,7 @@ data.refreshModules = function () {
     );
     attachPlanAliases();
     attachLazyRecordOpeners();
+    attachStableUpdateCheck();
     window.advicePanel?.attach?.(data);
     window['planAiDebug']?.install?.();
 };
