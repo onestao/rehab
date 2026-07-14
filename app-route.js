@@ -92,34 +92,48 @@
 
     const appRoute = {
         _applying: false,
+        _applyingToken: 0,
+        _intentToken: 0,
         parseHash,
         serializeRoute,
 
+        beginNavigation() {
+            this._intentToken += 1;
+            return this._intentToken;
+        },
+
         isApplying() {
-            return !!this._applying;
+            return !!this._applying && this._applyingToken === this._intentToken;
         },
 
         syncFromState() {
-            if (this._applying) return;
+            if (this.isApplying()) return;
             replaceHash(serializeRoute(currentRouteFromState()));
         },
 
-        async apply(route) {
+        async apply(route, options = {}) {
             if (!window.ui || !window.data) return;
+            const intentToken = options.intentToken ?? this.beginNavigation();
+            const navigationToken = window.ui.beginNavigation?.();
             const next = route || parseHash(window.location.hash);
             const page = normalizePage(next.page);
             const navIndex = { today: 0, workout: 1, records: 2, 'ai-coach': 3, profile: 4 }[page] || 0;
             const nav = document.querySelectorAll('.nav-item')[navIndex];
             this._applying = true;
+            this._applyingToken = intentToken;
             try {
                 if (page === 'records') window.data.healthView = next.healthView || 'diet';
                 if (page === 'profile') window.data.routineView = next.routineView || 'home';
                 if (page === 'ai-coach') window.data.adviceRange = next.adviceRange || 'today';
-                await window.ui._activateTab(page, nav, { preserveSubroute: true });
+                const activated = await window.ui._activateTab(page, nav, { preserveSubroute: true, navigationToken });
+                if (intentToken !== this._intentToken || (navigationToken != null && !window.ui.isCurrentNavigation?.(navigationToken))) return false;
+                if (activated === false) return false;
             } finally {
-                this._applying = false;
+                if (this._applyingToken === intentToken) this._applying = false;
             }
+            if (intentToken !== this._intentToken || (navigationToken != null && !window.ui.isCurrentNavigation?.(navigationToken))) return false;
             this.syncFromState();
+            return true;
         },
 
         async applyCurrent() {

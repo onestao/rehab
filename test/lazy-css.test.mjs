@@ -49,13 +49,15 @@ test('lazy CSS retry ignores failed link elements', () => {
     assert.match(html, /link\.remove\(\)/);
 });
 
-test('health profile lazy CSS is warmed only during idle-friendly conditions', () => {
+test('health profile lazy CSS is not warmed without a real health intent', () => {
     const html = readRootFile('index.html');
+    const idleBlock = html.slice(html.indexOf("bootMark('boot:idle-preload:start')"), html.indexOf('logBootPerfSummary();'));
 
     assert.match(html, /function canIdlePreloadCss\(\)/);
     assert.match(html, /connection\?\.saveData\) return false/);
     assert.match(html, /function warmLazyCss\(name\)/);
-    assert.match(html, /runWhenIdle\(\(\) => warmLazyCss\('42-health-profile'\), \{ timeout: 6000 \}\)/);
+    assert.doesNotMatch(idleBlock, /warmLazyCss\('42-health-profile'\)/);
+    assert.match(html, /page === 'records' && view === 'training'\) deps\.add\('42-health-profile'\)/);
 });
 
 test('records training keeps only critical health profile layout in eager CSS', () => {
