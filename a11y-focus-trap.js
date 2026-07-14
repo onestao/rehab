@@ -1,5 +1,7 @@
 // @ts-nocheck
 (function () {
+    if (window.focusTrap?.__installed) return;
+
     /** @type {{ root: HTMLElement|null, handler: any, previous: Element|null }} */
     const state = { root: null, handler: null, previous: null };
 
@@ -10,9 +12,11 @@
 
     function trap(rootEl) {
         if (!rootEl) return;
-        release();
+        if (state.root === rootEl && state.handler) return;
+        const previous = state.root === rootEl ? state.previous : document.activeElement;
+        release({ restore: false });
         state.root = rootEl;
-        state.previous = document.activeElement;
+        state.previous = previous;
         state.handler = (e) => {
             if (!state.root) return;
             if (e.key === 'Escape') {
@@ -35,16 +39,58 @@
         };
         document.addEventListener('keydown', state.handler);
         const list = focusables(rootEl);
-        (list[0] || rootEl).focus?.();
+        if (!rootEl.contains(document.activeElement)) {
+            (list[0] || rootEl).focus?.();
+        }
     }
 
-    function release() {
+    function release(options = {}) {
+        const restore = options.restore !== false;
         if (state.handler) document.removeEventListener('keydown', state.handler);
         state.handler = null;
         state.root = null;
-        try { state.previous?.focus?.(); } catch {}
+        if (restore) {
+            try { state.previous?.focus?.(); } catch {}
+        }
         state.previous = null;
     }
 
-    window.focusTrap = { trap, release };
+    function isOpenModal(el) {
+        if (!el || typeof el !== 'object') return false;
+        if (el.classList?.contains?.('hidden')) return false;
+        if (el.getAttribute?.('aria-hidden') === 'true') return false;
+        const style = window.getComputedStyle?.(el);
+        if (style && (style.display === 'none' || style.visibility === 'hidden')) return false;
+        return true;
+    }
+
+    function findOpenModal() {
+        const preferred = [
+            document.getElementById('voiceImportDialog'),
+            document.getElementById('voiceEngineDialog'),
+            document.getElementById('profileModal'),
+            document.getElementById('themeSheet'),
+            document.getElementById('voiceSettingsSheet'),
+            document.querySelector('.md-modal[data-rl-modal="1"]'),
+            document.querySelector('.md-modal:not(.hidden)[role="dialog"]'),
+            document.querySelector('.md-modal-sheet:not(.hidden)[role="dialog"]')
+        ];
+        for (const el of preferred) {
+            if (isOpenModal(el)) return el;
+        }
+        return null;
+    }
+
+    function attachOpenModals() {
+        const open = findOpenModal();
+        if (open) trap(open);
+    }
+
+    window.focusTrap = { trap, release, attachOpenModals, __installed: true };
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', attachOpenModals, { once: true });
+    } else {
+        attachOpenModals();
+    }
 })();

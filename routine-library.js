@@ -882,14 +882,6 @@
             </div>`;
         },
 
-        checkAppUpdate() {
-            if (window.appUpdate?.checkNow) {
-                window.appUpdate.checkNow();
-                return;
-            }
-            if (typeof toast?.show === 'function') toast.show('当前环境无法检测更新', 'error');
-        },
-
         detectAppVersion() {
             // Read the ?v=N param from any of the cache-busted asset tags Kilo emits in index.html.
             try {

@@ -1,5 +1,21 @@
 // @ts-nocheck
 (function () {
+    function actionBusySelector(key) {
+        if (key === 'openDietModal') return '[onclick*="openDietModal"],[data-q="diet"],[data-plan-quick="diet"]';
+        if (key === 'openWeightModal') return '[onclick*="openWeightModal"],[data-q="weight"],[data-plan-quick="weight"]';
+        if (key === 'openExerciseModal') return '[onclick*="openExerciseModal"],[data-q="cardio"],[data-plan-quick="cardio"]';
+        if (key === 'openPlanAiSheet') return '[onclick*="openPlanAiSheet"],[onclick*="openPlanTodayAiSheet"],[onclick*="createSelectedPlans"]';
+        if (key === 'openPlanTaskEdit') return '[onclick*="openPlanTaskEdit"]';
+        if (key === 'checkAppUpdate') return '#profileUpdateCheckBtn';
+        return '';
+    }
+
+    function actionBusyTextNode(node) {
+        return node.querySelector('.pvf-check-label') ||
+            Array.from(node.querySelectorAll('span'))
+                .find((span) => !span.classList.contains('material-symbols-rounded'));
+    }
+
     function dietMealForClock(date = new Date()) {
         const value = date instanceof Date ? date : new Date(date);
         const minutes = value.getHours() * 60 + value.getMinutes();
@@ -10,6 +26,50 @@
     }
 
     window.dataUiState = {
+        beginActionBusy(key, label) {
+            this._actionBusy = this._actionBusy || {};
+            if (this._actionBusy[key]) return false;
+            this._actionBusy[key] = true;
+            const selector = actionBusySelector(key);
+            if (!selector) return true;
+            document.querySelectorAll(selector).forEach((node) => {
+                if (!(node instanceof HTMLElement)) return;
+                if ('disabled' in node) {
+                    if (node.dataset.busyDisabledSaved == null) node.dataset.busyDisabledSaved = String(!!node.disabled);
+                    node.disabled = true;
+                }
+                node.setAttribute('aria-busy', 'true');
+                node.classList.add('is-action-busy');
+                if (node.dataset.busyLabelSaved != null) return;
+                const textNode = actionBusyTextNode(node);
+                if (textNode) {
+                    node.dataset.busyLabelSaved = textNode.textContent || '';
+                    textNode.textContent = label || '加载中';
+                }
+            });
+            return true;
+        },
+
+        endActionBusy(key) {
+            this._actionBusy = this._actionBusy || {};
+            delete this._actionBusy[key];
+            const selector = actionBusySelector(key);
+            if (!selector) return;
+            document.querySelectorAll(selector).forEach((node) => {
+                if (!(node instanceof HTMLElement)) return;
+                if ('disabled' in node && node.dataset.busyDisabledSaved != null) {
+                    node.disabled = node.dataset.busyDisabledSaved === 'true';
+                    delete node.dataset.busyDisabledSaved;
+                }
+                node.removeAttribute('aria-busy');
+                node.classList.remove('is-action-busy');
+                if (node.dataset.busyLabelSaved == null) return;
+                const textNode = actionBusyTextNode(node);
+                if (textNode) textNode.textContent = node.dataset.busyLabelSaved;
+                delete node.dataset.busyLabelSaved;
+            });
+        },
+
         defaultDietMealForTime(date = new Date()) {
             return dietMealForClock(date);
         },
@@ -46,6 +106,51 @@
             promise?.catch?.((e) => {
                 window.errorBus?.report?.('records.healthProfileCss', e, { view });
             });
+            return promise;
+        },
+
+        requestHealthProfileCss(reason = 'intent') {
+            const promise = window.loadAppCss?.('42-health-profile');
+            promise?.catch?.((e) => {
+                window.errorBus?.report?.('records.healthProfileCss', e, { reason });
+            });
+            return promise;
+        },
+
+        bindHealthCssIntent() {
+            if (this._healthCssIntentBound) return;
+            this._healthCssIntentBound = true;
+            const request = (reason) => this.requestHealthProfileCss(reason);
+            document.addEventListener('pointerdown', (event) => {
+                const target = event.target;
+                if (!(target instanceof Element)) return;
+                if (target.closest('[data-health-view="training"], [data-route-view="training"], [data-health-entry="training"]')) {
+                    request('pointerdown');
+                }
+            }, true);
+            document.addEventListener('focusin', (event) => {
+                const target = event.target;
+                if (!(target instanceof Element)) return;
+                if (target.closest('[data-health-view="training"]')) request('focus');
+            }, true);
+            document.addEventListener('pointerdown', (event) => {
+                const deck = document.getElementById('healthSwipeDeck');
+                if (!deck || !(event.target instanceof Element) || !deck.contains(event.target)) return;
+                this._healthSwipeIntent = { x: event.clientX, y: event.clientY, active: true };
+            }, true);
+            document.addEventListener('pointermove', (event) => {
+                const intent = this._healthSwipeIntent;
+                if (!intent?.active) return;
+                const dx = Math.abs(event.clientX - intent.x);
+                const dy = Math.abs(event.clientY - intent.y);
+                if (dx >= 8 && dx > dy) {
+                    intent.active = false;
+                    request('swipe-start');
+                }
+            }, true);
+            const clearIntent = () => { this._healthSwipeIntent = null; };
+            document.addEventListener('pointerup', clearIntent, true);
+            document.addEventListener('pointercancel', clearIntent, true);
         },
 
         setRoutineView(view) {
@@ -647,4 +752,8 @@
             });
         }
     };
+
+    try {
+        window.dataUiState.bindHealthCssIntent?.call(window.dataUiState);
+    } catch {}
 })();

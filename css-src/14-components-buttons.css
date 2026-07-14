@@ -36,6 +36,15 @@
     opacity: 0.48;
     box-shadow: none;
 }
+
+.record-quick-btn.is-action-busy,
+button.is-action-busy,
+.md-btn.is-action-busy,
+.pvf-action.is-action-busy {
+    opacity: 0.72;
+    cursor: progress;
+    pointer-events: none;
+}
 .md-btn-filled {
     background: var(--md-sys-primary);
     color: var(--md-sys-on-primary);

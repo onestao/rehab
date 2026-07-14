@@ -141,12 +141,12 @@ function loadPlanUiRuntime() {
 
 function createTodayHost(api, options = {}) {
     const elements = {
-        todayOverview: { innerHTML: '' },
-        todayQuickActions: { innerHTML: '' },
-        todayPlanStatus: { innerHTML: '' },
-        todayDietStatus: { innerHTML: '' },
-        todayTimeline: { innerHTML: '' },
-        todayAiCard: { innerHTML: '' }
+        todayOverview: { innerHTML: '', dataset: {}, removeAttribute() {} },
+        todayQuickActions: { innerHTML: '', dataset: {}, removeAttribute() {} },
+        todayPlanStatus: { innerHTML: '', dataset: {}, removeAttribute() {} },
+        todayDietStatus: { innerHTML: '', dataset: {}, removeAttribute() {} },
+        todayTimeline: { innerHTML: '', dataset: {}, removeAttribute() {} },
+        todayAiCard: { innerHTML: '', dataset: {}, removeAttribute() {} }
     };
     const document = {
         getElementById(id) {

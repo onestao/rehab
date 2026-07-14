@@ -281,11 +281,11 @@
         },
 
         renderRecordQuickActions() {
-            return `<div class="record-quick-actions">
-            <button class="record-quick-btn" onclick="data.openDietModal()"><span class="material-symbols-rounded">restaurant</span><span>记饮食</span></button>
-            <button class="record-quick-btn" onclick="data.openExerciseModal()"><span class="material-symbols-rounded">fitness_center</span><span>记运动</span></button>
-            <button class="record-quick-btn" onclick="data.openWeightModal()"><span class="material-symbols-rounded">monitor_weight</span><span>记体重</span></button>
-            <button class="record-quick-btn record-quick-btn-ai context-ai-btn" data-ai-ctx="today" data-ai-idx="0"><span class="material-symbols-rounded">psychology</span><span>问 AI</span></button>
+            return `<div class="quick-dock">
+            <button class="record-quick-btn" type="button" data-q="weight" onclick="data.openWeightModal()"><span class="material-symbols-rounded">monitor_weight</span><span>记体重</span></button>
+            <button class="record-quick-btn" type="button" data-q="diet" onclick="data.openDietModal()"><span class="material-symbols-rounded">restaurant</span><span>记饮食</span></button>
+            <button class="record-quick-btn" type="button" data-q="cardio" onclick="data.openExerciseModal()"><span class="material-symbols-rounded">fitness_center</span><span>记运动</span></button>
+            <button class="record-quick-btn record-quick-btn-ai context-ai-btn" type="button" data-q="ai" data-ai-ctx="today" data-ai-idx="0"><span class="material-symbols-rounded">psychology</span><span>问 AI</span></button>
         </div>`;
         },
 
