@@ -1,4 +1,4 @@
-// node scripts/bump-version.js [--check|--patch|--minor|--major|--print-cache-revision]
+// node scripts/bump-version.js [--check|--patch|--minor|--major|--print-cache-revision|--print-cache-extension-revision]
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -23,6 +23,7 @@ const patchMode = argv.has('--patch');
 const minorMode = argv.has('--minor');
 const majorMode = argv.has('--major');
 const printCacheRevisionMode = argv.has('--print-cache-revision');
+const printCacheExtensionRevisionMode = argv.has('--print-cache-extension-revision');
 const bumpFlags = [patchMode, minorMode, majorMode].filter(Boolean).length;
 if (bumpFlags > 1) {
     console.error('Specify only one of --patch / --minor / --major');
@@ -32,12 +33,14 @@ if (checkMode && bumpFlags > 0) {
     console.error('--check cannot be combined with --patch / --minor / --major');
     process.exit(1);
 }
-if (printCacheRevisionMode && (checkMode || bumpFlags > 0)) {
-    console.error('--print-cache-revision cannot be combined with other modes');
+if ((printCacheRevisionMode || printCacheExtensionRevisionMode) && (checkMode || bumpFlags > 0 || (printCacheRevisionMode && printCacheExtensionRevisionMode))) {
+    console.error('cache revision print modes cannot be combined with other modes');
     process.exit(1);
 }
 
 const CACHE_REVISION_PATTERN = /const CACHE_ASSET_REVISION = ['"]([a-f0-9]{64})['"]/;
+const CACHE_EXTENSION_REVISION_PATTERN = /const CACHE_ASSET_EXTENSION_REVISION = ['"]([a-f0-9]{64})['"]/;
+const CACHE_ASSET_EXTENSION_REVISION = '10fb90380598c1ed7a718d7e086472b69033fb6ee0c079ec1a7ff37cfc9f0137';
 
 function runCollectIcons() {
     const result = spawnSync(process.execPath, [collectIconsPath], {
@@ -69,13 +72,36 @@ function addTreeFiles(target, relativeDir, extensions) {
     }
 }
 
+function declaredStrings(source, name) {
+    const pattern = new RegExp(`const\\s+${name}\\s*=\\s*(?:new Set\\s*\\()?([\\s\\S]*?)\\)?;`);
+    const block = source.match(pattern)?.[1] || '';
+    return [...block.matchAll(/['"]([^'"]+)['"]/g)].map((match) => match[1]);
+}
+
+function addDeclaredAssets(target, source, names) {
+    for (const name of names) {
+        for (const value of declaredStrings(source, name)) {
+            const asset = value.split(/[?#]/, 1)[0].replace(/^\.\//, '');
+            if (asset && !/^[a-z]+:/i.test(asset) && fs.existsSync(path.join(root, asset))) target.add(asset);
+        }
+    }
+}
+
+function addDeclaredLazyScripts(target, htmlText) {
+    const mjsScripts = new Set(declaredStrings(htmlText, 'MJS_SCRIPTS'));
+    const names = new Set([
+        ...declaredStrings(htmlText, 'PAGE_DEPS'),
+        ...declaredStrings(htmlText, 'SCRIPT_PREREQUISITES')
+    ]);
+    for (const name of names) {
+        const relative = /\.m?js$/i.test(name) ? name : `${name}${mjsScripts.has(name) ? '.mjs' : '.js'}`;
+        if (fs.existsSync(path.join(root, relative))) target.add(relative);
+    }
+}
+
 function cacheManagedFiles(swText) {
     const files = new Set(['sw.js', 'index.html', 'app-update.js']);
-    const assetsBlock = swText.match(/const ASSETS = \[([\s\S]*?)\];/)?.[1] || '';
-    for (const match of assetsBlock.matchAll(/['"]([^'"]+)['"]/g)) {
-        const asset = match[1].split(/[?#]/, 1)[0].replace(/^\.\//, '');
-        if (asset && !/^[a-z]+:/i.test(asset)) files.add(asset);
-    }
+    addDeclaredAssets(files, swText, ['ASSETS']);
     for (const entry of fs.readdirSync(root, { withFileTypes: true })) {
         if (entry.isFile() && ['.js', '.mjs'].includes(path.extname(entry.name))) files.add(entry.name);
     }
@@ -84,6 +110,16 @@ function cacheManagedFiles(swText) {
     addTreeFiles(files, 'i18n', new Set(['.json']));
     if (fs.existsSync(path.join(root, 'build', 'generated.css'))) files.add('build/generated.css');
     return [...files].filter((relative) => fs.existsSync(path.join(root, relative))).sort();
+}
+
+function cacheManagedExtensionFiles(swText) {
+    const files = new Set();
+    addDeclaredAssets(files, swText, ['RUNTIME_CACHE_FIRST_ASSETS']);
+    addDeclaredLazyScripts(files, fs.readFileSync(htmlPath, 'utf8'));
+    const primary = new Set(cacheManagedFiles(swText));
+    return [...files]
+        .filter((relative) => !primary.has(relative) && fs.existsSync(path.join(root, relative)))
+        .sort();
 }
 
 function normalizedCacheAsset(relative, buffer) {
@@ -101,16 +137,25 @@ function normalizedCacheAsset(relative, buffer) {
     return Buffer.from(normalized, 'utf8');
 }
 
-function computeCacheAssetRevision() {
-    const sw = fs.readFileSync(swPath, 'utf8');
+function computeRevision(files) {
     const hash = crypto.createHash('sha256');
-    for (const relative of cacheManagedFiles(sw)) {
+    for (const relative of files) {
         hash.update(relative.replaceAll('\\', '/'));
         hash.update('\0');
         hash.update(normalizedCacheAsset(relative, fs.readFileSync(path.join(root, relative))));
         hash.update('\0');
     }
     return hash.digest('hex');
+}
+
+function computeCacheAssetRevision() {
+    const sw = fs.readFileSync(swPath, 'utf8');
+    return computeRevision(cacheManagedFiles(sw));
+}
+
+function computeCacheAssetExtensionRevision() {
+    const sw = fs.readFileSync(swPath, 'utf8');
+    return computeRevision(cacheManagedExtensionFiles(sw));
 }
 
 function readSwVersion(swText) {
@@ -191,6 +236,14 @@ function checkVersionSync() {
         process.exit(1);
     }
 
+    const actualExtensionRevision = computeCacheAssetExtensionRevision();
+    if (CACHE_ASSET_EXTENSION_REVISION !== actualExtensionRevision) {
+        console.error('runtime-cache-first or nested lazy asset fingerprint changed without a version bump; run node scripts/bump-version.js --patch');
+        console.error(`stored=${CACHE_ASSET_EXTENSION_REVISION}`);
+        console.error(`actual=${actualExtensionRevision}`);
+        process.exit(1);
+    }
+
     console.log(`version sync OK (v${swVersion})`);
 }
 
@@ -233,11 +286,18 @@ function bumpVersion() {
     swContent = fs.readFileSync(swPath, 'utf8').replace(CACHE_REVISION_PATTERN, `const CACHE_ASSET_REVISION = '${revision}'`);
     fs.writeFileSync(swPath, swContent);
 
+    const extensionRevision = computeCacheAssetExtensionRevision();
+    const scriptContent = fs.readFileSync(__filename, 'utf8')
+        .replace(CACHE_EXTENSION_REVISION_PATTERN, `const CACHE_ASSET_EXTENSION_REVISION = '${extensionRevision}'`);
+    fs.writeFileSync(__filename, scriptContent);
+
     console.log(`bumped to v${next} (${mode})`);
 }
 
 if (printCacheRevisionMode) {
     console.log(computeCacheAssetRevision());
+} else if (printCacheExtensionRevisionMode) {
+    console.log(computeCacheAssetExtensionRevision());
 } else if (checkMode) {
     checkVersionSync();
 } else {

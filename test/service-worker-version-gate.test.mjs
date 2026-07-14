@@ -132,27 +132,52 @@ test('startup registration does not execute app-update', () => {
     assert.match(registration, /serviceWorker\.register\(['"]sw\.js['"]/);
 });
 
-test('version gate rejects a changed cache-managed asset without a bump', () => {
+test('version gate rejects changed precache, runtime-cache-first, and nested lazy assets without a bump', () => {
     const fixture = fs.mkdtempSync(path.join(os.tmpdir(), 'rehab-version-gate-'));
-    const script = path.join(root, 'scripts', 'bump-version.js');
     const placeholder = '0'.repeat(64);
-    fs.writeFileSync(path.join(fixture, 'sw.js'), `const CACHE = 'training-assistant-v326';\nconst CACHE_ASSET_REVISION = '${placeholder}';\nconst ASSETS = ['index.html', 'chunk.js?v=326'];\n`);
-    fs.writeFileSync(path.join(fixture, 'index.html'), `<script src="chunk.js?v=326"></script><script>const key='rehab-sw-controller-reload-v326';</script>`);
+    const script = path.join(fixture, 'scripts', 'bump-version.js');
+    fs.mkdirSync(path.join(fixture, 'assets'), { recursive: true });
+    fs.mkdirSync(path.join(fixture, 'scripts'), { recursive: true });
+    fs.mkdirSync(path.join(fixture, 'lib'), { recursive: true });
+    fs.copyFileSync(path.join(root, 'scripts', 'bump-version.js'), script);
+    fs.writeFileSync(path.join(fixture, 'sw.js'), `const CACHE = 'training-assistant-v326';\nconst CACHE_ASSET_REVISION = '${placeholder}';\nconst ASSETS = ['index.html', 'chunk.js?v=326'];\nconst RUNTIME_CACHE_FIRST_ASSETS = new Set(['assets/heic2any.min.js']);\n`);
+    fs.writeFileSync(path.join(fixture, 'index.html'), `<script src="chunk.js?v=326"></script><script>const key='rehab-sw-controller-reload-v326';const PAGE_DEPS={today:['chunk','lib/virtual-core.umd']};const SCRIPT_PREREQUISITES={};const MJS_SCRIPTS=new Set([]);</script>`);
     fs.writeFileSync(path.join(fixture, 'app-update.js'), `const appUpdate={version:'326',key:'rehab-sw-controller-reload-v326'};`);
     fs.writeFileSync(path.join(fixture, 'chunk.js'), 'window.fixtureChunk = 1;\n');
+    fs.writeFileSync(path.join(fixture, 'assets', 'heic2any.min.js'), 'window.heicFixture = 1;\n');
+    fs.writeFileSync(path.join(fixture, 'lib', 'virtual-core.umd.js'), 'window.virtualFixture = 1;\n');
 
     const env = { ...process.env, REHAB_VERSION_ROOT: fixture };
+    const runCheck = () => spawnSync(process.execPath, [script, '--check'], { encoding: 'utf8', env });
     const printed = spawnSync(process.execPath, [script, '--print-cache-revision'], { encoding: 'utf8', env });
     assert.equal(printed.status, 0, printed.stderr);
-    const revision = printed.stdout.trim();
-    const fixtureSw = fs.readFileSync(path.join(fixture, 'sw.js'), 'utf8').replace(placeholder, revision);
+    const fixtureSw = fs.readFileSync(path.join(fixture, 'sw.js'), 'utf8').replace(placeholder, printed.stdout.trim());
     fs.writeFileSync(path.join(fixture, 'sw.js'), fixtureSw);
+    const printedExtension = spawnSync(process.execPath, [script, '--print-cache-extension-revision'], { encoding: 'utf8', env });
+    assert.equal(printedExtension.status, 0, printedExtension.stderr);
+    const fixtureScript = fs.readFileSync(script, 'utf8')
+        .replace(/const CACHE_ASSET_EXTENSION_REVISION = '[a-f0-9]{64}'/, `const CACHE_ASSET_EXTENSION_REVISION = '${printedExtension.stdout.trim()}'`);
+    fs.writeFileSync(script, fixtureScript);
 
-    const before = spawnSync(process.execPath, [script, '--check'], { encoding: 'utf8', env });
+    const before = runCheck();
     assert.equal(before.status, 0, before.stderr);
 
     fs.writeFileSync(path.join(fixture, 'chunk.js'), 'window.fixtureChunk = 2;\n');
-    const after = spawnSync(process.execPath, [script, '--check'], { encoding: 'utf8', env });
-    assert.notEqual(after.status, 0);
-    assert.match(after.stderr, /cache-managed asset fingerprint changed without a version bump/);
+    const changedPrecache = runCheck();
+    assert.notEqual(changedPrecache.status, 0);
+    assert.match(changedPrecache.stderr, /cache-managed asset fingerprint changed without a version bump/);
+    fs.writeFileSync(path.join(fixture, 'chunk.js'), 'window.fixtureChunk = 1;\n');
+    assert.equal(runCheck().status, 0);
+
+    fs.writeFileSync(path.join(fixture, 'assets', 'heic2any.min.js'), 'window.heicFixture = 2;\n');
+    const changedRuntimeCache = runCheck();
+    assert.notEqual(changedRuntimeCache.status, 0);
+    assert.match(changedRuntimeCache.stderr, /runtime-cache-first or nested lazy asset fingerprint changed without a version bump/);
+    fs.writeFileSync(path.join(fixture, 'assets', 'heic2any.min.js'), 'window.heicFixture = 1;\n');
+    assert.equal(runCheck().status, 0);
+
+    fs.writeFileSync(path.join(fixture, 'lib', 'virtual-core.umd.js'), 'window.virtualFixture = 2;\n');
+    const changedNestedLazy = runCheck();
+    assert.notEqual(changedNestedLazy.status, 0);
+    assert.match(changedNestedLazy.stderr, /runtime-cache-first or nested lazy asset fingerprint changed without a version bump/);
 });
