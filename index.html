@@ -8,7 +8,7 @@
     <link rel="icon" href="assets/app-icon.svg" type="image/svg+xml">
     <meta name="theme-color" content="#0061a4">
     <link rel="preload" href="assets/material-symbols-rounded.woff2" as="font" type="font/woff2" crossorigin>
-    <link rel="stylesheet" href="build/generated.css?v=325">
+    <link rel="stylesheet" href="build/generated.css?v=326">
 </head>
 <body>
     <div id="appUpdateBanner" class="app-update-banner hidden">
@@ -384,26 +384,26 @@
     </nav>
     </div>
 
-    <script src="m3e-ripple.js?v=325"></script>
-    <script src="toast.js?v=325"></script>
-    <script src="error-bus.js?v=325"></script>
-    <script src="i18n.js?v=325"></script>
-    <script src="theme.js?v=325"></script>
-    <script src="render-safe.js?v=325"></script>
-    <script src="nav-stack.js?v=325"></script>
-    <script src="app-route.js?v=325"></script>
-    <script type="module" src="data-utils-pure.js?v=325"></script>
-    <script type="module" src="action-identity.js?v=325"></script>
-    <script src="data-utils.js?v=325"></script>
-    <script src="storage/idb.js?v=325"></script>
-    <script src="storage/migrate.js?v=325"></script>
-    <script src="data-records.js?v=325"></script>
-    <script src="data-schema.js?v=325"></script>
-    <script src="data-store.js?v=325"></script>
-    <script src="data-ui-state.js?v=325"></script>
-    <script src="data-views.js?v=325"></script>
-    <script src="data.js?v=325"></script>
-    <script src="sync-status.js?v=325"></script>
+    <script src="m3e-ripple.js?v=326"></script>
+    <script src="toast.js?v=326"></script>
+    <script src="error-bus.js?v=326"></script>
+    <script src="i18n.js?v=326"></script>
+    <script src="theme.js?v=326"></script>
+    <script src="render-safe.js?v=326"></script>
+    <script src="nav-stack.js?v=326"></script>
+    <script src="app-route.js?v=326"></script>
+    <script type="module" src="data-utils-pure.js?v=326"></script>
+    <script type="module" src="action-identity.js?v=326"></script>
+    <script src="data-utils.js?v=326"></script>
+    <script src="storage/idb.js?v=326"></script>
+    <script src="storage/migrate.js?v=326"></script>
+    <script src="data-records.js?v=326"></script>
+    <script src="data-schema.js?v=326"></script>
+    <script src="data-store.js?v=326"></script>
+    <script src="data-ui-state.js?v=326"></script>
+    <script src="data-views.js?v=326"></script>
+    <script src="data.js?v=326"></script>
+    <script src="sync-status.js?v=326"></script>
     <div id="weightModal" class="md-modal md-modal-sheet hidden" aria-hidden="true">
         <div class="md-modal-backdrop" onclick="data.closeWeightModal()"></div>
         <div class="md-modal-card md-modal-sheet-card">
@@ -884,16 +884,46 @@
                 console.info('[boot:perf]', e);
             }
         }
+        function claimServiceWorkerReload(key) {
+            try {
+                if (window.sessionStorage.getItem(key) === '1') return false;
+                window.sessionStorage.setItem(key, '1');
+                return true;
+            } catch {}
+            try {
+                const state = history.state && typeof history.state === 'object' ? history.state : {};
+                if (state[key]) return false;
+                history.replaceState({ ...state, [key]: true }, '', window.location.href);
+                return true;
+            } catch {}
+            return false;
+        }
+        window.claimServiceWorkerReload = claimServiceWorkerReload;
         function scheduleServiceWorkerRegistration() {
             if (scheduleServiceWorkerRegistration._scheduled) return;
             scheduleServiceWorkerRegistration._scheduled = true;
+            if (!('serviceWorker' in navigator)) return;
+            const serviceWorker = navigator.serviceWorker;
+            const hadController = !!serviceWorker.controller;
+            const reloadKey = 'rehab-sw-controller-reload-v326';
+            if (hadController) {
+                serviceWorker.addEventListener('controllerchange', () => {
+                    if (!claimServiceWorkerReload(reloadKey)) return;
+                    errorBus?.event?.('appUpdate', 'controllerchange', { reloadKey });
+                    window.location.reload();
+                }, { once: true });
+            }
+            const register = () => {
+                navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' })
+                    .then((registration) => registration.update?.())
+                    .catch((e) => errorBus?.report?.('appUpdate.registration', e));
+            };
+            if (hadController) {
+                register();
+                return;
+            }
             window.setTimeout(() => {
-                runWhenIdle(() => {
-                    if (!('serviceWorker' in navigator)) return;
-                    navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' })
-                        .then((registration) => registration.update?.())
-                        .catch((e) => errorBus?.report?.('appUpdate.registration', e));
-                }, { timeout: 6000 });
+                runWhenIdle(register, { timeout: 6000 });
             }, 8000);
         }
         function idlePreloadEnabled() {
@@ -939,7 +969,7 @@
             const p = new Promise((res, rej) => {
                 const link = document.createElement('link');
                 link.rel = 'stylesheet';
-                link.href = `css-src/${name}.css?v=325`;
+                link.href = `css-src/${name}.css?v=326`;
                 link.dataset.appCss = name;
                 link.onload = () => {
                     link.dataset.loaded = 'true';
@@ -1005,7 +1035,7 @@
                     res();
                 };
                 if (MODULE_SCRIPTS.has(name)) s.type = 'module';
-                s.src = `${name}${MJS_SCRIPTS.has(name) ? '.mjs' : '.js'}?v=325`;
+                s.src = `${name}${MJS_SCRIPTS.has(name) ? '.mjs' : '.js'}?v=326`;
                 s.onload = () => settle();
                 s.onerror = () => settle(new Error(`Failed to load script: ${name}`));
                 timer = window.setTimeout(() => settle(new Error(`Timed out loading script: ${name}`)), scriptLoadTimeoutMs());

@@ -3,21 +3,48 @@ const appUpdate = {
     registration: null,
     waitingWorker: null,
     checking: false,
+    controllerReloadBound: false,
     swUrl: 'sw.js',
-    version: '325',
+    version: '326',
+
+    controllerReloadKey() {
+        return 'rehab-sw-controller-reload-v326';
+    },
+
+    claimControllerReload() {
+        const key = this.controllerReloadKey();
+        if (typeof window.claimServiceWorkerReload === 'function') {
+            return window.claimServiceWorkerReload(key);
+        }
+        try {
+            if (window.sessionStorage.getItem(key) === '1') return false;
+            window.sessionStorage.setItem(key, '1');
+            return true;
+        } catch {
+            return false;
+        }
+    },
+
+    bindControllerReload(hadController) {
+        if (!hadController || this.controllerReloadBound) return;
+        this.controllerReloadBound = true;
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+            if (!this.claimControllerReload()) return;
+            window.errorBus?.event?.('appUpdate', 'controllerchange', { version: this.version });
+            window.location.reload();
+        }, { once: true });
+    },
 
     async registerServiceWorker() {
         if (!('serviceWorker' in navigator)) return;
         const started = Date.now();
+        const hadController = !!navigator.serviceWorker.controller;
+        this.bindControllerReload(hadController);
         window.errorBus?.event?.('appUpdate', 'register:start', { swUrl: this.swUrl, version: this.version });
         try {
             this.registration = await navigator.serviceWorker.register(this.swUrl, { updateViaCache: 'none' });
             this.bindRegistration(this.registration);
             await this.registration.update?.();
-            navigator.serviceWorker.addEventListener('controllerchange', () => {
-                window.errorBus?.event?.('appUpdate', 'controllerchange');
-                window.location.reload();
-            }, { once: true });
             window.errorBus?.event?.('appUpdate', 'register:success', { elapsedMs: Date.now() - started, hasWaiting: !!this.registration?.waiting });
         } catch (e) {
             window.errorBus?.event?.('appUpdate', 'register:failed', { elapsedMs: Date.now() - started, error: e });
@@ -84,6 +111,7 @@ const appUpdate = {
         if (this.checking) return { ok: false, reason: 'checking' };
 
         const started = Date.now();
+        this.bindControllerReload(!!navigator.serviceWorker.controller);
         window.errorBus?.event?.('appUpdate', 'check:start', { version: this.version });
         this.checking = true;
         this.updateProfileButton(true);
