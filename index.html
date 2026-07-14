@@ -801,9 +801,14 @@
             ,'weekly-summary': ['report-version-pure']
         };
 
+        const SCRIPT_LOAD_TIMEOUT_MS = 12000;
         function runWhenIdle(callback, options) {
-            const idle = window.requestIdleCallback || ((cb) => setTimeout(cb, options?.timeout || 1500));
-            return idle(callback, options);
+            if (typeof window.requestIdleCallback === 'function') return window.requestIdleCallback(callback, options);
+            return window.setTimeout(() => callback({ didTimeout: false, timeRemaining: () => 0 }), 0);
+        }
+        function scriptLoadTimeoutMs() {
+            const configured = Number(window.__APP_SCRIPT_LOAD_TIMEOUT_MS__);
+            return Number.isFinite(configured) && configured > 0 ? configured : SCRIPT_LOAD_TIMEOUT_MS;
         }
         function schedulePostRenderUtilityLoad() {
             if (schedulePostRenderUtilityLoad._scheduled) return;
@@ -819,19 +824,36 @@
             }, 2000);
         }
         function scheduleTodayEnhancementLoad() {
-            if (scheduleTodayEnhancementLoad._scheduled) return;
+            if (_loaded.has('plan-ui')) {
+                scheduleTodayEnhancementLoad._completed = true;
+                return Promise.resolve();
+            }
+            if (scheduleTodayEnhancementLoad._promise) return scheduleTodayEnhancementLoad._promise;
             scheduleTodayEnhancementLoad._scheduled = true;
-            window.setTimeout(() => {
-                runWhenIdle(() => {
-                    if ((document.querySelector('.page.active')?.id || '') !== 'today') return;
-                    loadScript('plan-ui')
-                        .then(() => {
-                            data.refreshModules?.();
-                            if ((document.querySelector('.page.active')?.id || '') === 'today') data.render?.('today');
-                        })
-                        .catch((e) => errorBus?.report?.('today.planUi.lazyLoad', e));
-                }, { timeout: 5000 });
-            }, 1000);
+            scheduleTodayEnhancementLoad._promise = new Promise((resolve) => {
+                window.setTimeout(() => {
+                    runWhenIdle(() => {
+                        scheduleTodayEnhancementLoad._scheduled = false;
+                        if ((document.querySelector('.page.active')?.id || '') !== 'today') {
+                            scheduleTodayEnhancementLoad._promise = null;
+                            resolve();
+                            return;
+                        }
+                        loadScript('plan-ui')
+                            .then(() => {
+                                scheduleTodayEnhancementLoad._completed = true;
+                                data.refreshModules?.();
+                                if ((document.querySelector('.page.active')?.id || '') === 'today') data.render?.('today');
+                            })
+                            .catch((e) => errorBus?.report?.('today.planUi.lazyLoad', e))
+                            .finally(() => {
+                                scheduleTodayEnhancementLoad._promise = null;
+                                resolve();
+                            });
+                    }, { timeout: 5000 });
+                }, 1000);
+            });
+            return scheduleTodayEnhancementLoad._promise;
         }
         function bootPerfDebugEnabled() {
             try {
@@ -954,15 +976,45 @@
             const prereqs = SCRIPT_PREREQUISITES[name] || [];
             const wait = prereqs.length ? Promise.all(prereqs.map(loadScript)) : Promise.resolve();
             const p = wait.then(() => new Promise((res, rej) => {
-                if (_loaded.has(name)) return res();
+                if (_loaded.has(name)) {
+                    res();
+                    return;
+                }
                 const s = document.createElement('script');
+                let settled = false;
+                let timer = null;
+                const cleanup = () => {
+                    if (timer !== null) window.clearTimeout(timer);
+                    timer = null;
+                    s.onload = null;
+                    s.onerror = null;
+                };
+                const settle = (error) => {
+                    if (settled) return;
+                    settled = true;
+                    cleanup();
+                    if (error) {
+                        s.remove();
+                        if (_loadingPromises.get(name) === p) _loadingPromises.delete(name);
+                        rej(error);
+                        return;
+                    }
+                    _loaded.add(name);
+                    if (_loadingPromises.get(name) === p) _loadingPromises.delete(name);
+                    res();
+                };
                 if (MODULE_SCRIPTS.has(name)) s.type = 'module';
                 s.src = `${name}${MJS_SCRIPTS.has(name) ? '.mjs' : '.js'}?v=325`;
-                s.onload = () => { _loaded.add(name); res(); };
-                s.onerror = rej;
+                s.onload = () => settle();
+                s.onerror = () => settle(new Error(`Failed to load script: ${name}`));
+                timer = window.setTimeout(() => settle(new Error(`Timed out loading script: ${name}`)), scriptLoadTimeoutMs());
                 document.head.appendChild(s);
             }));
             _loadingPromises.set(name, p);
+            if (_loaded.has(name)) _loadingPromises.delete(name);
+            p.catch(() => {
+                if (_loadingPromises.get(name) === p) _loadingPromises.delete(name);
+            });
             return p;
         }
         window.loadAppScript = loadScript;
@@ -1021,19 +1073,30 @@
             }
         }
         const ui = {
+            _navigationToken: 0,
+            beginNavigation() {
+                this._navigationToken += 1;
+                return this._navigationToken;
+            },
+            isCurrentNavigation(token) {
+                return token === this._navigationToken;
+            },
             syncSwitchAria(input) {
                 input?.closest('.md-switch')?.setAttribute('aria-checked', String(!!input?.checked));
             },
             async _activateTab(id, el, options = {}) {
+                const navigationToken = options.navigationToken ?? this.beginNavigation();
                 const activePageId = data._activePageId || document.querySelector('.page.active')?.id || '';
                 const resetAdviceOnEntry = id === 'ai-coach' && activePageId !== 'ai-coach';
                 try { data.captureAdviceDraft?.(); } catch (e) { errorBus?.report?.('ui.captureAdviceDraft', e); }
                 try { data.captureAdviceScroll?.(); } catch (e) { errorBus?.report?.('ui.captureAdviceScroll', e); }
+                await ensureDeps(id);
+                if (!this.isCurrentNavigation(navigationToken)) return false;
                 if (resetAdviceOnEntry) data._adviceResetOnNextRender = true;
                 if (id === 'profile' && !options.preserveSubroute) data.routineView = 'home';
-                await ensureDeps(id);
                 data._activePageId = id;
                 const activate = () => {
+                    if (!this.isCurrentNavigation(navigationToken)) return;
                     document.documentElement.dataset.activePage = id;
                     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
                     document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
@@ -1044,16 +1107,21 @@
                     const transition = document.startViewTransition(activate);
                     try { await transition.updateCallbackDone; } catch (e) { errorBus?.report?.('ui.tab.transition', e, { page: id }); }
                 } else activate();
+                if (!this.isCurrentNavigation(navigationToken)) return false;
+                if (id === 'today') scheduleTodayEnhancementLoad();
                 try { data.render(id); } catch (e) {
                     errorBus?.report?.('ui.tab.render', e, { page: id });
                     console.error('data.render failed in ui.tab', e);
                 }
+                return true;
             },
             async tab(id, el) {
+                const routeToken = window.appRoute?.beginNavigation?.();
+                const navigationToken = this.beginNavigation();
                 if (id === 'today') window.navStack?.resetToRoot?.();
                 else window.navStack?.replaceTopOrPushTab?.(id);
-                await this._activateTab(id, el);
-                window.appRoute?.syncFromState?.();
+                const activated = await this._activateTab(id, el, { navigationToken });
+                if (activated && this.isCurrentNavigation(navigationToken)) window.appRoute?.syncFromState?.(routeToken);
             }
         };
         window.ui = ui;
@@ -1076,7 +1144,6 @@
                 bootMark('boot:first-render:end');
                 bootMeasure('boot:first-render', 'boot:start', 'boot:first-render:end');
                 schedulePostRenderUtilityLoad();
-                scheduleTodayEnhancementLoad();
                 window.workoutVoice?.init?.();
                 window.workoutVoice?.renderSettingsUI?.();
             } catch (e) {
@@ -1093,6 +1160,7 @@
                 if (hasShortcut) await loadScript('pwa-support');
                 await window.pwaSupport?.openShortcut?.();
             }
+            if ((document.querySelector('.page.active')?.id || '') === 'today') scheduleTodayEnhancementLoad();
             scheduleServiceWorkerRegistration();
             try { document.getElementById('localeSelectSheet') && (document.getElementById('localeSelectSheet').value = i18n.currentLocale || 'auto'); } catch {}
             ui.syncSwitchAria(document.getElementById('isAlt'));
