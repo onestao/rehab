@@ -13,7 +13,7 @@ const REVIEWED_HTML_SINK_FILES = new Map([
   ['ai-profile.js', { sinks: 1, review: 'select options are built from escaped profile names.' }],
   ['credential-fields.js', { sinks: 1, review: 'static icon-only button markup.' }],
   ['data-ui-state.js', { sinks: 2, review: 'modal bodies come from reviewed diet/exercise renderers.' }],
-  ['data-views.js', { sinks: 13, review: 'page shells compose reviewed renderer outputs, not raw user strings.' }],
+  ['data-views.js', { sinks: 11, review: 'page shells compose reviewed renderer outputs, not raw user strings.' }],
   ['food-log.js', { sinks: 9, review: 'food search and modal renderers escape names before HTML insertion.' }],
   ['health-diet.js', { sinks: 1, review: 'diet modal renderer owns escaping for food log fields.' }],
   ['health-profile.js', { sinks: 8, review: 'profile editors escape profile, condition, exam, and action fields.' }],
