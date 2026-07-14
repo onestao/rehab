@@ -121,7 +121,9 @@ test('loadScript timeout ignores late events and leaves the module retryable', a
     const firstNode = harness.appended[0];
     const lateLoad = firstNode.onload;
     const lateError = firstNode.onerror;
-    const [timerId] = harness.timerByDelay(25);
+    const timers = harness.timerByDelay(25);
+    assert.ok(timers);
+    const [timerId] = timers;
 
     harness.runTimer(timerId);
     await assert.rejects(first, /Timed out loading script: late-module/);
@@ -156,14 +158,17 @@ test('loadScript is single-flight while a module is pending', async () => {
 
 test('runWhenIdle without requestIdleCallback yields once through a zero-delay timer', () => {
     const harness = createLoaderHarness();
+    /** @type {any} */
     let received = null;
     const timerId = harness.api.runWhenIdle(deadline => { received = deadline; }, { timeout: 9000 });
 
     assert.equal(received, null);
     assert.equal(harness.timers.get(timerId).delay, 0);
     harness.runTimer(timerId);
-    assert.equal(received.didTimeout, false);
-    assert.equal(received.timeRemaining(), 0);
+    assert.ok(received);
+    const delivered = /** @type {any} */ (received);
+    assert.equal(delivered.didTimeout, false);
+    assert.equal(delivered.timeRemaining(), 0);
 });
 
 function createTodayEnhancementHarness(initialPage) {

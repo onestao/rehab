@@ -111,9 +111,9 @@ test('appRoute syncFromState uses explicit active page during tab transitions', 
 });
 
 function deferred() {
-    let resolve;
-    const promise = new Promise(done => { resolve = done; });
-    return { promise, resolve };
+    let release = () => {};
+    const promise = new Promise(done => { release = () => done(undefined); });
+    return { promise, resolve: release };
 }
 
 test('late completion from an older navigation cannot replace the latest page or hash', async () => {
@@ -143,11 +143,13 @@ test('late completion from an older navigation cannot replace the latest page or
     const older = window.appRoute.apply(window.appRoute.parseHash('#/records/calendar'));
     const latest = window.appRoute.apply(window.appRoute.parseHash('#/ai/advice?range=all'));
 
+    assert.ok(gates['ai-coach'].resolve);
     gates['ai-coach'].resolve();
     assert.equal(await latest, true);
     assert.equal(window.data._activePageId, 'ai-coach');
     assert.equal(window.location.hash, '#/ai/advice?range=all');
 
+    assert.ok(gates.records.resolve);
     gates.records.resolve();
     assert.equal(await older, false);
     assert.equal(window.data._activePageId, 'ai-coach');
