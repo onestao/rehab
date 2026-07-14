@@ -40,6 +40,12 @@ test('check update lazy-loads app-update instead of claiming unsupported', () =>
     assert.doesNotMatch(routine, /当前环境无法检测更新/);
 });
 
+test('service worker registration does not eagerly load app-update', () => {
+    const index = read('index.html');
+    const registration = index.slice(index.indexOf('function scheduleServiceWorkerRegistration'), index.indexOf('function idlePreloadEnabled'));
+    assert.doesNotMatch(registration, /loadScript\('app-update'\)/);
+    assert.match(registration, /navigator\.serviceWorker\.register\('sw\.js'/);
+});
 
 test('update check remains busy until deferred checkNow settles and retries after failure', async () => {
     class FakeHTMLElement {

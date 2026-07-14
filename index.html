@@ -889,9 +889,10 @@
             scheduleServiceWorkerRegistration._scheduled = true;
             window.setTimeout(() => {
                 runWhenIdle(() => {
-                    loadScript('app-update')
-                        .then(() => appUpdate.registerServiceWorker?.())
-                        .catch((e) => errorBus?.report?.('appUpdate.lazyLoad', e));
+                    if (!('serviceWorker' in navigator)) return;
+                    navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' })
+                        .then((registration) => registration.update?.())
+                        .catch((e) => errorBus?.report?.('appUpdate.registration', e));
                 }, { timeout: 6000 });
             }, 8000);
         }
