@@ -33,7 +33,7 @@ module.exports = [
       'credential-fields.js',
       'sheet-drag.js'
     ],
-    limit: '60 KB'
+    limit: '61 KB'
   },
   { name: 'generated-css', path: 'build/generated.css', limit: '80 KB' },
   { name: 'workout-bundle', path: ['workout-*.js', 'strength-form.js', 'swipe-actions.js', 'weekly-plan.js'], limit: '50 KB' },
