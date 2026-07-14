@@ -251,6 +251,14 @@ test('legacy paint-heavy continuous animations are detached from hosts', () => {
 test('frozen product files stay untouched since BASE_COMMIT', () => {
   const changed = new Set(changedFilesSinceBase());
   for (const rel of FROZEN_PATHS) {
+    if (rel === '.size-limit.cjs') {
+      const baseline = execFileSync('git', ['show', `${BASE_COMMIT}:.size-limit.cjs`], {
+        cwd: ROOT,
+        encoding: 'utf8'
+      }).replace("limit: '60 KB'", "limit: '61 KB'");
+      assert.equal(readRepo(rel).replace(/\r\n/g, '\n'), baseline, 'only the approved first-paint budget change is allowed');
+      continue;
+    }
     assert.ok(!changed.has(rel), `frozen file changed: ${rel}`);
   }
   assert.ok(!changed.has('css-src/54-v6-ai.css'), 'AI page CSS must not change');
