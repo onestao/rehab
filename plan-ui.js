@@ -65,8 +65,21 @@
         return normalized.length ? [...new Set(normalized)] : ['rehab'];
     }
 
+    function n0(v){return +v||0}
+    function ths(ctx,s){
+        if(s&&typeof s==='object')return s;
+        if(ctx?._ths)return ctx._ths;
+        const today=ctx.logicalDateKey?.()||ctx.dateKey?.(new Date())||'';
+        s=window.healthSummaryPure?.summarizeToday?.(ctx.db,today,{historyDayKey:r=>ctx.historyDayKey?.(r)||r?.dayKey||r?.date||''});
+        if(s)return s;
+        const m=ctx.todayMacros?.()||{},g=ctx.defaultDietGoals?.()||{};
+        return{intake:n0(ctx.todayCalories?.()),macros:{pro:n0(m.pro),carb:n0(m.carb),fat:n0(m.fat)},goals:{cal:n0(g.cal||ctx.db?.health?.dietGoal?.dailyCal),pro:n0(g.pro),carb:n0(g.carb),fat:n0(g.fat)}};
+    }
+
     window.dataPlanUi = Object.assign(window.dataPlanUi || {}, {
-        renderPlanTodaySection() {
+        renderTodayPage(){this._ths=ths(this);try{return window.dataViews.renderTodayPage.call(this)}finally{this._ths=null}},
+
+        renderPlanTodaySection(summary) {
             const plans = this.getTodayDailyPlans?.() || [];
             if (!plans.length) this.ensureTodayPlan?.();
             const todayPlans = this.getTodayDailyPlans?.() || [];
@@ -74,45 +87,22 @@
             const selected = todayPlans.find((item) => item.id === this.selectedPlanId) || todayPlans[0] || null;
             if (selected) this.selectedPlanId = selected.id;
             const plan = selected;
-            const planMeta = this.planTypeMeta?.(plan?.type || 'rehab', plan?.title) || { label: '训练计划', icon: 'event_note' };
             const percent = Math.round((aggregate.rate || 0) * 100);
             const today = this.logicalDateKey?.() || this.dateKey(new Date());
-            const weekdays = ['周日','周一','周二','周三','周四','周五','周六'];
-            const weekday = weekdays[this.dateFromKey(today).getDay()];
-            const weight = this.activeRecords?.(this.db.health?.weights || []).find((item) => item.date === today) || this.sortedWeights?.().slice(-1)[0] || null;
-            const exerciseCal = Math.round(this.todayTrainingCalories?.() || 0);
-            const intake = this.todayCalories?.() || 0;
-            const goalCal = this.db.health?.dietGoal?.dailyCal || 0;
-            const remaining = goalCal ? goalCal - intake : 0;
+            summary=ths(this,summary);
+            const weight = summary.weight || this.activeRecords?.(this.db.health?.weights || []).find((item) => item.date === today) || this.sortedWeights?.().slice(-1)[0] || null;
+            const exerciseCal = Math.round(this.todayTrainingCalories?.() || summary.exerciseCal || 0);
+            const intake=n0(summary.intake),goalCal=n0(summary.goals?.cal||this.db.health?.dietGoal?.dailyCal),remaining=goalCal?goalCal-intake:0;
             const heroTitle = goalCal ? `距目标还差 ${remaining} 千卡` : (weight ? `体重 ${Number(weight.weight || 0).toFixed(2)} kg` : '开始今日训练');
             const streakDays = this.computeStreakDays?.() || 0;
             const prefs = this.ensurePlanPrefs?.() || {};
             const weeklySummary = window.planWeekly?.summary?.() || { done: 0, total: 0 };
-            return `<div class="hero">
-                <span class="hero-motion-aura" aria-hidden="true"></span>
-                <div class="hero-head">
-                    <div>
-                        <div class="hero-label">今日概览</div>
-                        <div class="hero-title">${this.escapeHtml(heroTitle)}</div>
-                    </div>
-                    <div style="display:flex;align-items:center;gap:6px">
+            return `<div class="hero"><span class="hero-motion-aura" aria-hidden="true"></span><div class="hero-head"><div><div class="hero-label">今日概览</div><div class="hero-title">${this.escapeHtml(heroTitle)}</div></div><div style="display:flex;align-items:center;gap:6px">
                         ${streakDays > 0 ? `<span class="streak-chip"><span class="material-symbols-rounded">local_fire_department</span>连续 ${streakDays} 天</span>` : ''}
                         ${prefs.showWeeklyDock === false ? '' : `<button class="md-icon-btn-bar today-weekly-plan-btn" type="button" onclick="window.planWeekly?.open?.()" aria-label="近期计划" title="3-7天 · ${weeklySummary.done}/${weeklySummary.total || 0} 完成"><span class="material-symbols-rounded">calendar_month</span></button>`}
-                        <button class="md-icon-btn-bar" type="button" onclick="data.openPlanTodayAiSheet?.()" aria-label="AI"><span class="material-symbols-rounded">auto_awesome</span></button>
-                    </div>
-                </div>
-                <div class="rings">
-                    ${this.renderPlanIntakeRing?.() || ''}
-                    <span class="ring-divider"></span>
-                    <button class="ring ring-train ${plan ? planStatusClass(plan.type) : 'is-empty'}" style="--plan-progress:${percent * 3.6}deg" type="button" onclick="${plan ? `data.openPlanTaskDrawer('${plan.id}')` : 'data.openNewPlanSheet()'}">
-                        <span class="ring-motion-aura" aria-hidden="true"></span>
-                        <div>
-                            <b>${aggregate.total ? `${aggregate.done}/${aggregate.total}` : '+'}</b>
-                            <small>训练</small>
-                            <em>${percent}% · ${exerciseCal} 分钟</em>
-                        </div>
-                    </button>
-                </div>
+                        <button class="md-icon-btn-bar" type="button" onclick="data.openPlanTodayAiSheet?.()" aria-label="AI"><span class="material-symbols-rounded">auto_awesome</span></button></div></div><div class="rings">
+                    ${this.renderPlanIntakeRing?.(summary) || ''}
+                    <span class="ring-divider"></span><button class="ring ring-train ${plan ? planStatusClass(plan.type) : 'is-empty'}" style="--plan-progress:${percent * 3.6}deg" type="button" onclick="${plan ? `data.openPlanTaskDrawer('${plan.id}')` : 'data.openNewPlanSheet()'}"><span class="ring-motion-aura" aria-hidden="true"></span><div><b>${aggregate.total ? `${aggregate.done}/${aggregate.total}` : '+'}</b><small>训练</small><em>${percent}% · ${exerciseCal} 分钟</em></div></button></div>
                 ${todayPlans.length > 1 ? `<div class="plan-type-tabs">${todayPlans.map((item) => {
                     const meta = this.planTypeMeta?.(item.type, item.title) || { label: item.title || '计划', icon: 'event_note' };
                     return `<button class="plan-type-tab ${item.id === plan.id ? 'active' : ''} ${planStatusClass(item.type)}" type="button" onclick="window.dataPlanUi.selectTodayPlan.call(data, '${item.id}')"><span class="material-symbols-rounded">${meta.icon}</span>${this.escapeHtml(item.title || meta.label)}</button>`;
@@ -124,21 +114,7 @@
             const todayPlans = this.getTodayDailyPlans?.() || [];
             const selected = todayPlans.find((item) => item.id === this.selectedPlanId) || todayPlans[0] || null;
             if (!selected) {
-                return `<div class="sect-head"><span class="t">当前训练计划</span><button class="a" onclick="data.openNewPlanSheet()" type="button">新建计划</button></div>
-                <div class="glass-card plan-card">
-                    <div class="plan-head">
-                        <div>
-                            <div class="pt">待安排</div>
-                            <div class="pn">今天还没有训练计划</div>
-                        </div>
-                        <div class="plan-chip"><span class="material-symbols-rounded">event_note</span>0/0</div>
-                    </div>
-                    <div class="plan-meta"><span>先创建计划，或让 AI 根据当前目标安排今天的训练。</span></div>
-                    <div class="plan-actions">
-                        <button class="md-btn md-btn-filled" type="button" onclick="data.openNewPlanSheet()"><span class="material-symbols-rounded">playlist_add</span>新建计划</button>
-                        <button class="md-btn md-btn-tonal" type="button" onclick="data.openPlanTodayAiSheet?.()"><span class="material-symbols-rounded">auto_awesome</span>AI 生成</button>
-                    </div>
-                </div>`;
+                return `<div class="sect-head"><span class="t">当前训练计划</span><button class="a" onclick="data.openNewPlanSheet()" type="button">新建计划</button></div><div class="glass-card plan-card"><div class="plan-head"><div><div class="pt">待安排</div><div class="pn">今天还没有训练计划</div></div><div class="plan-chip"><span class="material-symbols-rounded">event_note</span>0/0</div></div><div class="plan-meta"><span>先创建计划，或让 AI 根据当前目标安排今天的训练。</span></div><div class="plan-actions"><button class="md-btn md-btn-filled" type="button" onclick="data.openNewPlanSheet()"><span class="material-symbols-rounded">playlist_add</span>新建计划</button><button class="md-btn md-btn-tonal" type="button" onclick="data.openPlanTodayAiSheet?.()"><span class="material-symbols-rounded">auto_awesome</span>AI 生成</button></div></div>`;
             }
             const plan = selected;
             const planMeta = this.planTypeMeta?.(plan.type || 'rehab', plan.title) || { label: '训练计划', icon: 'event_note' };
@@ -147,58 +123,25 @@
             const current = items.find((item) => item.status === 'in-progress') || items.find((item) => item.status === 'todo') || null;
             const pending = items.filter((item) => item.status === 'todo' || item.status === 'in-progress').length;
             const totalItems = items.length || 1;
-            const elapsed = current ? this.estimateElapsed?.(current) : null;
-            return `<div class="sect-head"><span class="t">当前训练计划</span><button class="a" onclick="data.openPlanTaskDrawer('${plan.id}')" type="button">查看全部</button></div>
-            <div class="glass-card plan-card">
-                <div class="plan-head">
-                    <div>
-                        <div class="pt">进行中 · ${this.escapeHtml(planMeta.label)}</div>
-                        <div class="pn">${this.escapeHtml(plan.title || planMeta.label)}</div>
-                    </div>
-                    <div class="plan-chip"><span class="material-symbols-rounded">play_circle</span>${completion.done}/${completion.total}</div>
-                </div>
-                <div class="seg-bar">${items.map((item) => {
+            return `<div class="sect-head"><span class="t">当前训练计划</span><button class="a" onclick="data.openPlanTaskDrawer('${plan.id}')" type="button">查看全部</button></div><div class="glass-card plan-card"><div class="plan-head"><div><div class="pt">进行中 · ${this.escapeHtml(planMeta.label)}</div><div class="pn">${this.escapeHtml(plan.title || planMeta.label)}</div></div><div class="plan-chip"><span class="material-symbols-rounded">play_circle</span>${completion.done}/${completion.total}</div></div><div class="seg-bar">${items.map((item) => {
                     const cls = item.status === 'done' ? 'done' : (current && item.id === current.id ? 'cur' : '');
                     return `<span class="seg ${cls}" style="width:${100/totalItems}%"></span>`;
                 }).join('')}</div>
                 ${current ? `<div class="plan-meta"><span>${taskSpecText(current)}${current.currentLevel ? ` · Lv${current.currentLevel}` : ''}</span>${pending ? `<span>${pending} 项待完成</span>` : ''}</div>` : ''}
                 <div class="plan-actions">
                     ${current ? `<button class="md-btn md-btn-filled" type="button" onclick="data.handlePlanTaskTap('${plan.id}','${current.id}')"><span class="material-symbols-rounded">play_arrow</span>继续训练</button>` : `<button class="md-btn md-btn-tonal" type="button" onclick="data.openPlanTaskDrawer('${plan.id}')"><span class="material-symbols-rounded">checklist</span>查看完成</button>`}
-                    <button class="md-btn md-btn-tonal" type="button" onclick="data.openPlanTaskDrawer('${plan.id}')">查看动作</button>
-                </div>
-            </div>`;
+                    <button class="md-btn md-btn-tonal" type="button" onclick="data.openPlanTaskDrawer('${plan.id}')">查看动作</button></div></div>`;
         },
 
-        renderTodayV6DietCard() {
-            const intake = this.todayCalories?.() || 0;
-            const macros = this.todayMacros?.() || { pro: 0, carb: 0, fat: 0 };
-            const goalCal = this.db.health?.dietGoal?.dailyCal || 0;
-            const goals = this.defaultDietGoals?.() || { pro: 0, carb: 0, fat: 0 };
-            const remaining = goalCal ? goalCal - intake : 0;
-            const pct = goalCal ? Math.min(100, Math.round((intake / goalCal) * 100)) : 0;
-            const proPct = goals.pro ? Math.min(100, Math.round((macros.pro / goals.pro) * 100)) : 0;
-            const carbPct = goals.carb ? Math.min(100, Math.round((macros.carb / goals.carb) * 100)) : 0;
-            const fatPct = goals.fat ? Math.min(100, Math.round((macros.fat / goals.fat) * 100)) : 0;
-            return `<div class="sect-head"><span class="t">饮食摄入</span><button class="a" onclick="data.openDietModal()" type="button">添加记录 ›</button></div>
-            <div class="glass-card">
-                <div class="calorie-head">
-                    <div>
-                        <span class="num">${goalCal ? remaining : '--'}</span>
-                        <span class="unit">${goalCal ? 'kcal 剩余' : ''}</span>
-                    </div>
+        renderTodayV6DietCard(summary){
+            summary=ths(this,summary);const m=summary.macros||{},g=summary.goals||{};
+            const intake=n0(summary.intake),pro=n0(m.pro),carb=n0(m.carb),fat=n0(m.fat);
+            const goalCal=n0(g.cal||this.db.health?.dietGoal?.dailyCal),remaining=goalCal?goalCal-intake:0;
+            const p=(v,t)=>t?Math.min(100,Math.round(v/t*100)):0,proPct=p(pro,n0(g.pro)),carbPct=p(carb,n0(g.carb)),fatPct=p(fat,n0(g.fat));
+            return `<div class="sect-head"><span class="t">饮食摄入</span><button class="a" onclick="data.openDietModal()" type="button">添加记录 ›</button></div><div class="glass-card"><div class="calorie-head"><div><span class="num">${goalCal ? remaining : '--'}</span><span class="unit">${goalCal ? 'kcal 剩余' : ''}</span></div>
                     ${goalCal ? `<div class="right"><div class="lab">已摄入 / 目标</div><div class="val">${intake} / ${goalCal}</div></div>` : ''}
                 </div>
-                ${goalCal ? `<div class="stack-bar">
-                    <i class="b1" style="width:${carbPct}%"></i>
-                    <i class="b2" style="width:${proPct}%"></i>
-                    <i class="b3" style="width:${fatPct}%"></i>
-                </div>
-                <div class="macros">
-                    <span class="macro c"><small>碳水</small><b>${macros.carb.toFixed(0)}g</b></span>
-                    <span class="macro p"><small>蛋白</small><b>${macros.pro.toFixed(0)}g</b></span>
-                    <span class="macro f"><small>脂肪</small><b>${macros.fat.toFixed(0)}g</b></span>
-                    <span class="macro r"><small>余</small><b>${remaining}</b></span>
-                </div>` : ''}
+                ${goalCal ? `<div class="stack-bar"><i class="b1" style="width:${carbPct}%"></i><i class="b2" style="width:${proPct}%"></i><i class="b3" style="width:${fatPct}%"></i></div><div class="macros"><span class="macro c"><small>碳水</small><b>${carb.toFixed(0)}g</b></span><span class="macro p"><small>蛋白</small><b>${pro.toFixed(0)}g</b></span><span class="macro f"><small>脂肪</small><b>${fat.toFixed(0)}g</b></span><span class="macro r"><small>余</small><b>${remaining}</b></span></div>` : ''}
             </div>`;
         },
 
@@ -217,20 +160,11 @@
             }
         },
 
-        renderPlanIntakeRing() {
-            const intake = this.todayCalories?.() || 0;
-            const macros = this.todayMacros?.() || { pro: 0, carb: 0, fat: 0 };
-            const goalCal = this.db.health?.dietGoal?.dailyCal || 0;
-            const goals = this.defaultDietGoals?.() || { pro: 0, carb: 0, fat: 0 };
-            const displayPercent = goalCal ? Math.max(0, Math.round((intake / goalCal) * 100)) : 0;
-            const ringProgress = Math.min(100, displayPercent);
-            const remaining = goalCal ? goalCal - intake : 0;
-            const remainingText = goalCal ? (remaining >= 0 ? `剩余${remaining}kcal` : `超出${Math.abs(remaining)}kcal`) : '';
-            const macroStops = {
-                pro: Math.min(120, this.ratio(macros.pro, goals.pro) * 1.2),
-                carb: 120 + Math.min(120, this.ratio(macros.carb, goals.carb) * 1.2),
-                fat: 240 + Math.min(120, this.ratio(macros.fat, goals.fat) * 1.2)
-            };
+        renderPlanIntakeRing(summary){
+            summary=ths(this,summary);const m=summary.macros||{},g=summary.goals||{};
+            const intake=n0(summary.intake),goalCal=n0(g.cal||this.db.health?.dietGoal?.dailyCal);
+            const displayPercent=goalCal?Math.max(0,Math.round(intake/goalCal*100)):0,ringProgress=Math.min(100,displayPercent);
+            const st=(v,t,b)=>b+Math.min(120,this.ratio(n0(v),n0(t))*1.2),macroStops={pro:st(m.pro,g.pro,0),carb:st(m.carb,g.carb,120),fat:st(m.fat,g.fat,240)};
             if (!goalCal) return '<div class="ring ring-diet"><span class="ring-motion-aura" aria-hidden="true"></span><div><b>--</b><small>饮食</small></div></div>';
             return `<div class="ring ring-diet" style="--progress:${ringProgress};--pro-stop:${macroStops.pro}deg;--carb-stop:${macroStops.carb}deg;--fat-stop:${macroStops.fat}deg"><span class="ring-motion-aura" aria-hidden="true"></span><div><b>${displayPercent}%</b><small>饮食</small><em>${intake}/${goalCal}</em></div></div>`;
         },
@@ -264,9 +198,7 @@
                 icon: 'add_circle',
                 bodyHtml: `<div id="planCreateSheetBody">${this.renderNewPlanSheetBody(types)}</div>`,
                 actionsHtml: `
-                    <button class="md-btn" type="button" data-modal-close>关闭</button>
-                    <button class="md-btn md-btn-tonal" type="button" onclick="data.createSelectedPlans(false)">手动创建</button>
-                    <button class="md-btn md-btn-filled" type="button" onclick="data.createSelectedPlans('${weekFirst ? 'week' : 'today'}')">AI ${weekFirst ? '7天' : '今日'}</button>
+                    <button class="md-btn" type="button" data-modal-close>关闭</button><button class="md-btn md-btn-tonal" type="button" onclick="data.createSelectedPlans(false)">手动创建</button><button class="md-btn md-btn-filled" type="button" onclick="data.createSelectedPlans('${weekFirst ? 'week' : 'today'}')">AI ${weekFirst ? '7天' : '今日'}</button>
                 `
             });
         },
@@ -276,10 +208,7 @@
             return `<div class="plan-create-sheet">
                 ${types.map((type) => {
                     const meta = this.planTypeMeta?.(type) || { label: type, icon: 'event_note' };
-                    return `<button class="model-picker-row plan-create-row ${planStatusClass(type)} ${selected.has(type) ? 'active' : ''}" type="button" onclick="data.toggleNewPlanType('${type}')">
-                        <span class="material-symbols-rounded">${selected.has(type) ? 'check_circle' : meta.icon}</span>
-                        <span class="model-picker-main"><strong>${this.escapeHtml(meta.label)}</strong><small>AI 会按该目标生成任务和放松安排</small></span>
-                    </button>`;
+                    return `<button class="model-picker-row plan-create-row ${planStatusClass(type)} ${selected.has(type) ? 'active' : ''}" type="button" onclick="data.toggleNewPlanType('${type}')"><span class="material-symbols-rounded">${selected.has(type) ? 'check_circle' : meta.icon}</span><span class="model-picker-main"><strong>${this.escapeHtml(meta.label)}</strong><small>AI 会按该目标生成任务和放松安排</small></span></button>`;
                 }).join('')}
             </div>`;
         },
@@ -319,32 +248,13 @@
         },
 
         renderTodayActionDock() {
-            return `<div class="quick-dock">
-                <button class="record-quick-btn" type="button" data-q="weight" onclick="data.openWeightModal()"><span class="material-symbols-rounded">monitor_weight</span><span>记体重</span></button>
-                <button class="record-quick-btn" type="button" data-q="diet" onclick="data.openDietModal()"><span class="material-symbols-rounded">restaurant</span><span>记饮食</span></button>
-                <button class="record-quick-btn" type="button" data-q="cardio" onclick="data.openExerciseModal()"><span class="material-symbols-rounded">fitness_center</span><span>记运动</span></button>
-                <button class="record-quick-btn record-quick-btn-ai context-ai-btn" type="button" data-q="ai" data-ai-ctx="today" data-ai-idx="0"><span class="material-symbols-rounded">psychology</span><span>问 AI</span></button>
-            </div>`;
+            return `<div class="quick-dock"><button class="record-quick-btn" type="button" data-q="weight" onclick="data.openWeightModal()"><span class="material-symbols-rounded">monitor_weight</span><span>记体重</span></button><button class="record-quick-btn" type="button" data-q="diet" onclick="data.openDietModal()"><span class="material-symbols-rounded">restaurant</span><span>记饮食</span></button><button class="record-quick-btn" type="button" data-q="cardio" onclick="data.openExerciseModal()"><span class="material-symbols-rounded">fitness_center</span><span>记运动</span></button><button class="record-quick-btn record-quick-btn-ai context-ai-btn" type="button" data-q="ai" data-ai-ctx="today" data-ai-idx="0"><span class="material-symbols-rounded">psychology</span><span>问 AI</span></button></div>`;
         },
 
         renderTodayAiReminder() {
             const collapsed = this.isCollapsed?.('todayAiReminder', true);
-            const content = this.renderContextAiCard?.('today') || `<div class="context-ai-card context-ai-placeholder">
-                <div class="context-ai-head">
-                    <div><span class="cardio-kicker">AI 建议</span><h3>综合分析</h3><small>配置 AI 后，可结合今日饮食、训练和体重记录生成建议</small></div>
-                    <span class="context-ai-icon material-symbols-rounded">psychology</span>
-                </div>
-                <div class="context-ai-actions">
-                    <button class="md-btn md-btn-tonal" type="button" onclick="ui.tab('ai-coach', document.querySelectorAll('.nav-item')[3])">打开 AI</button>
-                </div>
-            </div>`;
-            return `<div class="md-card collapsible-card today-ai-reminder ${collapsed ? 'collapsed' : ''}">
-                <button class="panel-head collapsible-head-btn" type="button" onclick="data.toggleCollapse('todayAiReminder')">
-                    <div><span class="cardio-kicker">AI</span><h3>今日 AI 提醒</h3><small>展开查看快速建议</small></div>
-                    <span class="collapse-btn"><span class="material-symbols-rounded">${collapsed ? 'expand_more' : 'expand_less'}</span></span>
-                </button>
-                <div class="collapse-content">${content}</div>
-            </div>`;
+            const content = this.renderContextAiCard?.('today') || `<div class="context-ai-card context-ai-placeholder"><div class="context-ai-head"><div><span class="cardio-kicker">AI 建议</span><h3>综合分析</h3><small>配置 AI 后，可结合今日饮食、训练和体重记录生成建议</small></div><span class="context-ai-icon material-symbols-rounded">psychology</span></div><div class="context-ai-actions"><button class="md-btn md-btn-tonal" type="button" onclick="ui.tab('ai-coach', document.querySelectorAll('.nav-item')[3])">打开 AI</button></div></div>`;
+            return `<div class="md-card collapsible-card today-ai-reminder ${collapsed ? 'collapsed' : ''}"><button class="panel-head collapsible-head-btn" type="button" onclick="data.toggleCollapse('todayAiReminder')"><div><span class="cardio-kicker">AI</span><h3>今日 AI 提醒</h3><small>展开查看快速建议</small></div><span class="collapse-btn"><span class="material-symbols-rounded">${collapsed ? 'expand_more' : 'expand_less'}</span></span></button><div class="collapse-content">${content}</div></div>`;
         },
 
         renderPlanTaskDrawerBody(planId) {
@@ -359,20 +269,9 @@
                 ['已完成', 'done', items.filter((item) => item.status === 'done')],
                 ['已跳过', 'skipped', items.filter((item) => item.status === 'skipped')]
             ];
-            return `<div class="plan-task-drawer">
-                <div class="plan-drawer-summary ${planStatusClass(plan.type)}">
-                    <span class="material-symbols-rounded plan-drawer-summary-icon">${planMeta.icon}</span>
-                    <span class="plan-drawer-summary-copy">
-                        <strong>${this.escapeHtml(plan.title || planMeta.label)}</strong>
-                        <small>${completion.total ? `${completion.done}/${completion.total} 完成` : '暂无待完成训练'}${plan.notes ? ` · ${this.escapeHtml(plan.notes)}` : ''}</small>
-                    </span>
-                    <button class="md-btn md-btn-tonal plan-cancel-day-btn" type="button" data-cancel-plan-id="${this.escapeHtml(plan.id)}" title="取消今日计划" aria-label="取消今日计划">
-                        <span class="material-symbols-rounded">event_busy</span><span>取消计划</span>
-                    </button>
-                </div>
+            return `<div class="plan-task-drawer"><div class="plan-drawer-summary ${planStatusClass(plan.type)}"><span class="material-symbols-rounded plan-drawer-summary-icon">${planMeta.icon}</span><span class="plan-drawer-summary-copy"><strong>${this.escapeHtml(plan.title || planMeta.label)}</strong><small>${completion.total ? `${completion.done}/${completion.total} 完成` : '暂无待完成训练'}${plan.notes ? ` · ${this.escapeHtml(plan.notes)}` : ''}</small></span><button class="md-btn md-btn-tonal plan-cancel-day-btn" type="button" data-cancel-plan-id="${this.escapeHtml(plan.id)}" title="取消今日计划" aria-label="取消今日计划"><span class="material-symbols-rounded">event_busy</span><span>取消计划</span></button></div>
                 ${sections.map(([label, key, list]) => `
-                    <section class="plan-section plan-section-${key}">
-                        <div class="plan-section-head"><strong>${label}</strong><small>${list.length}</small></div>
+                    <section class="plan-section plan-section-${key}"><div class="plan-section-head"><strong>${label}</strong><small>${list.length}</small></div>
                         ${list.length ? list.map((task, index) => this.renderPlanTaskRow(plan.id, task, index + 1, false)).join('') : '<div class="plan-empty">暂无</div>'}
                     </section>
                 `).join('')}
@@ -386,14 +285,7 @@
             modal.className = 'md-modal md-modal-sheet';
             modal.setAttribute('aria-hidden', 'false');
             modal.innerHTML = `
-                <div class="md-modal-backdrop" data-modal-close></div>
-                <div class="md-modal-card md-modal-sheet-card">
-                    <div class="md-modal-head">
-                        <strong>今日训练任务</strong>
-                        <button class="icon-btn" type="button" data-modal-close aria-label="关闭"><span class="material-symbols-rounded">close</span></button>
-                    </div>
-                    <div class="md-modal-body" id="planTaskDrawerBody">${this.renderPlanTaskDrawerBody(planId)}</div>
-                </div>`;
+                <div class="md-modal-backdrop" data-modal-close></div><div class="md-modal-card md-modal-sheet-card"><div class="md-modal-head"><strong>今日训练任务</strong><button class="icon-btn" type="button" data-modal-close aria-label="关闭"><span class="material-symbols-rounded">close</span></button></div><div class="md-modal-body" id="planTaskDrawerBody">${this.renderPlanTaskDrawerBody(planId)}</div></div>`;
             modal.querySelectorAll('[data-modal-close]').forEach((btn) => {
                 btn.addEventListener('click', () => this.closePlanTaskDrawer?.());
             });
@@ -447,36 +339,15 @@
             const policyBadge = task.requiresUserConfirm
                 ? `<span class="plan-policy-badge ${task.userConfirmed ? 'is-confirmed' : 'is-warning'}">${confirmMeta.badge}</span>`
                 : '';
-            return `<div class="plan-task-row ${meta.className}">
-                <button class="plan-task-main" type="button" onclick="data.handlePlanTaskTap('${planId}','${task.id}')">
-                    <span class="plan-task-order">${index}</span>
-                    <span class="plan-task-body">
-                        <span class="plan-task-title">
-                            <strong>${this.escapeHtml(task.name || '未命名任务')}</strong>
-                            <em><span class="material-symbols-rounded">${meta.icon}</span>${meta.label}</em>
-                        </span>
+            return `<div class="plan-task-row ${meta.className}"><button class="plan-task-main" type="button" onclick="data.handlePlanTaskTap('${planId}','${task.id}')"><span class="plan-task-order">${index}</span><span class="plan-task-body"><span class="plan-task-title"><strong>${this.escapeHtml(task.name || '未命名任务')}</strong><em><span class="material-symbols-rounded">${meta.icon}</span>${meta.label}</em></span>
                         ${policyBadge}
                         <small>${taskSpecText(task)}${task.currentLevel ? ` · Lv${task.currentLevel}` : ''}${task.userOverride ? ' · 已锁定' : ''}${task.invalidSpec ? ' · ⚠️ 参数不完整' : ''}</small>
                         ${!compact && doneMeta}
-                    </span>
-                </button>
-                <div class="plan-task-actions">
-                    <button class="md-icon-btn" type="button" onclick="event.stopPropagation();data.openPlanTaskEdit('${planId}','${task.id}')" aria-label="编辑动作"><span class="material-symbols-rounded">edit</span></button>
-                    <button class="md-icon-btn" type="button" onclick="event.stopPropagation();data.markPlanTaskDone('${planId}','${task.id}')" aria-label="手动完成"><span class="material-symbols-rounded">done</span></button>
-                    <button class="md-icon-btn" type="button" onclick="event.stopPropagation();data.openPlanTaskMenu('${planId}','${task.id}')" aria-label="更多"><span class="material-symbols-rounded">more_vert</span></button>
-                </div>
-            </div>`;
+                    </span></button><div class="plan-task-actions"><button class="md-icon-btn" type="button" onclick="event.stopPropagation();data.openPlanTaskEdit('${planId}','${task.id}')" aria-label="编辑动作"><span class="material-symbols-rounded">edit</span></button><button class="md-icon-btn" type="button" onclick="event.stopPropagation();data.markPlanTaskDone('${planId}','${task.id}')" aria-label="手动完成"><span class="material-symbols-rounded">done</span></button><button class="md-icon-btn" type="button" onclick="event.stopPropagation();data.openPlanTaskMenu('${planId}','${task.id}')" aria-label="更多"><span class="material-symbols-rounded">more_vert</span></button></div></div>`;
         },
 
         renderPlanManualStrip() {
-            return `<div class="plan-manual-strip">
-                <div class="record-quick-actions">
-                    <button class="record-quick-btn" type="button" data-plan-quick="diet" onclick="data.openDietModal()"><span class="material-symbols-rounded">restaurant</span><span>记饮食</span></button>
-                    <button class="record-quick-btn" type="button" data-plan-quick="cardio" onclick="data.openExerciseModal()"><span class="material-symbols-rounded">fitness_center</span><span>记运动</span></button>
-                    <button class="record-quick-btn" type="button" data-plan-quick="weight" onclick="data.openWeightModal()"><span class="material-symbols-rounded">monitor_weight</span><span>记体重</span></button>
-                    <button class="record-quick-btn record-quick-btn-ai context-ai-btn" type="button" data-ai-ctx="today" data-ai-idx="0"><span class="material-symbols-rounded">psychology</span><span>问 AI</span></button>
-                </div>
-            </div>`;
+            return `<div class="plan-manual-strip"><div class="record-quick-actions"><button class="record-quick-btn" type="button" data-plan-quick="diet" onclick="data.openDietModal()"><span class="material-symbols-rounded">restaurant</span><span>记饮食</span></button><button class="record-quick-btn" type="button" data-plan-quick="cardio" onclick="data.openExerciseModal()"><span class="material-symbols-rounded">fitness_center</span><span>记运动</span></button><button class="record-quick-btn" type="button" data-plan-quick="weight" onclick="data.openWeightModal()"><span class="material-symbols-rounded">monitor_weight</span><span>记体重</span></button><button class="record-quick-btn record-quick-btn-ai context-ai-btn" type="button" data-ai-ctx="today" data-ai-idx="0"><span class="material-symbols-rounded">psychology</span><span>问 AI</span></button></div></div>`;
         },
 
         togglePlanTodayExpanded() {
@@ -510,21 +381,9 @@
                 title: '编辑计划动作',
                 icon: 'edit',
                 bodyHtml: `
-                    <div class="md-grid modal-grid" style="gap:10px">
-                        <div class="md-field span-full"><input id="planEditName" type="text" placeholder=" " autocomplete="off" value="${this.escapeHtml(task.name || '')}" oninput="data.renderPlanEditActionSuggestions?.(this)" onfocus="data.renderPlanEditActionSuggestions?.(this)"><label>动作名称</label></div>
-                        <div id="planEditActionSuggestions" class="plan-action-suggestions span-full"></div>
-                        <div class="md-field"><select id="planEditCategory"><option value="warmup" ${category === 'warmup' ? 'selected' : ''}>热身</option><option value="main" ${category === 'main' ? 'selected' : ''}>主训练</option><option value="cooldown" ${category === 'cooldown' ? 'selected' : ''}>拉伸/放松</option></select><label>阶段</label></div>
-                        <div class="md-field"><input id="planEditSets" type="number" placeholder=" " value="${Number(current.sets || 1)}"><label>组数</label></div>
-                        <div class="md-field"><input id="planEditReps" type="number" placeholder=" " value="${Number(current.reps || 0)}"><label>次数</label></div>
-                        <div class="md-field"><input id="planEditWork" type="number" placeholder=" " value="${Number(current.work || 0)}"><label>时长（秒）</label></div>
-                        <div class="md-field"><input id="planEditRest" type="number" placeholder=" " value="${Number(current.actionRest || 0)}"><label>组间休息</label></div>
-                        <div class="md-field"><input id="planEditRepRest" type="number" min="0" placeholder=" " value="${Number(current.repRest || 0)}"><label>次/侧间休息（秒）</label></div>
-                        <label class="plan-edit-alt"><input id="planEditIsAlt" type="checkbox" ${current.isAlt ? 'checked' : ''}><span>双侧交替（左右换边）</span></label>
-                        <div class="md-field span-full"><input id="planEditReason" type="text" placeholder=" " value="${this.escapeHtml(task.aiReasoning || '')}"><label>修改理由/备注（可选）</label></div>
-                    </div>`,
+                    <div class="md-grid modal-grid" style="gap:10px"><div class="md-field span-full"><input id="planEditName" type="text" placeholder=" " autocomplete="off" value="${this.escapeHtml(task.name || '')}" oninput="data.renderPlanEditActionSuggestions?.(this)" onfocus="data.renderPlanEditActionSuggestions?.(this)"><label>动作名称</label></div><div id="planEditActionSuggestions" class="plan-action-suggestions span-full"></div><div class="md-field"><select id="planEditCategory"><option value="warmup" ${category === 'warmup' ? 'selected' : ''}>热身</option><option value="main" ${category === 'main' ? 'selected' : ''}>主训练</option><option value="cooldown" ${category === 'cooldown' ? 'selected' : ''}>拉伸/放松</option></select><label>阶段</label></div><div class="md-field"><input id="planEditSets" type="number" placeholder=" " value="${Number(current.sets || 1)}"><label>组数</label></div><div class="md-field"><input id="planEditReps" type="number" placeholder=" " value="${Number(current.reps || 0)}"><label>次数</label></div><div class="md-field"><input id="planEditWork" type="number" placeholder=" " value="${Number(current.work || 0)}"><label>时长（秒）</label></div><div class="md-field"><input id="planEditRest" type="number" placeholder=" " value="${Number(current.actionRest || 0)}"><label>组间休息</label></div><div class="md-field"><input id="planEditRepRest" type="number" min="0" placeholder=" " value="${Number(current.repRest || 0)}"><label>次/侧间休息（秒）</label></div><label class="plan-edit-alt"><input id="planEditIsAlt" type="checkbox" ${current.isAlt ? 'checked' : ''}><span>双侧交替（左右换边）</span></label><div class="md-field span-full"><input id="planEditReason" type="text" placeholder=" " value="${this.escapeHtml(task.aiReasoning || '')}"><label>修改理由/备注（可选）</label></div></div>`,
                 actionsHtml: `
-                    <button class="md-btn" type="button" data-modal-close>取消</button>
-                    <button class="md-btn md-btn-filled" type="button" onclick="data.savePlanTaskEdit('${planId}','${taskId}')">保存</button>
+                    <button class="md-btn" type="button" data-modal-close>取消</button><button class="md-btn md-btn-filled" type="button" onclick="data.savePlanTaskEdit('${planId}','${taskId}')">保存</button>
                 `
             });
         },
@@ -589,8 +448,7 @@
                     icon: 'verified',
                     bodyHtml: `<p class="md-muted">${this.escapeHtml(task.name || '此动作')} ${confirmMeta.detail}确认后标记完成并记录反馈。</p>`,
                     actionsHtml: `
-                        <button class="md-btn" type="button" data-modal-close>取消</button>
-                        <button class="md-btn md-btn-filled" type="button" onclick="data.confirmPlanTaskSuggestion('${planId}','${taskId}', { silent: true, keepModalOpen: true }); data.markPlanTaskDone('${planId}','${taskId}')">确认并完成</button>
+                        <button class="md-btn" type="button" data-modal-close>取消</button><button class="md-btn md-btn-filled" type="button" onclick="data.confirmPlanTaskSuggestion('${planId}','${taskId}', { silent: true, keepModalOpen: true }); data.markPlanTaskDone('${planId}','${taskId}')">确认并完成</button>
                     `
                 });
                 return;
@@ -612,12 +470,7 @@
                 icon: 'more_vert',
                 bodyHtml: `<div class="weekly-plan-picker">
                     ${task.requiresUserConfirm && !task.userConfirmed ? `<button class="model-picker-row plan-policy-confirm-row" type="button" onclick="data.confirmPlanTaskSuggestion('${planId}','${taskId}')"><span class="material-symbols-rounded">verified</span><span class="model-picker-main"><strong>${confirmMeta.title}</strong><small>${confirmMeta.detail}确认后执行</small></span></button>` : ''}
-                    <button class="model-picker-row" type="button" onclick="data.openPlanTaskEdit('${planId}','${taskId}')"><span class="material-symbols-rounded">edit</span><span class="model-picker-main"><strong>编辑动作</strong><small>临时修改名称、阶段和训练参数</small></span></button>
-                    <button class="model-picker-row" type="button" onclick="data.movePlanTaskTo('${planId}','${taskId}','${this.logicalDateKey?.() || this.dateKey(new Date())}')"><span class="material-symbols-rounded">today</span><span class="model-picker-main"><strong>移到今天</strong><small>回到当前日期执行</small></span></button>
-                    <button class="model-picker-row" type="button" onclick="data.movePlanTaskTo('${planId}','${taskId}','${tomorrowKey}')"><span class="material-symbols-rounded">event</span><span class="model-picker-main"><strong>移到明天</strong><small>延后一天执行</small></span></button>
-                    <button class="model-picker-row" type="button" onclick="data.togglePlanTaskLock('${planId}','${taskId}')"><span class="material-symbols-rounded">${task.userOverride ? 'lock_open' : 'lock'}</span><span class="model-picker-main"><strong>${task.userOverride ? '取消锁定' : '锁定任务'}</strong><small>锁定后 AI 不覆盖</small></span></button>
-                    <button class="model-picker-row" type="button" onclick="data.deletePlanTaskConfirm('${planId}','${taskId}')"><span class="material-symbols-rounded">delete</span><span class="model-picker-main"><strong>删除任务</strong><small>软删除，可同步</small></span></button>
-                </div>`,
+                    <button class="model-picker-row" type="button" onclick="data.openPlanTaskEdit('${planId}','${taskId}')"><span class="material-symbols-rounded">edit</span><span class="model-picker-main"><strong>编辑动作</strong><small>临时修改名称、阶段和训练参数</small></span></button><button class="model-picker-row" type="button" onclick="data.movePlanTaskTo('${planId}','${taskId}','${this.logicalDateKey?.() || this.dateKey(new Date())}')"><span class="material-symbols-rounded">today</span><span class="model-picker-main"><strong>移到今天</strong><small>回到当前日期执行</small></span></button><button class="model-picker-row" type="button" onclick="data.movePlanTaskTo('${planId}','${taskId}','${tomorrowKey}')"><span class="material-symbols-rounded">event</span><span class="model-picker-main"><strong>移到明天</strong><small>延后一天执行</small></span></button><button class="model-picker-row" type="button" onclick="data.togglePlanTaskLock('${planId}','${taskId}')"><span class="material-symbols-rounded">${task.userOverride ? 'lock_open' : 'lock'}</span><span class="model-picker-main"><strong>${task.userOverride ? '取消锁定' : '锁定任务'}</strong><small>锁定后 AI 不覆盖</small></span></button><button class="model-picker-row" type="button" onclick="data.deletePlanTaskConfirm('${planId}','${taskId}')"><span class="material-symbols-rounded">delete</span><span class="model-picker-main"><strong>删除任务</strong><small>软删除，可同步</small></span></button></div>`,
                 actionsHtml: `<button class="md-btn" type="button" data-modal-close>关闭</button>`
             });
         },
@@ -812,14 +665,9 @@
             this._openModal?.({
                 title: '保存为方案',
                 icon: 'bookmark_add',
-                bodyHtml: `<div class="plan-save-routine-sheet">
-                    <p>今日计划 ${completion.done}/${completion.total} 完成，存为方案？</p>
-                    <small>保存后会进入方案库，并带有计划标记。</small>
-                </div>`,
+                bodyHtml: `<div class="plan-save-routine-sheet"><p>今日计划 ${completion.done}/${completion.total} 完成，存为方案？</p><small>保存后会进入方案库，并带有计划标记。</small></div>`,
                 actionsHtml: `
-                    <button class="md-btn" type="button" data-plan-save-dismiss>不用</button>
-                    <button class="md-btn md-btn-tonal" type="button" data-plan-save-rename>改名后存</button>
-                    <button class="md-btn md-btn-filled" type="button" data-plan-save-default>默认存</button>
+                    <button class="md-btn" type="button" data-plan-save-dismiss>不用</button><button class="md-btn md-btn-tonal" type="button" data-plan-save-rename>改名后存</button><button class="md-btn md-btn-filled" type="button" data-plan-save-default>默认存</button>
                 `,
                 onMount: (root, close) => {
                     root.querySelector('[data-plan-save-dismiss]')?.addEventListener('click', () => {

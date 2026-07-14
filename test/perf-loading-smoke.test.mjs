@@ -90,3 +90,14 @@ test('weight modal loads without pulling Bluetooth code into the interaction pat
     assert.match(html, /'mi-scale-web-bluetooth':\s*\['mi-scale-pure'\]/);
     assert.match(html, /MODULE_SCRIPTS[^;]*'mi-scale-pure'/);
 });
+
+test('history-view still preloads health-summary-pure for lightweight today diet summaries', () => {
+    const html = readRootFile('index.html');
+    const historyPrereq = html.match(/'history-view':\s*\[([^\]]*)\]/)?.[1] || '';
+    const todayDepsLiteral = html.match(/today:\s*(\[[^\]]*\])/)?.[1] || '';
+
+    assert.equal(todayDepsLiteral.replace(/\s+/g, ''), "['history-view']");
+    assert.match(historyPrereq, /'health-summary-pure'/);
+    assert.doesNotMatch(todayDepsLiteral, /'health-diet'|'food-log'/);
+    assert.doesNotMatch(historyPrereq, /'health-diet'|'food-log'/);
+});

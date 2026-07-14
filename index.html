@@ -8,7 +8,7 @@
     <link rel="icon" href="assets/app-icon.svg" type="image/svg+xml">
     <meta name="theme-color" content="#0061a4">
     <link rel="preload" href="assets/material-symbols-rounded.woff2" as="font" type="font/woff2" crossorigin>
-    <link rel="stylesheet" href="build/generated.css?v=324">
+    <link rel="stylesheet" href="build/generated.css?v=325">
 </head>
 <body>
     <div id="appUpdateBanner" class="app-update-banner hidden">
@@ -384,26 +384,26 @@
     </nav>
     </div>
 
-    <script src="m3e-ripple.js?v=324"></script>
-    <script src="toast.js?v=324"></script>
-    <script src="error-bus.js?v=324"></script>
-    <script src="i18n.js?v=324"></script>
-    <script src="theme.js?v=324"></script>
-    <script src="render-safe.js?v=324"></script>
-    <script src="nav-stack.js?v=324"></script>
-    <script src="app-route.js?v=324"></script>
-    <script type="module" src="data-utils-pure.js?v=324"></script>
-    <script type="module" src="action-identity.js?v=324"></script>
-    <script src="data-utils.js?v=324"></script>
-    <script src="storage/idb.js?v=324"></script>
-    <script src="storage/migrate.js?v=324"></script>
-    <script src="data-records.js?v=324"></script>
-    <script src="data-schema.js?v=324"></script>
-    <script src="data-store.js?v=324"></script>
-    <script src="data-ui-state.js?v=324"></script>
-    <script src="data-views.js?v=324"></script>
-    <script src="data.js?v=324"></script>
-    <script src="sync-status.js?v=324"></script>
+    <script src="m3e-ripple.js?v=325"></script>
+    <script src="toast.js?v=325"></script>
+    <script src="error-bus.js?v=325"></script>
+    <script src="i18n.js?v=325"></script>
+    <script src="theme.js?v=325"></script>
+    <script src="render-safe.js?v=325"></script>
+    <script src="nav-stack.js?v=325"></script>
+    <script src="app-route.js?v=325"></script>
+    <script type="module" src="data-utils-pure.js?v=325"></script>
+    <script type="module" src="action-identity.js?v=325"></script>
+    <script src="data-utils.js?v=325"></script>
+    <script src="storage/idb.js?v=325"></script>
+    <script src="storage/migrate.js?v=325"></script>
+    <script src="data-records.js?v=325"></script>
+    <script src="data-schema.js?v=325"></script>
+    <script src="data-store.js?v=325"></script>
+    <script src="data-ui-state.js?v=325"></script>
+    <script src="data-views.js?v=325"></script>
+    <script src="data.js?v=325"></script>
+    <script src="sync-status.js?v=325"></script>
     <div id="weightModal" class="md-modal md-modal-sheet hidden" aria-hidden="true">
         <div class="md-modal-backdrop" onclick="data.closeWeightModal()"></div>
         <div class="md-modal-card md-modal-sheet-card">
@@ -916,7 +916,7 @@
             const p = new Promise((res, rej) => {
                 const link = document.createElement('link');
                 link.rel = 'stylesheet';
-                link.href = `css-src/${name}.css?v=324`;
+                link.href = `css-src/${name}.css?v=325`;
                 link.dataset.appCss = name;
                 link.onload = () => {
                     link.dataset.loaded = 'true';
@@ -957,7 +957,7 @@
                 if (_loaded.has(name)) return res();
                 const s = document.createElement('script');
                 if (MODULE_SCRIPTS.has(name)) s.type = 'module';
-                s.src = `${name}${MJS_SCRIPTS.has(name) ? '.mjs' : '.js'}?v=324`;
+                s.src = `${name}${MJS_SCRIPTS.has(name) ? '.mjs' : '.js'}?v=325`;
                 s.onload = () => { _loaded.add(name); res(); };
                 s.onerror = rej;
                 document.head.appendChild(s);
