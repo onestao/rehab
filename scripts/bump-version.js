@@ -123,7 +123,7 @@ function cacheManagedExtensionFiles(swText) {
 }
 
 function normalizedCacheAsset(relative, buffer) {
-    const textExtensions = new Set(['.js', '.mjs', '.css', '.json', '.html', '.svg', '.txt', '.csv', '.webmanifest']);
+    const textExtensions = new Set(['.js', '.mjs', '.css', '.json', '.html', '.svg', '.txt', '.csv', '.webmanifest', '.ico']);
     if (!textExtensions.has(path.extname(relative))) return buffer;
     let normalized = buffer.toString('utf8').replace(/\r\n/g, '\n');
     if (['sw.js', 'index.html', 'app-update.js'].includes(relative)) {

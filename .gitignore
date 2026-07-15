@@ -10,3 +10,7 @@ debug-backups/
 logs/
 docs/performance-optimization-plan.md
 AGENTS.disabled.md
+.tmp-terra-fix/
+_grok_fix_staging/
+docs/lazyload-*.md
+grok-fix.patch

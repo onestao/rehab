@@ -1,6 +1,6 @@
 // @ts-nocheck
 const CACHE = 'training-assistant-v326';
-const CACHE_ASSET_REVISION = 'fb9c79941423170beb71f06989005465fa51c09ef3a4efbf60ad97c8c6f5f9eb';
+const CACHE_ASSET_REVISION = '27bd6fc20801c6654d4f7306cf627bbd092f985561bd80995aaf2b33ab6bc335';
 const CACHE_VERSION = CACHE.replace(/^training-assistant-v/, '');
 const ASSETS = [
     'index.html',

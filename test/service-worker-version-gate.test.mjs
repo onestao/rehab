@@ -140,10 +140,11 @@ test('version gate rejects changed precache, runtime-cache-first, and nested laz
     fs.mkdirSync(path.join(fixture, 'scripts'), { recursive: true });
     fs.mkdirSync(path.join(fixture, 'lib'), { recursive: true });
     fs.copyFileSync(path.join(root, 'scripts', 'bump-version.js'), script);
-    fs.writeFileSync(path.join(fixture, 'sw.js'), `const CACHE = 'training-assistant-v326';\nconst CACHE_ASSET_REVISION = '${placeholder}';\nconst ASSETS = ['index.html', 'chunk.js?v=326'];\nconst RUNTIME_CACHE_FIRST_ASSETS = new Set(['assets/heic2any.min.js']);\n`);
+    fs.writeFileSync(path.join(fixture, 'sw.js'), `const CACHE = 'training-assistant-v326';\nconst CACHE_ASSET_REVISION = '${placeholder}';\nconst ASSETS = ['index.html', 'chunk.js?v=326', 'favicon.ico'];\nconst RUNTIME_CACHE_FIRST_ASSETS = new Set(['assets/heic2any.min.js']);\n`);
     fs.writeFileSync(path.join(fixture, 'index.html'), `<script src="chunk.js?v=326"></script><script>const key='rehab-sw-controller-reload-v326';const PAGE_DEPS={today:['chunk','lib/virtual-core.umd']};const SCRIPT_PREREQUISITES={};const MJS_SCRIPTS=new Set([]);</script>`);
     fs.writeFileSync(path.join(fixture, 'app-update.js'), `const appUpdate={version:'326',key:'rehab-sw-controller-reload-v326'};`);
     fs.writeFileSync(path.join(fixture, 'chunk.js'), 'window.fixtureChunk = 1;\n');
+    fs.writeFileSync(path.join(fixture, 'favicon.ico'), 'BASE64-ICON\n');
     fs.writeFileSync(path.join(fixture, 'assets', 'heic2any.min.js'), 'window.heicFixture = 1;\n');
     fs.writeFileSync(path.join(fixture, 'lib', 'virtual-core.umd.js'), 'window.virtualFixture = 1;\n');
 
@@ -162,11 +163,15 @@ test('version gate rejects changed precache, runtime-cache-first, and nested laz
     const before = runCheck();
     assert.equal(before.status, 0, before.stderr);
 
+    fs.writeFileSync(path.join(fixture, 'favicon.ico'), 'BASE64-ICON\r\n');
+    assert.equal(runCheck().status, 0, 'text favicon line endings should not change the cache fingerprint');
+
     fs.writeFileSync(path.join(fixture, 'chunk.js'), 'window.fixtureChunk = 2;\n');
     const changedPrecache = runCheck();
     assert.notEqual(changedPrecache.status, 0);
     assert.match(changedPrecache.stderr, /cache-managed asset fingerprint changed without a version bump/);
     fs.writeFileSync(path.join(fixture, 'chunk.js'), 'window.fixtureChunk = 1;\n');
+    fs.writeFileSync(path.join(fixture, 'favicon.ico'), 'BASE64-ICON\n');
     assert.equal(runCheck().status, 0);
 
     fs.writeFileSync(path.join(fixture, 'assets', 'heic2any.min.js'), 'window.heicFixture = 2;\n');
