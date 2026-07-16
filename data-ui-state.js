@@ -25,6 +25,8 @@
         return 'snack';
     }
 
+    const runtimeStateKeys = ['_activeModalEl'];
+
     window.dataUiState = {
         // ---- Shared modal core (available before lazy feature modules) ----
         _activeModalEl: null,
@@ -833,6 +835,10 @@
             });
         }
     };
+    Object.defineProperty(window.dataUiState, '__runtimeStateKeys', {
+        value: runtimeStateKeys,
+        enumerable: false
+    });
 
     try {
         window.dataUiState.bindHealthCssIntent?.call(window.dataUiState);

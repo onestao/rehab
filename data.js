@@ -42,35 +42,55 @@ const data = {
     historyColors: ['#2563eb', '#7c3aed', '#059669', '#f59e0b', '#e11d48', '#0891b2', '#9333ea', '#ea580c']
 };
 
-Object.assign(
-    data,
-    window.dataRecords || {},
-    window.dataSchema || {},
-    window.dataUtils || {},
-    window.dataStore || {},
-    window.dataUiState || {},
-    window.dataHealthDiet || {},
-    window.dataHealthWeight || {},
-    window.dataHealthExercise || {},
-    window.dataHealthProfile || {},
-    window['dataReport'] || {},
-    window.dataGoalPlan || {},
-    window.dataRoutinePlan || {},
-    window.dataRoutineLibrary || {},
-    window.dataHistoryView || {},
-    window.dataWeeklySummary || {},
-    window.dataViews || {},
-    window.dataAiTemplates || {},
-    window.adviceTemplateManager || {},
-    window['dataPlanStore'] || {},
-    window['dataPlanFeedback'] || {},
-    window['dataPlanCooldown'] || {},
-    window['dataPlanAutoAdjust'] || {},
-    window['dataPlanWeekly'] || {},
-    window['dataPlanAi'] || {},
-    window['dataPlanEquipment'] || {},
-    window['dataPlanUi'] || {}
-);
+function dataModules() {
+    return [
+        window.dataRecords || {},
+        window.dataSchema || {},
+        window.dataUtils || {},
+        window.dataStore || {},
+        window.dataUiState || {},
+        window.dataHealthDiet || {},
+        window.dataHealthWeight || {},
+        window.dataHealthExercise || {},
+        window.dataHealthProfile || {},
+        window['dataReport'] || {},
+        window.dataGoalPlan || {},
+        window.dataRoutinePlan || {},
+        window.dataRoutineLibrary || {},
+        window.dataHistoryView || {},
+        window.dataWeeklySummary || {},
+        window.dataViews || {},
+        window.dataAiTemplates || {},
+        window.adviceTemplateManager || {},
+        window['dataPlanStore'] || {},
+        window['dataPlanFeedback'] || {},
+        window['dataPlanCooldown'] || {},
+        window['dataPlanAutoAdjust'] || {},
+        window['dataPlanWeekly'] || {},
+        window['dataPlanAi'] || {},
+        window['dataPlanEquipment'] || {},
+        window['dataPlanUi'] || {}
+    ];
+}
+
+function mergeDataModules() {
+    const modules = dataModules();
+    const runtimeState = new Map();
+
+    modules.forEach((module) => {
+        const keys = module?.__runtimeStateKeys;
+        if (!Array.isArray(keys)) return;
+        keys.forEach((key) => {
+            if (typeof key !== 'string' || !Object.prototype.hasOwnProperty.call(data, key)) return;
+            runtimeState.set(key, data[key]);
+        });
+    });
+
+    Object.assign(data, ...modules);
+    runtimeState.forEach((value, key) => { data[key] = value; });
+}
+
+mergeDataModules();
 
 const LAZY_RECORD_OPENERS = {
     openDietModal: {
@@ -262,34 +282,8 @@ data.initDebugTools = function () {
 };
 
 data.refreshModules = function () {
-    Object.assign(data,
-        window.dataRecords || {},
-        window.dataSchema || {},
-        window.dataUtils || {},
-        window.dataStore || {},
-        window.dataUiState || {},
-        window.dataHealthDiet || {},
-        window.dataHealthWeight || {},
-        window.dataHealthExercise || {},
-        window.dataHealthProfile || {},
-        window['dataReport'] || {},
-        window.dataGoalPlan || {},
-        window.dataRoutinePlan || {},
-        window.dataRoutineLibrary || {},
-        window.dataHistoryView || {},
-        window.dataWeeklySummary || {},
-        window.dataViews || {},
-        window.dataAiTemplates || {},
-        window.adviceTemplateManager || {},
-        window['dataPlanStore'] || {},
-        window['dataPlanFeedback'] || {},
-        window['dataPlanCooldown'] || {},
-        window['dataPlanAutoAdjust'] || {},
-        window['dataPlanWeekly'] || {},
-        window['dataPlanAi'] || {},
-        window['dataPlanEquipment'] || {},
-        window['dataPlanUi'] || {}
-    );
+    mergeDataModules();
+
     attachPlanAliases();
     attachLazyRecordOpeners();
     attachStableUpdateCheck();
