@@ -193,7 +193,7 @@
             const types = ['rehab', 'cut', 'bulk', 'maintenance', 'custom'];
             this._newPlanTypes = normalizePlanTypes(config.defaultTypes || this._newPlanTypes || ['rehab']);
             const weekFirst = config.defaultMode === 'week';
-            this._openModal?.({
+            this._openModal({
                 title: '计划',
                 icon: 'add_circle',
                 bodyHtml: `<div id="planCreateSheetBody">${this.renderNewPlanSheetBody(types)}</div>`,
@@ -226,7 +226,7 @@
             const types = normalizePlanTypes(this._newPlanTypes || ['rehab']);
             const today = this.logicalDateKey?.() || this.dateKey(new Date());
             if (openAi) {
-                this._closeActiveModal?.();
+                this._closeActiveModal();
                 this.openPlanAiSheet?.(openAi === 'week' ? 'week' : 'today', types);
                 return;
             }
@@ -243,7 +243,7 @@
             }).filter(Boolean);
             this.selectedPlanId = created[0]?.id || '';
             this.save?.({ render: false });
-            this._closeActiveModal?.();
+            this._closeActiveModal();
             this.renderTodayPage?.();
         },
 
@@ -309,7 +309,7 @@
             const plan = this.activeRecords?.(this.db.dailyPlans || []).find((item) => item.id === planId);
             if (!plan) return;
             const title = plan.title || this.planTypeMeta?.(plan.type, plan.title)?.label || '今日计划';
-            this._confirmModal?.({
+            this._confirmModal({
                 title: '取消今日计划',
                 icon: 'event_busy',
                 message: `确定取消「${title}」？\n计划会软删除，历史记录和已完成训练不会被删除。`,
@@ -404,7 +404,7 @@
             if (!task) return;
             const current = task.spec || {};
             const category = task.category || 'main';
-            this._openModal?.({
+            this._openModal({
                 title: '编辑计划动作',
                 icon: 'edit',
                 bodyHtml: `
@@ -463,14 +463,14 @@
             this.touchRecord(task, ['name', 'category', 'spec', 'aiReasoning', 'userOverride', 'actionKey', 'canonicalName', 'progressionGroup', 'progressionLevel', 'chainId', 'sourceActionId', 'prescriptionActionId', 'policy']);
             this.touchRecord(plan, ['items']);
             this.save();
-            this._closeActiveModal?.();
+            this._closeActiveModal();
         },
 
         markPlanTaskDone(planId, taskId) {
             const { task } = this.findTask?.(planId, taskId) || {};
             if (task?.requiresUserConfirm && !task.userConfirmed) {
                 const confirmMeta = taskConfirmMeta(task);
-                this._openModal?.({
+                this._openModal({
                     title: confirmMeta.title,
                     icon: 'verified',
                     bodyHtml: `<p class="md-muted">${this.escapeHtml(task.name || '此动作')} ${confirmMeta.detail}确认后标记完成并记录反馈。</p>`,
@@ -492,7 +492,7 @@
             tomorrow.setDate(tomorrow.getDate() + 1);
             const tomorrowKey = this.dateKey(tomorrow);
             const confirmMeta = taskConfirmMeta(task);
-            this._openModal?.({
+            this._openModal({
                 title: this.escapeHtml(task.name || '任务'),
                 icon: 'more_vert',
                 bodyHtml: `<div class="weekly-plan-picker">
@@ -504,7 +504,7 @@
 
         movePlanTaskTo(planId, taskId, targetDate) {
             this.moveTask?.(planId, taskId, targetDate);
-            this._closeActiveModal?.();
+            this._closeActiveModal();
             this.render?.();
         },
 
@@ -512,7 +512,7 @@
             const { task } = this.findTask?.(planId, taskId) || {};
             if (!task) return;
             this.lockItem?.(planId, taskId, !task.userOverride);
-            this._closeActiveModal?.();
+            this._closeActiveModal();
             this.render?.();
         },
 
@@ -524,7 +524,7 @@
             this.touchRecord?.(task, ['userConfirmed', 'policy']);
             this.touchRecord?.(plan, ['items']);
             if (options.save !== false) this.save?.();
-            if (options.close !== false) this._closeActiveModal?.();
+            if (options.close !== false) this._closeActiveModal();
             if (options.render !== false) this.render?.();
             window.toast?.show?.(taskConfirmMeta(task).badge, 'success');
             return true;
@@ -532,7 +532,7 @@
 
         deletePlanTaskConfirm(planId, taskId) {
             this.deleteTask?.(planId, taskId);
-            this._closeActiveModal?.();
+            this._closeActiveModal();
             const stillActive = this.activeRecords?.(this.db.dailyPlans || []).some((plan) => plan.id === planId);
             if (!stillActive) this.closePlanTaskDrawer?.();
             this.render?.();
@@ -543,7 +543,7 @@
             if (!task) return;
             if (task.requiresUserConfirm && !task.userConfirmed) {
                 const confirmMeta = taskConfirmMeta(task);
-                this._confirmModal?.({
+                this._confirmModal({
                     title: confirmMeta.title,
                     icon: 'verified',
                     message: `${confirmMeta.detail}确认后开始训练。`,
@@ -689,7 +689,7 @@
             this._planSaveRoutineManualStop = false;
             if (!manualStop && hour < 23) return;
             if (plan.planRoutineSavedAt || plan.planRoutineDismissedAt) return;
-            this._openModal?.({
+            this._openModal({
                 title: '保存为方案',
                 icon: 'bookmark_add',
                 bodyHtml: `<div class="plan-save-routine-sheet"><p>今日计划 ${completion.done}/${completion.total} 完成，存为方案？</p><small>保存后会进入方案库，并带有计划标记。</small></div>`,
@@ -805,7 +805,7 @@
                             onClick: () => this.openPlanQuickRecord('strength')
                         }));
             if (!rows.length) return;
-            this._openModal?.({
+            this._openModal({
                 title: '快速重复',
                 icon: 'history',
                 bodyHtml: rows.map((row) => `<button class="model-picker-row" type="button"><span class="material-symbols-rounded">history</span><span class="model-picker-main"><strong>${this.escapeHtml(row.title || '')}</strong><small>${this.escapeHtml(row.meta || '')}</small></span></button>`).join(''),
