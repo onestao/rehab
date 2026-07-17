@@ -72,15 +72,15 @@ function createRegistrationHarness({ hasController, session }) {
     };
 }
 
-test('release assets and controller reload keys are consistently v326', () => {
-    assert.match(sw, /training-assistant-v326/);
+test('release assets and controller reload keys are consistently v327', () => {
+    assert.match(sw, /training-assistant-v327/);
     assert.match(sw, /const CACHE_ASSET_REVISION = '[a-f0-9]{64}'/);
-    assert.doesNotMatch(sw, /training-assistant-v325|\?v=325/);
-    assert.doesNotMatch(html, /\?v=325|rehab-sw-controller-reload-v325/);
-    assert.doesNotMatch(appUpdate, /version:\s*['"]325['"]|rehab-sw-controller-reload-v325/);
-    assert.match(html, /rehab-sw-controller-reload-v326/);
-    assert.match(appUpdate, /version:\s*['"]326['"]/);
-    assert.match(appUpdate, /rehab-sw-controller-reload-v326/);
+    assert.doesNotMatch(sw, /training-assistant-v326|\?v=326|training-assistant-v328|\?v=328/);
+    assert.doesNotMatch(html, /\?v=326|rehab-sw-controller-reload-v326|\?v=328|rehab-sw-controller-reload-v328/);
+    assert.doesNotMatch(appUpdate, /version:\s*['"](?:326|328)['"]|rehab-sw-controller-reload-v(?:326|328)/);
+    assert.match(html, /rehab-sw-controller-reload-v327/);
+    assert.match(appUpdate, /version:\s*['"]327['"]/);
+    assert.match(appUpdate, /rehab-sw-controller-reload-v327/);
 });
 
 test('plan precache membership stays unchanged while query versions advance', () => {
@@ -96,7 +96,7 @@ test('plan precache membership stays unchanged while query versions advance', ()
         'plan-ui.js'
     ];
     const assetsBlock = sw.match(/const ASSETS = \[([\s\S]*?)\];/)?.[1] || '';
-    const actual = expected.filter((asset) => assetsBlock.includes(`'${asset}?v=326'`));
+    const actual = expected.filter((asset) => assetsBlock.includes(`'${asset}?v=327'`));
     assert.deepEqual(actual, expected);
 });
 

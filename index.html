@@ -8,9 +8,424 @@
     <link rel="icon" href="assets/app-icon.svg" type="image/svg+xml">
     <meta name="theme-color" content="#0061a4">
     <link rel="preload" href="assets/material-symbols-rounded.woff2" as="font" type="font/woff2" crossorigin>
-    <link rel="stylesheet" href="build/generated.css?v=326">
+    <style>
+        [hidden] { display: none !important; }
+        body:not(.rehab-app-ready) > :not(#startupBarrier) { visibility: hidden !important; }
+        #startupBarrier {
+            position: fixed;
+            inset: 0;
+            z-index: 2147483647;
+            overflow: auto;
+            box-sizing: border-box;
+            min-height: 100vh;
+            padding: max(32px, env(safe-area-inset-top)) 24px max(32px, env(safe-area-inset-bottom));
+            display: grid;
+            place-items: center;
+            background: #f7f9fc;
+            color: #1a1c1e;
+            font: 16px/1.5 system-ui, sans-serif;
+        }
+        .startup-barrier-card {
+            width: min(100%, 420px);
+            padding: 24px;
+            border: 1px solid #c2c7cf;
+            border-radius: 20px;
+            background: #fff;
+            box-shadow: 0 8px 24px rgba(25, 28, 32, .08);
+        }
+        .startup-barrier-card h1 { margin: 0 0 8px; font-size: 1.25rem; }
+        .startup-barrier-card p { margin: 0; }
+        .startup-barrier-detail { margin-top: 8px !important; color: #45464f; font-size: .9rem; }
+        .startup-barrier-retry {
+            margin-top: 18px;
+            min-height: 44px;
+            padding: 0 18px;
+            border: 0;
+            border-radius: 22px;
+            background: #0061a4;
+            color: #fff;
+            font: inherit;
+            font-weight: 600;
+        }
+    </style>
+    <script>
+        /* APP_STARTUP_VERSION_BARRIER_BEGIN */
+        (function installStartupVersionBarrier() {
+            'use strict';
+
+            const reloadKey = 'rehab-sw-controller-reload-v327';
+            const releaseVersion = reloadKey.replace(/^.*-v/, '');
+            const versionReplyTimeoutMs = 500;
+            const controllerSwitchTimeoutMs = 15000;
+            const releasePrepareTimeoutMs = 20000;
+            const versionReplyAttempts = 2;
+            let applicationLaunchStarted = false;
+            let upgradeFinished = false;
+
+            function acknowledgeV327Page() {
+                const url = new URL(window.location.href);
+                const legacyNavigation = url.searchParams.get('__rehab_upgrade') === releaseVersion;
+                if (legacyNavigation) {
+                    url.searchParams.delete('__rehab_upgrade');
+                    try { window.history?.replaceState?.(window.history.state, '', url.href); } catch {}
+                }
+                try { navigator.serviceWorker.controller?.postMessage?.({ type: 'V327_PAGE_READY' }); } catch {}
+                return legacyNavigation;
+            }
+
+            function whenDocumentReady() {
+                if (document.readyState !== 'loading') return Promise.resolve();
+                return new Promise((resolve) => document.addEventListener('DOMContentLoaded', resolve, { once: true }));
+            }
+
+            function barrierElements() {
+                return {
+                    root: document.getElementById('startupBarrier'),
+                    status: document.getElementById('startupBarrierStatus'),
+                    detail: document.getElementById('startupBarrierDetail'),
+                    retry: document.getElementById('startupBarrierRetry'),
+                    app: document.getElementById('appShell')
+                };
+            }
+
+            async function setBarrierStatus(message, detail = '') {
+                await whenDocumentReady();
+                const elements = barrierElements();
+                if (elements.status) elements.status.textContent = message;
+                if (elements.detail) {
+                    elements.detail.textContent = detail;
+                    elements.detail.hidden = !detail;
+                }
+            }
+
+            async function showFailure(error) {
+                const message = error && error.message ? error.message : String(error || '未知错误');
+                await whenDocumentReady();
+                const elements = barrierElements();
+                document.body.classList.remove('rehab-app-ready');
+                if (elements.app) elements.app.hidden = true;
+                if (elements.root) elements.root.hidden = false;
+                if (elements.status) elements.status.textContent = '无法完成版本升级';
+                if (elements.detail) {
+                    elements.detail.textContent = `${message}。请检查网络后重试。`;
+                    elements.detail.hidden = false;
+                }
+                if (elements.retry) elements.retry.hidden = false;
+            }
+
+            async function showRefreshFallback(message = '\u66f4\u65b0\u5df2\u5b8c\u6210\uff0c\u8bf7\u5237\u65b0\u9875\u9762') {
+                await whenDocumentReady();
+                const banner = document.getElementById('appUpdateBanner');
+                if (!banner) return;
+                banner.classList.remove('hidden');
+                const title = banner.querySelector('strong');
+                const detail = banner.querySelector('small');
+                const buttons = banner.querySelectorAll('button');
+                const refreshButton = buttons[buttons.length - 1];
+                if (title) title.textContent = message;
+                if (detail) detail.textContent = '\u65b0\u7248\u5df2\u63a5\u7ba1\uff1b\u82e5\u9875\u9762\u672a\u81ea\u52a8\u5207\u6362\uff0c\u8bf7\u624b\u52a8\u5237\u65b0\u4e00\u6b21\u3002';
+                if (refreshButton) {
+                    refreshButton.textContent = '\u5237\u65b0';
+                    refreshButton.onclick = () => window.location.reload();
+                }
+            }
+
+            function bindRefreshFallback(serviceWorker) {
+                serviceWorker.addEventListener('message', (event) => {
+                    if (event.data?.type !== 'UPDATE_REFRESH_REQUIRED') return;
+                    void showRefreshFallback(event.data.message);
+                });
+            }
+
+            function claimReload() {
+                try {
+                    if (window.sessionStorage.getItem(reloadKey) === '1') return false;
+                    window.sessionStorage.setItem(reloadKey, '1');
+                    return true;
+                } catch {
+                    return false;
+                }
+            }
+
+            function queryControllerVersion(serviceWorker, timeoutMs = versionReplyTimeoutMs) {
+                const controller = serviceWorker.controller;
+                if (!controller || typeof controller.postMessage !== 'function') {
+                    return Promise.resolve({ version: null, precacheReady: false });
+                }
+                return new Promise((resolve) => {
+                    const requestId = `rehab-boot-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+                    let settled = false;
+                    const finish = (state) => {
+                        if (settled) return;
+                        settled = true;
+                        window.clearTimeout(timer);
+                        serviceWorker.removeEventListener('message', onMessage);
+                        resolve(state);
+                    };
+                    const onMessage = (event) => {
+                        const data = event && event.data;
+                        if (!data || data.type !== 'VERSION' || data.requestId !== requestId) return;
+                        finish({ version: String(data.version || ''), precacheReady: data.precacheReady === true });
+                    };
+                    const timer = window.setTimeout(() => finish({ version: null, precacheReady: false }), timeoutMs);
+                    serviceWorker.addEventListener('message', onMessage);
+                    try {
+                        controller.postMessage({ type: 'GET_VERSION', requestId });
+                    } catch {
+                        finish({ version: null, precacheReady: false });
+                    }
+                });
+            }
+
+            function compareReleaseVersion(value) {
+                if (!/^\d+$/.test(String(value || ''))) return 'unknown';
+                const candidate = Number(value);
+                const current = Number(releaseVersion);
+                if (candidate === current) return 'current';
+                return candidate < current ? 'old' : 'newer';
+            }
+
+            function versionFromWorkerScriptUrl(worker) {
+                const scriptUrl = String(worker?.scriptURL || '');
+                if (!scriptUrl) return null;
+                try {
+                    const url = new URL(scriptUrl, window.location.href);
+                    for (const key of ['v', 'version', '__rehab_version']) {
+                        const value = url.searchParams.get(key);
+                        if (/^\d+$/.test(String(value || ''))) return String(value);
+                    }
+                    const filename = url.pathname.split('/').pop() || '';
+                    return filename.match(/(?:^|[-_.])v?(\d+)(?=[-_.]|$)/i)?.[1] || null;
+                } catch {
+                    return null;
+                }
+            }
+
+            async function controllerUrlVersionState(serviceWorker) {
+                const controllerVersion = versionFromWorkerScriptUrl(serviceWorker.controller);
+                if (controllerVersion) return { status: compareReleaseVersion(controllerVersion), version: controllerVersion };
+
+                let registration = null;
+                try { registration = await serviceWorker.getRegistration?.(); } catch {}
+                const activeVersion = versionFromWorkerScriptUrl(registration?.active);
+                if (activeVersion) return { status: compareReleaseVersion(activeVersion), version: activeVersion };
+                return { status: 'unknown', version: null };
+            }
+
+            async function queryControllerVersionWithRetries(serviceWorker) {
+                let state = { version: null, precacheReady: false };
+                for (let attempt = 0; attempt < versionReplyAttempts; attempt += 1) {
+                    state = await queryControllerVersion(serviceWorker);
+                    if (state.version) return state;
+                }
+                return state;
+            }
+
+            function prepareRelease(serviceWorker, timeoutMs = releasePrepareTimeoutMs) {
+                const controller = serviceWorker.controller;
+                if (!controller || typeof controller.postMessage !== 'function') return Promise.reject(new Error('新版本控制器不可用'));
+                return new Promise((resolve, reject) => {
+                    const requestId = `rehab-prepare-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+                    let settled = false;
+                    const finish = (error) => {
+                        if (settled) return;
+                        settled = true;
+                        window.clearTimeout(timer);
+                        serviceWorker.removeEventListener('message', onMessage);
+                        if (error) reject(error);
+                        else resolve();
+                    };
+                    const onMessage = (event) => {
+                        const data = event && event.data;
+                        if (!data || data.type !== 'RELEASE_READY' || data.requestId !== requestId) return;
+                        if (String(data.version || '') !== releaseVersion) {
+                            finish(new Error('新版资源版本校验失败'));
+                            return;
+                        }
+                        finish();
+                    };
+                    const timer = window.setTimeout(() => finish(new Error('准备新版资源超时')), timeoutMs);
+                    serviceWorker.addEventListener('message', onMessage);
+                    try {
+                        controller.postMessage({ type: 'PREPARE_RELEASE', requestId });
+                    } catch (error) {
+                        finish(error);
+                    }
+                });
+            }
+
+            function loadStylesheet() {
+                const declaration = document.querySelector('[data-rehab-stylesheet]');
+                if (!declaration || !declaration.dataset.href) return Promise.reject(new Error('缺少应用样式声明'));
+                return new Promise((resolve, reject) => {
+                    const link = document.createElement('link');
+                    link.rel = 'stylesheet';
+                    link.href = declaration.dataset.href;
+                    link.onload = resolve;
+                    link.onerror = () => reject(new Error('应用样式加载失败'));
+                    document.head.appendChild(link);
+                });
+            }
+
+            function loadEntryScript(declaration) {
+                return new Promise((resolve, reject) => {
+                    const script = document.createElement('script');
+                    if (declaration.dataset.kind === 'module') script.type = 'module';
+                    else script.async = false;
+                    script.src = declaration.dataset.src;
+                    script.onload = resolve;
+                    script.onerror = () => reject(new Error(`应用模块加载失败：${declaration.dataset.src}`));
+                    document.head.appendChild(script);
+                });
+            }
+
+            async function launchApplication() {
+                if (applicationLaunchStarted) return;
+                applicationLaunchStarted = true;
+                await whenDocumentReady();
+                await setBarrierStatus('正在启动应用…');
+                try {
+                    const declarations = [...document.querySelectorAll('script[data-rehab-entry]')];
+                    const stylesheetReady = loadStylesheet();
+                    const scriptsReady = (async () => {
+                        for (const declaration of declarations) await loadEntryScript(declaration);
+                    })();
+                    await Promise.all([stylesheetReady, scriptsReady]);
+
+                    const source = document.getElementById('rehab-app-main');
+                    if (!source) throw new Error('缺少应用启动代码');
+                    const script = document.createElement('script');
+                    script.textContent = source.textContent;
+                    document.body.appendChild(script);
+                    if (typeof window.__rehabStartApplication !== 'function') throw new Error('应用启动入口不可用');
+
+                    const elements = barrierElements();
+                    document.body.classList.add('rehab-app-ready');
+                    if (elements.app) elements.app.hidden = false;
+                    if (elements.root) elements.root.hidden = true;
+                    Promise.resolve(window.__rehabStartApplication()).catch(showFailure);
+                } catch (error) {
+                    applicationLaunchStarted = false;
+                    await showFailure(error);
+                }
+            }
+
+            async function upgradeController(serviceWorker, legacyNavigation = false) {
+                await setBarrierStatus('正在安全升级应用…', '完成后将自动刷新一次。');
+                let switchTimer = null;
+                const cleanup = () => {
+                    if (switchTimer !== null) window.clearTimeout(switchTimer);
+                    switchTimer = null;
+                    serviceWorker.removeEventListener('controllerchange', onControllerChange);
+                };
+                const fail = async (error) => {
+                    if (upgradeFinished) return;
+                    upgradeFinished = true;
+                    cleanup();
+                    await showFailure(error);
+                };
+                const onControllerChange = async () => {
+                    if (upgradeFinished) return;
+                    cleanup();
+                    const urlState = await controllerUrlVersionState(serviceWorker);
+                    let controllerState = { version: urlState.version, precacheReady: null };
+                    let controllerStatus = urlState.status;
+                    if (controllerStatus === 'unknown') {
+                        controllerState = await queryControllerVersionWithRetries(serviceWorker);
+                        controllerStatus = compareReleaseVersion(controllerState.version);
+                    }
+                    if (controllerStatus !== 'current' && controllerStatus !== 'newer') {
+                        await fail(new Error(`新版本接管校验失败（当前 ${controllerState.version || '未知'}）`));
+                        return;
+                    }
+                    await setBarrierStatus('正在准备新版资源…', '完成后将自动刷新一次。');
+                    try {
+                        await prepareRelease(serviceWorker);
+                    } catch (error) {
+                        await fail(error);
+                        return;
+                    }
+                    upgradeFinished = true;
+                    if (legacyNavigation) {
+                        await launchApplication();
+                        return;
+                    }
+                    if (!claimReload()) {
+                        await showFailure(new Error('已阻止重复刷新，请手动重试'));
+                        return;
+                    }
+                    window.location.reload();
+                };
+
+                serviceWorker.addEventListener('controllerchange', onControllerChange);
+                switchTimer = window.setTimeout(() => {
+                    void fail(new Error('等待新版本接管超时'));
+                }, controllerSwitchTimeoutMs);
+
+                try {
+                    const registration = await serviceWorker.register('sw.js', { updateViaCache: 'none' });
+                    await registration.update?.();
+                    registration.waiting?.postMessage?.({ type: 'SKIP_WAITING', source: 'startup-barrier-v327' });
+                } catch (error) {
+                    await fail(error);
+                }
+            }
+
+            const legacyUpgradeNavigation = acknowledgeV327Page();
+
+            async function start() {
+                if (!('serviceWorker' in navigator) || !navigator.serviceWorker.controller) {
+                    await launchApplication();
+                    return;
+                }
+
+                const serviceWorker = navigator.serviceWorker;
+                bindRefreshFallback(serviceWorker);
+                const urlState = await controllerUrlVersionState(serviceWorker);
+                if (urlState.status === 'current' || urlState.status === 'newer') {
+                    await launchApplication();
+                    return;
+                }
+                if (urlState.status === 'old' || legacyUpgradeNavigation) {
+                    await upgradeController(serviceWorker, legacyUpgradeNavigation);
+                    return;
+                }
+
+                const controllerState = await queryControllerVersionWithRetries(serviceWorker);
+                const messageStatus = compareReleaseVersion(controllerState.version);
+                if (messageStatus === 'current' || messageStatus === 'newer') {
+                    if (messageStatus === 'current' && controllerState.precacheReady === false) {
+                        await setBarrierStatus('正在准备新版资源…');
+                        await prepareRelease(serviceWorker);
+                    }
+                    await launchApplication();
+                    return;
+                }
+                if (messageStatus === 'old') {
+                    await upgradeController(serviceWorker, legacyUpgradeNavigation);
+                    return;
+                }
+
+                throw new Error('无法确认当前离线版本');
+            }
+
+            window.rehabStartupBarrier = {
+                retry() { window.location.reload(); }
+            };
+            void start().catch(showFailure);
+        })();
+        /* APP_STARTUP_VERSION_BARRIER_END */
+    </script>
+    <link data-rehab-stylesheet="primary" data-href="build/generated.css?v=327">
 </head>
 <body>
+    <div id="startupBarrier" role="status" aria-live="polite">
+        <div class="startup-barrier-card">
+            <h1 id="startupBarrierStatus">正在检查应用版本…</h1>
+            <p id="startupBarrierDetail" class="startup-barrier-detail" hidden></p>
+            <button id="startupBarrierRetry" class="startup-barrier-retry" type="button" onclick="rehabStartupBarrier.retry()" hidden>重试</button>
+        </div>
+    </div>
     <div id="appUpdateBanner" class="app-update-banner hidden">
         <span class="material-symbols-rounded">system_update</span>
         <div>
@@ -24,7 +439,7 @@
     <video id="pipVideo" class="pip-video-source" muted playsinline preload="auto" aria-hidden="true"></video>
 
     <div id="globalTrainingBar" class="global-training-bar hidden"><span></span></div>
-    <div id="appShell" class="app-shell-v6">
+    <div id="appShell" class="app-shell-v6" hidden>
     <main id="app">
         <!-- Workout -->
         <section id="workout" class="page">
@@ -384,26 +799,26 @@
     </nav>
     </div>
 
-    <script src="m3e-ripple.js?v=326"></script>
-    <script src="toast.js?v=326"></script>
-    <script src="error-bus.js?v=326"></script>
-    <script src="i18n.js?v=326"></script>
-    <script src="theme.js?v=326"></script>
-    <script src="render-safe.js?v=326"></script>
-    <script src="nav-stack.js?v=326"></script>
-    <script src="app-route.js?v=326"></script>
-    <script type="module" src="data-utils-pure.js?v=326"></script>
-    <script type="module" src="action-identity.js?v=326"></script>
-    <script src="data-utils.js?v=326"></script>
-    <script src="storage/idb.js?v=326"></script>
-    <script src="storage/migrate.js?v=326"></script>
-    <script src="data-records.js?v=326"></script>
-    <script src="data-schema.js?v=326"></script>
-    <script src="data-store.js?v=326"></script>
-    <script src="data-ui-state.js?v=326"></script>
-    <script src="data-views.js?v=326"></script>
-    <script src="data.js?v=326"></script>
-    <script src="sync-status.js?v=326"></script>
+    <script data-rehab-entry data-kind="classic" data-src="m3e-ripple.js?v=327"></script>
+    <script data-rehab-entry data-kind="classic" data-src="toast.js?v=327"></script>
+    <script data-rehab-entry data-kind="classic" data-src="error-bus.js?v=327"></script>
+    <script data-rehab-entry data-kind="classic" data-src="i18n.js?v=327"></script>
+    <script data-rehab-entry data-kind="classic" data-src="theme.js?v=327"></script>
+    <script data-rehab-entry data-kind="classic" data-src="render-safe.js?v=327"></script>
+    <script data-rehab-entry data-kind="classic" data-src="nav-stack.js?v=327"></script>
+    <script data-rehab-entry data-kind="classic" data-src="app-route.js?v=327"></script>
+    <script data-rehab-entry data-kind="module" data-src="data-utils-pure.js?v=327"></script>
+    <script data-rehab-entry data-kind="module" data-src="action-identity.js?v=327"></script>
+    <script data-rehab-entry data-kind="classic" data-src="data-utils.js?v=327"></script>
+    <script data-rehab-entry data-kind="classic" data-src="storage/idb.js?v=327"></script>
+    <script data-rehab-entry data-kind="classic" data-src="storage/migrate.js?v=327"></script>
+    <script data-rehab-entry data-kind="classic" data-src="data-records.js?v=327"></script>
+    <script data-rehab-entry data-kind="classic" data-src="data-schema.js?v=327"></script>
+    <script data-rehab-entry data-kind="classic" data-src="data-store.js?v=327"></script>
+    <script data-rehab-entry data-kind="classic" data-src="data-ui-state.js?v=327"></script>
+    <script data-rehab-entry data-kind="classic" data-src="data-views.js?v=327"></script>
+    <script data-rehab-entry data-kind="classic" data-src="data.js?v=327"></script>
+    <script data-rehab-entry data-kind="classic" data-src="sync-status.js?v=327"></script>
     <div id="weightModal" class="md-modal md-modal-sheet hidden" aria-hidden="true">
         <div class="md-modal-backdrop" onclick="data.closeWeightModal()"></div>
         <div class="md-modal-card md-modal-sheet-card">
@@ -733,7 +1148,7 @@
             </div>
         </div>
     </div>
-    <script>
+    <script type="text/plain" id="rehab-app-main">
         const PAGE_DEPS = {
             workout: ['voice-engine','voice-cache','voice-webspeech-adapter','voice-legado-adapter','workout-voice','workout-readiness','strength-form','weekly-plan','action-history','plan-chains','plan-progression','plan-store','plan-feedback','plan-cooldown','plan-auto-adjust','plan-weekly','plan-equipment','plan-ui','workout-system','workout-pip','workout-core','workout-cardio-pure','workout-cardio','workout-engine','workout-state','swipe-actions','routine-plan','routine-library','workout-wakelock','workout-media-session','ai-store','ai-profile','ai-routing-pure','ai-routing','ai-api','ai-task-settings'],
             'ai-coach': ['lib/virtual-core.umd','ai-store','ai-profile','ai-model-catalog-pure','ai-model-cache','ai-models','ai-routing-pure','ai-routing','ai-api','ai-task-settings','ai-provider-manager','ai-pricing','ai-templates','advice-template-manager','advice-rules','plan-analytics','advice-panel','coach-context','advice-attachments','advice-render','advice-prompt','advice-stream-renderer','routine-library','plan-chains','plan-progression','plan-store','plan-ai-pure','plan-ai'],
@@ -905,7 +1320,7 @@
             if (!('serviceWorker' in navigator)) return;
             const serviceWorker = navigator.serviceWorker;
             const hadController = !!serviceWorker.controller;
-            const reloadKey = 'rehab-sw-controller-reload-v326';
+            const reloadKey = 'rehab-sw-controller-reload-v327';
             if (hadController) {
                 serviceWorker.addEventListener('controllerchange', () => {
                     if (!claimServiceWorkerReload(reloadKey)) return;
@@ -969,7 +1384,7 @@
             const p = new Promise((res, rej) => {
                 const link = document.createElement('link');
                 link.rel = 'stylesheet';
-                link.href = `css-src/${name}.css?v=326`;
+                link.href = `css-src/${name}.css?v=327`;
                 link.dataset.appCss = name;
                 link.onload = () => {
                     link.dataset.loaded = 'true';
@@ -1035,7 +1450,7 @@
                     res();
                 };
                 if (MODULE_SCRIPTS.has(name)) s.type = 'module';
-                s.src = `${name}${MJS_SCRIPTS.has(name) ? '.mjs' : '.js'}?v=326`;
+                s.src = `${name}${MJS_SCRIPTS.has(name) ? '.mjs' : '.js'}?v=327`;
                 s.onload = () => settle();
                 s.onerror = () => settle(new Error(`Failed to load script: ${name}`));
                 timer = window.setTimeout(() => settle(new Error(`Timed out loading script: ${name}`)), scriptLoadTimeoutMs());
@@ -1156,7 +1571,7 @@
             }
         };
         window.ui = ui;
-        window.onload = async () => {
+        window.__rehabStartApplication = async () => {
             bootMark('boot:start');
             try { await i18n?.init?.(); i18n?.applyDom?.(document); } catch {}
             const hadRouteHash = !!window.location.hash;
