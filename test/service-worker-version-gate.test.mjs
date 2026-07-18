@@ -94,15 +94,15 @@ function createQuietRegistrationHarness() {
     };
 }
 
-test('release assets and controller reload keys are consistently v328', () => {
-    assert.match(sw, /training-assistant-v328/);
+test('release assets and controller reload keys are consistently v332', () => {
+    assert.match(sw, /training-assistant-v332/);
     assert.match(sw, /const CACHE_ASSET_REVISION = '[a-f0-9]{64}'/);
     assert.doesNotMatch(sw, /training-assistant-v326|\?v=326|training-assistant-v327|\?v=327/);
     assert.doesNotMatch(html, /\?v=326|rehab-sw-controller-reload-v326|\?v=327|rehab-sw-controller-reload-v327/);
     assert.doesNotMatch(appUpdate, /version:\s*['"](?:326|327)['"]|rehab-sw-controller-reload-v(?:326|327)/);
-    assert.match(html, /rehab-sw-controller-reload-v328/);
-    assert.match(appUpdate, /version:\s*['"]328['"]/);
-    assert.match(appUpdate, /rehab-sw-controller-reload-v328/);
+    assert.match(html, /rehab-sw-controller-reload-v332/);
+    assert.match(appUpdate, /version:\s*['"]332['"]/);
+    assert.match(appUpdate, /rehab-sw-controller-reload-v332/);
 });
 
 test('plan precache membership stays unchanged while query versions advance', () => {
@@ -118,7 +118,7 @@ test('plan precache membership stays unchanged while query versions advance', ()
         'plan-ui.js'
     ];
     const assetsBlock = sw.match(/const ASSETS = \[([\s\S]*?)\];/)?.[1] || '';
-    const actual = expected.filter((asset) => assetsBlock.includes(`'${asset}?v=328'`));
+    const actual = expected.filter((asset) => assetsBlock.includes(`'${asset}?v=332'`));
     assert.deepEqual(actual, expected);
 });
 
@@ -138,7 +138,7 @@ test('startup registration path is non-blocking and loads app-update on demand o
     assert.match(registration, /requestIdleCallback|setTimeout/);
     assert.doesNotMatch(registration, /location\.reload/);
     assert.doesNotMatch(registration, /SKIP_WAITING|GET_VERSION/);
-    assert.match(registration, /app-update\.js\?v=328/);
+    assert.match(registration, /app-update\.js\?v=332/);
 });
 
 test('version gate rejects changed precache, runtime-cache-first, and nested lazy assets without a bump', () => {

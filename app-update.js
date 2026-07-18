@@ -5,10 +5,10 @@ const appUpdate = {
     checking: false,
     controllerReloadBound: false,
     swUrl: './sw.js',
-    version: '328',
+    version: '332',
 
     controllerReloadKey() {
-        return 'rehab-sw-controller-reload-v328';
+        return 'rehab-sw-controller-reload-v332';
     },
 
     claimControllerReload() {

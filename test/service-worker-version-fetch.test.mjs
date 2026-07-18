@@ -202,9 +202,9 @@ function createFetchHarness({
 
 test('old worker passes a newer versioned asset straight to network without touching its cache', async () => {
     const harness = createFetchHarness({ workerVersion: '326' });
-    const { request, response } = await harness.dispatch('https://example.test/history-view.js?v=328');
+    const { request, response } = await harness.dispatch('https://example.test/history-view.js?v=332');
 
-    assert.equal(await response.text(), 'network:https://example.test/history-view.js?v=328');
+    assert.equal(await response.text(), 'network:https://example.test/history-view.js?v=332');
     assert.equal(harness.fetches.length, 1);
     assert.equal(harness.fetches[0].input, request);
     assert.equal(harness.fetches[0].options.cache, 'no-store');
@@ -253,38 +253,38 @@ test('unversioned same-origin requests retain network-first behavior', async () 
 });
 
 test('worker reports its cache version and release readiness through the startup handshake', async () => {
-    const harness = createFetchHarness({ workerVersion: '328' });
+    const harness = createFetchHarness({ workerVersion: '332' });
     await harness.dispatchMessage({ type: 'GET_VERSION', requestId: 'boot-1' });
-    assert.deepEqual(JSON.parse(JSON.stringify(harness.messages)), [{ type: 'VERSION', requestId: 'boot-1', version: '328', precacheReady: false }]);
+    assert.deepEqual(JSON.parse(JSON.stringify(harness.messages)), [{ type: 'VERSION', requestId: 'boot-1', version: '332', precacheReady: false }]);
 });
 
 test('upgrade install stays waiting and does not request release assets before an explicit update', async () => {
-    const harness = createFetchHarness({ workerVersion: '328', hasActiveWorker: true });
+    const harness = createFetchHarness({ workerVersion: '332', hasActiveWorker: true });
     await harness.dispatchInstall();
     assert.equal(harness.skipWaitingCalls, 0);
     assert.equal(harness.adds.length, 0);
 
     await harness.dispatchMessage({ type: 'PREPARE_RELEASE', requestId: 'prepare-1' });
-    assert.ok(harness.adds.includes('build/generated.css?v=328'));
-    assert.ok(harness.adds.includes('plan-ui.js?v=328'));
-    assert.deepEqual(JSON.parse(JSON.stringify(harness.messages)), [{ type: 'RELEASE_READY', requestId: 'prepare-1', version: '328' }]);
+    assert.ok(harness.adds.includes('build/generated.css?v=332'));
+    assert.ok(harness.adds.includes('plan-ui.js?v=332'));
+    assert.deepEqual(JSON.parse(JSON.stringify(harness.messages)), [{ type: 'RELEASE_READY', requestId: 'prepare-1', version: '332' }]);
 });
 
 test('first install still precaches release assets without forcing a page reload', async () => {
-    const harness = createFetchHarness({ workerVersion: '328', hasActiveWorker: false });
+    const harness = createFetchHarness({ workerVersion: '332', hasActiveWorker: false });
     await harness.dispatchInstall();
     assert.equal(harness.skipWaitingCalls, 1);
-    assert.ok(harness.adds.includes('build/generated.css?v=328'));
-    assert.ok(harness.adds.includes('plan-ui.js?v=328'));
+    assert.ok(harness.adds.includes('build/generated.css?v=332'));
+    assert.ok(harness.adds.includes('plan-ui.js?v=332'));
 });
 
 test('legacy v326 SKIP_WAITING prepares before activation, then navigates that old client once', async () => {
-    const harness = createFetchHarness({ workerVersion: '328', hasActiveWorker: true });
+    const harness = createFetchHarness({ workerVersion: '332', hasActiveWorker: true });
     await harness.dispatchInstall();
     await harness.dispatchMessage({ type: 'SKIP_WAITING' });
 
-    assert.ok(harness.adds.includes('build/generated.css?v=328'));
-    assert.ok(harness.adds.includes('plan-ui.js?v=328'));
+    assert.ok(harness.adds.includes('build/generated.css?v=332'));
+    assert.ok(harness.adds.includes('plan-ui.js?v=332'));
     assert.equal(harness.skipWaitingCalls, 1);
     assert.equal(harness.events.at(-1), 'skipWaiting');
 
@@ -292,7 +292,7 @@ test('legacy v326 SKIP_WAITING prepares before activation, then navigates that o
     await harness.waitForMigration();
     assert.equal(harness.claims, 1);
     assert.equal(harness.navigations.length, 1);
-    assert.match(harness.navigations[0].url, /__rehab_upgrade=328/);
+    assert.match(harness.navigations[0].url, /__rehab_upgrade=332/);
 
     await harness.dispatchActivate();
     await harness.waitForMigration();
@@ -301,7 +301,7 @@ test('legacy v326 SKIP_WAITING prepares before activation, then navigates that o
 
 test('legacy client migrations isolate navigation failures and retain v326 cache until retry succeeds', async () => {
     const harness = createFetchHarness({
-        workerVersion: '328',
+        workerVersion: '332',
         hasActiveWorker: true,
         oldCacheNames: ['training-assistant-v326'],
         clients: [
@@ -320,7 +320,7 @@ test('legacy client migrations isolate navigation failures and retain v326 cache
     assert.equal(harness.claims, 1);
     assert.equal(harness.cacheNames.has('training-assistant-v326'), true);
     assert.match(harness.navigations[0].url, /[?&]tab=one(?:&|$)/);
-    assert.match(harness.navigations[0].url, /__rehab_upgrade=328/);
+    assert.match(harness.navigations[0].url, /__rehab_upgrade=332/);
 
     harness.setNavigateError('legacy-retry', null);
     await harness.dispatchMessage({ type: 'V327_PAGE_READY' }, harness.client('legacy-success'));
@@ -335,7 +335,7 @@ test('legacy client migrations isolate navigation failures and retain v326 cache
 test('a permanently pending legacy navigation cannot block claim or activation', async () => {
     const never = new Promise(() => {});
     const harness = createFetchHarness({
-        workerVersion: '328',
+        workerVersion: '332',
         hasActiveWorker: true,
         oldCacheNames: ['training-assistant-v326'],
         clients: [
@@ -380,8 +380,8 @@ test('a permanently pending legacy navigation cannot block claim or activation',
     assert.equal(harness.cacheNames.has('training-assistant-v326'), false);
 });
 
-test('a v328 page-ready event acknowledges its queued marker before activation fallback navigation', async () => {
-    const harness = createFetchHarness({ workerVersion: '328', hasActiveWorker: true });
+test('a v332 page-ready event acknowledges its queued marker before activation fallback navigation', async () => {
+    const harness = createFetchHarness({ workerVersion: '332', hasActiveWorker: true });
     await harness.dispatchMessage({ type: 'SKIP_WAITING' });
     await harness.dispatchMessage({ type: 'V327_PAGE_READY' });
     await harness.dispatchActivate();
@@ -392,13 +392,13 @@ test('a v328 page-ready event acknowledges its queued marker before activation f
 });
 
 test('legacy activation does not leave v326 half-upgraded when release preparation fails', async () => {
-    const harness = createFetchHarness({ workerVersion: '328', hasActiveWorker: true, addError: new Error('offline') });
+    const harness = createFetchHarness({ workerVersion: '332', hasActiveWorker: true, addError: new Error('offline') });
     await harness.dispatchMessage({ type: 'SKIP_WAITING' });
 
     assert.equal(harness.skipWaitingCalls, 0);
     assert.deepEqual(JSON.parse(JSON.stringify(harness.messages)), [{
         type: 'RELEASE_FAILED',
-        version: '328',
+        version: '332',
         message: '新版资源准备失败，请检查网络后重试'
     }]);
 });
