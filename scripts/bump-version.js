@@ -215,6 +215,21 @@ function checkVersionSync() {
         process.exit(1);
     }
 
+    const releaseVersion = html.match(/const releaseVersion = ['"](\d+)['"]/);
+    if (!releaseVersion || parseInt(releaseVersion[1], 10) !== swVersion) {
+        console.error(`index.html releaseVersion is missing or does not match v${swVersion}`);
+        process.exit(1);
+    }
+
+    const swUrlVersions = [
+        ...html.matchAll(/serviceWorker\.register\(\s*['"]\.\/sw\.js\?v=(\d+)['"]/g),
+        ...appUpdate.matchAll(/swUrl:\s*['"]\.\/sw\.js\?v=(\d+)['"]/g)
+    ].map((match) => parseInt(match[1], 10));
+    if (!swUrlVersions.length || swUrlVersions.some((version) => version !== swVersion)) {
+        console.error(`service worker registration URL is missing or does not match v${swVersion}`);
+        process.exit(1);
+    }
+
     for (const [label, source] of [['index.html', html], ['app-update.js', appUpdate]]) {
         const reloadVersions = [...source.matchAll(/rehab-sw-controller-reload-v(\d+)/g)].map((match) => parseInt(match[1], 10));
         if (!reloadVersions.length || reloadVersions.some((version) => version !== swVersion)) {
@@ -273,6 +288,7 @@ function bumpVersion() {
 
     let html = fs.readFileSync(htmlPath, 'utf8');
     html = html.replace(/\?v=\d+/g, `?v=${next}`);
+    html = html.replace(/const releaseVersion = ['"]\d+['"]/, `const releaseVersion = '${next}'`);
     html = html.replace(/rehab-sw-controller-reload-v\d+/g, `rehab-sw-controller-reload-v${next}`);
     fs.writeFileSync(htmlPath, html);
 

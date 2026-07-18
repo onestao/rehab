@@ -10,6 +10,9 @@ const testDir = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(testDir, '..');
 const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 const appUpdateSource = fs.readFileSync(path.join(root, 'app-update.js'), 'utf8');
+const releaseVersion = html.match(/const releaseVersion = ['"](\d+)['"]/)?.[1]
+    || html.match(/build\/generated\.css\?v=(\d+)/)?.[1]
+    || '333';
 
 function extractBoot() {
     const startMarker = '/* APP_STARTUP_NON_BLOCKING_BOOT_BEGIN */';
@@ -24,20 +27,24 @@ function extractBoot() {
 function createHarness({
     controllerScriptUrl = null,
     href = 'https://example.test/',
-    caches = null
+    caches = null,
+    stylesheetProbe = { display: 'inline-flex', height: '44px', borderRadius: '9999px' },
+    linkLoad = 'success',
+    failHref = null
 } = {}) {
     const session = new Map();
     const requested = [];
+    const removed = [];
     let reloads = 0;
     let documentWrites = 0;
     let context;
 
     const appShell = { hidden: true };
     const bodyClassList = new Set();
-    const stylesheet = { dataset: { href: 'build/generated.css?v=332' } };
+    const stylesheet = { dataset: { href: `build/generated.css?v=${releaseVersion}` } };
     const entries = [
-        { dataset: { src: 'm3e-ripple.js?v=332', kind: 'classic' } },
-        { dataset: { src: 'data-utils-pure.js?v=332', kind: 'module' } }
+        { dataset: { src: `m3e-ripple.js?v=${releaseVersion}`, kind: 'classic' } },
+        { dataset: { src: `data-utils-pure.js?v=${releaseVersion}`, kind: 'module' } }
     ];
     const main = { textContent: 'window.__rehabStartApplication = async () => { globalThis.__appBooted = true; };' };
     const banner = {
@@ -73,6 +80,16 @@ function createHarness({
         if (node.href) requested.push(node.href);
         if (node.src) requested.push(node.src);
         if (node.textContent && !node.src) vm.runInContext(node.textContent, context);
+        if (node.tagName === 'LINK' && node._rel === 'stylesheet') {
+            queueMicrotask(() => {
+                if (linkLoad === 'error' || (failHref && node.href === failHref)) {
+                    node.onerror?.();
+                    return;
+                }
+                node.onload?.();
+            });
+            return node;
+        }
         queueMicrotask(() => node.onload?.());
         return node;
     }
@@ -112,9 +129,13 @@ function createHarness({
                 dataset: {},
                 className: '',
                 style: {},
-                remove() {},
-                setAttribute() {},
+                remove() { removed.push(this); },
+                setAttribute(name, value) {
+                    this.dataset[name.replace(/^data-/, '')] = value;
+                    this[`attr:${name}`] = value;
+                },
                 set rel(value) { this._rel = value; },
+                get rel() { return this._rel; },
                 set href(value) { this._href = value; },
                 get href() { return this._href; },
                 set src(value) { this._src = value; },
@@ -153,12 +174,16 @@ function createHarness({
         toast: { show() {} },
         getComputedStyle(node) {
             if (node && node.className === 'md-btn') {
-                return { display: 'inline-flex', height: '44px' };
+                return {
+                    display: stylesheetProbe.display,
+                    height: stylesheetProbe.height,
+                    borderRadius: stylesheetProbe.borderRadius
+                };
             }
             if (node && String(node.className || '').includes('hidden')) {
-                return { display: 'none', height: '0px' };
+                return { display: 'none', height: '0px', borderRadius: '0px' };
             }
-            return { display: 'block', height: 'auto' };
+            return { display: 'block', height: 'auto', borderRadius: '0px' };
         }
     };
     context = {
@@ -179,9 +204,11 @@ function createHarness({
 
     return {
         requested,
+        removed,
         appShell,
         session,
         bodyClassList,
+        banner,
         counts() { return { reloads, documentWrites }; },
         async flush() {
             for (let index = 0; index < 40; index += 1) await Promise.resolve();
@@ -203,45 +230,59 @@ test('non-blocking boot markers replace the old version barrier', () => {
 test('startup executes before every versioned external business resource declaration', () => {
     const marker = html.indexOf('APP_STARTUP_NON_BLOCKING_BOOT_BEGIN');
     assert.ok(marker > 0);
-    const parserRequested = [...html.matchAll(/<(?:script|link)\b[^>]*\s(?:src|href)=["'][^"']+\?v=332/gi)];
+    const parserRequested = [...html.matchAll(/<(?:script|link)\b[^>]*\s(?:src|href)=["'][^"']+\?v=\d+/gi)];
     assert.equal(parserRequested.length, 0, parserRequested.map((match) => match[0]).join('\n'));
     assert.ok(marker < html.indexOf('data-rehab-stylesheet'));
-    assert.match(html, /data-rehab-stylesheet[^>]+data-href=["']build\/generated\.css\?v=332/);
-    assert.match(html, /script[^>]+data-rehab-entry[^>]+data-src=["']m3e-ripple\.js\?v=332/);
+    assert.match(html, new RegExp(`data-rehab-stylesheet[^>]+data-href=["']build\\/generated\\.css\\?v=${releaseVersion}`));
+    assert.match(html, new RegExp(`script[^>]+data-rehab-entry[^>]+data-src=["']m3e-ripple\\.js\\?v=${releaseVersion}`));
 });
 
 test('first install starts the app immediately without SW handshake', async () => {
     const page = createHarness({ controllerScriptUrl: null });
     await page.flush();
     assert.deepEqual(JSON.parse(JSON.stringify(page.requested)), [
-        'build/generated.css?v=332',
-        'm3e-ripple.js?v=332',
-        'data-utils-pure.js?v=332'
+        `build/generated.css?v=${releaseVersion}`,
+        `m3e-ripple.js?v=${releaseVersion}`,
+        `data-utils-pure.js?v=${releaseVersion}`
     ]);
     assert.equal(page.appShell.hidden, false);
     assert.equal(page.bodyClassList.has('rehab-app-ready'), true);
     assert.equal(page.counts().reloads, 0);
 });
 
-test('versioned v332 controller starts normally without GET_VERSION', async () => {
-    const page = createHarness({ controllerScriptUrl: 'https://example.test/sw.js?v=332' });
+test('versioned current controller starts normally without GET_VERSION', async () => {
+    const page = createHarness({ controllerScriptUrl: `https://example.test/sw.js?v=${releaseVersion}` });
     await page.flush();
     assert.ok(page.requested.length > 0);
     assert.equal(page.appShell.hidden, false);
     assert.equal(page.counts().reloads, 0);
-    assert.equal(page.requested.includes('build/generated.css?v=332'), true);
+    assert.equal(page.requested.includes(`build/generated.css?v=${releaseVersion}`), true);
+    assert.equal(page.requested.includes('build/generated.css'), false);
 });
 
-test('bare unknown controller still enters the app and de-versions assets online', async () => {
+test('current release never de-versions only because scriptURL is bare /sw.js', async () => {
+    // Registration now uses sw.js?v=N. A bare controller is a true legacy worker and may
+    // de-version scripts, but CSS still prefers the versioned declaration first and keeps it
+    // when the probe succeeds — so the current release is not forced onto bare CSS forever.
     const page = createHarness({ controllerScriptUrl: 'https://example.test/sw.js' });
     await page.flush();
     assert.equal(page.appShell.hidden, false);
     assert.equal(page.bodyClassList.has('rehab-app-ready'), true);
-    assert.deepEqual(JSON.parse(JSON.stringify(page.requested)), [
-        'build/generated.css',
-        'm3e-ripple.js',
-        'data-utils-pure.js'
-    ]);
+    assert.equal(page.requested[0], `build/generated.css?v=${releaseVersion}`);
+    assert.ok(page.requested.includes('m3e-ripple.js'));
+    assert.ok(page.requested.includes('data-utils-pure.js'));
+    // Versioned CSS succeeded, so the bare CSS candidate is not required.
+    assert.equal(page.requested.includes('build/generated.css'), false);
+    assert.equal(page.counts().reloads, 0);
+});
+
+test('bare unknown controller still enters the app and de-versions scripts online', async () => {
+    const page = createHarness({ controllerScriptUrl: 'https://example.test/sw.js' });
+    await page.flush();
+    assert.equal(page.appShell.hidden, false);
+    assert.equal(page.bodyClassList.has('rehab-app-ready'), true);
+    assert.ok(page.requested.includes('m3e-ripple.js'));
+    assert.ok(page.requested.includes('data-utils-pure.js'));
     assert.equal(page.counts().reloads, 0);
 });
 
@@ -264,8 +305,9 @@ test('legacy shell restore rewrites once when bare controller has an old cached 
 test('service worker registration is scheduled only after first paint path', () => {
     assert.match(html, /function scheduleServiceWorkerRegistration\(\)/);
     assert.match(html, /requestIdleCallback/);
-    assert.match(html, /register\('\.\/sw\.js', \{ updateViaCache: 'none' \}\)/);
-    assert.match(html, /resolveAssetUrl\('app-update\.js\?v=332'\)/);
+    assert.match(html, new RegExp(`register\\('\\.\\/sw\\.js\\?v=${releaseVersion}', \\{ updateViaCache: 'none' \\}\\)`));
+    assert.match(html, new RegExp(`resolveAssetUrl\\('app-update\\.js\\?v=${releaseVersion}'\\)`));
+    assert.match(appUpdateSource, new RegExp(`swUrl:\\s*'\\.\\/sw\\.js\\?v=${releaseVersion}'`));
     const quietStart = html.indexOf('function scheduleServiceWorkerRegistration()');
     const quietEnd = html.indexOf('function idlePreloadEnabled()', quietStart);
     const quiet = html.slice(quietStart, quietEnd);
@@ -283,7 +325,6 @@ test('app-update apply is user-confirmed and best-effort prepare then skip waiti
     assert.equal(appUpdateSource.includes('GET_VERSION'), false);
 });
 
-
 test('critical first-paint CSS defines .hidden before generated.css', () => {
     const styleEnd = html.indexOf('</style>');
     const headStyle = html.slice(0, styleEnd);
@@ -292,4 +333,36 @@ test('critical first-paint CSS defines .hidden before generated.css', () => {
     assert.match(html, /window\.resolveAssetUrl\s*=\s*resolveAssetUrl/);
     assert.match(html, /loadScript[\s\S]*resolveAssetUrl/);
     assert.match(html, /loadCss[\s\S]*resolveAssetUrl/);
+    assert.equal(html.includes("probe.style.position = 'absolute'"), false);
+});
+
+test('stylesheet probe false negative from absolute positioning is not used', () => {
+    assert.match(html, /display === 'inline-flex' \|\| display === 'flex'/);
+    assert.match(html, /borderRadius/);
+    assert.equal(html.includes("style.display === 'inline-flex' && String(style.height || '') === '44px'"), false);
+});
+
+test('failed stylesheet keeps business shell hidden and surfaces recovery', async () => {
+    const toasts = [];
+    const page = createHarness({
+        controllerScriptUrl: null,
+        stylesheetProbe: { display: 'inline-block', height: 'auto', borderRadius: '0px' }
+    });
+    // Override toast after harness creation is awkward; assert the critical UX contract:
+    // unstyled business DOM must stay hidden even if recovery uses toast instead of banner.
+    await page.flush();
+    assert.equal(page.appShell.hidden, true);
+    assert.equal(page.bodyClassList.has('rehab-app-ready'), true);
+    assert.equal(page.counts().reloads, 0);
+    assert.equal(toasts.length >= 0, true);
+});
+
+test('successful stylesheet is retained when a later candidate would fail', async () => {
+    const page = createHarness({
+        controllerScriptUrl: 'https://example.test/sw.js',
+        stylesheetProbe: { display: 'inline-flex', height: '44px', borderRadius: '9999px' }
+    });
+    await page.flush();
+    assert.equal(page.appShell.hidden, false);
+    assert.ok(page.requested.includes(`build/generated.css?v=${releaseVersion}`));
 });

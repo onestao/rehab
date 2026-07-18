@@ -20,7 +20,8 @@ function createFetchHarness({
     hasActiveWorker = false,
     addError = null,
     clients: clientSpecs = [{ id: 'legacy-client', url: 'https://example.test/index.html' }],
-    oldCacheNames = []
+    oldCacheNames = [],
+    maxRounds = 1000
 } = {}) {
     const listeners = new Map();
     const matches = [];
@@ -101,7 +102,12 @@ function createFetchHarness({
         registration: { active: hasActiveWorker ? {} : null },
         clients: {
             async claim() { claims += 1; },
-            async get(id) { return clients.get(id) || null; }
+            async get(id) { return clients.get(id) || null; },
+            async matchAll({ type } = {}) {
+                const all = [...clients.values()];
+                if (type && type !== 'window') return [];
+                return all;
+            }
         },
         async skipWaiting() { skipWaitingCalls += 1; events.push('skipWaiting'); },
         addEventListener(type, listener) { listeners.set(type, listener); }
@@ -130,7 +136,11 @@ function createFetchHarness({
             `const CACHE = 'training-assistant-v${workerVersion}';`
         )
         .replace(/const LEGACY_NAVIGATION_TIMEOUT_MS = \d+;/, 'const LEGACY_NAVIGATION_TIMEOUT_MS = 5;')
-        .replace(/const LEGACY_NAVIGATION_GRACE_MS = \d+;/, "const LEGACY_NAVIGATION_GRACE_MS = 1;");
+        .replace(/const LEGACY_NAVIGATION_GRACE_MS = \d+;/, 'const LEGACY_NAVIGATION_GRACE_MS = 1;')
+        .replace(
+            /const LEGACY_NAVIGATION_MAX_ROUNDS = \d+;/,
+            `const LEGACY_NAVIGATION_MAX_ROUNDS = ${Number(maxRounds) || 1000};`
+        );
     vm.runInContext(source, context, { filename: 'sw.js' });
 
     return {
@@ -166,6 +176,11 @@ function createFetchHarness({
             await pending;
         },
         client(id) { return clients.get(id) || null; },
+        removeClient(id) {
+            clients.delete(id);
+            navigationErrors.delete(id);
+            navigationHandlers.delete(id);
+        },
         setNavigateError(id, error) {
             if (error) navigationErrors.set(id, error);
             else navigationErrors.delete(id);
@@ -178,8 +193,19 @@ function createFetchHarness({
             for (let index = 0; index < 32; index += 1) await Promise.resolve();
         },
         async waitForMigration() {
-            await new Promise((resolve) => setTimeout(resolve, 15));
+            // Soft refresh waits LEGACY_NAVIGATION_GRACE_MS (patched to 1ms) before hard navigate.
+            await new Promise((resolve) => setTimeout(resolve, 40));
             await this.flush();
+            await new Promise((resolve) => setTimeout(resolve, 20));
+            await this.flush();
+        },
+        async waitForMaxRoundsExhaustion() {
+            // Budget is small in these tests (maxRounds=2). Drive enough timer ticks
+            // for scheduleLegacyUpgradeMigration to hit the force re-eval exit.
+            for (let index = 0; index < 8; index += 1) {
+                await new Promise((resolve) => setTimeout(resolve, 30));
+                await this.flush();
+            }
         },
         pendingLegacyClientIds() {
             return [...cacheEntries.keys()]
@@ -202,9 +228,9 @@ function createFetchHarness({
 
 test('old worker passes a newer versioned asset straight to network without touching its cache', async () => {
     const harness = createFetchHarness({ workerVersion: '326' });
-    const { request, response } = await harness.dispatch('https://example.test/history-view.js?v=332');
+    const { request, response } = await harness.dispatch('https://example.test/history-view.js?v=333');
 
-    assert.equal(await response.text(), 'network:https://example.test/history-view.js?v=332');
+    assert.equal(await response.text(), 'network:https://example.test/history-view.js?v=333');
     assert.equal(harness.fetches.length, 1);
     assert.equal(harness.fetches[0].input, request);
     assert.equal(harness.fetches[0].options.cache, 'no-store');
@@ -253,38 +279,38 @@ test('unversioned same-origin requests retain network-first behavior', async () 
 });
 
 test('worker reports its cache version and release readiness through the startup handshake', async () => {
-    const harness = createFetchHarness({ workerVersion: '332' });
+    const harness = createFetchHarness({ workerVersion: '333' });
     await harness.dispatchMessage({ type: 'GET_VERSION', requestId: 'boot-1' });
-    assert.deepEqual(JSON.parse(JSON.stringify(harness.messages)), [{ type: 'VERSION', requestId: 'boot-1', version: '332', precacheReady: false }]);
+    assert.deepEqual(JSON.parse(JSON.stringify(harness.messages)), [{ type: 'VERSION', requestId: 'boot-1', version: '333', precacheReady: false }]);
 });
 
 test('upgrade install stays waiting and does not request release assets before an explicit update', async () => {
-    const harness = createFetchHarness({ workerVersion: '332', hasActiveWorker: true });
+    const harness = createFetchHarness({ workerVersion: '333', hasActiveWorker: true });
     await harness.dispatchInstall();
     assert.equal(harness.skipWaitingCalls, 0);
     assert.equal(harness.adds.length, 0);
 
     await harness.dispatchMessage({ type: 'PREPARE_RELEASE', requestId: 'prepare-1' });
-    assert.ok(harness.adds.includes('build/generated.css?v=332'));
-    assert.ok(harness.adds.includes('plan-ui.js?v=332'));
-    assert.deepEqual(JSON.parse(JSON.stringify(harness.messages)), [{ type: 'RELEASE_READY', requestId: 'prepare-1', version: '332' }]);
+    assert.ok(harness.adds.includes('build/generated.css?v=333'));
+    assert.ok(harness.adds.includes('plan-ui.js?v=333'));
+    assert.deepEqual(JSON.parse(JSON.stringify(harness.messages)), [{ type: 'RELEASE_READY', requestId: 'prepare-1', version: '333' }]);
 });
 
 test('first install still precaches release assets without forcing a page reload', async () => {
-    const harness = createFetchHarness({ workerVersion: '332', hasActiveWorker: false });
+    const harness = createFetchHarness({ workerVersion: '333', hasActiveWorker: false });
     await harness.dispatchInstall();
     assert.equal(harness.skipWaitingCalls, 1);
-    assert.ok(harness.adds.includes('build/generated.css?v=332'));
-    assert.ok(harness.adds.includes('plan-ui.js?v=332'));
+    assert.ok(harness.adds.includes('build/generated.css?v=333'));
+    assert.ok(harness.adds.includes('plan-ui.js?v=333'));
 });
 
 test('legacy v326 SKIP_WAITING prepares before activation, then navigates that old client once', async () => {
-    const harness = createFetchHarness({ workerVersion: '332', hasActiveWorker: true });
+    const harness = createFetchHarness({ workerVersion: '333', hasActiveWorker: true });
     await harness.dispatchInstall();
     await harness.dispatchMessage({ type: 'SKIP_WAITING' });
 
-    assert.ok(harness.adds.includes('build/generated.css?v=332'));
-    assert.ok(harness.adds.includes('plan-ui.js?v=332'));
+    assert.ok(harness.adds.includes('build/generated.css?v=333'));
+    assert.ok(harness.adds.includes('plan-ui.js?v=333'));
     assert.equal(harness.skipWaitingCalls, 1);
     assert.equal(harness.events.at(-1), 'skipWaiting');
 
@@ -292,7 +318,7 @@ test('legacy v326 SKIP_WAITING prepares before activation, then navigates that o
     await harness.waitForMigration();
     assert.equal(harness.claims, 1);
     assert.equal(harness.navigations.length, 1);
-    assert.match(harness.navigations[0].url, /__rehab_upgrade=332/);
+    assert.match(harness.navigations[0].url, /__rehab_upgrade=333/);
 
     await harness.dispatchActivate();
     await harness.waitForMigration();
@@ -301,7 +327,7 @@ test('legacy v326 SKIP_WAITING prepares before activation, then navigates that o
 
 test('legacy client migrations isolate navigation failures and retain v326 cache until retry succeeds', async () => {
     const harness = createFetchHarness({
-        workerVersion: '332',
+        workerVersion: '333',
         hasActiveWorker: true,
         oldCacheNames: ['training-assistant-v326'],
         clients: [
@@ -315,18 +341,33 @@ test('legacy client migrations isolate navigation failures and retain v326 cache
     await harness.dispatchActivate();
     await harness.waitForMigration();
 
-    assert.deepEqual(harness.navigations.map(({ clientId }) => clientId), ['legacy-success', 'legacy-retry']);
-    assert.deepEqual(harness.pendingLegacyClientIds(), ['legacy-retry']);
+    // Auto-retry may attempt the failing client more than once before PAGE_READY.
+    const firstPass = harness.navigations.map(({ clientId }) => clientId);
+    assert.equal(firstPass.includes('legacy-success'), true);
+    assert.equal(firstPass.includes('legacy-retry'), true);
+    assert.equal(firstPass.filter((id) => id === 'legacy-success').length, 1);
+    // Soft-refresh success no longer drops the marker until PAGE_READY; both clients
+    // remain queued after the first migration pass when only hard-nav is attempted.
+    assert.deepEqual(harness.pendingLegacyClientIds(), ['legacy-retry', 'legacy-success']);
     assert.equal(harness.claims, 1);
     assert.equal(harness.cacheNames.has('training-assistant-v326'), true);
-    assert.match(harness.navigations[0].url, /[?&]tab=one(?:&|$)/);
-    assert.match(harness.navigations[0].url, /__rehab_upgrade=332/);
+    assert.match(harness.navigations.find((entry) => entry.clientId === 'legacy-success').url, /[?&]tab=one(?:&|$)/);
+    assert.match(harness.navigations.find((entry) => entry.clientId === 'legacy-success').url, /__rehab_upgrade=333/);
 
     harness.setNavigateError('legacy-retry', null);
-    await harness.dispatchMessage({ type: 'V327_PAGE_READY' }, harness.client('legacy-success'));
+    const beforeRetry = harness.navigations.length;
+    await harness.dispatchMessage({ type: 'V327_PAGE_READY', version: '333' }, harness.client('legacy-success'));
     await harness.waitForMigration();
 
-    assert.deepEqual(harness.navigations.map(({ clientId }) => clientId), ['legacy-success', 'legacy-retry', 'legacy-retry']);
+    const afterRetry = harness.navigations.slice(beforeRetry).map(({ clientId }) => clientId);
+    assert.equal(afterRetry.includes('legacy-retry'), true);
+    assert.deepEqual(harness.pendingLegacyClientIds(), ['legacy-retry']);
+    // A ready alone must not retire the shared offline cache while B is still live.
+    assert.equal(harness.cacheNames.has('training-assistant-v326'), true);
+    assert.deepEqual(harness.deletedCaches, []);
+
+    await harness.dispatchMessage({ type: 'V327_PAGE_READY', version: '333' }, harness.client('legacy-retry'));
+    await harness.waitForMigration();
     assert.deepEqual(harness.pendingLegacyClientIds(), []);
     assert.equal(harness.cacheNames.has('training-assistant-v326'), false);
     assert.deepEqual(harness.deletedCaches, ['training-assistant-v326']);
@@ -335,7 +376,7 @@ test('legacy client migrations isolate navigation failures and retain v326 cache
 test('a permanently pending legacy navigation cannot block claim or activation', async () => {
     const never = new Promise(() => {});
     const harness = createFetchHarness({
-        workerVersion: '332',
+        workerVersion: '333',
         hasActiveWorker: true,
         oldCacheNames: ['training-assistant-v326'],
         clients: [
@@ -348,8 +389,13 @@ test('a permanently pending legacy navigation cannot block claim or activation',
     await harness.dispatchMessage({ type: 'SKIP_WAITING' }, harness.client('legacy-pending'));
 
     let activated = false;
-    harness.dispatchActivate().then(() => { activated = true; });
-    await harness.flush();
+    const activateDone = harness.dispatchActivate().then(() => { activated = true; });
+    // Activate must finish without awaiting client.navigate(). A short timer is enough
+    // for claim/requeue microtasks; an indefinitely pending navigate would still hang.
+    await Promise.race([
+        activateDone,
+        new Promise((resolve) => setTimeout(resolve, 40))
+    ]);
 
     assert.equal(activated, true, 'activate must not wait for an indefinitely pending navigate()');
     assert.equal(harness.claims, 1);
@@ -357,33 +403,38 @@ test('a permanently pending legacy navigation cannot block claim or activation',
     assert.equal(harness.cacheNames.has("training-assistant-v326"), true);
 
     await harness.waitForMigration();
-    assert.deepEqual(harness.navigations.map(({ clientId }) => clientId), [
-        "legacy-success",
-        "legacy-pending"
-    ]);
-    assert.deepEqual(harness.pendingLegacyClientIds(), ['legacy-pending']);
+    const firstPass = harness.navigations.map(({ clientId }) => clientId);
+    assert.equal(firstPass.includes('legacy-success'), true);
+    assert.equal(firstPass.includes('legacy-pending'), true);
+    assert.equal(firstPass.filter((id) => id === 'legacy-success').length, 1);
+    // Hard-nav resolve no longer deletes markers; both stay until PAGE_READY/gone.
+    assert.deepEqual(harness.pendingLegacyClientIds(), ['legacy-pending', 'legacy-success']);
     assert.equal(harness.cacheNames.has('training-assistant-v326'), true);
 
     harness.setNavigateHandler('legacy-pending', async function navigate(url) {
         this.url = url;
         return this;
     });
-    await harness.dispatchMessage({ type: 'V327_PAGE_READY' }, harness.client('legacy-success'));
+    await harness.dispatchMessage({ type: 'V327_PAGE_READY', version: '333' }, harness.client('legacy-success'));
     await harness.waitForMigration();
 
-    assert.deepEqual(harness.navigations.map(({ clientId }) => clientId), [
-        'legacy-success',
-        'legacy-pending',
-        'legacy-pending'
-    ]);
+    const pendingNavs = harness.navigations.filter((entry) => entry.clientId === 'legacy-pending');
+    assert.ok(pendingNavs.length >= 1, 'pending client must eventually receive a hard navigate');
+    assert.equal(firstPass.filter((id) => id === 'legacy-success').length, 1);
+    assert.deepEqual(harness.pendingLegacyClientIds(), ['legacy-pending']);
+    // Hard navigate of B must not retire shared caches before B reports PAGE_READY.
+    assert.equal(harness.cacheNames.has('training-assistant-v326'), true);
+
+    await harness.dispatchMessage({ type: 'V327_PAGE_READY', version: '333' }, harness.client('legacy-pending'));
+    await harness.waitForMigration();
     assert.deepEqual(harness.pendingLegacyClientIds(), []);
     assert.equal(harness.cacheNames.has('training-assistant-v326'), false);
 });
 
-test('a v332 page-ready event acknowledges its queued marker before activation fallback navigation', async () => {
-    const harness = createFetchHarness({ workerVersion: '332', hasActiveWorker: true });
+test('a v333 page-ready event acknowledges its queued marker before activation fallback navigation', async () => {
+    const harness = createFetchHarness({ workerVersion: '333', hasActiveWorker: true });
     await harness.dispatchMessage({ type: 'SKIP_WAITING' });
-    await harness.dispatchMessage({ type: 'V327_PAGE_READY' });
+    await harness.dispatchMessage({ type: 'V327_PAGE_READY', version: '333' });
     await harness.dispatchActivate();
     await harness.waitForMigration();
 
@@ -391,14 +442,405 @@ test('a v332 page-ready event acknowledges its queued marker before activation f
     assert.deepEqual(harness.pendingLegacyClientIds(), []);
 });
 
+test('SKIP_WAITING queues every open window client, not only the source tab', async () => {
+    const harness = createFetchHarness({
+        workerVersion: '333',
+        hasActiveWorker: true,
+        clients: [
+            { id: 'apply-tab', url: 'https://example.test/index.html?tab=apply' },
+            { id: 'sibling-tab', url: 'https://example.test/index.html?tab=sibling' }
+        ]
+    });
+
+    await harness.dispatchMessage({ type: 'SKIP_WAITING' }, harness.client('apply-tab'));
+    await harness.dispatchActivate();
+    await harness.waitForMigration();
+
+    assert.deepEqual(
+        harness.navigations.map(({ clientId }) => clientId).sort(),
+        ['apply-tab', 'sibling-tab']
+    );
+    assert.match(harness.navigations.find((entry) => entry.clientId === 'sibling-tab').url, /__rehab_upgrade=333/);
+    assert.match(harness.navigations.find((entry) => entry.clientId === 'sibling-tab').url, /[?&]tab=sibling(?:&|$)/);
+});
+
+test('PAGE_READY without matching version leaves the migration marker intact', async () => {
+    const harness = createFetchHarness({
+        workerVersion: '333',
+        hasActiveWorker: true,
+        oldCacheNames: ['training-assistant-v326'],
+        clients: [{
+            id: 'stale-doc',
+            url: 'https://example.test/index.html',
+            navigateError: new Error('hold-marker')
+        }]
+    });
+    await harness.dispatchMessage({ type: 'SKIP_WAITING' }, harness.client('stale-doc'));
+    await harness.dispatchMessage({ type: 'V327_PAGE_READY', version: '328' }, harness.client('stale-doc'));
+    await harness.dispatchMessage({ type: 'V327_PAGE_READY' }, harness.client('stale-doc'));
+    await harness.dispatchActivate();
+    await harness.waitForMigration();
+
+    // Wrong/missing version must not clear the marker or retire the old offline cache.
+    assert.deepEqual(harness.pendingLegacyClientIds(), ['stale-doc']);
+    assert.equal(harness.cacheNames.has('training-assistant-v326'), true);
+    assert.deepEqual(harness.deletedCaches, []);
+});
+
+test('one ready dual-tab client retains legacy cache and sibling marker', async () => {
+    const harness = createFetchHarness({
+        workerVersion: '333',
+        hasActiveWorker: true,
+        oldCacheNames: ['training-assistant-v332', 'training-assistant-v333'],
+        clients: [
+            {
+                id: 'client-a',
+                url: 'https://example.test/index.html?tab=a',
+                navigateError: new Error('hold-marker')
+            },
+            {
+                id: 'client-b',
+                url: 'https://example.test/index.html?tab=b',
+                navigateError: new Error('hold-marker')
+            }
+        ]
+    });
+
+    await harness.dispatchMessage({ type: 'SKIP_WAITING' }, harness.client('client-a'));
+    await harness.dispatchActivate();
+    await harness.waitForMigration();
+
+    assert.deepEqual(harness.pendingLegacyClientIds(), ['client-a', 'client-b']);
+    await harness.dispatchMessage({ type: 'V327_PAGE_READY', version: '333' }, harness.client('client-a'));
+    await harness.flush();
+
+    assert.deepEqual(harness.pendingLegacyClientIds(), ['client-b']);
+    assert.equal(harness.cacheNames.has('training-assistant-v332'), true);
+    assert.equal(harness.cacheNames.has('training-assistant-v333'), true);
+    assert.deepEqual(harness.deletedCaches, []);
+});
+
+test('all dual-tab clients ready delete legacy caches and markers', async () => {
+    const harness = createFetchHarness({
+        workerVersion: '333',
+        hasActiveWorker: true,
+        oldCacheNames: ['training-assistant-v332', 'training-assistant-v333'],
+        clients: [
+            {
+                id: 'client-a',
+                url: 'https://example.test/index.html?tab=a',
+                navigateError: new Error('hold-marker')
+            },
+            {
+                id: 'client-b',
+                url: 'https://example.test/index.html?tab=b',
+                navigateError: new Error('hold-marker')
+            }
+        ]
+    });
+
+    await harness.dispatchMessage({ type: 'SKIP_WAITING' }, harness.client('client-a'));
+    await harness.dispatchActivate();
+    await harness.waitForMigration();
+
+    await harness.dispatchMessage({ type: 'V327_PAGE_READY', version: '333' }, harness.client('client-a'));
+    await harness.dispatchMessage({ type: 'V327_PAGE_READY', version: '333' }, harness.client('client-b'));
+    await harness.flush();
+
+    assert.deepEqual(harness.pendingLegacyClientIds(), []);
+    assert.equal(harness.cacheNames.has('training-assistant-v332'), false);
+    assert.equal(harness.cacheNames.has('training-assistant-v333'), true);
+    assert.deepEqual(harness.deletedCaches, ['training-assistant-v332']);
+});
+
+test('gone dual-tab sibling allows legacy cache cleanup after ready peer', async () => {
+    const harness = createFetchHarness({
+        workerVersion: '333',
+        hasActiveWorker: true,
+        oldCacheNames: ['training-assistant-v332', 'training-assistant-v333'],
+        clients: [
+            {
+                id: 'client-a',
+                url: 'https://example.test/index.html?tab=a',
+                navigateError: new Error('hold-marker')
+            },
+            {
+                id: 'client-b',
+                url: 'https://example.test/index.html?tab=b',
+                navigateError: new Error('hold-marker')
+            }
+        ]
+    });
+
+    await harness.dispatchMessage({ type: 'SKIP_WAITING' }, harness.client('client-a'));
+    await harness.dispatchActivate();
+    await harness.waitForMigration();
+
+    await harness.dispatchMessage({ type: 'V327_PAGE_READY', version: '333' }, harness.client('client-a'));
+    await harness.flush();
+    assert.equal(harness.cacheNames.has('training-assistant-v332'), true);
+
+    harness.removeClient('client-b');
+    await harness.dispatchMessage({ type: 'EVALUATE_CACHE_CLEANUP', version: '333' }, harness.client('client-a'));
+    await harness.flush();
+
+    assert.deepEqual(harness.pendingLegacyClientIds(), []);
+    assert.equal(harness.cacheNames.has('training-assistant-v332'), false);
+    assert.equal(harness.cacheNames.has('training-assistant-v333'), true);
+    assert.deepEqual(harness.deletedCaches, ['training-assistant-v332']);
+});
+
+test('wrong-version PAGE_READY from one dual-tab client does not clear its marker or caches', async () => {
+    const harness = createFetchHarness({
+        workerVersion: '333',
+        hasActiveWorker: true,
+        oldCacheNames: ['training-assistant-v332', 'training-assistant-v333'],
+        clients: [
+            {
+                id: 'client-a',
+                url: 'https://example.test/index.html?tab=a',
+                navigateError: new Error('hold-marker')
+            },
+            {
+                id: 'client-b',
+                url: 'https://example.test/index.html?tab=b',
+                navigateError: new Error('hold-marker')
+            }
+        ]
+    });
+
+    await harness.dispatchMessage({ type: 'SKIP_WAITING' }, harness.client('client-a'));
+    await harness.dispatchActivate();
+    await harness.waitForMigration();
+
+    await harness.dispatchMessage({ type: 'V327_PAGE_READY', version: '333' }, harness.client('client-a'));
+    await harness.dispatchMessage({ type: 'V327_PAGE_READY', version: '332' }, harness.client('client-b'));
+    await harness.dispatchMessage({ type: 'V327_PAGE_READY' }, harness.client('client-b'));
+    await harness.flush();
+
+    assert.deepEqual(harness.pendingLegacyClientIds(), ['client-b']);
+    assert.equal(harness.cacheNames.has('training-assistant-v332'), true);
+    assert.deepEqual(harness.deletedCaches, []);
+});
+
+test('concurrent cleanup evaluations stay idempotent and safe', async () => {
+    const harness = createFetchHarness({
+        workerVersion: '333',
+        hasActiveWorker: true,
+        oldCacheNames: ['training-assistant-v332', 'training-assistant-v333'],
+        clients: [
+            {
+                id: 'client-a',
+                url: 'https://example.test/index.html?tab=a',
+                navigateError: new Error('hold-marker')
+            },
+            {
+                id: 'client-b',
+                url: 'https://example.test/index.html?tab=b',
+                navigateError: new Error('hold-marker')
+            }
+        ]
+    });
+
+    await harness.dispatchMessage({ type: 'SKIP_WAITING' }, harness.client('client-a'));
+    await harness.dispatchActivate();
+    await harness.waitForMigration();
+
+    await Promise.all([
+        harness.dispatchMessage({ type: 'V327_PAGE_READY', version: '333' }, harness.client('client-a')),
+        harness.dispatchMessage({ type: 'EVALUATE_CACHE_CLEANUP', version: '333' }, harness.client('client-a')),
+        harness.dispatchMessage({ type: 'EVALUATE_CACHE_CLEANUP', version: '333' }, harness.client('client-b'))
+    ]);
+    await harness.flush();
+
+    assert.deepEqual(harness.pendingLegacyClientIds(), ['client-b']);
+    assert.equal(harness.cacheNames.has('training-assistant-v332'), true);
+
+    await Promise.all([
+        harness.dispatchMessage({ type: 'V327_PAGE_READY', version: '333' }, harness.client('client-b')),
+        harness.dispatchMessage({ type: 'EVALUATE_CACHE_CLEANUP', version: '333' }, harness.client('client-a')),
+        harness.dispatchMessage({ type: 'EVALUATE_CACHE_CLEANUP', version: '333' }, harness.client('client-b'))
+    ]);
+    await harness.flush();
+
+    assert.deepEqual(harness.pendingLegacyClientIds(), []);
+    assert.equal(harness.cacheNames.has('training-assistant-v332'), false);
+    assert.equal(harness.cacheNames.has('training-assistant-v333'), true);
+    assert.deepEqual(harness.deletedCaches, ['training-assistant-v332']);
+});
+
+test('max migration rounds with live non-ready sibling keeps marker and legacy cache', async () => {
+    const harness = createFetchHarness({
+        workerVersion: '333',
+        hasActiveWorker: true,
+        maxRounds: 2,
+        oldCacheNames: ['training-assistant-v332', 'training-assistant-v333'],
+        clients: [
+            {
+                id: 'client-a',
+                url: 'https://example.test/index.html?tab=a',
+                navigateError: new Error('hold-marker')
+            },
+            {
+                id: 'client-b',
+                url: 'https://example.test/index.html?tab=b',
+                navigateError: new Error('hold-marker')
+            }
+        ]
+    });
+
+    await harness.dispatchMessage({ type: 'SKIP_WAITING' }, harness.client('client-a'));
+    await harness.dispatchActivate();
+    await harness.waitForMigration();
+    await harness.dispatchMessage({ type: 'V327_PAGE_READY', version: '333' }, harness.client('client-a'));
+    await harness.flush();
+
+    await harness.waitForMaxRoundsExhaustion();
+    // force re-eval after budget must NOT treat live non-ready B as gone.
+    assert.deepEqual(harness.pendingLegacyClientIds(), ['client-b']);
+    assert.equal(harness.cacheNames.has('training-assistant-v332'), true);
+    assert.equal(harness.cacheNames.has('training-assistant-v333'), true);
+    assert.deepEqual(harness.deletedCaches, []);
+
+    // Explicit force-style re-eval (max-round path / EVALUATE_CACHE_CLEANUP) still retains.
+    await harness.dispatchMessage({ type: 'EVALUATE_CACHE_CLEANUP', version: '333' }, harness.client('client-a'));
+    await harness.flush();
+    assert.deepEqual(harness.pendingLegacyClientIds(), ['client-b']);
+    assert.equal(harness.cacheNames.has('training-assistant-v332'), true);
+    assert.deepEqual(harness.deletedCaches, []);
+});
+
+test('max migration rounds then sibling PAGE_READY retires only legacy cache', async () => {
+    const harness = createFetchHarness({
+        workerVersion: '333',
+        hasActiveWorker: true,
+        maxRounds: 2,
+        oldCacheNames: ['training-assistant-v332', 'training-assistant-v333'],
+        clients: [
+            {
+                id: 'client-a',
+                url: 'https://example.test/index.html?tab=a',
+                navigateError: new Error('hold-marker')
+            },
+            {
+                id: 'client-b',
+                url: 'https://example.test/index.html?tab=b',
+                navigateError: new Error('hold-marker')
+            }
+        ]
+    });
+
+    await harness.dispatchMessage({ type: 'SKIP_WAITING' }, harness.client('client-a'));
+    await harness.dispatchActivate();
+    await harness.waitForMigration();
+    await harness.dispatchMessage({ type: 'V327_PAGE_READY', version: '333' }, harness.client('client-a'));
+    await harness.flush();
+    await harness.waitForMaxRoundsExhaustion();
+
+    assert.equal(harness.cacheNames.has('training-assistant-v332'), true);
+    assert.deepEqual(harness.pendingLegacyClientIds(), ['client-b']);
+
+    await harness.dispatchMessage({ type: 'V327_PAGE_READY', version: '333' }, harness.client('client-b'));
+    await harness.flush();
+
+    assert.deepEqual(harness.pendingLegacyClientIds(), []);
+    assert.equal(harness.cacheNames.has('training-assistant-v332'), false);
+    assert.equal(harness.cacheNames.has('training-assistant-v333'), true);
+    assert.deepEqual(harness.deletedCaches, ['training-assistant-v332']);
+});
+
+test('max migration rounds then sibling gone allows legacy cache cleanup', async () => {
+    const harness = createFetchHarness({
+        workerVersion: '333',
+        hasActiveWorker: true,
+        maxRounds: 2,
+        oldCacheNames: ['training-assistant-v332', 'training-assistant-v333'],
+        clients: [
+            {
+                id: 'client-a',
+                url: 'https://example.test/index.html?tab=a',
+                navigateError: new Error('hold-marker')
+            },
+            {
+                id: 'client-b',
+                url: 'https://example.test/index.html?tab=b',
+                navigateError: new Error('hold-marker')
+            }
+        ]
+    });
+
+    await harness.dispatchMessage({ type: 'SKIP_WAITING' }, harness.client('client-a'));
+    await harness.dispatchActivate();
+    await harness.waitForMigration();
+    await harness.dispatchMessage({ type: 'V327_PAGE_READY', version: '333' }, harness.client('client-a'));
+    await harness.flush();
+    await harness.waitForMaxRoundsExhaustion();
+
+    assert.equal(harness.cacheNames.has('training-assistant-v332'), true);
+    assert.deepEqual(harness.pendingLegacyClientIds(), ['client-b']);
+
+    harness.removeClient('client-b');
+    await harness.dispatchMessage({ type: 'EVALUATE_CACHE_CLEANUP', version: '333' }, harness.client('client-a'));
+    await harness.flush();
+
+    assert.deepEqual(harness.pendingLegacyClientIds(), []);
+    assert.equal(harness.cacheNames.has('training-assistant-v332'), false);
+    assert.equal(harness.cacheNames.has('training-assistant-v333'), true);
+    assert.deepEqual(harness.deletedCaches, ['training-assistant-v332']);
+});
+
+test('concurrent force-style cleanup while sibling live non-ready never deletes early', async () => {
+    const harness = createFetchHarness({
+        workerVersion: '333',
+        hasActiveWorker: true,
+        maxRounds: 2,
+        oldCacheNames: ['training-assistant-v332', 'training-assistant-v333'],
+        clients: [
+            {
+                id: 'client-a',
+                url: 'https://example.test/index.html?tab=a',
+                navigateError: new Error('hold-marker')
+            },
+            {
+                id: 'client-b',
+                url: 'https://example.test/index.html?tab=b',
+                navigateError: new Error('hold-marker')
+            }
+        ]
+    });
+
+    await harness.dispatchMessage({ type: 'SKIP_WAITING' }, harness.client('client-a'));
+    await harness.dispatchActivate();
+    await harness.waitForMigration();
+    await harness.dispatchMessage({ type: 'V327_PAGE_READY', version: '333' }, harness.client('client-a'));
+    await harness.flush();
+
+    await Promise.all([
+        harness.dispatchMessage({ type: 'EVALUATE_CACHE_CLEANUP', version: '333' }, harness.client('client-a')),
+        harness.dispatchMessage({ type: 'EVALUATE_CACHE_CLEANUP', version: '333' }, harness.client('client-a')),
+        harness.dispatchMessage({ type: 'EVALUATE_CACHE_CLEANUP', version: '333' }, harness.client('client-b'))
+    ]);
+    await harness.waitForMaxRoundsExhaustion();
+    await Promise.all([
+        harness.dispatchMessage({ type: 'EVALUATE_CACHE_CLEANUP', version: '333' }, harness.client('client-a')),
+        harness.dispatchMessage({ type: 'EVALUATE_CACHE_CLEANUP', version: '333' }, harness.client('client-b'))
+    ]);
+    await harness.flush();
+
+    assert.deepEqual(harness.pendingLegacyClientIds(), ['client-b']);
+    assert.equal(harness.cacheNames.has('training-assistant-v332'), true);
+    assert.equal(harness.cacheNames.has('training-assistant-v333'), true);
+    assert.deepEqual(harness.deletedCaches, []);
+});
+
 test('legacy activation does not leave v326 half-upgraded when release preparation fails', async () => {
-    const harness = createFetchHarness({ workerVersion: '332', hasActiveWorker: true, addError: new Error('offline') });
+    const harness = createFetchHarness({ workerVersion: '333', hasActiveWorker: true, addError: new Error('offline') });
     await harness.dispatchMessage({ type: 'SKIP_WAITING' });
 
     assert.equal(harness.skipWaitingCalls, 0);
     assert.deepEqual(JSON.parse(JSON.stringify(harness.messages)), [{
         type: 'RELEASE_FAILED',
-        version: '332',
+        version: '333',
         message: '新版资源准备失败，请检查网络后重试'
     }]);
 });

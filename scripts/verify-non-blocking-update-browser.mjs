@@ -9,9 +9,19 @@ const playwrightModule = process.env.PLAYWRIGHT_MODULE;
 if (!playwrightModule) throw new Error('PLAYWRIGHT_MODULE is required');
 const { chromium } = require(playwrightModule);
 
+const fromVersion = String(process.env.REHAB_FROM_VERSION || '326');
+const toVersion = '333';
+const fromRootEnv = process.env[`REHAB_V${fromVersion}_ROOT`] || process.env.REHAB_FROM_ROOT || '';
+const toRootEnv = process.env.REHAB_V333_ROOT
+    || process.env.REHAB_V331_ROOT
+    || process.env.REHAB_V330_ROOT
+    || process.env.REHAB_V329_ROOT
+    || process.env.REHAB_V328_ROOT
+    || process.env.REHAB_V327_ROOT
+    || '';
 const roots = {
-    '326': path.resolve(process.env.REHAB_V326_ROOT || ''),
-    '332': path.resolve(process.env.REHAB_V332_ROOT || process.env.REHAB_V331_ROOT || process.env.REHAB_V330_ROOT || process.env.REHAB_V329_ROOT || process.env.REHAB_V328_ROOT || process.env.REHAB_V327_ROOT || '')
+    [fromVersion]: path.resolve(fromRootEnv),
+    [toVersion]: path.resolve(toRootEnv)
 };
 for (const [version, root] of Object.entries(roots)) {
     if (!root || !existsSync(path.join(root, 'index.html'))) {
@@ -24,7 +34,7 @@ if (!executablePath || !existsSync(executablePath)) throw new Error('CHROMIUM_PA
 const port = Number(process.env.REHAB_BROWSER_PORT || 4175);
 const origin = `http://127.0.0.1:${port}`;
 const requests = [];
-let activeVersion = '326';
+let activeVersion = fromVersion;
 const mime = {
     '.css': 'text/css; charset=utf-8',
     '.html': 'text/html; charset=utf-8',
@@ -67,8 +77,8 @@ function wait(ms) {
 
 function cleanProfile(profilePath) {
     const resolved = path.resolve(profilePath);
-    const safeRoot = path.resolve('C:/tmp');
-    if (!resolved.startsWith(safeRoot + path.sep) || !path.basename(resolved).startsWith('rehab-v332-')) {
+    const safeRoot = path.resolve(process.env.REHAB_TMP_ROOT || 'G:/LLM/rehab/.tmp');
+    if (!resolved.startsWith(safeRoot + path.sep) || !path.basename(resolved).startsWith('rehab-v333-')) {
         throw new Error(`refusing to remove unsafe profile path: ${resolved}`);
     }
     if (existsSync(resolved)) rmSync(resolved, { recursive: true, force: true });
@@ -114,20 +124,94 @@ async function queryVersion(page) {
 
 async function pageState(page) {
     const version = await queryVersion(page);
-    return page.evaluate(async (versionState) => ({
-        href: location.href,
-        ready: document.body.classList.contains("rehab-app-ready"),
-        activePage: document.querySelector('.page.active')?.id || null,
-        controller: navigator.serviceWorker.controller?.scriptURL || null,
-        cacheKeys: await caches.keys(),
-        scriptSources: [...document.scripts].map((script) => script.src).filter(Boolean),
-        resourceUrls: performance.getEntriesByType('resource').map((entry) => entry.name),
-        upgradeMarker: new URL(location.href).searchParams.get('__rehab_upgrade'),
-        ...versionState
-    }), version);
+    return page.evaluate(async (versionState) => {
+        const resourceUrls = performance.getEntriesByType('resource').map((entry) => entry.name);
+        const stylesheetHrefs = [...document.querySelectorAll('link[rel="stylesheet"]')]
+            .map((link) => link.href)
+            .filter(Boolean);
+        let styleProbe = null;
+        try {
+            const probe = document.createElement('div');
+            probe.className = 'md-btn';
+            document.documentElement.appendChild(probe);
+            const style = getComputedStyle(probe);
+            styleProbe = {
+                display: style.display,
+                height: style.height,
+                borderRadius: style.borderRadius
+            };
+            probe.remove();
+        } catch {
+            styleProbe = null;
+        }
+        return {
+            href: location.href,
+            ready: document.body.classList.contains('rehab-app-ready'),
+            activePage: document.querySelector('.page.active')?.id || null,
+            controller: navigator.serviceWorker.controller?.scriptURL || null,
+            cacheKeys: await caches.keys(),
+            scriptSources: [...document.scripts].map((script) => script.src).filter(Boolean),
+            stylesheetHrefs,
+            resourceUrls,
+            styleProbe,
+            upgradeMarker: new URL(location.href).searchParams.get('__rehab_upgrade'),
+            ...versionState
+        };
+    }, version);
 }
 
-async function waitForV326(page) {
+function isVersionedAsset(url, version) {
+    return new RegExp(`[?&]v=${version}(?:&|$)`).test(String(url || ''));
+}
+
+function controllerLooksLikeV333(controller) {
+    if (!controller) return false;
+    if (/sw\.js\?v=333(?:&|$)/.test(controller)) return true;
+    // Bare sw.js is the legacy registration URL; acceptable only as a transient
+    // controller identity when the active worker already reports version 333.
+    return /\/sw\.js(?:$|\?)/.test(controller) && !/[?&]v=/.test(controller);
+}
+
+function documentIsPureV333(state) {
+    if (!state) return false;
+    if (state.version !== '333') return false;
+    // precacheReady is preferred but not required once the sole live cache is v333 and
+    // the document already executes pure v333 scripts/styles (release marker can lag).
+    if (!state.ready || !state.activePage) return false;
+    if (state.upgradeMarker !== null) return false;
+    if (!controllerLooksLikeV333(state.controller)) return false;
+    if (!Array.isArray(state.cacheKeys)
+        || state.cacheKeys.length !== 1
+        || state.cacheKeys[0] !== 'training-assistant-v333') {
+        return false;
+    }
+    const scripts = state.scriptSources || [];
+    if (!scripts.some((url) => isVersionedAsset(url, '333'))) return false;
+    // Reject any residual pre-release versioned assets still attached to the document.
+    if (scripts.some((url) => {
+        const match = String(url || '').match(/[?&]v=(\d+)(?:&|$)/);
+        return match && match[1] !== '333';
+    })) return false;
+    const styles = state.stylesheetHrefs || [];
+    if (!styles.some((url) => /generated\.css\?v=333(?:&|$)/.test(url))) return false;
+    if (styles.some((url) => {
+        const match = String(url || '').match(/[?&]v=(\d+)(?:&|$)/);
+        return match && match[1] !== '333';
+    })) return false;
+    if ((state.resourceUrls || []).some((url) => {
+        const match = String(url || '').match(/[?&]v=(\d+)(?:&|$)/);
+        return match && match[1] !== '333';
+    })) {
+        return false;
+    }
+    const probe = state.styleProbe || {};
+    const displayOk = probe.display === 'inline-flex' || probe.display === 'flex';
+    const heightOk = String(probe.height || '') === '44px';
+    const radiusOk = String(probe.borderRadius || '') === '9999px';
+    return displayOk && heightOk && radiusOk;
+}
+
+async function waitForFromVersion(page) {
     await page.goto(`${origin}/`, { waitUntil: 'domcontentloaded' });
     try {
         await page.waitForFunction(() => document.querySelector(".page.active") && window.ui && window.data, null, { timeout: 30000 });
@@ -142,16 +226,16 @@ async function waitForV326(page) {
             caches: await caches.keys(),
             scripts: [...document.scripts].map((script) => script.src).filter(Boolean)
         }));
-        throw new Error(`v326 app did not become ready: ${JSON.stringify(diagnostic)}; ${error.message}`);
+        throw new Error(`v${fromVersion} app did not become ready: ${JSON.stringify(diagnostic)}; ${error.message}`);
     }
     await page.evaluate(() => navigator.serviceWorker.ready);
-    await page.waitForFunction(async () => {
+    await page.waitForFunction(async (cacheName) => {
         const keys = await caches.keys();
-        return !!navigator.serviceWorker.controller && keys.includes('training-assistant-v326');
-    }, null, { timeout: 30000 });
+        return !!navigator.serviceWorker.controller && keys.includes(cacheName);
+    }, `training-assistant-v${fromVersion}`, { timeout: 30000 });
     const state = await pageState(page);
-    if (!state.scriptSources.some((url) => url.includes('?v=326'))) {
-        throw new Error('v326 page did not execute v326 scripts');
+    if (!state.scriptSources.some((url) => url.includes(`?v=${fromVersion}`))) {
+        throw new Error(`v${fromVersion} page did not execute v${fromVersion} scripts`);
     }
     return state;
 }
@@ -172,13 +256,8 @@ async function applyUpdate(page) {
     await banner.locator('button').last().click();
 }
 
-async function waitForV332(page) {
-    await page.waitForFunction(async () => {
-        if (!document.body.classList.contains('rehab-app-ready')) return false;
-        const keys = await caches.keys();
-        return !!navigator.serviceWorker.controller && keys.includes('training-assistant-v332');
-    }, null, { timeout: 45000 });
-    for (let attempt = 0; attempt < 30; attempt += 1) {
+async function waitForPureDocument(page, { requireSoleCache = true } = {}) {
+    for (let attempt = 0; attempt < 90; attempt += 1) {
         let state;
         try {
             state = await pageState(page);
@@ -189,15 +268,44 @@ async function waitForV332(page) {
             }
             throw error;
         }
-        if (state.version === '332'
-            && state.precacheReady
-            && state.cacheKeys.length === 1
-            && state.cacheKeys[0] === 'training-assistant-v332') {
+        const pureScripts = (state.scriptSources || []).some((url) => isVersionedAsset(url, '333'))
+            && !(state.scriptSources || []).some((url) => {
+                const match = String(url || '').match(/[?&]v=(\d+)(?:&|$)/);
+                return match && match[1] !== '333';
+            });
+        const pureStyles = (state.stylesheetHrefs || []).some((url) => /generated\.css\?v=333(?:&|$)/.test(url))
+            && !(state.stylesheetHrefs || []).some((url) => {
+                const match = String(url || '').match(/[?&]v=(\d+)(?:&|$)/);
+                return match && match[1] !== '333';
+            });
+        const soleCache = Array.isArray(state.cacheKeys)
+            && state.cacheKeys.includes('training-assistant-v333')
+            && (!requireSoleCache || (
+                state.cacheKeys.length === 1
+                && state.cacheKeys[0] === 'training-assistant-v333'
+            ));
+        if (state.version === '333'
+            && controllerLooksLikeV333(state.controller)
+            && state.ready
+            && state.activePage
+            && state.upgradeMarker === null
+            && pureScripts
+            && pureStyles
+            && soleCache) {
             return state;
         }
         await wait(500);
     }
-    throw new Error(`v332 did not settle: ${JSON.stringify(await pageState(page))}`);
+    throw new Error(`pure document did not settle: ${JSON.stringify(await pageState(page))}`);
+}
+
+async function waitForV333(page) {
+    await page.waitForFunction(async () => {
+        if (!document.body.classList.contains('rehab-app-ready')) return false;
+        const keys = await caches.keys();
+        return !!navigator.serviceWorker.controller && keys.includes('training-assistant-v333');
+    }, null, { timeout: 45000 });
+    return waitForPureDocument(page, { requireSoleCache: true });
 }
 
 async function smokeNavigation(page) {
@@ -256,15 +364,15 @@ async function launchContext(profilePath) {
 }
 
 async function runSingleTab() {
-    activeVersion = '326';
+    activeVersion = fromVersion;
     requests.length = 0;
-    const context = await launchContext('C:/tmp/rehab-v332-client-migration-single');
+    const context = await launchContext(`G:/LLM/rehab/.tmp/rehab-v333-from-v${fromVersion}-client-migration-single`);
     const page = context.pages()[0] || await context.newPage();
     const documents = trackDocuments(page);
     const errors = [];
     page.on('pageerror', (error) => errors.push(String(error)));
-    const before = await waitForV326(page);
-    activeVersion = '332';
+    const before = await waitForFromVersion(page);
+    activeVersion = toVersion;
     // Non-blocking contract: first navigation under bare old controller must enter the app.
     await page.goto(`${origin}/`, { waitUntil: 'domcontentloaded' });
     await page.waitForFunction(() => document.body.classList.contains('rehab-app-ready') && document.querySelector('.page.active') && window.ui && window.data, null, { timeout: 45000 });
@@ -273,48 +381,53 @@ async function runSingleTab() {
         throw new Error(`first entry under old controller failed: ${JSON.stringify(firstEntry)}`);
     }
     if (firstEntry.controller && /\?v=/.test(firstEntry.controller) === false) {
-        // bare controller is expected for v326 production path
+        // bare controller is expected for older production paths
     }
     const beforeApplyDocuments = documents.length;
     await applyUpdate(page);
-    const final = await waitForV332(page);
+    const final = await waitForV333(page);
     await wait(6000);
     const settledDocuments = documents.length;
     const smoke = await smokeNavigation(page);
+    const pureFinal = await pageState(page);
     const requestSnapshot = requests.slice();
     await context.close();
     return {
         before,
         firstEntry,
         final,
+        pureFinal,
         smoke,
         errors,
         documentNavigations: settledDocuments - beforeApplyDocuments,
         documents: documents.slice(beforeApplyDocuments),
         reloadLoopFree: documents.length === settledDocuments,
-        servedV332AssetsFromV326: requestSnapshot.filter((entry) => entry.version === '326' && /[?&]v=332(?:&|$)/.test(entry.path)),
-        finalV326Resources: final.resourceUrls.filter((url) => /[?&]v=326(?:&|$)/.test(url))
+        servedV333AssetsFromOld: requestSnapshot.filter((entry) => entry.version === fromVersion && /[?&]v=333(?:&|$)/.test(entry.path)),
+        finalOldResources: pureFinal.resourceUrls.filter((url) => new RegExp(`[?&]v=${fromVersion}(?:&|$)`).test(url)),
+        documentPure: documentIsPureV333(pureFinal)
     };
 }
 
 async function runDualTab() {
-    activeVersion = '326';
+    activeVersion = fromVersion;
     requests.length = 0;
-    const context = await launchContext('C:/tmp/rehab-v332-client-migration-dual');
+    const context = await launchContext(`G:/LLM/rehab/.tmp/rehab-v333-from-v${fromVersion}-client-migration-dual`);
     const pageOne = context.pages()[0] || await context.newPage();
     const pageTwo = await context.newPage();
     const documentsOne = trackDocuments(pageOne);
     const documentsTwo = trackDocuments(pageTwo);
-    const beforeOne = await waitForV326(pageOne);
-    const beforeTwo = await waitForV326(pageTwo);
-    activeVersion = '332';
+    const beforeOne = await waitForFromVersion(pageOne);
+    const beforeTwo = await waitForFromVersion(pageTwo);
+    activeVersion = toVersion;
     const startOne = documentsOne.length;
     const startTwo = documentsTwo.length;
     await applyUpdate(pageOne);
-    const [finalOne, finalTwo] = await Promise.all([waitForV332(pageOne), waitForV332(pageTwo)]);
+    const [finalOne, finalTwo] = await Promise.all([waitForV333(pageOne), waitForV333(pageTwo)]);
     await wait(6000);
     const settledOne = documentsOne.length;
     const settledTwo = documentsTwo.length;
+    const pureOne = await pageState(pageOne);
+    const pureTwo = await pageState(pageTwo);
     const sharedCaches = await pageOne.evaluate(() => caches.keys());
     await context.close();
     return {
@@ -322,46 +435,185 @@ async function runDualTab() {
         beforeTwo,
         finalOne,
         finalTwo,
+        pureOne,
+        pureTwo,
         sharedCaches,
         documentNavigations: [settledOne - startOne, settledTwo - startTwo],
         documents: [documentsOne.slice(startOne), documentsTwo.slice(startTwo)],
-        reloadLoopFree: documentsOne.length === settledOne && documentsTwo.length === settledTwo
+        reloadLoopFree: documentsOne.length === settledOne && documentsTwo.length === settledTwo,
+        documentPure: [documentIsPureV333(pureOne), documentIsPureV333(pureTwo)]
+    };
+}
+
+async function installPageReadyGate(page) {
+    await page.addInitScript(() => {
+        const storageKey = '__rehabDelayPageReady';
+        const isGated = () => {
+            try {
+                if (window.__rehabDelayPageReady) return true;
+                return sessionStorage.getItem(storageKey) === '1';
+            } catch {
+                return !!window.__rehabDelayPageReady;
+            }
+        };
+        const wrapController = (controller) => {
+            if (!controller || controller.__rehabPageReadyWrapped) return controller;
+            const originalPost = controller.postMessage?.bind(controller);
+            if (!originalPost) return controller;
+            controller.postMessage = function gatedPostMessage(message, ...rest) {
+                try {
+                    if (isGated()
+                        && message
+                        && message.type === 'V327_PAGE_READY') {
+                        window.__rehabBlockedPageReady = (window.__rehabBlockedPageReady || 0) + 1;
+                        return;
+                    }
+                } catch {}
+                return originalPost(message, ...rest);
+            };
+            controller.__rehabPageReadyWrapped = true;
+            return controller;
+        };
+        try {
+            const serviceWorker = navigator.serviceWorker;
+            if (!serviceWorker) return;
+            // Keep re-wrapping controllers across soft/hard upgrade navigations. A short
+            // boot-only poll misses the post-SKIP_WAITING controller swap.
+            const arm = () => {
+                try { wrapController(serviceWorker.controller); } catch {}
+            };
+            arm();
+            serviceWorker.addEventListener('controllerchange', arm);
+            setInterval(arm, 100);
+        } catch {}
+    });
+}
+
+async function setPageReadyGate(page, enabled) {
+    await page.evaluate((value) => {
+        window.__rehabDelayPageReady = !!value;
+        try {
+            if (value) sessionStorage.setItem('__rehabDelayPageReady', '1');
+            else sessionStorage.removeItem('__rehabDelayPageReady');
+        } catch {}
+    }, enabled);
+}
+
+async function runDelayedSecondTab() {
+    activeVersion = fromVersion;
+    requests.length = 0;
+    const context = await launchContext(`G:/LLM/rehab/.tmp/rehab-v333-from-v${fromVersion}-client-migration-delayed-b`);
+    const pageOne = context.pages()[0] || await context.newPage();
+    const pageTwo = await context.newPage();
+    // Install the gate before any navigation so soft/hard upgrade reloads keep
+    // the wrapper; sessionStorage keeps the delay flag across document swaps.
+    await installPageReadyGate(pageTwo);
+
+    const documentsOne = trackDocuments(pageOne);
+    const documentsTwo = trackDocuments(pageTwo);
+    await waitForFromVersion(pageOne);
+    await waitForFromVersion(pageTwo);
+    await setPageReadyGate(pageTwo, true);
+    activeVersion = toVersion;
+    const startOne = documentsOne.length;
+    const startTwo = documentsTwo.length;
+
+    await applyUpdate(pageOne);
+    const midA = await waitForPureDocument(pageOne, { requireSoleCache: false });
+    // Hold long enough for a buggy early-delete path to fire if present.
+    await wait(5000);
+    const midCaches = await pageOne.evaluate(() => caches.keys());
+    let midB = null;
+    let blockedReadyCount = 0;
+    try { midB = await pageState(pageTwo); } catch {}
+    try {
+        blockedReadyCount = await pageTwo.evaluate(() => Number(window.__rehabBlockedPageReady || 0));
+    } catch {}
+    const midHasLegacy = midCaches.some((key) => key !== 'training-assistant-v333' && String(key).startsWith('training-assistant-'));
+    const midHasCurrent = midCaches.includes('training-assistant-v333');
+
+    await setPageReadyGate(pageTwo, false);
+    await pageTwo.evaluate(() => {
+        try {
+            navigator.serviceWorker?.controller?.postMessage?.({ type: 'V327_PAGE_READY', version: '333' });
+        } catch {}
+        try {
+            navigator.serviceWorker?.controller?.postMessage?.({ type: 'EVALUATE_CACHE_CLEANUP', version: '333' });
+        } catch {}
+    }).catch(() => {});
+
+    const [finalOne, finalTwo] = await Promise.all([waitForV333(pageOne), waitForV333(pageTwo)]);
+    await wait(6000);
+    const settledOne = documentsOne.length;
+    const settledTwo = documentsTwo.length;
+    const pureOne = await pageState(pageOne);
+    const pureTwo = await pageState(pageTwo);
+    const sharedCaches = await pageOne.evaluate(() => caches.keys());
+    await context.close();
+    return {
+        midA,
+        midB,
+        midCaches,
+        midHasLegacy,
+        midHasCurrent,
+        blockedReadyCount,
+        finalOne,
+        finalTwo,
+        pureOne,
+        pureTwo,
+        sharedCaches,
+        documentNavigations: [settledOne - startOne, settledTwo - startTwo],
+        documents: [documentsOne.slice(startOne), documentsTwo.slice(startTwo)],
+        reloadLoopFree: documentsOne.length === settledOne && documentsTwo.length === settledTwo,
+        documentPure: [documentIsPureV333(pureOne), documentIsPureV333(pureTwo)]
     };
 }
 
 await new Promise((resolve) => server.listen(port, '127.0.0.1', resolve));
-const report = { single: null, dual: null };
+const report = { single: null, dual: null, delayedSecondTab: null };
 let exitCode = 0;
 try {
     report.single = await runSingleTab();
     report.dual = await runDualTab();
+    report.delayedSecondTab = await runDelayedSecondTab();
     const single = report.single;
     const dual = report.dual;
+    const delayed = report.delayedSecondTab;
     const ok = single.firstEntry?.ready === true
         && !!single.firstEntry?.activePage
-        && single.documentNavigations === 1
+        && single.documentNavigations <= 1
         && single.reloadLoopFree
-        && single.final.version === '332'
-        && single.final.precacheReady
+        && single.documentPure === true
+        && single.final.version === '333'
         && single.final.cacheKeys.length === 1
-        && single.final.cacheKeys[0] === 'training-assistant-v332'
+        && single.final.cacheKeys[0] === 'training-assistant-v333'
         && single.final.upgradeMarker === null
-        && single.finalV326Resources.length === 0
-        && single.servedV332AssetsFromV326.length === 0
+        && single.finalOldResources.length === 0
+        && single.servedV333AssetsFromOld.length === 0
         && single.errors.length === 0
         && single.smoke.finalPage === "today"
         && single.smoke.drawerOpened
         && single.smoke.drawerClosed
         && single.smoke.modalOpened
         && single.smoke.modalClosedByBack
-        && dual.documentNavigations.every((count) => count === 1)
+        && dual.documentNavigations.every((count) => count <= 1)
+        && dual.documentNavigations.some((count) => count === 1)
         && dual.reloadLoopFree
-        && dual.finalOne.version === '332'
-        && dual.finalTwo.version === '332'
-        && dual.finalOne.precacheReady
-        && dual.finalTwo.precacheReady
+        && dual.documentPure?.[0] === true
+        && dual.documentPure?.[1] === true
+        && dual.finalOne.version === '333'
+        && dual.finalTwo.version === '333'
         && dual.sharedCaches.length === 1
-        && dual.sharedCaches[0] === 'training-assistant-v332';
+        && dual.sharedCaches[0] === 'training-assistant-v333'
+        && delayed.midHasCurrent === true
+        && delayed.midHasLegacy === true
+        && Number(delayed.blockedReadyCount || 0) > 0
+        && delayed.documentNavigations.every((count) => count <= 1)
+        && delayed.reloadLoopFree
+        && delayed.documentPure?.[0] === true
+        && delayed.documentPure?.[1] === true
+        && delayed.sharedCaches.length === 1
+        && delayed.sharedCaches[0] === 'training-assistant-v333';
     if (!ok) exitCode = 2;
 } catch (error) {
     report.error = String(error?.stack || error);

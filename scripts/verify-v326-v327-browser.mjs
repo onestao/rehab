@@ -67,7 +67,7 @@ function wait(ms) {
 
 function cleanProfile(profilePath) {
     const resolved = path.resolve(profilePath);
-    const safeRoot = path.resolve('C:/tmp');
+    const safeRoot = path.resolve(process.env.REHAB_TMP_ROOT || 'G:/LLM/rehab/.tmp');
     if (!resolved.startsWith(safeRoot + path.sep) || !path.basename(resolved).startsWith('rehab-v327-')) {
         throw new Error(`refusing to remove unsafe profile path: ${resolved}`);
     }
@@ -258,7 +258,7 @@ async function launchContext(profilePath) {
 async function runSingleTab() {
     activeVersion = '326';
     requests.length = 0;
-    const context = await launchContext('C:/tmp/rehab-v327-client-migration-single');
+    const context = await launchContext('G:/LLM/rehab/.tmp/rehab-v327-client-migration-single');
     const page = context.pages()[0] || await context.newPage();
     const documents = trackDocuments(page);
     const errors = [];
@@ -289,7 +289,7 @@ async function runSingleTab() {
 async function runDualTab() {
     activeVersion = '326';
     requests.length = 0;
-    const context = await launchContext('C:/tmp/rehab-v327-client-migration-dual');
+    const context = await launchContext('G:/LLM/rehab/.tmp/rehab-v327-client-migration-dual');
     const pageOne = context.pages()[0] || await context.newPage();
     const pageTwo = await context.newPage();
     const documentsOne = trackDocuments(pageOne);

@@ -4,11 +4,11 @@ const appUpdate = {
     waitingWorker: null,
     checking: false,
     controllerReloadBound: false,
-    swUrl: './sw.js',
-    version: '332',
+    swUrl: './sw.js?v=333',
+    version: '333',
 
     controllerReloadKey() {
-        return 'rehab-sw-controller-reload-v332';
+        return 'rehab-sw-controller-reload-v333';
     },
 
     claimControllerReload() {
@@ -16,26 +16,78 @@ const appUpdate = {
         if (typeof window.claimServiceWorkerReload === 'function') {
             return window.claimServiceWorkerReload(key);
         }
+        // Fallback must stay per-document. Shared sessionStorage would block
+        // sibling tabs from reloading after the first tab claims.
+        const claimed = this._controllerReloadClaimed;
+        if (claimed && claimed[key]) return false;
+        this._controllerReloadClaimed = Object.assign({}, claimed || null, { [key]: true });
+        return true;
+    },
+
+    documentNeedsControllerReload() {
         try {
-            if (window.sessionStorage.getItem(key) === '1') return false;
-            window.sessionStorage.setItem(key, '1');
-            return true;
+            const controller = navigator.serviceWorker?.controller;
+            if (!controller?.scriptURL) return true;
+            const controllerVersion = new URL(controller.scriptURL, window.location.href)
+                .searchParams.get('v');
+            if (controllerVersion && controllerVersion !== this.version) return true;
+            const scripts = document.scripts ? [...document.scripts] : [];
+            const versioned = scripts
+                .map((script) => script.src)
+                .filter(Boolean)
+                .some((src) => {
+                    try {
+                        return new URL(src, window.location.href).searchParams.get('v') === this.version;
+                    } catch {
+                        return false;
+                    }
+                });
+            // Already executing this release's scripts: do not force another reload.
+            return !versioned;
         } catch {
-            return false;
+            return true;
         }
     },
 
     bindControllerReload(hadController) {
         if (!hadController || this.controllerReloadBound) return;
         this.controllerReloadBound = true;
-        navigator.serviceWorker.addEventListener('controllerchange', () => {
+        const reloadIfNeeded = (reason) => {
+            if (!this.documentNeedsControllerReload()) {
+                window.errorBus?.event?.('appUpdate', 'controllerchange:skip', {
+                    version: this.version,
+                    reason: 'document-already-current'
+                });
+                // Still acknowledge readiness so the worker can drop this client's
+                // migration marker. Legacy cache retirement stays SW-owned so a sibling
+                // tab that is still migrating keeps its offline cache.
+                try {
+                    navigator.serviceWorker?.controller?.postMessage?.({
+                        type: 'V327_PAGE_READY',
+                        version: this.version
+                    });
+                } catch {}
+                return;
+            }
             if (!this.claimControllerReload()) {
+                // Another reload already claimed for this document only.
                 this.showRefreshRequired('更新已完成，请刷新页面');
                 return;
             }
-            window.errorBus?.event?.('appUpdate', 'controllerchange', { version: this.version });
+            window.errorBus?.event?.('appUpdate', reason, { version: this.version });
             window.location.reload();
+        };
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+            reloadIfNeeded('controllerchange');
         }, { once: true });
+        // Sibling tabs that miss controllerchange (or lose the SW navigate race) still
+        // receive an explicit refresh request from the active worker.
+        navigator.serviceWorker.addEventListener('message', (event) => {
+            const data = event && event.data;
+            if (!data || data.type !== 'UPDATE_REFRESH_REQUIRED') return;
+            if (String(data.version || '') !== this.version) return;
+            reloadIfNeeded('update-refresh-required');
+        });
     },
 
     showRefreshRequired(message = '更新已完成，请刷新页面') {

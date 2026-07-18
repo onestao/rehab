@@ -1,83 +1,83 @@
 // @ts-nocheck
-const CACHE = 'training-assistant-v332';
-const CACHE_ASSET_REVISION = '90a75889468f467c7c268d17eb9946dedd226cd832c49cbbe456e31a9c230c2d';
+const CACHE = 'training-assistant-v333';
+const CACHE_ASSET_REVISION = '5c97133d2aa78f774bcc4f128a38f458e3678c4cf86aa05c1a6bba31a934d193';
 const CACHE_VERSION = CACHE.replace(/^training-assistant-v/, '');
 const ASSETS = [
     'index.html',
-    'build/generated.css?v=332',
+    'build/generated.css?v=333',
     'assets/app-icon.svg',
     'assets/material-symbols-rounded.woff2',
     'assets/screenshots/android-today.svg',
     'assets/screenshots/android-workout.svg',
-    'pwa-support.js?v=332',
+    'pwa-support.js?v=333',
     // Lazy CSS: loaded on profile or records/training entry, still precached for offline use.
-    'css-src/42-health-profile.css?v=332',
-    'theme.js?v=332',
-    'haptics.js?v=332',
-    'fooddb.js?v=332',
-    'food-ai-normalizer-pure.js?v=332',
-    'render-safe.js?v=332',
-    'nav-stack.js?v=332',
-    'app-route.js?v=332',
-    'data-utils-pure.js?v=332',
-    'action-identity.js?v=332',
-    'data-utils.js?v=332',
-    'data-records.js?v=332',
-    'data-schema.js?v=332',
-    'storage/idb.js?v=332',
-    'storage/idb-collections.js?v=332',
-    'storage/idb-advice-collections.js?v=332',
-    'storage/migrate.js?v=332',
-    'advice-virtual-list.js?v=332',
-    'data-store.js?v=332',
-    'data-ui-state.js?v=332',
-    'data-views.js?v=332',
-    'data.js?v=332',
-    'health-summary-pure.js?v=332',
-    'ai-model-catalog-pure.mjs?v=332',
-    'ai-routing-pure.mjs?v=332',
-    'ai-routing.js?v=332',
-    'ai-model-visual.js?v=332',
-    'ai-task-settings.js?v=332',
-    'ai-provider-manager.js?v=332',
-    'report-version-pure.js?v=332',
-    'plan-chains.js?v=332',
-    'plan-progression.js?v=332',
-    'rehab-policy.js?v=332',
-    'plan-store.js?v=332',
-    'plan-feedback.js?v=332',
-    'plan-cooldown.js?v=332',
-    'plan-weekly.js?v=332',
-    'plan-equipment.js?v=332',
-    'plan-ui.js?v=332',
-    'rehab-progression-pure.js?v=332',
-    'plan-store-pure.js?v=332',
-    'backup-import-pure.js?v=332',
-    'backup-ring-pure.js?v=332',
-    'backup.js?v=332',
-    'sync-ui.js?v=332',
-    'sync-adapters.js?v=332',
-    'sync.js?v=332',
-    'sync-pure.js?v=332',
-    'sync-status.js?v=332',
-    'workout-system.js?v=332',
-    'workout-wakelock.js?v=332',
-    'workout-media-session.js?v=332',
-    'workout-pip.js?v=332',
-    'workout-core.js?v=332',
-    'workout-cardio-pure.js?v=332',
-    'workout-cardio.js?v=332',
-    'workout-engine.js?v=332',
-    'workout-state.js?v=332',
-    'app-update.js?v=332',
-    'sheet-drag.js?v=332',
-    'm3e-ripple.js?v=332',
-    'toast.js?v=332',
-    'error-bus.js?v=332',
-    'i18n.js?v=332',
-    'a11y-focus-trap.js?v=332',
-    'i18n/zh-CN.json?v=332',
-    'i18n/en-US.json?v=332',
+    'css-src/42-health-profile.css?v=333',
+    'theme.js?v=333',
+    'haptics.js?v=333',
+    'fooddb.js?v=333',
+    'food-ai-normalizer-pure.js?v=333',
+    'render-safe.js?v=333',
+    'nav-stack.js?v=333',
+    'app-route.js?v=333',
+    'data-utils-pure.js?v=333',
+    'action-identity.js?v=333',
+    'data-utils.js?v=333',
+    'data-records.js?v=333',
+    'data-schema.js?v=333',
+    'storage/idb.js?v=333',
+    'storage/idb-collections.js?v=333',
+    'storage/idb-advice-collections.js?v=333',
+    'storage/migrate.js?v=333',
+    'advice-virtual-list.js?v=333',
+    'data-store.js?v=333',
+    'data-ui-state.js?v=333',
+    'data-views.js?v=333',
+    'data.js?v=333',
+    'health-summary-pure.js?v=333',
+    'ai-model-catalog-pure.mjs?v=333',
+    'ai-routing-pure.mjs?v=333',
+    'ai-routing.js?v=333',
+    'ai-model-visual.js?v=333',
+    'ai-task-settings.js?v=333',
+    'ai-provider-manager.js?v=333',
+    'report-version-pure.js?v=333',
+    'plan-chains.js?v=333',
+    'plan-progression.js?v=333',
+    'rehab-policy.js?v=333',
+    'plan-store.js?v=333',
+    'plan-feedback.js?v=333',
+    'plan-cooldown.js?v=333',
+    'plan-weekly.js?v=333',
+    'plan-equipment.js?v=333',
+    'plan-ui.js?v=333',
+    'rehab-progression-pure.js?v=333',
+    'plan-store-pure.js?v=333',
+    'backup-import-pure.js?v=333',
+    'backup-ring-pure.js?v=333',
+    'backup.js?v=333',
+    'sync-ui.js?v=333',
+    'sync-adapters.js?v=333',
+    'sync.js?v=333',
+    'sync-pure.js?v=333',
+    'sync-status.js?v=333',
+    'workout-system.js?v=333',
+    'workout-wakelock.js?v=333',
+    'workout-media-session.js?v=333',
+    'workout-pip.js?v=333',
+    'workout-core.js?v=333',
+    'workout-cardio-pure.js?v=333',
+    'workout-cardio.js?v=333',
+    'workout-engine.js?v=333',
+    'workout-state.js?v=333',
+    'app-update.js?v=333',
+    'sheet-drag.js?v=333',
+    'm3e-ripple.js?v=333',
+    'toast.js?v=333',
+    'error-bus.js?v=333',
+    'i18n.js?v=333',
+    'a11y-focus-trap.js?v=333',
+    'i18n/zh-CN.json?v=333',
+    'i18n/en-US.json?v=333',
     'manifest.json'
     , 'favicon.ico'
 ];
@@ -90,10 +90,14 @@ const RELEASE_READY_KEY = `__release_ready__?v=${CACHE_VERSION}`;
 const LEGACY_UPGRADE_NAVIGATION_PATH = '__legacy_upgrade_navigation__';
 const LEGACY_NAVIGATION_TIMEOUT_MS = 5000;
 const LEGACY_NAVIGATION_GRACE_MS = 3000;
+const LEGACY_NAVIGATION_MAX_ROUNDS = 12;
 let releasePrecachePromise = null;
 let legacyMigrationPromise = null;
 let legacyMigrationTimer = null;
+let legacyMigrationRounds = 0;
+let cleanupOldCachesPromise = null;
 const legacyNavigationAttempts = new Map();
+const pageReadyClientIds = new Set();
 
 async function isReleaseCacheReady() {
     const cache = await caches.open(CACHE);
@@ -134,6 +138,15 @@ async function queueLegacyUpgradeNavigation(source) {
     }));
 }
 
+async function queueLegacyUpgradeNavigationForAllClients() {
+    // Every open tab must migrate independently. Queuing only e.source leaves
+    // sibling tabs on the old document while the new worker/cache are already active.
+    const clientsApi = self.clients;
+    if (!clientsApi || typeof clientsApi.matchAll !== 'function') return;
+    const windows = await clientsApi.matchAll({ type: 'window', includeUncontrolled: true });
+    await Promise.all((windows || []).map((client) => queueLegacyUpgradeNavigation(client)));
+}
+
 function legacyUpgradeUrl(urlText) {
     const url = new URL(urlText);
     url.searchParams.set('__rehab_upgrade', CACHE_VERSION);
@@ -151,9 +164,46 @@ async function legacyUpgradeNavigationRequests(cache) {
 
 async function acknowledgeV327Page(source) {
     const clientId = String(source?.id || '');
+    if (clientId) pageReadyClientIds.add(clientId);
     if (!clientId) return;
     const cache = await caches.open(CACHE);
     await cache.delete(legacyUpgradeNavigationRequest(clientId));
+}
+
+async function pruneStaleLegacyUpgradeMarkers() {
+    const cache = await caches.open(CACHE);
+    const queued = await legacyUpgradeNavigationRequests(cache);
+    await Promise.all(queued.map(async (request) => {
+        const clientId = new URL(request.url).searchParams.get('client');
+        if (!clientId) {
+            await cache.delete(request);
+            return;
+        }
+        const client = await self.clients.get(clientId);
+        if (!client) {
+            await cache.delete(request);
+            return;
+        }
+        // A live client that already reported PAGE_READY for this release no longer
+        // needs a forced navigate (typical after controllerchange reload changes id).
+        if (pageReadyClientIds.has(clientId)) {
+            await cache.delete(request);
+        }
+    }));
+}
+
+async function clearAllLegacyUpgradeMarkers() {
+    const cache = await caches.open(CACHE);
+    const queued = await legacyUpgradeNavigationRequests(cache);
+    await Promise.all(queued.map((request) => cache.delete(request)));
+}
+
+async function allLiveClientsPageReady() {
+    const clientsApi = self.clients;
+    if (!clientsApi || typeof clientsApi.matchAll !== 'function') return false;
+    const windows = await clientsApi.matchAll({ type: 'window', includeUncontrolled: true });
+    if (!windows || !windows.length) return false;
+    return windows.every((client) => pageReadyClientIds.has(String(client.id || '')));
 }
 
 function notifyLegacyRefreshRequired(client) {
@@ -182,24 +232,86 @@ async function navigateLegacyUpgradeClient(cache, request) {
             return 'client-gone';
         }
 
+        // Skip clients that already paint the current release (apply-tab controllerchange
+        // reload). Keep the marker until PAGE_READY so a half-upgraded tab is retried.
+        try {
+            const currentUrl = new URL(client.url || '');
+            if (currentUrl.searchParams.get('__rehab_upgrade') === CACHE_VERSION) {
+                return 'already-upgrading';
+            }
+        } catch {}
+
+        if (pageReadyClientIds.has(clientId)) {
+            await cache.delete(request);
+            return 'already-ready';
+        }
+
+        // Prefer soft refresh. Controlled legacy pages (v326+) already reload once on
+        // controllerchange; a simultaneous client.navigate produced the dual-tab nav=2
+        // mixed-count failure. Soft-notify first, hard-navigate only if the client is
+        // still live without PAGE_READY after the grace window.
+        notifyLegacyRefreshRequired(client);
+
+        let liveUrl = '';
+        try { liveUrl = String(client.url || ''); } catch { liveUrl = ''; }
         const fallbackUrl = await response.text();
+        const candidate = liveUrl || fallbackUrl;
+        const target = legacyUpgradeUrl(candidate);
+
+        await new Promise((resolve) => setTimeout(resolve, LEGACY_NAVIGATION_GRACE_MS));
+
+        if (pageReadyClientIds.has(clientId)) {
+            await cache.delete(request);
+            return 'soft-ready';
+        }
+        const stillAfterGrace = await self.clients.get(clientId);
+        if (!stillAfterGrace || typeof stillAfterGrace.navigate !== 'function') {
+            await cache.delete(request);
+            return 'soft-gone';
+        }
+        try {
+            const stillUrl = new URL(stillAfterGrace.url || '');
+            if (stillUrl.searchParams.get('__rehab_upgrade') === CACHE_VERSION) {
+                return 'already-upgrading';
+            }
+        } catch {}
+
         let timeoutId = null;
         const navigation = Promise.resolve()
-            .then(() => client.navigate(legacyUpgradeUrl(client.url || fallbackUrl)))
-            .then(async () => {
+            .then(() => stillAfterGrace.navigate(target))
+            .then(async (navigated) => {
                 if (timeoutId !== null) clearTimeout(timeoutId);
-                await cache.delete(request);
-                return 'resolved';
+                // Keep the marker until PAGE_READY (or client disappearance). Deleting it
+                // on navigate resolve races dual-tab cache cleanup: the peer can appear
+                // "marker-free" while its replacement document is still booting.
+                if (pageReadyClientIds.has(clientId)) {
+                    await cache.delete(request);
+                    return navigated === null ? 'navigated-null-ready' : 'resolved-ready';
+                }
+                return navigated === null ? 'navigated-null' : 'resolved';
             }, (error) => {
                 if (timeoutId !== null) clearTimeout(timeoutId);
                 console.warn('[sw] legacy client navigation will retry', clientId, error && error.message);
-                notifyLegacyRefreshRequired(client);
+                notifyLegacyRefreshRequired(stillAfterGrace);
                 return 'rejected';
             });
         const timeout = new Promise((resolve) => {
             timeoutId = setTimeout(() => {
-                notifyLegacyRefreshRequired(client);
-                resolve('timeout');
+                void (async () => {
+                    const still = await self.clients.get(clientId);
+                    if (!still) {
+                        await cache.delete(request);
+                        resolve('timeout-gone');
+                        return;
+                    }
+                    if (pageReadyClientIds.has(clientId)) {
+                        await cache.delete(request);
+                        resolve('timeout-ready');
+                        return;
+                    }
+                    notifyLegacyRefreshRequired(still);
+                    resolve('timeout');
+                })();
             }, LEGACY_NAVIGATION_TIMEOUT_MS);
         });
         return Promise.race([navigation, timeout]);
@@ -228,22 +340,109 @@ function migrateLegacyUpgradeClients() {
     return legacyMigrationPromise;
 }
 
-function scheduleLegacyUpgradeMigration() {
+function scheduleLegacyUpgradeMigration(delayMs = LEGACY_NAVIGATION_GRACE_MS) {
     if (legacyMigrationTimer !== null) return;
+    if (legacyMigrationRounds >= LEGACY_NAVIGATION_MAX_ROUNDS) return;
     legacyMigrationTimer = setTimeout(() => {
         legacyMigrationTimer = null;
-        void migrateLegacyUpgradeClients()
-            .then(() => cleanupOldCachesIfLegacyMigrationComplete())
-            .catch((error) => console.warn('[sw] legacy migration failed', error && error.message));
-    }, LEGACY_NAVIGATION_GRACE_MS);
+        legacyMigrationRounds += 1;
+        void (async () => {
+            try {
+                await pruneStaleLegacyUpgradeMarkers();
+                if (await allLiveClientsPageReady()) {
+                    await clearAllLegacyUpgradeMarkers();
+                    await cleanupOldCachesIfLegacyMigrationComplete();
+                    return;
+                }
+                await migrateLegacyUpgradeClients();
+                await pruneStaleLegacyUpgradeMarkers();
+                if (await allLiveClientsPageReady()) {
+                    await clearAllLegacyUpgradeMarkers();
+                }
+                const cleaned = await cleanupOldCachesIfLegacyMigrationComplete();
+                if (cleaned) return;
+                if (legacyMigrationRounds >= LEGACY_NAVIGATION_MAX_ROUNDS) {
+                    // Stop auto-navigation after the budget. force only re-evaluates and
+                    // drops markers for clients that already disappeared — live non-ready
+                    // tabs keep their marker + legacy cache until PAGE_READY, gone, or a
+                    // later explicit evaluation (no infinite polling, no forced delete).
+                    await cleanupOldCachesIfLegacyMigrationComplete({ force: true });
+                    return;
+                }
+                scheduleLegacyUpgradeMigration(Math.max(LEGACY_NAVIGATION_TIMEOUT_MS, LEGACY_NAVIGATION_GRACE_MS));
+            } catch (error) {
+                console.warn('[sw] legacy migration failed', error && error.message);
+                if (legacyMigrationRounds < LEGACY_NAVIGATION_MAX_ROUNDS) {
+                    scheduleLegacyUpgradeMigration(Math.max(LEGACY_NAVIGATION_TIMEOUT_MS, LEGACY_NAVIGATION_GRACE_MS));
+                }
+            }
+        })();
+    }, Math.max(0, Number(delayMs) || 0));
 }
 
-async function cleanupOldCachesIfLegacyMigrationComplete() {
-    const cache = await caches.open(CACHE);
-    if ((await legacyUpgradeNavigationRequests(cache)).length) return false;
+function isLegacyTrainingCache(name) {
+    return name !== CACHE && String(name || '').startsWith('training-assistant-');
+}
+
+async function deleteLegacyTrainingCaches() {
     const keys = await caches.keys();
-    await Promise.all(keys.filter((key) => key !== CACHE).map((key) => caches.delete(key)));
-    return true;
+    await Promise.all(keys.filter((key) => isLegacyTrainingCache(key)).map((key) => caches.delete(key)));
+}
+
+async function cleanupOldCachesIfLegacyMigrationComplete(options = {}) {
+    // Single-flight: concurrent PAGE_READY / activate / schedule paths must share one
+    // evaluation so one call cannot delete while another still sees live markers.
+    //
+    // force=true is an idempotent re-evaluation: re-enumerate live clients and drop
+    // markers for clients that already disappeared (or already reported PAGE_READY).
+    // It never overrides live non-ready safety — old caches stay while any live
+    // window is mid-migration.
+    if (cleanupOldCachesPromise) return cleanupOldCachesPromise;
+    cleanupOldCachesPromise = (async () => {
+        // force is accepted for API compatibility (max-round / explicit re-eval) but
+        // intentionally unused as a safety bypass: live readiness always wins.
+        void options;
+        await pruneStaleLegacyUpgradeMarkers();
+        const cache = await caches.open(CACHE);
+        const clientsApi = self.clients;
+        const windows = (clientsApi && typeof clientsApi.matchAll === 'function')
+            ? await clientsApi.matchAll({ type: 'window', includeUncontrolled: true })
+            : [];
+        const liveIds = new Set((windows || []).map((client) => String(client.id || '')).filter(Boolean));
+        const queued = await legacyUpgradeNavigationRequests(cache);
+        let liveMarkers = 0;
+        await Promise.all(queued.map(async (request) => {
+            const clientId = new URL(request.url).searchParams.get('client');
+            // Drop markers for gone clients, ready clients, or malformed entries.
+            if (!clientId || !liveIds.has(clientId) || pageReadyClientIds.has(clientId)) {
+                await cache.delete(request);
+                return;
+            }
+            liveMarkers += 1;
+        }));
+
+        // Live non-ready migration markers are authoritative: a sibling tab still
+        // mid-migration must keep the previous training-assistant cache offline.
+        if (liveMarkers > 0) return false;
+
+        // Soft-reload races can drop the old clientId/marker before the replacement
+        // document posts PAGE_READY. While any live window is not ready for this
+        // release, retain legacy caches.
+        if (windows && windows.length) {
+            const allReady = windows.every((client) => pageReadyClientIds.has(String(client.id || '')));
+            if (!allReady) return false;
+        }
+
+        if (await allLiveClientsPageReady() || !windows || !windows.length) {
+            await clearAllLegacyUpgradeMarkers();
+        }
+        if ((await legacyUpgradeNavigationRequests(cache)).length) return false;
+        await deleteLegacyTrainingCaches();
+        return true;
+    })().finally(() => {
+        cleanupOldCachesPromise = null;
+    });
+    return cleanupOldCachesPromise;
 }
 
 self.addEventListener('install', (e) => {
@@ -259,10 +458,24 @@ self.addEventListener('install', (e) => {
 
 self.addEventListener('activate', (e) => {
     e.waitUntil((async () => {
-        // Claim first so the legacy page's existing controllerchange handler can
-        // reload immediately. Navigation is a bounded, non-blocking fallback.
+        // Claim first so pages can observe the new controller. Re-queue every
+        // window client after claim (waiting-worker matchAll can miss siblings).
+        // Only schedule navigation after requeue settles; never await navigate().
         await self.clients.claim();
-        scheduleLegacyUpgradeMigration();
+        const keys = await caches.keys();
+        const hasLegacyCaches = keys.some((key) => key !== CACHE && String(key).startsWith('training-assistant-v'));
+        const cache = await caches.open(CACHE);
+        const alreadyQueued = await legacyUpgradeNavigationRequests(cache);
+        if (hasLegacyCaches || alreadyQueued.length) {
+            try {
+                await queueLegacyUpgradeNavigationForAllClients();
+            } catch (error) {
+                console.warn('[sw] legacy requeue failed', error && error.message);
+            }
+            // Immediate pass for sibling tabs; grace pass covers apply-tab reload races.
+            scheduleLegacyUpgradeMigration(0);
+        }
+        // Cleanup only removes old caches when no markers remain; never waits on navigate.
         await cleanupOldCachesIfLegacyMigrationComplete();
     })());
 });
@@ -272,7 +485,14 @@ self.addEventListener('message', (e) => {
         e.waitUntil((async () => {
             try {
                 await precacheReleaseAssets();
-                if (e.data.source !== 'startup-barrier-v327') await queueLegacyUpgradeNavigation(e.source);
+                // script-url-normalize only promotes the versioned registration URL after the
+                // release is already active; do not re-queue legacy navigations for that path.
+                if (e.data.source !== 'startup-barrier-v327' && e.data.source !== 'script-url-normalize') {
+                    legacyMigrationRounds = 0;
+                    await queueLegacyUpgradeNavigationForAllClients();
+                    // Source may be missing from matchAll in some harnesses; keep it queued.
+                    await queueLegacyUpgradeNavigation(e.source);
+                }
                 await self.skipWaiting();
             } catch (error) {
                 e.source?.postMessage?.({
@@ -310,9 +530,24 @@ self.addEventListener('message', (e) => {
     }
     if (e.data && e.data.type === 'V327_PAGE_READY') {
         e.waitUntil((async () => {
+            // Only the current release may clear a migration marker. An old
+            // document acknowledging readiness would drop a sibling tab's
+            // pending navigate and leave a mixed worker/document state.
+            if (String(e.data.version || '') !== CACHE_VERSION) {
+                scheduleLegacyUpgradeMigration(0);
+                return;
+            }
             await acknowledgeV327Page(e.source);
+            // Ready only clears this client's marker. Old caches stay until every
+            // live client is ready (or gone) — never on the first PAGE_READY alone.
             await cleanupOldCachesIfLegacyMigrationComplete();
-            scheduleLegacyUpgradeMigration();
+            scheduleLegacyUpgradeMigration(0);
+        })());
+    }
+    if (e.data && e.data.type === 'EVALUATE_CACHE_CLEANUP') {
+        e.waitUntil((async () => {
+            if (String(e.data.version || '') !== CACHE_VERSION) return;
+            await cleanupOldCachesIfLegacyMigrationComplete();
         })());
     }
     if (e.data && e.data.type === 'VOICE_TTS_HOSTS') {
