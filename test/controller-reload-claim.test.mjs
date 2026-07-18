@@ -47,8 +47,8 @@ function createClaimHarness() {
 }
 
 function createAppUpdateHarness({
-    controllerScriptURL = 'https://example.test/sw.js?v=334',
-    scriptSources = ['https://example.test/data.js?v=334']
+    controllerScriptURL = 'https://example.test/sw.js?v=335',
+    scriptSources = ['https://example.test/data.js?v=335']
 } = {}) {
     const reloads = [];
     const documentScripts = scriptSources.map((src) => ({ src }));
@@ -98,7 +98,7 @@ function createAppUpdateHarness({
 test('claimServiceWorkerReload is per-document and does not use shared sessionStorage', () => {
     const first = createClaimHarness();
     const second = createClaimHarness();
-    const key = 'rehab-sw-controller-reload-v334';
+    const key = 'rehab-sw-controller-reload-v335';
 
     assert.equal(first.claim(key), true);
     assert.equal(first.claim(key), false, 'same document cannot claim twice');
@@ -119,13 +119,13 @@ test('appUpdate claim fallback stays per-instance, never session-wide', () => {
 
 test('documentNeedsControllerReload skips reload when scripts already match target version', () => {
     const current = createAppUpdateHarness({
-        controllerScriptURL: 'https://example.test/sw.js?v=334',
-        scriptSources: ['https://example.test/data.js?v=334']
+        controllerScriptURL: 'https://example.test/sw.js?v=335',
+        scriptSources: ['https://example.test/data.js?v=335']
     });
     assert.equal(current.needsReload(), false);
 
     const stale = createAppUpdateHarness({
-        controllerScriptURL: 'https://example.test/sw.js?v=334',
+        controllerScriptURL: 'https://example.test/sw.js?v=335',
         scriptSources: ['https://example.test/data.js?v=328']
     });
     assert.equal(stale.needsReload(), true);

@@ -22,7 +22,7 @@ const REVIEWED_HTML_SINK_FILES = new Map([
   ['plan-cooldown.js', { sinks: 1, review: 'cooldown panel markup is generated from structured local plan state.' }],
   ['plan-equipment.js', { sinks: 2, review: 'equipment cards are generated from structured action metadata.' }],
   ['plan-feedback.js', { sinks: 1, review: 'feedback panel markup is generated from controlled status text.' }],
-  ['plan-ui.js', { sinks: 4, review: 'plan UI sections compose reviewed plan renderers.' }],
+  ['plan-ui.js', { sinks: 5, review: 'plan UI sections compose reviewed plan renderers; enhanceTodayPage only fills deferred timeline/AI skeleton slots from reviewed renderers.' }],
   ['plan-weekly.js', { sinks: 3, review: 'weekly plan panel markup is generated from structured plan state.' }],
   ['pwa-support.js', { sinks: 2, review: 'install/update banners use static controlled markup.' }],
   ['report-panel.js', { sinks: 4, review: 'report renderers escape report, version, model, and task fields before insertion.' }],

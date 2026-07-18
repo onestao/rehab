@@ -17,14 +17,14 @@ test('today shell seeds static skeleton and keeps fixed quick action order', () 
     assert.doesNotMatch(source, /shimmer|skeleton-shimmer|setInterval\(/);
 });
 
-test('history, today-view-core and plan-ui quick actions share weight-diet-cardio-ai order', () => {
+test('history and today-view-core quick actions share weight-diet-cardio-ai order', () => {
     const history = read('history-view.js');
     const core = read('today-view-core.js');
-    const plan = read('plan-ui.js');
     const historyDock = history.slice(history.indexOf('renderRecordQuickActions'), history.indexOf('renderTodayTimeline'));
     const coreDock = core.slice(core.indexOf('renderTodayActionDock'), core.indexOf('updateTodayV6Greet'));
-    const planDock = plan.slice(plan.indexOf('renderTodayActionDock'), plan.indexOf('renderTodayAiReminder'));
-    for (const chunk of [historyDock, coreDock, planDock]) {
+    // plan-ui must not re-own the first-paint dock (sole owner is today-view-core)
+    assert.doesNotMatch(read('plan-ui.js'), /^\s*renderTodayActionDock\s*\(/m);
+    for (const chunk of [historyDock, coreDock]) {
         const weight = chunk.indexOf('记体重');
         const diet = chunk.indexOf('记饮食');
         const cardio = chunk.indexOf('记运动');

@@ -1,6 +1,6 @@
 // @ts-nocheck
 (function () {
-    if (window.dataPlanUi?.renderPlanTodaySection) return;
+    if (window.dataPlanUi?.enhanceTodayPage && window.dataPlanUi?.renderTodayAiReminder) return;
 
     function navButton(pageId) {
         return Array.from(document.querySelectorAll('.nav-item')).find((btn) => (btn.getAttribute('onclick') || '').includes(`'${pageId}'`));
@@ -77,96 +77,34 @@
     }
 
     window.dataPlanUi = Object.assign(window.dataPlanUi || {}, {
+        // First-paint V6 renderers live only on dataTodayViewCore. plan-ui must not
+        // re-own them on refreshModules (Object.assign last-wins would flip ownership).
         renderTodayPage(){this._ths=ths(this);try{return window.dataViews.renderTodayPage.call(this)}finally{this._ths=null}},
 
-        renderPlanTodaySection(summary) {
-            const plans = this.getTodayDailyPlans?.() || [];
-            if (!plans.length) this.ensureTodayPlan?.();
-            const todayPlans = this.getTodayDailyPlans?.() || [];
-            const aggregate = this.aggregateCompletionRate?.(todayPlans) || { done: 0, total: 0, rate: 0 };
-            const selected = todayPlans.find((item) => item.id === this.selectedPlanId) || todayPlans[0] || null;
-            if (selected) this.selectedPlanId = selected.id;
-            const plan = selected;
-            const percent = Math.round((aggregate.rate || 0) * 100);
-            const today = this.logicalDateKey?.() || this.dateKey(new Date());
-            summary=ths(this,summary);
-            const weight = summary.weight || this.activeRecords?.(this.db.health?.weights || []).find((item) => item.date === today) || this.sortedWeights?.().slice(-1)[0] || null;
-            const exerciseCal = Math.round(this.todayTrainingCalories?.() || summary.exerciseCal || 0);
-            const intake=n0(summary.intake),goalCal=n0(summary.goals?.cal||this.db.health?.dietGoal?.dailyCal),remaining=goalCal?goalCal-intake:0;
-            const heroTitle = goalCal ? `距目标还差 ${remaining} 千卡` : (weight ? `体重 ${Number(weight.weight || 0).toFixed(2)} kg` : '开始今日训练');
-            const streakDays = this.computeStreakDays?.() || 0;
-            const prefs = this.ensurePlanPrefs?.() || {};
-            const weeklySummary = window.planWeekly?.summary?.() || { done: 0, total: 0 };
-            return `<div class="hero"><span class="hero-motion-aura" aria-hidden="true"></span><div class="hero-head"><div><div class="hero-label">今日概览</div><div class="hero-title">${this.escapeHtml(heroTitle)}</div></div><div style="display:flex;align-items:center;gap:6px">
-                        ${streakDays > 0 ? `<span class="streak-chip"><span class="material-symbols-rounded">local_fire_department</span>连续 ${streakDays} 天</span>` : ''}
-                        ${prefs.showWeeklyDock === false ? '' : `<button class="md-icon-btn-bar today-weekly-plan-btn" type="button" onclick="window.planWeekly?.open?.()" aria-label="近期计划" title="3-7天 · ${weeklySummary.done}/${weeklySummary.total || 0} 完成"><span class="material-symbols-rounded">calendar_month</span></button>`}
-                        <button class="md-icon-btn-bar" type="button" onclick="data.openPlanTodayAiSheet?.()" aria-label="AI"><span class="material-symbols-rounded">auto_awesome</span></button></div></div><div class="rings">
-                    ${this.renderPlanIntakeRing?.(summary) || ''}
-                    <span class="ring-divider"></span><button class="ring ring-train ${plan ? planStatusClass(plan.type) : 'is-empty'}" style="--plan-progress:${percent * 3.6}deg" type="button" onclick="${plan ? `data.openPlanTaskDrawer('${plan.id}')` : 'data.openNewPlanSheet()'}"><span class="ring-motion-aura" aria-hidden="true"></span><div><b>${aggregate.total ? `${aggregate.done}/${aggregate.total}` : '+'}</b><small>训练</small><em>${percent}% · ${exerciseCal} 分钟</em></div></button></div>
-                ${todayPlans.length > 1 ? `<div class="plan-type-tabs">${todayPlans.map((item) => {
-                    const meta = this.planTypeMeta?.(item.type, item.title) || { label: item.title || '计划', icon: 'event_note' };
-                    return `<button class="plan-type-tab ${item.id === plan.id ? 'active' : ''} ${planStatusClass(item.type)}" type="button" onclick="window.dataPlanUi.selectTodayPlan.call(data, '${item.id}')"><span class="material-symbols-rounded">${meta.icon}</span>${this.escapeHtml(item.title || meta.label)}</button>`;
-                }).join('')}</div>` : ''}
-            </div>`;
-        },
-
-        renderTodayV6PlanCard() {
-            const todayPlans = this.getTodayDailyPlans?.() || [];
-            const selected = todayPlans.find((item) => item.id === this.selectedPlanId) || todayPlans[0] || null;
-            if (!selected) {
-                return `<div class="sect-head"><span class="t">当前训练计划</span><button class="a" onclick="data.openNewPlanSheet()" type="button">新建计划</button></div><div class="glass-card plan-card"><div class="plan-head"><div><div class="pt">待安排</div><div class="pn">今天还没有训练计划</div></div><div class="plan-chip"><span class="material-symbols-rounded">event_note</span>0/0</div></div><div class="plan-meta"><span>先创建计划，或让 AI 根据当前目标安排今天的训练。</span></div><div class="plan-actions"><button class="md-btn md-btn-filled" type="button" onclick="data.openNewPlanSheet()"><span class="material-symbols-rounded">playlist_add</span>新建计划</button><button class="md-btn md-btn-tonal" type="button" onclick="data.openPlanTodayAiSheet?.()"><span class="material-symbols-rounded">auto_awesome</span>AI 生成</button></div></div>`;
+        // Local enhancement only: fill deferred AI/timeline slots + bind interactions.
+        // Never rewrite ready hero/plan/diet/dock, never create plans.
+        enhanceTodayPage() {
+            const ctx = this;
+            const timeline = document.getElementById('todayTimeline');
+            const aiCard = document.getElementById('todayAiCard');
+            const fillIfNeeded = (el, html) => {
+                if (!el) return;
+                const next = String(html || '');
+                if (!next) return;
+                const shell = el.dataset?.todayShell;
+                // Ready slots already painted by core; only fill skeleton/placeholder deferred sinks.
+                if (shell === 'ready' && el.firstChild && !el.querySelector?.('.today-shell-skeleton, .is-placeholder')) return;
+                el.innerHTML = next;
+                if (el.dataset) el.dataset.todayShell = 'ready';
+            };
+            fillIfNeeded(timeline, ctx.renderTodayTimeline?.() || '');
+            if (aiCard) {
+                let aiHtml = ctx.renderTodayAiReminder?.() || ctx.renderContextAiCard?.('today') || '';
+                if (ctx.renderWeeklyAiInsightCard) aiHtml += ctx.renderWeeklyAiInsightCard();
+                fillIfNeeded(aiCard, aiHtml);
             }
-            const plan = selected;
-            const planMeta = this.planTypeMeta?.(plan.type || 'rehab', plan.title) || { label: '训练计划', icon: 'event_note' };
-            const completion = this.completionRate?.(plan) || { done: 0, total: 0, rate: 0 };
-            const items = (plan.items || []).filter((item) => !item.deleted).sort((a, b) => taskSort(a) - taskSort(b));
-            const current = items.find((item) => item.status === 'in-progress') || items.find((item) => item.status === 'todo') || null;
-            const pending = items.filter((item) => item.status === 'todo' || item.status === 'in-progress').length;
-            const totalItems = items.length || 1;
-            return `<div class="sect-head"><span class="t">当前训练计划</span><button class="a" onclick="data.openPlanTaskDrawer('${plan.id}')" type="button">查看全部</button></div><div class="glass-card plan-card"><div class="plan-head"><div><div class="pt">进行中 · ${this.escapeHtml(planMeta.label)}</div><div class="pn">${this.escapeHtml(plan.title || planMeta.label)}</div></div><div class="plan-chip"><span class="material-symbols-rounded">play_circle</span>${completion.done}/${completion.total}</div></div><div class="seg-bar">${items.map((item) => {
-                    const cls = item.status === 'done' ? 'done' : (current && item.id === current.id ? 'cur' : '');
-                    return `<span class="seg ${cls}" style="width:${100/totalItems}%"></span>`;
-                }).join('')}</div>
-                ${current ? `<div class="plan-meta"><span>${taskSpecText(current)}${current.currentLevel ? ` · Lv${current.currentLevel}` : ''}</span>${pending ? `<span>${pending} 项待完成</span>` : ''}</div>` : ''}
-                <div class="plan-actions">
-                    ${current ? `<button class="md-btn md-btn-filled" type="button" onclick="data.handlePlanTaskTap('${plan.id}','${current.id}')"><span class="material-symbols-rounded">play_arrow</span>继续训练</button>` : `<button class="md-btn md-btn-tonal" type="button" onclick="data.openPlanTaskDrawer('${plan.id}')"><span class="material-symbols-rounded">checklist</span>查看完成</button>`}
-                    <button class="md-btn md-btn-tonal" type="button" onclick="data.openPlanTaskDrawer('${plan.id}')">查看动作</button></div></div>`;
-        },
-
-        renderTodayV6DietCard(summary){
-            summary=ths(this,summary);const m=summary.macros||{},g=summary.goals||{};
-            const intake=n0(summary.intake),pro=n0(m.pro),carb=n0(m.carb),fat=n0(m.fat);
-            const goalCal=n0(g.cal||this.db.health?.dietGoal?.dailyCal),remaining=goalCal?goalCal-intake:0;
-            const p=(v,t)=>t?Math.min(100,Math.round(v/t*100)):0,proPct=p(pro,n0(g.pro)),carbPct=p(carb,n0(g.carb)),fatPct=p(fat,n0(g.fat));
-            return `<div class="sect-head"><span class="t">饮食摄入</span><button class="a" onclick="data.openDietModal()" type="button">添加记录 ›</button></div><div class="glass-card"><div class="calorie-head"><div><span class="num">${goalCal ? remaining : '--'}</span><span class="unit">${goalCal ? 'kcal 剩余' : ''}</span></div>
-                    ${goalCal ? `<div class="right"><div class="lab">已摄入 / 目标</div><div class="val">${intake} / ${goalCal}</div></div>` : ''}
-                </div>
-                ${goalCal ? `<div class="stack-bar"><i class="b1" style="width:${carbPct}%"></i><i class="b2" style="width:${proPct}%"></i><i class="b3" style="width:${fatPct}%"></i></div><div class="macros"><span class="macro c"><small>碳水</small><b>${carb.toFixed(0)}g</b></span><span class="macro p"><small>蛋白</small><b>${pro.toFixed(0)}g</b></span><span class="macro f"><small>脂肪</small><b>${fat.toFixed(0)}g</b></span><span class="macro r"><small>余</small><b>${remaining}</b></span></div>` : ''}
-            </div>`;
-        },
-
-        updateTodayV6Greet() {
-            const greetLine = document.querySelector('.today-v6-greet-line');
-            const greetSub = document.querySelector('.today-v6-greet-sub');
-            if (!greetLine) return;
-            const hour = new Date().getHours();
-            const greet = hour < 6 ? '凌晨好' : hour < 12 ? '早上好' : hour < 18 ? '下午好' : '晚上好';
-            const name = this.db.profile?.name || '';
-            greetLine.textContent = name ? `${greet}，${name}` : greet;
-            if (greetSub) {
-                const now = new Date();
-                const weekdays = ['周日','周一','周二','周三','周四','周五','周六'];
-                greetSub.textContent = `${now.getMonth()+1}月${now.getDate()}日 · ${weekdays[now.getDay()]}`;
-            }
-        },
-
-        renderPlanIntakeRing(summary){
-            summary=ths(this,summary);const m=summary.macros||{},g=summary.goals||{};
-            const intake=n0(summary.intake),goalCal=n0(g.cal||this.db.health?.dietGoal?.dailyCal);
-            const displayPercent=goalCal?Math.max(0,Math.round(intake/goalCal*100)):0,ringProgress=Math.min(100,displayPercent);
-            const st=(v,t,b)=>b+Math.min(120,this.ratio(n0(v),n0(t))*1.2),macroStops={pro:st(m.pro,g.pro,0),carb:st(m.carb,g.carb,120),fat:st(m.fat,g.fat,240)};
-            if (!goalCal) return '<div class="ring ring-diet"><span class="ring-motion-aura" aria-hidden="true"></span><div><b>--</b><small>饮食</small></div></div>';
-            return `<div class="ring ring-diet" style="--progress:${ringProgress};--pro-stop:${macroStops.pro}deg;--carb-stop:${macroStops.carb}deg;--fat-stop:${macroStops.fat}deg"><span class="ring-motion-aura" aria-hidden="true"></span><div><b>${displayPercent}%</b><small>饮食</small><em>${intake}/${goalCal}</em></div></div>`;
+            ctx.bindPlanQuickRepeat?.();
+            ctx.updateTodayV6Greet?.();
         },
 
         selectTodayPlan(planId) {
@@ -245,10 +183,6 @@
             this.save?.({ render: false });
             this._closeActiveModal();
             this.renderTodayPage?.();
-        },
-
-        renderTodayActionDock() {
-            return `<div class="quick-dock"><button class="record-quick-btn" type="button" data-q="weight" onclick="data.openWeightModal()"><span class="material-symbols-rounded">monitor_weight</span><span>记体重</span></button><button class="record-quick-btn" type="button" data-q="diet" onclick="data.openDietModal()"><span class="material-symbols-rounded">restaurant</span><span>记饮食</span></button><button class="record-quick-btn" type="button" data-q="cardio" onclick="data.openExerciseModal()"><span class="material-symbols-rounded">fitness_center</span><span>记运动</span></button><button class="record-quick-btn record-quick-btn-ai context-ai-btn" type="button" data-q="ai" data-ai-ctx="today" data-ai-idx="0"><span class="material-symbols-rounded">psychology</span><span>问 AI</span></button></div>`;
         },
 
         renderTodayAiReminder() {

@@ -5,6 +5,7 @@ import vm from 'node:vm';
 
 function loadPlanUi() {
   const policyCode = readFileSync(new URL('../rehab-policy.js', import.meta.url), 'utf8');
+  const coreCode = readFileSync(new URL('../today-view-core.js', import.meta.url), 'utf8');
   const code = readFileSync(new URL('../plan-ui.js', import.meta.url), 'utf8');
   const sandbox = {
     window: {},
@@ -15,8 +16,13 @@ function loadPlanUi() {
   sandbox.window.workout = { isPlaying: false, setMode() {}, toggle() {} };
   sandbox.ui = { async tab() {} };
   vm.runInNewContext(policyCode, sandbox);
+  vm.runInNewContext(coreCode, sandbox);
   vm.runInNewContext(code, sandbox);
-  return sandbox.window.dataPlanUi;
+  return Object.assign(
+    {},
+    sandbox.window.dataTodayViewCore || {},
+    sandbox.window.dataPlanUi || {}
+  );
 }
 
 function createContext(api, plans) {

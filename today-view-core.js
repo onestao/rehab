@@ -253,12 +253,10 @@
             }
         },
 
+        // Fallback only: without plan-ui there is nothing deferred to enhance.
+        // plan-ui replaces this with a local AI/timeline enhance after it loads.
         enhanceTodayPage() {
-            if (typeof this.renderTodayPage === 'function') {
-                this.renderTodayPage();
-                return;
-            }
-            window.dataViews?.renderTodayPage?.call(this);
+            this.updateTodayV6Greet?.();
         }
     };
 })();

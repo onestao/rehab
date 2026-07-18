@@ -63,6 +63,7 @@ interface Window {
   healthSummaryPure: any;
   dataWeeklySummary: any;
   dataViews: any;
+  dataTodayViewCore: any;
   dataAiTemplates: any;
   adviceTemplateManager: any;
   adviceAttachments: any;

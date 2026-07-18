@@ -135,7 +135,14 @@ function loadPlanUiRuntime() {
     vm.runInContext(readFileSync(new URL('../health-summary-pure.js', import.meta.url), 'utf8'), context);
     vm.runInContext(readFileSync(new URL('../data-views.js', import.meta.url), 'utf8'), context);
     vm.runInContext(readFileSync(new URL('../rehab-policy.js', import.meta.url), 'utf8'), context);
+    vm.runInContext(readFileSync(new URL('../today-view-core.js', import.meta.url), 'utf8'), context);
     vm.runInContext(readFileSync(new URL('../plan-ui.js', import.meta.url), 'utf8'), context);
+    // Mirror production merge: core first-paint methods + plan-ui interactions.
+    context.window.dataPlanUi = Object.assign(
+      {},
+      context.window.dataTodayViewCore || {},
+      context.window.dataPlanUi || {}
+    );
     return { window: context.window, context };
 }
 

@@ -5,6 +5,7 @@ import vm from 'node:vm';
 
 function loadPlanUi() {
   const policyCode = readFileSync(new URL('../rehab-policy.js', import.meta.url), 'utf8');
+  const coreCode = readFileSync(new URL('../today-view-core.js', import.meta.url), 'utf8');
   const code = readFileSync(new URL('../plan-ui.js', import.meta.url), 'utf8');
   const tabCalls = /** @type {{ page: string, nav: unknown }[]} */ ([]);
   const sandbox = {
@@ -32,11 +33,18 @@ function loadPlanUi() {
     }
   };
   vm.runInNewContext(policyCode, sandbox);
+  // First-paint V6 renderers live on dataTodayViewCore; plan-ui only owns interactions.
+  vm.runInNewContext(coreCode, sandbox);
   vm.runInNewContext(code, sandbox);
-  sandbox.window.dataPlanUi.__testDocument = sandbox.document;
-  sandbox.window.dataPlanUi.__testWindow = sandbox.window;
-  sandbox.window.dataPlanUi.__testTabCalls = sandbox.__tabCalls;
-  return sandbox.window.dataPlanUi;
+  const api = Object.assign(
+    {},
+    sandbox.window.dataTodayViewCore || {},
+    sandbox.window.dataPlanUi || {}
+  );
+  api.__testDocument = sandbox.document;
+  api.__testWindow = sandbox.window;
+  api.__testTabCalls = sandbox.__tabCalls;
+  return api;
 }
 
 function createContext(api, plans) {
@@ -148,7 +156,7 @@ test('today AI types use selected plan first and include other daily plan types'
   assert.deepEqual(Array.from(api.todayPlanAiTypes.call(ctx)), ['bulk', 'rehab', 'cut']);
 });
 
-test('multiple-plan tabs call the loaded plan UI module directly', () => {
+test('multiple-plan tabs call selectTodayPlan on the data bag', () => {
   const api = loadPlanUi();
   const plans = [
     { id: 'rehab', type: 'rehab', title: '康复计划', items: [] },
@@ -156,8 +164,10 @@ test('multiple-plan tabs call the loaded plan UI module directly', () => {
   ];
   const html = api.renderPlanTodaySection.call(createContext(api, plans));
 
-  assert.match(html, /window\.dataPlanUi\.selectTodayPlan\.call\(data,/);
-  assert.doesNotMatch(html, /onclick="data\.selectTodayPlan\(/);
+  // Core first-paint HTML routes through data.selectTodayPlan; plan-ui provides the method after merge.
+  assert.match(html, /data\.selectTodayPlan\?\.\(['"]rehab['"]\)/);
+  assert.match(html, /data\.selectTodayPlan\?\.\(['"]bulk['"]\)/);
+  assert.doesNotMatch(html, /window\.dataPlanUi\.selectTodayPlan/);
 });
 
 test('today plan card renders an actionable state when no plan exists', () => {
