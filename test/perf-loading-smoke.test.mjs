@@ -101,3 +101,16 @@ test('history-view still preloads health-summary-pure for lightweight today diet
     assert.doesNotMatch(todayDepsLiteral, /'health-diet'|'food-log'/);
     assert.doesNotMatch(historyPrereq, /'health-diet'|'food-log'/);
 });
+
+test('food-log always loads fooddb first so manual diet search cannot hit ReferenceError', () => {
+    const html = readRootFile('index.html');
+    const data = readRootFile('data.js');
+    const foodLog = readRootFile('food-log.js');
+    const foodLogPrereq = html.match(/'food-log':\s*\[([^\]]*)\]/)?.[1] || '';
+
+    assert.match(foodLog, /\bfooddb\.(searchAll|getAll)\b/);
+    assert.match(foodLogPrereq, /'food-ai-normalizer-pure'/);
+    assert.match(foodLogPrereq, /'fooddb'/);
+    assert.match(data, /openDietModal:\s*\{[\s\S]*?scripts:\s*\[[^\]]*'fooddb'[^\]]*\]/);
+    assert.doesNotMatch(foodLog, /window\.fooddb/);
+});

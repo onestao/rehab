@@ -156,6 +156,169 @@ test('loadScript is single-flight while a module is pending', async () => {
     await Promise.all([first, second]);
 });
 
+function extractScriptPrerequisites() {
+    const match = html.match(/const SCRIPT_PREREQUISITES = \{[\s\S]*?\n {8}\};/);
+    assert.ok(match, 'SCRIPT_PREREQUISITES should exist in index.html');
+    return match[0];
+}
+
+function createLoaderHarnessWithRealPrerequisites() {
+    const appended = [];
+    const timers = new Map();
+    let nextTimerId = 1;
+    const window = {
+        setTimeout(callback, delay) {
+            const id = nextTimerId++;
+            timers.set(id, { callback, delay, cleared: false });
+            return id;
+        },
+        clearTimeout(id) {
+            const timer = timers.get(id);
+            if (timer) timer.cleared = true;
+        }
+    };
+    const document = {
+        createElement(tag) {
+            assert.equal(tag, 'script');
+            return {
+                dataset: {},
+                onload: null,
+                onerror: null,
+                removed: false,
+                remove() { this.removed = true; }
+            };
+        },
+        head: {
+            appendChild(node) { appended.push(node); }
+        }
+    };
+    const context = {
+        window,
+        document,
+        URLSearchParams,
+        console
+    };
+    context.globalThis = context;
+    vm.createContext(context);
+
+    const runWhenIdle = extractBetween(html, 'function runWhenIdle', 'function scriptLoadTimeoutMs');
+    const scriptLoadTimeoutMs = extractBetween(html, 'function scriptLoadTimeoutMs', 'function schedulePostRenderUtilityLoad');
+    const loadScript = extractBetween(html, 'function loadScript', 'window.loadAppScript = loadScript;');
+    const prerequisites = extractScriptPrerequisites();
+    vm.runInContext(`
+        const SCRIPT_LOAD_TIMEOUT_MS = 12000;
+        const _loaded = new Set();
+        const _loadingPromises = new Map();
+        const MODULE_SCRIPTS = new Set();
+        const MJS_SCRIPTS = new Set();
+        ${prerequisites}
+        ${runWhenIdle}
+        ${scriptLoadTimeoutMs}
+        ${loadScript}
+        window.__loaderTest = { loadScript, runWhenIdle, _loaded, _loadingPromises, SCRIPT_PREREQUISITES };
+    `, context);
+
+    return {
+        window,
+        appended,
+        timers,
+        api: window.__loaderTest,
+        srcNames() {
+            return appended.map(node => String(node.src || '').split('?')[0]);
+        },
+        nodesFor(name) {
+            const file = `${name}.js`;
+            return appended.filter(node => String(node.src || '').split('?')[0] === file);
+        },
+        complete(name) {
+            const nodes = this.nodesFor(name);
+            assert.ok(nodes.length, `${name} should have been requested`);
+            nodes.forEach(node => node.onload?.());
+        },
+        fail(name) {
+            const nodes = this.nodesFor(name);
+            assert.ok(nodes.length, `${name} should have been requested`);
+            nodes.forEach(node => node.onerror?.());
+        }
+    };
+}
+
+test('food-log waits for fooddb and food-ai-normalizer-pure before executing', async () => {
+    const harness = createLoaderHarnessWithRealPrerequisites();
+    const load = harness.api.loadScript('food-log');
+    await flushMicrotasks();
+
+    assert.deepEqual(new Set(harness.srcNames()), new Set([
+        'food-ai-normalizer-pure.js',
+        'fooddb.js'
+    ]));
+    assert.equal(harness.nodesFor('food-log').length, 0);
+
+    harness.complete('food-ai-normalizer-pure');
+    await flushMicrotasks();
+    assert.equal(harness.nodesFor('food-log').length, 0);
+
+    harness.complete('fooddb');
+    await flushMicrotasks();
+    assert.equal(harness.nodesFor('food-log').length, 1);
+
+    harness.complete('food-log');
+    await load;
+    assert.equal(harness.api._loaded.has('food-log'), true);
+    assert.equal(harness.api._loaded.has('fooddb'), true);
+});
+
+test('food-log concurrent loads request fooddb only once', async () => {
+    const harness = createLoaderHarnessWithRealPrerequisites();
+    const first = harness.api.loadScript('food-log');
+    const second = harness.api.loadScript('food-log');
+    assert.equal(second, first);
+    await flushMicrotasks();
+
+    assert.equal(harness.nodesFor('fooddb').length, 1);
+    assert.equal(harness.nodesFor('food-ai-normalizer-pure').length, 1);
+    assert.equal(harness.nodesFor('food-log').length, 0);
+
+    harness.complete('fooddb');
+    harness.complete('food-ai-normalizer-pure');
+    await flushMicrotasks();
+    assert.equal(harness.nodesFor('food-log').length, 1);
+
+    harness.complete('food-log');
+    await Promise.all([first, second]);
+    assert.equal(harness.nodesFor('fooddb').length, 1);
+    assert.equal(harness.nodesFor('food-log').length, 1);
+});
+
+test('fooddb failure keeps food-log unloadable and retryable', async () => {
+    const harness = createLoaderHarnessWithRealPrerequisites();
+    const first = harness.api.loadScript('food-log');
+    await flushMicrotasks();
+    harness.complete('food-ai-normalizer-pure');
+    harness.fail('fooddb');
+    await assert.rejects(first, /Failed to load script: fooddb/);
+    await flushMicrotasks();
+
+    assert.equal(harness.nodesFor('food-log').length, 0);
+    assert.equal(harness.api._loaded.has('food-log'), false);
+    assert.equal(harness.api._loaded.has('fooddb'), false);
+    assert.equal(harness.api._loadingPromises.has('food-log'), false);
+    assert.equal(harness.api._loadingPromises.has('fooddb'), false);
+
+    const retry = harness.api.loadScript('food-log');
+    assert.notEqual(retry, first);
+    await flushMicrotasks();
+    assert.equal(harness.nodesFor('fooddb').length, 2);
+    assert.equal(harness.nodesFor('food-log').length, 0);
+
+    harness.complete('fooddb');
+    await flushMicrotasks();
+    assert.equal(harness.nodesFor('food-log').length, 1);
+    harness.complete('food-log');
+    await retry;
+    assert.equal(harness.api._loaded.has('food-log'), true);
+});
+
 test('runWhenIdle without requestIdleCallback yields once through a zero-delay timer', () => {
     const harness = createLoaderHarness();
     /** @type {any} */

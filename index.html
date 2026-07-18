@@ -34,7 +34,7 @@
         (function installNonBlockingStartup() {
             'use strict';
 
-            const releaseVersion = '333';
+            const releaseVersion = '334';
             let applicationLaunchStarted = false;
 
             function acknowledgeReleasePage() {
@@ -392,7 +392,7 @@
         })();
         /* APP_STARTUP_NON_BLOCKING_BOOT_END */
     </script>
-    <link data-rehab-stylesheet="primary" data-href="build/generated.css?v=333">
+    <link data-rehab-stylesheet="primary" data-href="build/generated.css?v=334">
 </head>
 <body>
     <div id="appUpdateBanner" class="app-update-banner hidden">
@@ -768,26 +768,26 @@
     </nav>
     </div>
 
-    <script data-rehab-entry data-kind="classic" data-src="m3e-ripple.js?v=333"></script>
-    <script data-rehab-entry data-kind="classic" data-src="toast.js?v=333"></script>
-    <script data-rehab-entry data-kind="classic" data-src="error-bus.js?v=333"></script>
-    <script data-rehab-entry data-kind="classic" data-src="i18n.js?v=333"></script>
-    <script data-rehab-entry data-kind="classic" data-src="theme.js?v=333"></script>
-    <script data-rehab-entry data-kind="classic" data-src="render-safe.js?v=333"></script>
-    <script data-rehab-entry data-kind="classic" data-src="nav-stack.js?v=333"></script>
-    <script data-rehab-entry data-kind="classic" data-src="app-route.js?v=333"></script>
-    <script data-rehab-entry data-kind="module" data-src="data-utils-pure.js?v=333"></script>
-    <script data-rehab-entry data-kind="module" data-src="action-identity.js?v=333"></script>
-    <script data-rehab-entry data-kind="classic" data-src="data-utils.js?v=333"></script>
-    <script data-rehab-entry data-kind="classic" data-src="storage/idb.js?v=333"></script>
-    <script data-rehab-entry data-kind="classic" data-src="storage/migrate.js?v=333"></script>
-    <script data-rehab-entry data-kind="classic" data-src="data-records.js?v=333"></script>
-    <script data-rehab-entry data-kind="classic" data-src="data-schema.js?v=333"></script>
-    <script data-rehab-entry data-kind="classic" data-src="data-store.js?v=333"></script>
-    <script data-rehab-entry data-kind="classic" data-src="data-ui-state.js?v=333"></script>
-    <script data-rehab-entry data-kind="classic" data-src="data-views.js?v=333"></script>
-    <script data-rehab-entry data-kind="classic" data-src="data.js?v=333"></script>
-    <script data-rehab-entry data-kind="classic" data-src="sync-status.js?v=333"></script>
+    <script data-rehab-entry data-kind="classic" data-src="m3e-ripple.js?v=334"></script>
+    <script data-rehab-entry data-kind="classic" data-src="toast.js?v=334"></script>
+    <script data-rehab-entry data-kind="classic" data-src="error-bus.js?v=334"></script>
+    <script data-rehab-entry data-kind="classic" data-src="i18n.js?v=334"></script>
+    <script data-rehab-entry data-kind="classic" data-src="theme.js?v=334"></script>
+    <script data-rehab-entry data-kind="classic" data-src="render-safe.js?v=334"></script>
+    <script data-rehab-entry data-kind="classic" data-src="nav-stack.js?v=334"></script>
+    <script data-rehab-entry data-kind="classic" data-src="app-route.js?v=334"></script>
+    <script data-rehab-entry data-kind="module" data-src="data-utils-pure.js?v=334"></script>
+    <script data-rehab-entry data-kind="module" data-src="action-identity.js?v=334"></script>
+    <script data-rehab-entry data-kind="classic" data-src="data-utils.js?v=334"></script>
+    <script data-rehab-entry data-kind="classic" data-src="storage/idb.js?v=334"></script>
+    <script data-rehab-entry data-kind="classic" data-src="storage/migrate.js?v=334"></script>
+    <script data-rehab-entry data-kind="classic" data-src="data-records.js?v=334"></script>
+    <script data-rehab-entry data-kind="classic" data-src="data-schema.js?v=334"></script>
+    <script data-rehab-entry data-kind="classic" data-src="data-store.js?v=334"></script>
+    <script data-rehab-entry data-kind="classic" data-src="data-ui-state.js?v=334"></script>
+    <script data-rehab-entry data-kind="classic" data-src="data-views.js?v=334"></script>
+    <script data-rehab-entry data-kind="classic" data-src="data.js?v=334"></script>
+    <script data-rehab-entry data-kind="classic" data-src="sync-status.js?v=334"></script>
     <div id="weightModal" class="md-modal md-modal-sheet hidden" aria-hidden="true">
         <div class="md-modal-backdrop" onclick="data.closeWeightModal()"></div>
         <div class="md-modal-card md-modal-sheet-card">
@@ -1136,7 +1136,7 @@
         const MJS_SCRIPTS = new Set(['ai-vision-pure','ai-model-catalog-pure','ai-routing-pure']);
         const SCRIPT_PREREQUISITES = {
             'history-view': ['health-summary-pure'],
-            'food-log': ['food-ai-normalizer-pure'],
+            'food-log': ['food-ai-normalizer-pure', 'fooddb'],
             'goal-plan': ['health-summary-pure'],
             'ai-model-visual': [],
             'ai-profile': ['ai-store'],
@@ -1283,7 +1283,7 @@
             return true;
         }
         window.claimServiceWorkerReload = claimServiceWorkerReload;
-        const SERVICE_WORKER_CONTROLLER_RELOAD_KEY = 'rehab-sw-controller-reload-v333';
+        const SERVICE_WORKER_CONTROLLER_RELOAD_KEY = 'rehab-sw-controller-reload-v334';
         void SERVICE_WORKER_CONTROLLER_RELOAD_KEY;
         function scheduleServiceWorkerRegistration() {
             if (scheduleServiceWorkerRegistration._scheduled) return;
@@ -1310,7 +1310,7 @@
                     return;
                 }
                 const script = document.createElement('script');
-                script.src = (typeof window.resolveAssetUrl === 'function' ? window.resolveAssetUrl('app-update.js?v=333') : 'app-update.js?v=333');
+                script.src = (typeof window.resolveAssetUrl === 'function' ? window.resolveAssetUrl('app-update.js?v=334') : 'app-update.js?v=334');
                 script.async = true;
                 script.dataset.rehabAppUpdate = '1';
                 script.onload = () => resolve(window.appUpdate);
@@ -1322,11 +1322,11 @@
                 try {
                     // Do not re-register / normalize while an intentional SW navigate is in flight.
                     try {
-                        if (new URL(window.location.href).searchParams.get('__rehab_upgrade') === '333') {
+                        if (new URL(window.location.href).searchParams.get('__rehab_upgrade') === '334') {
                             return;
                         }
                     } catch {}
-                    const registration = await navigator.serviceWorker.register('./sw.js?v=333', { updateViaCache: 'none' });
+                    const registration = await navigator.serviceWorker.register('./sw.js?v=334', { updateViaCache: 'none' });
                     await registration.update?.();
                     // Never auto-activate a waiting worker here. Quiet registration only discovers
                     // updates; activation must wait for explicit user apply (or the post-apply
@@ -1342,7 +1342,7 @@
                                 return null;
                             }
                         })();
-                        const alreadyCurrent = controllerUrl && controllerUrl.searchParams.get('v') === '333';
+                        const alreadyCurrent = controllerUrl && controllerUrl.searchParams.get('v') === '334';
                         // Bare controllers are normal for legacy installs until the user applies.
                         // Only suppress the banner when the controller scriptURL is already versioned.
                         if (!alreadyCurrent) {
@@ -1414,7 +1414,7 @@
             const p = new Promise((res, rej) => {
                 const link = document.createElement('link');
                 link.rel = 'stylesheet';
-                link.href = (typeof window.resolveAssetUrl === 'function' ? window.resolveAssetUrl(`css-src/${name}.css?v=333`) : `css-src/${name}.css?v=333`);
+                link.href = (typeof window.resolveAssetUrl === 'function' ? window.resolveAssetUrl(`css-src/${name}.css?v=334`) : `css-src/${name}.css?v=334`);
                 link.dataset.appCss = name;
                 link.onload = () => {
                     link.dataset.loaded = 'true';
@@ -1480,7 +1480,7 @@
                     res();
                 };
                 if (MODULE_SCRIPTS.has(name)) s.type = 'module';
-                s.src = (typeof window.resolveAssetUrl === 'function' ? window.resolveAssetUrl(`${name}${MJS_SCRIPTS.has(name) ? '.mjs' : '.js'}?v=333`) : `${name}${MJS_SCRIPTS.has(name) ? '.mjs' : '.js'}?v=333`);
+                s.src = (typeof window.resolveAssetUrl === 'function' ? window.resolveAssetUrl(`${name}${MJS_SCRIPTS.has(name) ? '.mjs' : '.js'}?v=334`) : `${name}${MJS_SCRIPTS.has(name) ? '.mjs' : '.js'}?v=334`);
                 s.onload = () => settle();
                 s.onerror = () => settle(new Error(`Failed to load script: ${name}`));
                 timer = window.setTimeout(() => settle(new Error(`Timed out loading script: ${name}`)), scriptLoadTimeoutMs());
