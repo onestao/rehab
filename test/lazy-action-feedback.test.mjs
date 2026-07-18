@@ -44,7 +44,7 @@ test('service worker registration does not eagerly load app-update', () => {
     const index = read('index.html');
     const registration = index.slice(index.indexOf('function scheduleServiceWorkerRegistration'), index.indexOf('function idlePreloadEnabled'));
     assert.doesNotMatch(registration, /loadScript\('app-update'\)/);
-    assert.match(registration, /navigator\.serviceWorker\.register\('sw\.js'/);
+    assert.match(registration, /navigator\.serviceWorker\.register\('\.\/sw\.js'/);
 });
 
 test('update check remains busy until deferred checkNow settles and retries after failure', async () => {

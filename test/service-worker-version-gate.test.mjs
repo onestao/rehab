@@ -21,66 +21,88 @@ function extractBetween(source, startMarker, endMarker) {
     return source.slice(start, end);
 }
 
-function createRegistrationHarness({ hasController, session }) {
+function createQuietRegistrationHarness() {
     const listeners = new Map();
     const timers = [];
     let reloads = 0;
     let registrations = 0;
     let updates = 0;
-    const sessionStorage = {
-        getItem(key) { return session.has(key) ? session.get(key) : null; },
-        setItem(key, value) { session.set(key, String(value)); }
-    };
+    let appUpdateLoads = 0;
     const serviceWorker = {
-        controller: hasController ? {} : null,
+        controller: { scriptURL: 'https://example.test/sw.js' },
         addEventListener(type, callback, options = {}) {
             listeners.set(type, { callback, once: !!options.once });
         },
-        register() {
+        register(url) {
             registrations += 1;
-            return Promise.resolve({ update() { updates += 1; return Promise.resolve(); } });
+            this._lastUrl = url;
+            return Promise.resolve({
+                waiting: null,
+                installing: null,
+                update() { updates += 1; return Promise.resolve(); }
+            });
         }
     };
-    const window = {
-        sessionStorage,
+    const document = {
+        getElementById() { return null; },
+        querySelector() { return null; },
+        createElement(tag) {
+            return {
+                tagName: String(tag).toUpperCase(),
+                dataset: {},
+                set src(value) {
+                    this._src = value;
+                    if (String(value).includes('app-update.js')) appUpdateLoads += 1;
+                },
+                get src() { return this._src; },
+                set async(value) { this._async = value; },
+                onload: null,
+                onerror: null
+            };
+        },
+        head: { appendChild(node) { queueMicrotask(() => node.onload?.()); return node; } }
+    };
+    const windowObj = {
+        document,
+        requestIdleCallback(callback) { callback({ didTimeout: false, timeRemaining: () => 0 }); },
+        setTimeout(callback) { timers.push(callback); return timers.length; },
         location: { href: 'https://example.test/', reload() { reloads += 1; } },
-        setTimeout(callback, delay) { timers.push({ callback, delay }); return timers.length; }
+        appUpdate: null
     };
     const context = {
-        window,
+        window: windowObj,
+        document,
         navigator: { serviceWorker },
         history: { state: null, replaceState() {} },
         errorBus: { event() {}, report() {} },
-        runWhenIdle(callback) { callback({ didTimeout: false, timeRemaining: () => 0 }); }
+        queueMicrotask,
+        Promise
     };
+    context.globalThis = context;
+    windowObj.window = windowObj;
     const block = extractBetween(html, 'function claimServiceWorkerReload', 'function idlePreloadEnabled');
     vm.runInNewContext(`${block};globalThis.__schedule = scheduleServiceWorkerRegistration;`, context);
     return {
         schedule: context.__schedule,
-        async flush() { await Promise.resolve(); await Promise.resolve(); },
-        runTimers() {
-            while (timers.length) timers.shift().callback();
-        },
-        emit(type) {
-            const listener = listeners.get(type);
-            if (!listener) return;
-            if (listener.once) listeners.delete(type);
-            listener.callback();
+        serviceWorker,
+        async flush() {
+            while (timers.length) timers.shift()();
+            for (let i = 0; i < 20; i += 1) await Promise.resolve();
         },
         hasListener(type) { return listeners.has(type); },
-        counts() { return { reloads, registrations, updates }; }
+        counts() { return { reloads, registrations, updates, appUpdateLoads }; }
     };
 }
 
-test('release assets and controller reload keys are consistently v327', () => {
-    assert.match(sw, /training-assistant-v327/);
+test('release assets and controller reload keys are consistently v328', () => {
+    assert.match(sw, /training-assistant-v328/);
     assert.match(sw, /const CACHE_ASSET_REVISION = '[a-f0-9]{64}'/);
-    assert.doesNotMatch(sw, /training-assistant-v326|\?v=326|training-assistant-v328|\?v=328/);
-    assert.doesNotMatch(html, /\?v=326|rehab-sw-controller-reload-v326|\?v=328|rehab-sw-controller-reload-v328/);
-    assert.doesNotMatch(appUpdate, /version:\s*['"](?:326|328)['"]|rehab-sw-controller-reload-v(?:326|328)/);
-    assert.match(html, /rehab-sw-controller-reload-v327/);
-    assert.match(appUpdate, /version:\s*['"]327['"]/);
-    assert.match(appUpdate, /rehab-sw-controller-reload-v327/);
+    assert.doesNotMatch(sw, /training-assistant-v326|\?v=326|training-assistant-v327|\?v=327/);
+    assert.doesNotMatch(html, /\?v=326|rehab-sw-controller-reload-v326|\?v=327|rehab-sw-controller-reload-v327/);
+    assert.doesNotMatch(appUpdate, /version:\s*['"](?:326|327)['"]|rehab-sw-controller-reload-v(?:326|327)/);
+    assert.match(html, /rehab-sw-controller-reload-v328/);
+    assert.match(appUpdate, /version:\s*['"]328['"]/);
+    assert.match(appUpdate, /rehab-sw-controller-reload-v328/);
 });
 
 test('plan precache membership stays unchanged while query versions advance', () => {
@@ -96,40 +118,27 @@ test('plan precache membership stays unchanged while query versions advance', ()
         'plan-ui.js'
     ];
     const assetsBlock = sw.match(/const ASSETS = \[([\s\S]*?)\];/)?.[1] || '';
-    const actual = expected.filter((asset) => assetsBlock.includes(`'${asset}?v=327'`));
+    const actual = expected.filter((asset) => assetsBlock.includes(`'${asset}?v=328'`));
     assert.deepEqual(actual, expected);
 });
 
-test('existing controller reloads once per release version', async () => {
-    const session = new Map();
-    const firstPage = createRegistrationHarness({ hasController: true, session });
-    firstPage.schedule();
-    await firstPage.flush();
-    assert.equal(firstPage.hasListener('controllerchange'), true);
-    firstPage.emit('controllerchange');
-    firstPage.emit('controllerchange');
-    assert.deepEqual(firstPage.counts(), { reloads: 1, registrations: 1, updates: 1 });
-
-    const reloadedPage = createRegistrationHarness({ hasController: true, session });
-    reloadedPage.schedule();
-    await reloadedPage.flush();
-    reloadedPage.emit('controllerchange');
-    assert.equal(reloadedPage.counts().reloads, 0);
-});
-
-test('first service worker installation does not reload', async () => {
-    const page = createRegistrationHarness({ hasController: false, session: new Map() });
+test('quiet post-render registration does not auto-reload or force app-update', async () => {
+    const page = createQuietRegistrationHarness();
     page.schedule();
-    assert.equal(page.hasListener('controllerchange'), false);
-    page.runTimers();
     await page.flush();
-    assert.deepEqual(page.counts(), { reloads: 0, registrations: 1, updates: 1 });
+    assert.equal(page.hasListener('controllerchange'), false);
+    assert.deepEqual(page.counts(), { reloads: 0, registrations: 1, updates: 1, appUpdateLoads: 0 });
+    assert.match(String(page.serviceWorker._lastUrl || ''), /(?:^\.?\/)?sw\.js$/);
 });
 
-test('startup registration does not execute app-update', () => {
+test('startup registration path is non-blocking and loads app-update on demand only', () => {
     const registration = extractBetween(html, 'function scheduleServiceWorkerRegistration', 'function idlePreloadEnabled');
     assert.doesNotMatch(registration, /loadScript\(['"]app-update['"]\)/);
-    assert.match(registration, /serviceWorker\.register\(['"]sw\.js['"]/);
+    assert.match(registration, /serviceWorker\.register\(['"]\.\/sw\.js['"]/);
+    assert.match(registration, /requestIdleCallback|setTimeout/);
+    assert.doesNotMatch(registration, /location\.reload/);
+    assert.doesNotMatch(registration, /SKIP_WAITING|GET_VERSION/);
+    assert.match(registration, /app-update\.js\?v=328/);
 });
 
 test('version gate rejects changed precache, runtime-cache-first, and nested lazy assets without a bump', () => {

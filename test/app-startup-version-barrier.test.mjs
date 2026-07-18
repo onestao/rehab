@@ -9,108 +9,89 @@ import { fileURLToPath } from 'node:url';
 const testDir = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(testDir, '..');
 const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+const appUpdateSource = fs.readFileSync(path.join(root, 'app-update.js'), 'utf8');
 
-function extractBarrier() {
-    const startMarker = '/* APP_STARTUP_VERSION_BARRIER_BEGIN */';
-    const endMarker = '/* APP_STARTUP_VERSION_BARRIER_END */';
+function extractBoot() {
+    const startMarker = '/* APP_STARTUP_NON_BLOCKING_BOOT_BEGIN */';
+    const endMarker = '/* APP_STARTUP_NON_BLOCKING_BOOT_END */';
     const start = html.indexOf(startMarker);
     const end = html.indexOf(endMarker, start);
-    assert.notEqual(start, -1, 'startup barrier start marker should exist');
-    assert.notEqual(end, -1, 'startup barrier end marker should exist');
+    assert.notEqual(start, -1, 'non-blocking boot start marker should exist');
+    assert.notEqual(end, -1, 'non-blocking boot end marker should exist');
     return html.slice(start + startMarker.length, end);
 }
 
 function createHarness({
-    controllerVersion = null,
-    registrationError = null,
-    precacheReady = true,
-    href = 'https://example.test/',
     controllerScriptUrl = null,
-    activeScriptUrl = null,
-    suppressVersionResponse = false
+    href = 'https://example.test/',
+    caches = null
 } = {}) {
-    const listeners = new Map();
-    const timers = new Map();
     const session = new Map();
     const requested = [];
-    let nextTimer = 1;
-    let registrations = 0;
-    let updates = 0;
     let reloads = 0;
-    let activeControllerVersion = controllerVersion;
-    let activeControllerScriptUrl = controllerScriptUrl;
-    if (activeControllerScriptUrl == null && activeControllerVersion && activeControllerVersion !== 'unknown') {
-        activeControllerScriptUrl = `https://example.test/sw.js?v=${activeControllerVersion}`;
-    }
-    let activePrecacheReady = precacheReady;
-    let prepares = 0;
+    let documentWrites = 0;
     let context;
 
-    const status = { textContent: '' };
-    const detail = { textContent: '', hidden: true };
-    const retry = { hidden: true };
-    const barrier = { hidden: false, dataset: {} };
     const appShell = { hidden: true };
-    const stylesheet = { dataset: { href: 'build/generated.css?v=327' } };
+    const bodyClassList = new Set();
+    const stylesheet = { dataset: { href: 'build/generated.css?v=328' } };
     const entries = [
-        { dataset: { src: 'm3e-ripple.js?v=327', kind: 'classic' } },
-        { dataset: { src: 'data-utils-pure.js?v=327', kind: 'module' } }
+        { dataset: { src: 'm3e-ripple.js?v=328', kind: 'classic' } },
+        { dataset: { src: 'data-utils-pure.js?v=328', kind: 'module' } }
     ];
     const main = { textContent: 'window.__rehabStartApplication = async () => { globalThis.__appBooted = true; };' };
+    const banner = {
+        classList: {
+            _hidden: true,
+            contains(name) { return name === 'hidden' ? this._hidden : false; },
+            add(name) { if (name === 'hidden') this._hidden = true; },
+            remove(name) { if (name === 'hidden') this._hidden = false; }
+        },
+        querySelector() { return { textContent: '', onclick: null }; },
+        querySelectorAll() { return []; }
+    };
 
     const serviceWorker = {
         get controller() {
-            if (activeControllerVersion === null) return null;
+            if (!controllerScriptUrl) return null;
             return {
-                scriptURL: activeControllerScriptUrl || '',
-                postMessage(message) {
-                    if (activeControllerVersion === 'unknown' || suppressVersionResponse) return;
-                    if (message.type === 'GET_VERSION') {
-                        queueMicrotask(() => emit('message', {
-                            data: { type: 'VERSION', requestId: message.requestId, version: activeControllerVersion, precacheReady: activePrecacheReady }
-                        }));
-                        return;
-                    }
-                    if (message.type === 'PREPARE_RELEASE') {
-                        prepares += 1;
-                        activePrecacheReady = true;
-                        queueMicrotask(() => emit('message', {
-                            data: { type: 'RELEASE_READY', requestId: message.requestId, version: activeControllerVersion }
-                        }));
-                    }
+                scriptURL: controllerScriptUrl,
+                postMessage() {
+                    throw new Error('startup must not message controller for version handshake');
                 }
             };
         },
-        addEventListener(type, callback) {
-            const group = listeners.get(type) || new Set();
-            group.add(callback);
-            listeners.set(type, group);
-        },
-        removeEventListener(type, callback) {
-            listeners.get(type)?.delete(callback);
-        },
-        async getRegistration() {
-            return { active: activeScriptUrl ? { scriptURL: activeScriptUrl } : null };
-        },
+        addEventListener() {},
+        removeEventListener() {},
+        async getRegistration() { return null; },
         async register() {
-            registrations += 1;
-            if (registrationError) throw registrationError;
-            return {
-                active: activeScriptUrl ? { scriptURL: activeScriptUrl } : null,
-                async update() { updates += 1; }
-            };
+            throw new Error('startup must not register service worker');
         }
     };
 
-    function emit(type, event = {}) {
-        for (const callback of [...(listeners.get(type) || [])]) callback(event);
+    function append(node) {
+        if (node.href) requested.push(node.href);
+        if (node.src) requested.push(node.src);
+        if (node.textContent && !node.src) vm.runInContext(node.textContent, context);
+        queueMicrotask(() => node.onload?.());
+        return node;
     }
 
     const document = {
         readyState: 'complete',
         head: { appendChild: append },
-        body: { appendChild: append, classList: { add() {}, remove() {} } },
+        body: {
+            appendChild: append,
+            classList: {
+                add(name) { bodyClassList.add(name); },
+                remove(name) { bodyClassList.delete(name); },
+                contains(name) { return bodyClassList.has(name); }
+            }
+        },
         addEventListener() {},
+        open() {},
+        write() { documentWrites += 1; },
+        close() {},
         querySelector(selector) {
             if (selector === '[data-rehab-stylesheet]') return stylesheet;
             return null;
@@ -120,11 +101,8 @@ function createHarness({
         },
         getElementById(id) {
             return {
-                startupBarrier: barrier,
-                startupBarrierStatus: status,
-                startupBarrierDetail: detail,
-                startupBarrierRetry: retry,
                 appShell,
+                appUpdateBanner: banner,
                 'rehab-app-main': main
             }[id] || null;
         },
@@ -143,205 +121,148 @@ function createHarness({
         }
     };
 
-    function append(node) {
-        if (node.href) requested.push(node.href);
-        if (node.src) requested.push(node.src);
-        if (node.textContent && !node.src) vm.runInContext(node.textContent, context);
-        queueMicrotask(() => node.onload?.());
-        return node;
-    }
-
-    const historyUrls = [];
-    const window = {
+    const cacheStore = caches || new Map();
+    const windowObj = {
         document,
         sessionStorage: {
             getItem(key) { return session.has(key) ? session.get(key) : null; },
             setItem(key, value) { session.set(key, String(value)); }
         },
         location: { href, reload() { reloads += 1; } },
-        history: { state: null, replaceState(_state, _title, url) { historyUrls.push(url); } },
-        setTimeout(callback, delay) {
-            const id = nextTimer++;
-            timers.set(id, { callback, delay });
-            return id;
+        caches: {
+            async keys() { return [...cacheStore.keys()]; },
+            async open(name) {
+                const entriesMap = cacheStore.get(name) || new Map();
+                return {
+                    async match(request) {
+                        const key = typeof request === 'string' ? request : String(request);
+                        const hit = entriesMap.get(key);
+                        if (!hit) return null;
+                        return { async text() { return hit; } };
+                    }
+                };
+            }
         },
-        clearTimeout(id) { timers.delete(id); }
+        toast: { show() {} }
     };
-    context = { window, document, navigator: { serviceWorker }, console, Promise, queueMicrotask, URL };
+    context = {
+        window: windowObj,
+        document,
+        navigator: { serviceWorker },
+        console,
+        Promise,
+        queueMicrotask,
+        URL,
+        setTimeout,
+        clearTimeout
+    };
     context.globalThis = context;
-    window.window = window;
+    windowObj.window = windowObj;
     vm.createContext(context);
-    vm.runInContext(extractBarrier(), context, { filename: 'startup-barrier.js' });
+    vm.runInContext(extractBoot(), context, { filename: 'startup-non-blocking.js' });
 
     return {
         requested,
-        status,
-        detail,
-        retry,
-        barrier,
         appShell,
         session,
-        historyUrls,
-        counts() { return { registrations, updates, reloads }; },
-        prepares() { return prepares; },
-        hasListener(type) { return (listeners.get(type)?.size || 0) > 0; },
+        bodyClassList,
+        counts() { return { reloads, documentWrites }; },
         async flush() {
-            for (let index = 0; index < 32; index += 1) await Promise.resolve();
-        },
-        runTimer(delay) {
-            const found = [...timers].find(([, timer]) => timer.delay === delay);
-            assert.ok(found, `timer ${delay} should exist`);
-            timers.delete(found[0]);
-            found[1].callback();
-        },
-        switchController(version) {
-            activeControllerVersion = version;
-            activeControllerScriptUrl = `https://example.test/sw.js?v=${version}`;
-            activePrecacheReady = false;
-            emit('controllerchange');
+            for (let index = 0; index < 40; index += 1) await Promise.resolve();
         }
     };
 }
 
-test('startup barrier marks its own activation request and clears the one-shot legacy navigation marker', () => {
-    assert.match(html, /type: 'SKIP_WAITING', source: 'startup-barrier-v327'/);
-    assert.match(html, /__rehab_upgrade/);
-    assert.match(html, /V327_PAGE_READY/);
+test('non-blocking boot markers replace the old version barrier', () => {
+    assert.match(html, /APP_STARTUP_NON_BLOCKING_BOOT_BEGIN/);
+    assert.match(html, /APP_STARTUP_NON_BLOCKING_BOOT_END/);
+    assert.equal(html.includes('APP_STARTUP_VERSION_BARRIER'), false);
+    assert.equal(html.includes('startupBarrier'), false);
+    assert.equal(html.includes('body:not(.rehab-app-ready)'), false);
+    assert.equal(html.includes('GET_VERSION'), false);
+    assert.equal(html.includes('无法确认当前离线版本'), false);
+    assert.equal(html.includes('无法完成版本升级'), false);
 });
 
-test('startup barrier exposes a visible manual refresh fallback', () => {
-    assert.match(html, /UPDATE_REFRESH_REQUIRED/);
-    assert.match(html, /showRefreshFallback/);
-    assert.match(html, /refreshButton\.onclick = \(\) => window\.location\.reload\(\)/);
-});
-
-test('startup barrier executes before every versioned external business resource declaration', () => {
-    const marker = html.indexOf('APP_STARTUP_VERSION_BARRIER_BEGIN');
+test('startup executes before every versioned external business resource declaration', () => {
+    const marker = html.indexOf('APP_STARTUP_NON_BLOCKING_BOOT_BEGIN');
     assert.ok(marker > 0);
-    const parserRequested = [...html.matchAll(/<(?:script|link)\b[^>]*\s(?:src|href)=["'][^"']+\?v=327/gi)];
+    const parserRequested = [...html.matchAll(/<(?:script|link)\b[^>]*\s(?:src|href)=["'][^"']+\?v=328/gi)];
     assert.equal(parserRequested.length, 0, parserRequested.map((match) => match[0]).join('\n'));
     assert.ok(marker < html.indexOf('data-rehab-stylesheet'));
-    assert.match(html, /data-rehab-stylesheet[^>]+data-href=["']build\/generated\.css\?v=327/);
-    assert.match(html, /script[^>]+data-rehab-entry[^>]+data-src=["']m3e-ripple\.js\?v=327/);
-    assert.match(html, /body:not\(\.rehab-app-ready\) > :not\(#startupBarrier\)/);
+    assert.match(html, /data-rehab-stylesheet[^>]+data-href=["']build\/generated\.css\?v=328/);
+    assert.match(html, /script[^>]+data-rehab-entry[^>]+data-src=["']m3e-ripple\.js\?v=328/);
 });
 
-test('first install starts normally without registration reload barrier', async () => {
-    const page = createHarness({ controllerVersion: null });
+test('first install starts the app immediately without SW handshake', async () => {
+    const page = createHarness({ controllerScriptUrl: null });
     await page.flush();
-    assert.deepEqual(page.counts(), { registrations: 0, updates: 0, reloads: 0 });
-    assert.deepEqual(JSON.parse(JSON.stringify(page.requested)), ['build/generated.css?v=327', 'm3e-ripple.js?v=327', 'data-utils-pure.js?v=327']);
+    assert.deepEqual(JSON.parse(JSON.stringify(page.requested)), [
+        'build/generated.css?v=328',
+        'm3e-ripple.js?v=328',
+        'data-utils-pure.js?v=328'
+    ]);
     assert.equal(page.appShell.hidden, false);
-    assert.equal(page.barrier.hidden, true);
+    assert.equal(page.bodyClassList.has('rehab-app-ready'), true);
+    assert.equal(page.counts().reloads, 0);
 });
 
-test('same-version v327 controller starts without update or reload', async () => {
-    const page = createHarness({ controllerVersion: '327' });
+test('versioned v328 controller starts normally without GET_VERSION', async () => {
+    const page = createHarness({ controllerScriptUrl: 'https://example.test/sw.js?v=328' });
     await page.flush();
-    assert.deepEqual(page.counts(), { registrations: 0, updates: 0, reloads: 0 });
     assert.ok(page.requested.length > 0);
-    assert.equal(page.prepares(), 0);
+    assert.equal(page.appShell.hidden, false);
+    assert.equal(page.counts().reloads, 0);
+    assert.equal(page.requested.includes('build/generated.css?v=328'), true);
 });
 
-test('explicit v327 controller URL starts normally when GET_VERSION never replies', async () => {
+test('bare unknown controller still enters the app and de-versions assets online', async () => {
+    const page = createHarness({ controllerScriptUrl: 'https://example.test/sw.js' });
+    await page.flush();
+    assert.equal(page.appShell.hidden, false);
+    assert.equal(page.bodyClassList.has('rehab-app-ready'), true);
+    assert.deepEqual(JSON.parse(JSON.stringify(page.requested)), [
+        'build/generated.css',
+        'm3e-ripple.js',
+        'data-utils-pure.js'
+    ]);
+    assert.equal(page.counts().reloads, 0);
+});
+
+test('legacy shell restore rewrites once when bare controller has an old cached shell', async () => {
+    const caches = new Map([
+        ['training-assistant-v316', new Map([
+            ['index.html', '<!DOCTYPE html><html><body>legacy-shell-v316</body></html>']
+        ])]
+    ]);
     const page = createHarness({
-        controllerVersion: '327',
-        controllerScriptUrl: 'https://example.test/sw.js?v=327',
-        suppressVersionResponse: true
+        controllerScriptUrl: 'https://example.test/sw.js',
+        caches
     });
     await page.flush();
-    assert.deepEqual(page.counts(), { registrations: 0, updates: 0, reloads: 0 });
-    assert.ok(page.requested.length > 0);
-    assert.equal(page.barrier.hidden, true);
-    assert.equal(page.retry.hidden, true);
-    assert.equal(page.hasListener('controllerchange'), false);
-});
-
-test('unrecognized controller URL does not immediately enter the old-worker upgrade path', async () => {
-    const page = createHarness({ controllerVersion: 'unknown' });
-    await page.flush();
-    assert.deepEqual(page.counts(), { registrations: 0, updates: 0, reloads: 0 });
-    assert.equal(page.hasListener('controllerchange'), false);
-    page.runTimer(500);
-    await page.flush();
-    page.runTimer(500);
-    await page.flush();
-    assert.deepEqual(page.counts(), { registrations: 0, updates: 0, reloads: 0 });
-    assert.equal(page.hasListener('controllerchange'), false);
-    assert.equal(page.barrier.hidden, false);
-    assert.equal(page.retry.hidden, false);
-    assert.ok(page.detail.textContent.length > 0);
+    assert.equal(page.counts().documentWrites, 1);
+    assert.equal(page.session.get('rehab-legacy-shell-restored'), '1');
     assert.equal(page.requested.length, 0);
 });
 
-test('same-version controller repairs an interrupted release cache before starting', async () => {
-    const page = createHarness({
-        controllerVersion: '327',
-        controllerScriptUrl: '',
-        precacheReady: false
-    });
-    await page.flush();
-    assert.deepEqual(page.counts(), { registrations: 0, updates: 0, reloads: 0 });
-    assert.equal(page.prepares(), 1);
-    assert.ok(page.requested.length > 0);
+test('service worker registration is scheduled only after first paint path', () => {
+    assert.match(html, /function scheduleServiceWorkerRegistration\(\)/);
+    assert.match(html, /requestIdleCallback/);
+    assert.match(html, /register\('\.\/sw\.js', \{ updateViaCache: 'none' \}\)/);
+    assert.match(html, /script\.src = 'app-update\.js\?v=328'/);
+    const quietStart = html.indexOf('function scheduleServiceWorkerRegistration()');
+    const quietEnd = html.indexOf('function idlePreloadEnabled()', quietStart);
+    const quiet = html.slice(quietStart, quietEnd);
+    assert.equal(quiet.includes('location.reload'), false);
+    assert.equal(quiet.includes('SKIP_WAITING'), false);
+    assert.equal(quiet.includes('GET_VERSION'), false);
 });
 
-test('confirmed old controller blocks app resources until v327 takes control, then reloads once', async () => {
-    const page = createHarness({
-        controllerVersion: 'unknown',
-        controllerScriptUrl: 'https://example.test/sw.js?v=326'
-    });
-    await page.flush();
-    assert.equal(page.requested.length, 0);
-    assert.deepEqual(page.counts(), { registrations: 1, updates: 1, reloads: 0 });
-    assert.equal(page.requested.length, 0);
-    page.switchController('327');
-    await page.flush();
-    assert.deepEqual(page.counts(), { registrations: 1, updates: 1, reloads: 1 });
-    assert.equal(page.requested.length, 0);
-    assert.equal(page.session.get('rehab-sw-controller-reload-v327'), '1');
-    assert.equal(page.prepares(), 1);
-});
-
-test('legacy worker navigation marker starts after v327 claims without a second reload', async () => {
-    const page = createHarness({
-        controllerVersion: 'unknown',
-        href: 'https://example.test/index.html?__rehab_upgrade=327'
-    });
-    await page.flush();
-    page.switchController('327');
-    await page.flush();
-
-    assert.deepEqual(page.counts(), { registrations: 1, updates: 1, reloads: 0 });
-    assert.equal(page.prepares(), 1);
-    assert.ok(page.requested.length > 0);
-    assert.deepEqual(page.historyUrls, ['https://example.test/index.html']);
-});
-test('registration failure remains visible and exposes a static retry', async () => {
-    const page = createHarness({
-        controllerVersion: 'unknown',
-        controllerScriptUrl: 'https://example.test/sw.js?v=326',
-        registrationError: new Error('offline')
-    });
-    await page.flush();
-    assert.equal(page.barrier.hidden, false);
-    assert.equal(page.retry.hidden, false);
-    assert.match(page.status.textContent, /无法完成版本升级/);
-    assert.match(page.detail.textContent, /offline/);
-    assert.equal(page.requested.length, 0);
-});
-
-test('controller switch timeout stays on a non-blank retry screen', async () => {
-    const page = createHarness({
-        controllerVersion: 'unknown',
-        controllerScriptUrl: 'https://example.test/sw.js?v=326'
-    });
-    await page.flush();
-    page.runTimer(15000);
-    await page.flush();
-    assert.equal(page.barrier.hidden, false);
-    assert.equal(page.retry.hidden, false);
-    assert.match(page.status.textContent, /无法完成版本升级/);
-    assert.equal(page.requested.length, 0);
-    assert.deepEqual(page.counts(), { registrations: 1, updates: 1, reloads: 0 });
+test('app-update apply is user-confirmed and best-effort prepare then skip waiting', () => {
+    assert.match(appUpdateSource, /async apply\(/);
+    assert.match(appUpdateSource, /PREPARE_RELEASE/);
+    assert.match(appUpdateSource, /SKIP_WAITING/);
+    assert.match(appUpdateSource, /showRefreshRequired/);
+    assert.match(appUpdateSource, /async checkNow\(/);
+    assert.equal(appUpdateSource.includes('GET_VERSION'), false);
 });
