@@ -356,7 +356,8 @@ function createTodayEnhancementHarness(initialPage) {
         },
         data: {
             refreshModules() { renderCalls.push('refresh'); },
-            render(page) { renderCalls.push(page); }
+            render(page) { renderCalls.push(page); },
+            enhanceTodayPage() { renderCalls.push('enhance'); }
         },
         errorBus: { report() {} },
         runWhenIdle(callback) { idleCallbacks.push(callback); },
@@ -401,7 +402,8 @@ for (const deepLinkPage of ['records', 'ai-coach']) {
         await returnSchedule;
 
         assert.deepEqual(harness.loadCalls, ['plan-ui']);
-        assert.deepEqual(harness.renderCalls, ['refresh', 'today']);
+        assert.deepEqual(harness.renderCalls, ['refresh', 'enhance']);
+        assert.ok(!harness.renderCalls.includes('today'), 'enhancement must not full-render today');
     });
 }
 

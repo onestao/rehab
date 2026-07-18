@@ -60,6 +60,7 @@ function dataModules() {
         window.dataHistoryView || {},
         window.dataWeeklySummary || {},
         window.dataViews || {},
+        window.dataTodayViewCore || {},
         window.dataAiTemplates || {},
         window.adviceTemplateManager || {},
         window['dataPlanStore'] || {},

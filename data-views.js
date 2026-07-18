@@ -133,8 +133,8 @@
             const timeline = document.getElementById('todayTimeline');
             const aiCard = document.getElementById('todayAiCard');
 
-            fillTodaySlot(overview, ctx.renderPlanTodaySection?.() || ctx.renderRecordOverview?.() || '', 'todayOverview');
-            fillTodaySlot(quickActions, ctx.renderTodayActionDock?.() || ctx.renderRecordQuickActions?.() || '', 'todayQuickActions');
+            fillTodaySlot(overview, ctx.renderPlanTodaySection?.() || '', 'todayOverview');
+            fillTodaySlot(quickActions, ctx.renderTodayActionDock?.() || '', 'todayQuickActions');
             fillTodaySlot(planStatus, ctx.renderTodayV6PlanCard?.() || '', 'todayPlanStatus');
             fillTodaySlot(dietStatus, ctx.renderTodayV6DietCard?.() || '', 'todayDietStatus');
             fillTodaySlot(timeline, ctx.renderTodayTimeline?.() || '', 'todayTimeline');

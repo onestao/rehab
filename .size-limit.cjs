@@ -50,6 +50,7 @@ module.exports = [
       'food-ai-normalizer-pure.js',
       'food-log.js',
       'history-view.js',
+      'today-view-core.js',
       'weekly-summary.js',
       'goal-plan.js',
       'report-*.js',
@@ -58,6 +59,11 @@ module.exports = [
       'action-history.js'
     ],
     limit: '90 KB'
+  },
+  {
+    name: 'today-view-core',
+    path: 'today-view-core.js',
+    limit: '18 KB'
   },
   { name: 'routine-bundle', path: 'routine-*.js', limit: '25 KB' },
   { name: 'sync-bundle', path: ['backup.js', 'backup-import-pure.js', 'backup-ring-pure.js', 'sync.js', 'sync-pure.js', 'sync-ui.js', 'sync-adapters.js'], limit: '30 KB' },

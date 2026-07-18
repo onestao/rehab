@@ -20,6 +20,7 @@ test('today keeps quick record modules lazy until the user taps a record action'
     const todayDeps = html.match(/today:\s*\[([^\]]*)\]/)?.[1] || '';
 
     assert.match(todayDeps, /'history-view'/);
+    assert.match(todayDeps, /'today-view-core'/);
     assert.doesNotMatch(todayDeps, /'plan-ui'|'health-diet'|'health-weight'|'health-exercise'|'food-log'/);
     assert.match(html, /function scheduleTodayEnhancementLoad\(\)/);
 });
@@ -94,11 +95,13 @@ test('weight modal loads without pulling Bluetooth code into the interaction pat
 test('history-view still preloads health-summary-pure for lightweight today diet summaries', () => {
     const html = readRootFile('index.html');
     const historyPrereq = html.match(/'history-view':\s*\[([^\]]*)\]/)?.[1] || '';
+    const todayCorePrereq = html.match(/'today-view-core':\s*\[([^\]]*)\]/)?.[1] || '';
     const todayDepsLiteral = html.match(/today:\s*(\[[^\]]*\])/)?.[1] || '';
 
-    assert.equal(todayDepsLiteral.replace(/\s+/g, ''), "['history-view']");
+    assert.equal(todayDepsLiteral.replace(/\s+/g, ''), "['history-view','today-view-core']");
     assert.match(historyPrereq, /'health-summary-pure'/);
-    assert.doesNotMatch(todayDepsLiteral, /'health-diet'|'food-log'/);
+    assert.match(todayCorePrereq, /'health-summary-pure'/);
+    assert.doesNotMatch(todayDepsLiteral, /'health-diet'|'food-log'|'plan-ui'/);
     assert.doesNotMatch(historyPrereq, /'health-diet'|'food-log'/);
 });
 
