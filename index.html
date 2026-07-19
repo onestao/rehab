@@ -1519,17 +1519,29 @@
         window.loadAppCss = loadCss;
         window.ensureAppCss = ensureCss;
         data.initDebugTools?.();
+        /**
+         * Pure module load: scripts + merge only. Safe for idle warm and cancelled navigations.
+         * Must not init page controllers, bind listeners, set workout mode, or open UI.
+         */
         async function ensureDeps(page, options = {}) {
             if (options.includeCss !== false) await ensureCss(page);
             const deps = PAGE_DEPS[page] || [];
             const pending = deps.filter(name => !_loaded.has(name));
             if (pending.length) await Promise.all(pending.map(loadScript));
             data.refreshModules?.();
+            // AI client bootstrap is shared readiness, not page-only UI — still no render.
             if (['ai-coach', 'profile', 'records', 'workout'].includes(page) && window.ai && typeof ai.init === 'function' && !data._aiRuntimeReady && !_loaded.has('_aiInit')) {
                 await ai.init({ saveData: true, renderData: false });
                 data._aiRuntimeReady = true;
                 _loaded.add('_aiInit');
             }
+        }
+
+        /**
+         * Page-only side effects after navigation token is still current.
+         * Cancelled navigations may keep modules loaded but must not run this.
+         */
+        function activatePageSideEffects(page) {
             if (page === 'ai-coach' && window.advicePanel) {
                 advicePanel.attach(data);
             }
@@ -1570,6 +1582,9 @@
                 window.haptics?.syncToggle?.();
             }
         }
+
+        window.activatePageSideEffects = activatePageSideEffects;
+
         const ui = {
             _navigationToken: 0,
             beginNavigation() {
@@ -1589,6 +1604,8 @@
                 try { data.captureAdviceDraft?.(); } catch (e) { errorBus?.report?.('ui.captureAdviceDraft', e); }
                 try { data.captureAdviceScroll?.(); } catch (e) { errorBus?.report?.('ui.captureAdviceScroll', e); }
                 await ensureDeps(id);
+                if (!this.isCurrentNavigation(navigationToken)) return false;
+                activatePageSideEffects(id);
                 if (!this.isCurrentNavigation(navigationToken)) return false;
                 if (resetAdviceOnEntry) data._adviceResetOnNextRender = true;
                 if (id === 'profile' && !options.preserveSubroute) data.routineView = 'home';
@@ -1657,6 +1674,8 @@
             try {
                 bootMark('boot:deps:start');
                 await ensureDeps(initialPage);
+                // First paint of the resolved route needs page init (not only module load).
+                activatePageSideEffects(initialPage);
                 bootMark('boot:deps:end');
                 bootMeasure('boot:deps', 'boot:deps:start', 'boot:deps:end');
                 bootMark('boot:data-init:start');
