@@ -1,9 +1,9 @@
 # Lazyload Rehab Repair — Final Validation
 
-**Branch:** `integration/lazyload-rehab-repair`  
-**Worktree:** `G:/LLM/rehab/.claude/worktrees/lazy-integration`  
-**Baseline:** `0fa29d9` / `perfrom` / v335  
-**Date:** 2026-07-19  
+**Branch:** `integration/lazyload-rehab-repair`
+**Worktree:** `G:/LLM/rehab/.claude/worktrees/lazy-integration`
+**Baseline:** `0fa29d9` / `perfrom` / v335
+**Date:** 2026-07-19
 **Status:** implementation complete on integration branch — **no push / no merge to `perfrom` until user approves**
 
 ## Commits (integration)

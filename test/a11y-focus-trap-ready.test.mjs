@@ -44,5 +44,5 @@ test('F-T2: modal open ensures focusTrap, loading script if missing', () => {
 
 test('F-T3: a11y module is in SW ASSETS for offline modals', () => {
     const sw = read('sw.js');
-    assert.match(sw, /a11y-focus-trap\.js\?v=335/);
+    assert.match(sw, /a11y-focus-trap\.js\?v=336/);
 });

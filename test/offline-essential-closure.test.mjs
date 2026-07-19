@@ -67,9 +67,9 @@ function extractAssets(swSource) {
 }
 
 function baseName(asset) {
-    // 'history-view.js?v=335' -> 'history-view'
-    // 'ai-model-catalog-pure.mjs?v=335' -> 'ai-model-catalog-pure'
-    // 'storage/idb.js?v=335' -> 'storage/idb'
+    // 'history-view.js?v=336' -> 'history-view'
+    // 'ai-model-catalog-pure.mjs?v=336' -> 'ai-model-catalog-pure'
+    // 'storage/idb.js?v=336' -> 'storage/idb'
     const noQuery = asset.split('?')[0];
     return noQuery.replace(/\.(js|mjs|css|json|html|ico|svg|woff2)$/i, '');
 }
