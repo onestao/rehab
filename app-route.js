@@ -128,6 +128,11 @@
                 const activated = await window.ui._activateTab(page, nav, { preserveSubroute: true, navigationToken });
                 if (intentToken !== this._intentToken || (navigationToken != null && !window.ui.isCurrentNavigation?.(navigationToken))) return false;
                 if (activated === false) return false;
+                // Deep-link / hash paths must maintain the same stack contract as ui.tab.
+                if (page === 'today') window.navStack?.resetToRoot?.();
+                else window.navStack?.replaceTopOrPushTab?.(page);
+                if (page === 'profile') window.data.syncRoutineSubpageNav?.(window.data.routineView || 'home');
+                else if (page === 'records') window.data.syncHealthSubtabNav?.(window.data.healthView || 'diet');
             } finally {
                 if (this._applyingToken === intentToken) this._applying = false;
             }

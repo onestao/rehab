@@ -155,3 +155,55 @@ test('late completion from an older navigation cannot replace the latest page or
     assert.equal(window.data._activePageId, 'ai-coach');
     assert.equal(window.location.hash, '#/ai/advice?range=all');
 });
+
+test('appRoute.apply updates navStack for deep-linked tabs and subroutes', async () => {
+    const context = loadRouteHarness();
+    const { window } = context;
+    const calls = [];
+    window.navStack = {
+        stack: [{ type: 'tab', id: 'today' }],
+        resetToRoot() {
+            calls.push(['resetToRoot']);
+            this.stack = [{ type: 'tab', id: 'today' }];
+        },
+        replaceTopOrPushTab(id) {
+            calls.push(['replaceTopOrPushTab', id]);
+            this.stack = [{ type: 'tab', id: 'today' }, { type: 'tab', id }];
+        }
+    };
+    window.data.syncRoutineSubpageNav = (view) => {
+        calls.push(['syncRoutineSubpageNav', view]);
+        window.navStack.stack.push({ type: 'subtab', id: 'routine', view });
+    };
+    window.data.syncHealthSubtabNav = (view) => {
+        calls.push(['syncHealthSubtabNav', view]);
+    };
+    window.ui = {
+        beginNavigation() { return 1; },
+        isCurrentNavigation() { return true; },
+        async _activateTab(page) {
+            window.data._activePageId = page;
+            return true;
+        }
+    };
+
+    await window.appRoute.apply(window.appRoute.parseHash('#/profile/library'));
+    assert.equal(window.data._activePageId, 'profile');
+    assert.equal(window.data.routineView, 'library');
+    assert.deepEqual(calls, [
+        ['replaceTopOrPushTab', 'profile'],
+        ['syncRoutineSubpageNav', 'library']
+    ]);
+    assert.equal(window.navStack.stack.at(-1).type, 'subtab');
+
+    calls.length = 0;
+    await window.appRoute.apply(window.appRoute.parseHash('#/records/calendar'));
+    assert.deepEqual(calls, [
+        ['replaceTopOrPushTab', 'records'],
+        ['syncHealthSubtabNav', 'calendar']
+    ]);
+
+    calls.length = 0;
+    await window.appRoute.apply(window.appRoute.parseHash('#/today'));
+    assert.deepEqual(calls, [['resetToRoot']]);
+});

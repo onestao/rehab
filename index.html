@@ -768,6 +768,24 @@
     </nav>
     </div>
 
+    <script>
+        /* Early deep-link shell: flip active tab/page from hash before boot scripts paint Today. */
+        (function earlyDeepLinkShell() {
+            try {
+                const raw = String(window.location.hash || '').replace(/^#/, '').replace(/^!/, '').replace(/^\/?/, '');
+                if (!raw) return;
+                const first = raw.split('?')[0].split('/').filter(Boolean)[0] || 'today';
+                const map = { today: 'today', workout: 'workout', training: 'workout', records: 'records', profile: 'profile', me: 'profile', 'ai-coach': 'ai-coach', ai: 'ai-coach', advice: 'ai-coach' };
+                const page = map[first] || 'today';
+                if (page === 'today') return;
+                const order = ['today', 'workout', 'records', 'ai-coach', 'profile'];
+                document.querySelectorAll('.page').forEach((el) => el.classList.toggle('active', el.id === page));
+                document.querySelectorAll('.nav-item').forEach((el, i) => el.classList.toggle('active', order[i] === page));
+                document.documentElement.dataset.activePage = page;
+            } catch (_) { /* keep default shell */ }
+        })();
+    </script>
+
     <script data-rehab-entry data-kind="classic" data-src="m3e-ripple.js?v=335"></script>
     <script data-rehab-entry data-kind="classic" data-src="toast.js?v=335"></script>
     <script data-rehab-entry data-kind="classic" data-src="error-bus.js?v=335"></script>
@@ -1608,13 +1626,37 @@
         window.__rehabStartApplication = async () => {
             bootMark('boot:start');
             try { await i18n?.init?.(); i18n?.applyDom?.(document); } catch {}
-            const hadRouteHash = !!window.location.hash;
+            const hadRouteHash = !!window.location.hash && window.location.hash !== '#' && window.location.hash !== '#/';
             window.navStack?.init?.();
             window.appRoute?.init?.();
             theme.init();
+            // Single navigation transaction: resolve initial route before first ensureDeps/render
+            // so deep links never paint Today first and leave navStack stuck at root.
+            const initialRoute = hadRouteHash
+                ? (window.appRoute?.parseHash?.(window.location.hash) || { page: 'today' })
+                : { page: 'today' };
+            const initialPage = ({ today: 'today', workout: 'workout', records: 'records', 'ai-coach': 'ai-coach', profile: 'profile' })[initialRoute.page] || 'today';
+            const navIndexByPage = { today: 0, workout: 1, records: 2, 'ai-coach': 3, profile: 4 };
+            const applyShellRoute = (pageId) => {
+                const navItems = document.querySelectorAll('.nav-item');
+                document.querySelectorAll('.page').forEach((p) => p.classList.remove('active'));
+                document.getElementById(pageId)?.classList.add('active');
+                navItems.forEach((n) => n.classList.remove('active'));
+                navItems[navIndexByPage[pageId] || 0]?.classList.add('active');
+                document.documentElement.dataset.activePage = pageId;
+                if (window.data) window.data._activePageId = pageId;
+            };
+            if (initialPage !== 'today') {
+                if (initialPage === 'records') data.healthView = initialRoute.healthView || 'diet';
+                if (initialPage === 'profile') data.routineView = initialRoute.routineView || 'home';
+                if (initialPage === 'ai-coach') data.adviceRange = initialRoute.adviceRange || 'today';
+                applyShellRoute(initialPage);
+            } else {
+                data._activePageId = 'today';
+            }
             try {
                 bootMark('boot:deps:start');
-                await ensureDeps(document.querySelector('.page.active')?.id || 'today');
+                await ensureDeps(initialPage);
                 bootMark('boot:deps:end');
                 bootMeasure('boot:deps', 'boot:deps:start', 'boot:deps:end');
                 bootMark('boot:data-init:start');
@@ -1632,15 +1674,17 @@
                 if (window.toast) toast.show(`\u6570\u636e\u521d\u59cb\u5316\u5931\u8d25\uff1a${toast.sanitize ? toast.sanitize(e) : e?.message || e}`, 'error');
             }
             if (window.syncStatus) syncStatus.init();
-            if (hadRouteHash) await window.appRoute?.applyCurrent?.();
-            else {
+            if (hadRouteHash) {
+                // Completes navStack + subroute frames and re-syncs hash after data.init.
+                await window.appRoute?.applyCurrent?.();
+            } else {
                 const hasShortcut = (() => {
                     try { return new URLSearchParams(window.location.search).has('shortcut'); } catch { return false; }
                 })();
                 if (hasShortcut) await loadScript('pwa-support');
                 await window.pwaSupport?.openShortcut?.();
             }
-            if ((document.querySelector('.page.active')?.id || '') === 'today') scheduleTodayEnhancementLoad();
+            if ((document.querySelector('.page.active')?.id || data._activePageId || '') === 'today') scheduleTodayEnhancementLoad();
             scheduleServiceWorkerRegistration();
             try { document.getElementById('localeSelectSheet') && (document.getElementById('localeSelectSheet').value = i18n.currentLocale || 'auto'); } catch {}
             ui.syncSwitchAria(document.getElementById('isAlt'));
@@ -1649,7 +1693,7 @@
             }, { passive: true });
             runWhenIdle(() => {
                 bootMark('boot:idle-preload:start');
-                const activeId = document.querySelector('.page.active')?.id || 'today';
+                const activeId = document.querySelector('.page.active')?.id || data._activePageId || 'today';
                 const preloadBudget = idlePreloadBudget();
                 const pages = Object.keys(PAGE_DEPS).filter(p => p !== activeId).slice(0, preloadBudget);
                 let index = 0;

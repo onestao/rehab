@@ -49,9 +49,21 @@
                     return true;
                 }
             };
-            const top = this.top();
-            if (top.type === 'tab' && top.id !== 'today') {
-                this.stack[this.stack.length - 1] = entry;
+            let lastTabIdx = -1;
+            for (let i = this.stack.length - 1; i >= 0; i -= 1) {
+                if (this.stack[i]?.type === 'tab') {
+                    lastTabIdx = i;
+                    break;
+                }
+            }
+            // Already on this tab (possibly with subtabs/modals above): keep frames, refresh handler.
+            if (lastTabIdx > 0 && this.stack[lastTabIdx].id === id) {
+                this.stack[lastTabIdx] = entry;
+                return;
+            }
+            // Replace a non-root tab (and drop frames above it) when switching tabs.
+            if (lastTabIdx > 0 && this.stack[lastTabIdx].id !== 'today') {
+                this.stack = this.stack.slice(0, lastTabIdx).concat([entry]);
                 try { history.replaceState({ navIndex: this.stack.length - 1, type: 'tab', id }, ''); } catch {}
                 return;
             }
