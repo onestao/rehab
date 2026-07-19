@@ -34,6 +34,8 @@ const ASSETS = [
     'data-views.js?v=335',
     'data.js?v=335',
     'health-summary-pure.js?v=335',
+    // Today essential: PAGE_DEPS.today requires history-view (FIND-05).
+    'history-view.js?v=335',
     'today-view-core.js?v=335',
     'ai-model-catalog-pure.mjs?v=335',
     'ai-routing-pure.mjs?v=335',
