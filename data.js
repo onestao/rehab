@@ -111,6 +111,18 @@ const LAZY_RECORD_OPENERS = {
     }
 };
 
+/** Plan UI methods exposed by first-paint hard onclick before plan-ui loads. */
+const LAZY_PLAN_OPENERS = [
+    'openNewPlanSheet',
+    'openPlanTaskDrawer',
+    'handlePlanTaskTap',
+    'selectTodayPlan',
+    'openPlanTodayAiSheet',
+    'enhanceTodayPage'
+];
+
+const PLAN_FEATURE_FAIL_TOAST = '计划功能暂时未加载成功。请检查网络后重试，已保存的训练记录不会丢失。';
+
 async function loadAppScripts(names = []) {
     if (typeof window.loadAppScript !== 'function') {
         throw new Error('模块加载器尚未就绪，请稍后重试');
@@ -118,6 +130,154 @@ async function loadAppScripts(names = []) {
     const unique = [...new Set(names)].filter(Boolean);
     await Promise.all(unique.map(name => window.loadAppScript(name)));
     data.refreshModules?.();
+}
+
+function currentActivePageId() {
+    return data._activePageId
+        || document.querySelector?.('.page.active')?.id
+        || '';
+}
+
+function currentNavigationGeneration() {
+    const token = window.ui?._navigationToken;
+    return Number.isFinite(token) ? token : 0;
+}
+
+function resolvePlanMethod(actionName) {
+    const fromOwner = window.dataPlanUi?.[actionName];
+    if (typeof fromOwner === 'function' && fromOwner !== data[actionName]) return fromOwner;
+    const merged = data[actionName];
+    if (typeof merged === 'function' && !merged.__isPlanFeatureGateStub) return merged;
+    if (typeof fromOwner === 'function') return fromOwner;
+    return null;
+}
+
+function createPlanFeatureGate() {
+    const gate = {
+        state: 'unloaded',
+        _loadPromise: null,
+        _pendingByAction: Object.create(null),
+        _intentSeq: 0,
+
+        getState() {
+            return this.state;
+        },
+
+        async ensureReady() {
+            if (this.state === 'ready' && LAZY_PLAN_OPENERS.every((name) => resolvePlanMethod(name))) {
+                return true;
+            }
+            if (this._loadPromise) return this._loadPromise;
+
+            this.state = 'loading';
+            this._loadPromise = (async () => {
+                if (typeof window.loadAppScript !== 'function') {
+                    throw new Error('模块加载器尚未就绪');
+                }
+                await window.loadAppScript('plan-ui');
+                data.refreshModules?.();
+                const missing = LAZY_PLAN_OPENERS.filter((name) => !resolvePlanMethod(name));
+                if (missing.length) {
+                    throw new Error(`计划模块未注册: ${missing.join(', ')}`);
+                }
+                this.state = 'ready';
+                return true;
+            })().catch((error) => {
+                this.state = 'failed';
+                this._loadPromise = null;
+                throw error;
+            }).finally(() => {
+                if (this.state === 'ready') this._loadPromise = null;
+            });
+
+            return this._loadPromise;
+        },
+
+        async run(actionName, args = [], context = {}) {
+            const implNow = resolvePlanMethod(actionName);
+            if (implNow) return implNow.apply(data, args);
+
+            // Single-flight: rapid clicks share one load + one replay.
+            const existing = this._pendingByAction[actionName];
+            if (existing) return existing.promise;
+
+            const intentId = ++this._intentSeq;
+            const routeAtClick = context.routeAtClick || currentActivePageId() || 'today';
+            const navigationGeneration = context.navigationGeneration ?? currentNavigationGeneration();
+            const intent = {
+                intentId,
+                actionName,
+                args,
+                routeAtClick,
+                navigationGeneration,
+                status: 'loading',
+                createdAt: Date.now(),
+                promise: null
+            };
+
+            // Reserve the slot synchronously before any await so concurrent callers join.
+            const promise = (async () => {
+                const busyKey = actionName;
+                data.beginActionBusy?.(busyKey, '加载中');
+                try {
+                    await this.ensureReady();
+                    const active = currentActivePageId() || routeAtClick;
+                    const stillSameRoute = !routeAtClick || active === routeAtClick;
+                    const gen = currentNavigationGeneration();
+                    const generationOk = !navigationGeneration || gen === navigationGeneration || gen === 0;
+                    if (!stillSameRoute || !generationOk) {
+                        intent.status = 'cancelled';
+                        return undefined;
+                    }
+                    const impl = resolvePlanMethod(actionName);
+                    if (!impl) throw new Error(`计划方法未就绪: ${actionName}`);
+                    intent.status = 'done';
+                    return impl.apply(data, intent.args);
+                } catch (error) {
+                    intent.status = 'failed';
+                    this.state = 'failed';
+                    window.errorBus?.report?.(`plan-feature.${actionName}`, error);
+                    window.toast?.show?.(PLAN_FEATURE_FAIL_TOAST, 'error');
+                    return undefined;
+                } finally {
+                    data.endActionBusy?.(busyKey);
+                    if (this._pendingByAction[actionName]?.intentId === intentId) {
+                        delete this._pendingByAction[actionName];
+                    }
+                }
+            })();
+
+            intent.promise = promise;
+            this._pendingByAction[actionName] = intent;
+            return promise;
+        }
+    };
+    return gate;
+}
+
+function attachPlanFeatureGate() {
+    data.planFeatureGate = data.planFeatureGate || createPlanFeatureGate();
+    const gate = data.planFeatureGate;
+    // If a previous load already registered real methods, mark ready.
+    if (LAZY_PLAN_OPENERS.every((name) => resolvePlanMethod(name))) {
+        gate.state = 'ready';
+    }
+
+    LAZY_PLAN_OPENERS.forEach((actionName) => {
+        if (resolvePlanMethod(actionName) && typeof data[actionName] === 'function' && !data[actionName].__isPlanFeatureGateStub) {
+            return;
+        }
+        if (typeof data[actionName] === 'function' && data[actionName].__isPlanFeatureGateStub) return;
+
+        const stub = function (...args) {
+            return data.planFeatureGate.run(actionName, args, {
+                routeAtClick: currentActivePageId() || 'today',
+                navigationGeneration: currentNavigationGeneration()
+            });
+        };
+        stub.__isPlanFeatureGateStub = true;
+        data[actionName] = stub;
+    });
 }
 
 function attachPlanAliases() {
@@ -178,6 +338,7 @@ function attachLazyRecordOpeners() {
 
 attachPlanAliases();
 attachLazyRecordOpeners();
+attachPlanFeatureGate();
 
 async function checkAppUpdate() {
     if (!data.beginActionBusy?.('checkAppUpdate', '检测中...')) return;
@@ -287,6 +448,7 @@ data.refreshModules = function () {
 
     attachPlanAliases();
     attachLazyRecordOpeners();
+    attachPlanFeatureGate();
     attachStableUpdateCheck();
     window.advicePanel?.attach?.(data);
     window['planAiDebug']?.install?.();

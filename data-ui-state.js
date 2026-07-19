@@ -5,6 +5,12 @@
         if (key === 'openWeightModal') return '[onclick*="openWeightModal"],[data-q="weight"],[data-plan-quick="weight"]';
         if (key === 'openExerciseModal') return '[onclick*="openExerciseModal"],[data-q="cardio"],[data-plan-quick="cardio"]';
         if (key === 'openPlanAiSheet') return '[onclick*="openPlanAiSheet"],[onclick*="openPlanTodayAiSheet"],[onclick*="createSelectedPlans"]';
+        if (key === 'openNewPlanSheet') return '[onclick*="openNewPlanSheet"]';
+        if (key === 'openPlanTaskDrawer') return '[onclick*="openPlanTaskDrawer"]';
+        if (key === 'handlePlanTaskTap') return '[onclick*="handlePlanTaskTap"]';
+        if (key === 'selectTodayPlan') return '[onclick*="selectTodayPlan"]';
+        if (key === 'openPlanTodayAiSheet') return '[onclick*="openPlanTodayAiSheet"]';
+        if (key === 'enhanceTodayPage') return '';
         if (key === 'openPlanTaskEdit') return '[onclick*="openPlanTaskEdit"]';
         if (key === 'checkAppUpdate') return '#profileUpdateCheckBtn';
         return '';
