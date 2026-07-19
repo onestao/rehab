@@ -101,6 +101,8 @@ let legacyMigrationRounds = 0;
 let cleanupOldCachesPromise = null;
 const legacyNavigationAttempts = new Map();
 const pageReadyClientIds = new Set();
+/** Clients that reported an active rehab session — hard navigate must not interrupt them. */
+const sessionDeferClientIds = new Set();
 
 async function isReleaseCacheReady() {
     const cache = await caches.open(CACHE);
@@ -266,6 +268,13 @@ async function navigateLegacyUpgradeClient(cache, request) {
         if (pageReadyClientIds.has(clientId)) {
             await cache.delete(request);
             return 'soft-ready';
+        }
+        // Active training / drafts: never hard-navigate this tab. Keep marker + soft notify
+        // so it upgrades only after the client clears deferral (session end / save).
+        if (sessionDeferClientIds.has(clientId)) {
+            const stillDeferred = await self.clients.get(clientId);
+            if (stillDeferred) notifyLegacyRefreshRequired(stillDeferred);
+            return 'deferred-for-session';
         }
         const stillAfterGrace = await self.clients.get(clientId);
         if (!stillAfterGrace || typeof stillAfterGrace.navigate !== 'function') {
@@ -540,10 +549,32 @@ self.addEventListener('message', (e) => {
                 scheduleLegacyUpgradeMigration(0);
                 return;
             }
+            const readyId = String(e.source?.id || '');
+            if (readyId) sessionDeferClientIds.delete(readyId);
             await acknowledgeV327Page(e.source);
             // Ready only clears this client's marker. Old caches stay until every
             // live client is ready (or gone) — never on the first PAGE_READY alone.
             await cleanupOldCachesIfLegacyMigrationComplete();
+            scheduleLegacyUpgradeMigration(0);
+        })());
+    }
+    if (e.data && e.data.type === 'UPDATE_DEFER_FOR_SESSION') {
+        e.waitUntil((async () => {
+            const clientId = String(e.source?.id || e.data.clientId || '');
+            if (!clientId) return;
+            sessionDeferClientIds.add(clientId);
+            // Soft-notify only; do not hard-navigate while deferred.
+            try {
+                const client = await self.clients.get(clientId);
+                if (client) notifyLegacyRefreshRequired(client);
+            } catch {}
+        })());
+    }
+    if (e.data && e.data.type === 'UPDATE_SESSION_CLEAR') {
+        e.waitUntil((async () => {
+            const clientId = String(e.source?.id || e.data.clientId || '');
+            if (clientId) sessionDeferClientIds.delete(clientId);
+            // Session ended — re-evaluate pending legacy migrations for this client.
             scheduleLegacyUpgradeMigration(0);
         })());
     }
