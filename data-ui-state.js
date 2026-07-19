@@ -85,7 +85,16 @@
                 id: `routine-${Date.now()}`,
                 close: () => this._closeActiveModalInternal(),
             });
-            if (window.focusTrap?.trap) window.focusTrap.trap(modal);
+            const applyFocusTrap = () => {
+                if (this._activeModalEl === modal && window.focusTrap?.trap) {
+                    window.focusTrap.trap(modal);
+                }
+            };
+            applyFocusTrap();
+            // Phase F: do not wait solely on +2s utility idle — ensure trap before first modal use.
+            if (!window.focusTrap?.trap && typeof window.loadAppScript === 'function') {
+                window.loadAppScript('a11y-focus-trap').then(applyFocusTrap).catch(() => {});
+            }
             try {
                 onMount?.(modal, close);
             } catch {}

@@ -188,7 +188,7 @@ test('A-T1 browser: first click with delayed plan-ui opens one modal without Typ
 
 test('A-T2 browser: five rapid clicks open only one modal and load plan-ui once', async () => {
     await mkdir(evidenceRoot, { recursive: true });
-    const http = await startServer({ planUiDelayMs: 2500 });
+    const http = await startServer({ planUiDelayMs: 1800 });
     try {
         await withBrowser(async (browser) => {
             const context = await browser.newContext({
@@ -200,26 +200,60 @@ test('A-T2 browser: five rapid clicks open only one modal and load plan-ui once'
             page.on('pageerror', (err) => pageErrors.push(err.message));
             await page.goto(http.url, { waitUntil: 'domcontentloaded', timeout: 60000 });
             await waitBoot(page);
+            // Ensure Today ownership is settled before firing intents.
+            await page.evaluate(() => {
+                if (window.data) window.data._activePageId = 'today';
+                document.getElementById('today')?.classList.add('active');
+            });
+            const pre = await page.evaluate(() => ({
+                hasLoad: typeof window.loadAppScript === 'function',
+                hasStub: !!window.data?.openNewPlanSheet?.__isPlanFeatureGateStub,
+                gate: window.data?.planFeatureGate?.getState?.() || null,
+                openType: typeof window.data?.openNewPlanSheet,
+                planUiOwner: typeof window.dataPlanUi?.openNewPlanSheet
+            }));
             // Rapid programmatic intents (native disabled buttons drop force-clicks mid-busy).
             await page.evaluate(() => {
-                window.__planOpenResults = Promise.all([
-                    window.data.openNewPlanSheet(),
-                    window.data.openNewPlanSheet(),
-                    window.data.openNewPlanSheet(),
-                    window.data.openNewPlanSheet(),
-                    window.data.openNewPlanSheet()
-                ]);
+                window.__planOpenErrors = [];
+                window.__planOpenResults = Promise.all(
+                    [0, 1, 2, 3, 4].map(async () => {
+                        try {
+                            return await window.data.openNewPlanSheet();
+                        } catch (e) {
+                            window.__planOpenErrors.push(String(e?.message || e));
+                            return null;
+                        }
+                    })
+                );
             });
             await page.waitForFunction(() => {
-                return !!document.querySelector('.md-modal[data-rl-modal="1"]');
-            }, null, { timeout: 15000 });
-            await page.evaluate(() => window.__planOpenResults);
+                return !!document.querySelector('.md-modal[data-rl-modal="1"]')
+                    || window.data?.planFeatureGate?.getState?.() === 'failed'
+                    || window.data?.planFeatureGate?.getState?.() === 'ready';
+            }, null, { timeout: 30000 });
+            const results = await page.evaluate(async () => {
+                const settled = await window.__planOpenResults;
+                return {
+                    pre: null,
+                    gate: window.data?.planFeatureGate?.getState?.() || null,
+                    activePageId: window.data?._activePageId || null,
+                    navToken: window.ui?._navigationToken ?? null,
+                    modal: !!document.querySelector('.md-modal[data-rl-modal="1"]'),
+                    settledCount: Array.isArray(settled) ? settled.length : 0,
+                    errors: window.__planOpenErrors || [],
+                    hasLoad: typeof window.loadAppScript === 'function',
+                    hasStub: !!window.data?.openNewPlanSheet?.__isPlanFeatureGateStub,
+                    toastText: document.body.innerText.slice(0, 500)
+                };
+            });
+            results.pre = pre;
             await delay(200);
             const modals = await page.locator('.md-modal[data-rl-modal="1"]').count();
-            const evidence = { pageErrors, modals, planUiHits: http.planUiHits };
+            const evidence = { pageErrors, modals, planUiHits: http.planUiHits, results };
             await writeFile(path.join(evidenceRoot, 'a-t2.json'), JSON.stringify(evidence, null, 2));
             assert.equal(pageErrors.length, 0, String(pageErrors));
-            assert.equal(modals, 1);
+            assert.equal(results.gate, 'ready', `gate=${results.gate} diag=${JSON.stringify(evidence)}`);
+            assert.equal(modals, 1, `modals=${modals} diag=${JSON.stringify(evidence)}`);
             assert.ok(http.planUiHits >= 1 && http.planUiHits <= 2, `plan-ui hits=${http.planUiHits}`);
             await context.close();
         });

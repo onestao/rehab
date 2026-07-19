@@ -221,10 +221,15 @@ function createPlanFeatureGate() {
                 data.beginActionBusy?.(busyKey, '加载中');
                 try {
                     await this.ensureReady();
-                    const active = currentActivePageId() || routeAtClick;
-                    const stillSameRoute = !routeAtClick || active === routeAtClick;
+                    const active = currentActivePageId() || '';
+                    // Empty active means route not yet resolved — do not treat as navigated-away.
+                    const stillSameRoute = !routeAtClick || !active || active === routeAtClick;
                     const gen = currentNavigationGeneration();
-                    const generationOk = !navigationGeneration || gen === navigationGeneration || gen === 0;
+                    // Cancel only when a real tab navigation advanced the token after the click.
+                    const generationOk = !navigationGeneration
+                        || navigationGeneration === 0
+                        || gen === 0
+                        || gen === navigationGeneration;
                     if (!stillSameRoute || !generationOk) {
                         intent.status = 'cancelled';
                         return undefined;
