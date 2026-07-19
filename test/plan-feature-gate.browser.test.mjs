@@ -200,11 +200,18 @@ test('A-T2 browser: five rapid clicks open only one modal and load plan-ui once'
             page.on('pageerror', (err) => pageErrors.push(err.message));
             await page.goto(http.url, { waitUntil: 'domcontentloaded', timeout: 60000 });
             await waitBoot(page);
-            // Ensure Today ownership is settled before firing intents.
+            // Ensure Today ownership is settled and script loader is live before firing intents.
+            await page.waitForFunction(() => {
+                return typeof window.loadAppScript === 'function'
+                    && typeof window.data?.openNewPlanSheet === 'function'
+                    && !!document.querySelector('#today');
+            }, null, { timeout: 20000 });
             await page.evaluate(() => {
                 if (window.data) window.data._activePageId = 'today';
                 document.getElementById('today')?.classList.add('active');
             });
+            // Short settle so concurrent first-paint work does not starve plan-ui fetch.
+            await delay(400);
             const pre = await page.evaluate(() => ({
                 hasLoad: typeof window.loadAppScript === 'function',
                 hasStub: !!window.data?.openNewPlanSheet?.__isPlanFeatureGateStub,
