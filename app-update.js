@@ -67,6 +67,16 @@ const appUpdate = {
                         version: this.version
                     });
                 } catch {}
+                this.hideUpgradeOverlay();
+                return;
+            }
+            if (this.hasActiveRehabSession()) {
+                this.deferredForSession = true;
+                this.showUpdateDeferredForSession();
+                window.errorBus?.event?.('appUpdate', 'controllerchange:deferred-for-session', {
+                    version: this.version,
+                    reason
+                });
                 return;
             }
             if (!this.claimControllerReload()) {
@@ -74,6 +84,7 @@ const appUpdate = {
                 this.showRefreshRequired('更新已完成，请刷新页面');
                 return;
             }
+            this.showUpgradeOverlay('正在完成更新…');
             window.errorBus?.event?.('appUpdate', reason, { version: this.version });
             window.location.reload();
         };
@@ -217,18 +228,60 @@ const appUpdate = {
         });
     },
 
+    hasActiveRehabSession() {
+        try {
+            const w = window.workoutSystem || window.workout;
+            if (w?.isPlaying) return true;
+            if (window.data?._pendingLocalWrite) return true;
+            return false;
+        } catch {
+            return false;
+        }
+    },
+
+    showUpdateDeferredForSession() {
+        this.notify('训练进行中，更新已推迟。结束后可在设置中完成更新。', 'info');
+        const banner = document.getElementById('appUpdateBanner');
+        if (!banner) return;
+        banner.classList.remove('hidden');
+        const title = banner.querySelector('strong');
+        const detail = banner.querySelector('small');
+        if (title) title.textContent = '更新已就绪（训练中推迟）';
+        if (detail) detail.textContent = '当前训练不会被打断。训练结束后再点“立即更新”。';
+    },
+
     async apply() {
         const worker = this.waitingWorker || this.registration?.waiting;
         if (!worker) {
+            if (this.hasActiveRehabSession()) {
+                this.showUpdateDeferredForSession();
+                window.errorBus?.event?.('appUpdate', 'apply:deferred-no-worker');
+                return { ok: false, reason: 'active-session' };
+            }
             window.errorBus?.event?.('appUpdate', 'apply:reloadFallback');
             window.location.reload();
             return;
+        }
+
+        if (this.hasActiveRehabSession()) {
+            this.deferredForSession = true;
+            this.waitingWorker = worker;
+            this.showUpdateDeferredForSession();
+            window.errorBus?.event?.('appUpdate', 'apply:deferred-for-session');
+            return { ok: false, reason: 'active-session' };
         }
 
         this.bindControllerReload(!!navigator.serviceWorker.controller);
         try {
             window.errorBus?.event?.('appUpdate', 'apply:prepare', { state: worker.state || '' });
             await this.prepareWaitingWorker(worker);
+            if (this.hasActiveRehabSession()) {
+                this.deferredForSession = true;
+                this.showUpdateDeferredForSession();
+                window.errorBus?.event?.('appUpdate', 'apply:deferred-after-prepare');
+                return { ok: false, reason: 'active-session' };
+            }
+            this.showUpgradeOverlay('正在完成更新…');
             window.errorBus?.event?.('appUpdate', 'apply:skipWaiting', { state: worker.state || '' });
             worker.postMessage({ type: 'SKIP_WAITING' });
             window.setTimeout(() => {
@@ -237,10 +290,43 @@ const appUpdate = {
                     this.showRefreshRequired('更新可能已完成，请刷新页面');
                 }
             }, 15000);
+            return { ok: true };
         } catch (e) {
+            this.hideUpgradeOverlay();
             window.errorBus?.event?.('appUpdate', 'apply:failed', { error: e });
             this.notify('更新失败：' + (e?.message || '请稍后重试'), 'error');
+            return { ok: false, reason: 'failed', error: e };
         }
+    },
+
+    showUpgradeOverlay(message = '正在完成更新…') {
+        let el = document.getElementById('rehabUpgradeOverlay');
+        if (!el) {
+            el = document.createElement('div');
+            el.id = 'rehabUpgradeOverlay';
+            el.setAttribute('role', 'alertdialog');
+            el.setAttribute('aria-live', 'assertive');
+            el.setAttribute('aria-modal', 'true');
+            el.style.cssText = 'position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;background:rgba(15,23,42,.72);color:#fff;font:600 16px/1.4 system-ui,sans-serif;pointer-events:all;';
+            el.innerHTML = `<div style="padding:20px 24px;border-radius:16px;background:#0f172a;max-width:280px;text-align:center">${message}</div>`;
+            document.body.appendChild(el);
+            // Block keyboard until ready.
+            el._keyHandler = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+            };
+            document.addEventListener('keydown', el._keyHandler, true);
+        } else {
+            el.querySelector('div').textContent = message;
+            el.style.display = 'flex';
+        }
+    },
+
+    hideUpgradeOverlay() {
+        const el = document.getElementById('rehabUpgradeOverlay');
+        if (!el) return;
+        if (el._keyHandler) document.removeEventListener('keydown', el._keyHandler, true);
+        el.remove();
     },
 
     dismiss() {

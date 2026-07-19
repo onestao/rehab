@@ -784,6 +784,28 @@
                 document.documentElement.dataset.activePage = page;
             } catch (_) { /* keep default shell */ }
         })();
+        /* Upgrade navigate barrier: block interaction until app boot finishes. */
+        (function earlyUpgradeOverlay() {
+            try {
+                const url = new URL(window.location.href);
+                if (url.searchParams.get('__rehab_upgrade') !== '335') return;
+                const el = document.createElement('div');
+                el.id = 'rehabUpgradeOverlay';
+                el.setAttribute('role', 'alertdialog');
+                el.setAttribute('aria-live', 'assertive');
+                el.setAttribute('aria-modal', 'true');
+                el.style.cssText = 'position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;background:rgba(15,23,42,.72);color:#fff;font:600 16px/1.4 system-ui,sans-serif;pointer-events:all;';
+                el.innerHTML = '<div style="padding:20px 24px;border-radius:16px;background:#0f172a;max-width:280px;text-align:center">正在完成更新…</div>';
+                (document.body || document.documentElement).appendChild(el);
+                const block = (e) => { e.preventDefault(); e.stopPropagation(); };
+                document.addEventListener('keydown', block, true);
+                window.__rehabClearUpgradeOverlay = () => {
+                    document.removeEventListener('keydown', block, true);
+                    el.remove();
+                    delete window.__rehabClearUpgradeOverlay;
+                };
+            } catch (_) { /* no overlay */ }
+        })();
     </script>
 
     <script data-rehab-entry data-kind="classic" data-src="m3e-ripple.js?v=335"></script>
@@ -1216,11 +1238,15 @@
         function schedulePostRenderUtilityLoad() {
             if (schedulePostRenderUtilityLoad._scheduled) return;
             schedulePostRenderUtilityLoad._scheduled = true;
+            // a11y focus trap must be available before the first modal (FIND modal/a11y).
+            // Load it immediately; defer non-critical haptics/sheet-drag to idle.
+            loadScript('a11y-focus-trap').then(() => {
+                window.focusTrap?.attachOpenModals?.();
+            }).catch(() => {});
             window.setTimeout(() => {
                 runWhenIdle(() => {
                     Promise.allSettled([
                         loadScript('haptics'),
-                        loadScript('a11y-focus-trap'),
                         loadScript('sheet-drag')
                     ]).catch(() => {});
                 }, { timeout: 6000 });
@@ -1705,6 +1731,7 @@
             }
             if ((document.querySelector('.page.active')?.id || data._activePageId || '') === 'today') scheduleTodayEnhancementLoad();
             scheduleServiceWorkerRegistration();
+            try { window.__rehabClearUpgradeOverlay?.(); window.appUpdate?.hideUpgradeOverlay?.(); } catch {}
             try { document.getElementById('localeSelectSheet') && (document.getElementById('localeSelectSheet').value = i18n.currentLocale || 'auto'); } catch {}
             ui.syncSwitchAria(document.getElementById('isAlt'));
             window.addEventListener('scroll', () => {
