@@ -3,7 +3,7 @@
 **Branch:** `integration/lazyload-rehab-repair`
 **Worktree:** `G:/LLM/rehab/.claude/worktrees/lazy-integration`
 **Baseline:** `0fa29d9` / `perfrom` / was v335
-**Candidate HEAD:** `5836239ab5aec48cc931b6731bf4857ccad117b9`
+**Candidate HEAD:** `01ffecc3a54f566e521f6661c178a7f6cf65e6d6`
 **Release version:** **v336** (bumped via `node scripts/bump-version.js --patch`)
 **Date:** 2026-07-20
 **Status:** implementation + full gates complete on integration branch —
@@ -13,7 +13,7 @@
 
 | Item | Value |
 |------|--------|
-| HEAD | `5836239ab5aec48cc931b6731bf4857ccad117b9` |
+| HEAD | `01ffecc3a54f566e521f6661c178a7f6cf65e6d6` |
 | Branch | `integration/lazyload-rehab-repair` |
 | Working tree | clean (except this report rewrite) |
 | Baseline | `0fa29d9` |
@@ -33,6 +33,7 @@
 | `31a3ce7` | chore: bump release to v336 after session-defer repair |
 | `cbe2a92` | test: retarget version pins and cache cleanup expects for v336 |
 | `5836239` | test: harden A-T2 browser settle and add pre-merge evidence harness |
+| `01ffecc` | docs: rewrite lazyload repair final validation with real gate evidence |
 
 Logs: `G:/LLM/rehab/.tmp/lazyload-repair/gates/00-freeze-final.txt`
 
@@ -129,4 +130,4 @@ Summary JSON: `G:/LLM/rehab/.tmp/lazyload-repair/evidence/summary.json`
 
 - **Do not push** `integration/lazyload-rehab-repair`.
 - **Do not merge** into `perfrom` until user confirms after reviewing this report and gates.
-- Candidate ready for user approval: **v336 @ `5836239`**.
+- Candidate ready for user approval: **v336 @ `01ffecc`**.
