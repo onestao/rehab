@@ -1,12 +1,12 @@
 # Lazyload Rehab Repair — Requirements Traceability Matrix
 
-**Branch:** `integration/lazyload-rehab-repair`  
-**Worktree:** `G:/LLM/rehab/.claude/worktrees/lazy-integration`  
+**Branch:** `fix/lazyload-repair-closeout-v336` (closeout) · prior matrix on `integration/lazyload-rehab-repair`  
+**Worktree:** `G:/LLM/rehab/.claude/worktrees/lazy-closeout`  
 **Baseline:** `0fa29d9` / `perfrom` / v335  
-**Candidate HEAD:** `5ebcfd1513eb4d3ce85104edad9974c1089711c2`  
-**Release:** **v336** / `training-assistant-v336`  
+**Pre-closeout matrix freeze:** `fc83ab8`  
+**Release:** **v342** / `training-assistant-v342`  
 **Date:** 2026-07-20  
-**Scope:** 合入前任务书完成度与证据追踪复核（只读；不扩修；不 push；不 merge）
+**Scope:** closeout implementation + re-verified gates (see `docs/audits/lazyload-repair-closeout-final.md`). No push / no merge until user approves.
 
 ### Sources
 
@@ -44,9 +44,10 @@
 
 ### Freeze note
 
-- Working tree at audit time: clean at `5ebcfd1`.
-- Final validation doc freeze table still cites `01ffecc` for “Candidate HEAD”; later pin commit is `5ebcfd1` (docs-only SHA pin). Functional code freeze for gates is **v336 @ `5ebcfd1`** after `31a3ce7` bump + test retargets + evidence harness.
-- Gates claimed in final validation (npm 687, browser 7, evidence 10/10) have log files under `.tmp/lazyload-repair/gates/`; this matrix does **not** re-execute them.
+- Pre-closeout matrix freeze: clean at `fc83ab8` (v336 era).
+- Closeout branch: `fix/lazyload-repair-closeout-v336` · worktree `lazy-closeout` · production fingerprint **v342**.
+- Closeout gates re-run: unit **708**, formal browser lazyload **14**, evidence **10/10**, version check OK.
+- Authoritative closeout report: `docs/audits/lazyload-repair-closeout-final.md`.
 
 ---
 
@@ -54,11 +55,12 @@
 
 | Question | Answer |
 |----------|--------|
-| Core FIND-01–06 product failures (plan first-click, deep-link shell/navStack app-back, cancelled nav side effects, Today history-view precache, plan fail toast, basic update defer) | **Largely DONE** with E2–E3 |
-| Full task-book delivery (architecture docs, full offline rehab loop, post-upgrade session restore, full a11y, phase G hygiene, system browser-back) | **Not complete** — several **PARTIAL / NOT DONE / DEFERRED** |
-| Forbidden “fixes” (full sync load, `?.` silence for plan openers, SW off as product fix, bloat all pages into ASSETS) | **Not observed** on plan openers / SW |
-| Recommend merge to `perfrom` as-is? | **Conditional yes for A–F core release**, **only if** product accepts residual risks in §6. **No** if stakeholder treats architecture docs + 1.4 restore + B-T4 system-back + FIND-07 as merge blockers. |
-| Expand fixes now? | **No** (per user instruction). Report gaps only. |
+| Core FIND-01–06 product failures (plan first-click, deep-link shell/navStack app-back, cancelled nav side effects, Today history-view precache, plan fail toast, basic update defer) | **DONE** with E2–E3 (inherited + re-verified at closeout) |
+| Closeout residual blockers (FIND-07 hard openers, B-T4 progressive back, H3 a11y E3, H5 journal restore, architecture/PWA docs, formal release scripts) | **DONE** — see closeout-final |
+| Full offline rehab / FIND-11–16 hygiene / CI default `test:release` | **Scheme B + DEFERRED WITH ACCEPTED RISK** — not release blockers |
+| Forbidden “fixes” (full sync load, `?.` silence for plan openers, SW off as product fix, bloat all pages into ASSETS) | **Not used** |
+| Recommend merge to `perfrom` as-is? | **Yes for closeout candidate after user review** of closeout-final + residual deferred list |
+| Expand fixes now? | **No** — closeout complete; stop for approval (no push / no merge). |
 
 ---
 
@@ -66,11 +68,11 @@
 
 | ID | Requirement | Status | Evidence | Notes |
 |----|-------------|--------|----------|-------|
-| P-1.1 | First visible click completes intent or loading→auto-continue; no second click; no silent `?.`; no raw tech error to user | **DONE** (plan openers path) | E3: A-T1/A-T2/A-T3, S1/S2; E2: plan-feature-gate unit | Covers `openNewPlanSheet` / gate openers. **Does not** cover FIND-07 weekly/AI `?.` buttons. |
-| P-1.2 | Active training state independent of DOM/route/SW update; must not be reset unintentionally | **PARTIAL** | E2: C unit + E-T*; E3: S4/S6/S7 | Cancelled nav does not force workout mode; update defer broad. No assert that timers/pain drafts survive arbitrary route/module preload independently of DOM. |
-| P-1.3 | Minimal offline rehab loop: view Today plan, start/pause/complete, local pain/symptom, back/close; online features degrade clearly | **PARTIAL** | E1/E2: D-T1–T3; E3: S5 cache 200 for history-view/today-view-core/data | Precache closes FIND-05 Today script hole. **No** E3 that offline start→pause→complete training + pain save works. Workout/AI pages still warm-dependent (accepted non-bloat). |
-| P-1.4 | No force-navigate mid dangerous moment; save → mark pending → safe apply → **restore recoverable training state** | **PARTIAL** | E2: E-T1–T8; E3: S6/S7; E1: SW defer before `client.navigate` | Block/defer **DONE**. Explicit pre-update local save orchestration + **post-upgrade session restore** **NOT DONE**. |
-| P-1.5 | a11y core not deferred utility: focus trap, Escape/system close, focus restore, close control, keyboard, busy/error a11y | **PARTIAL** | E1: F-T1–T3; E3: S8 (script load path) | Trap loads early + open-path ensure. Escape handled in `a11y-focus-trap.js`. **No** E3 Tab cycle / Escape close / focus-return / AT busy asserts. S8: `trapApi: false` at sample point (script present, API not yet true). |
+| P-1.1 | First visible click completes intent or loading→auto-continue; no second click; no silent `?.`; no raw tech error to user | **DONE** | E3: A-T1–T3, H1-T1–T3, S1/S2; E2: plan-feature-gate unit | Plan openers + FIND-07 weekly/AI hard buttons non-silent. |
+| P-1.2 | Active training state independent of DOM/route/SW update; must not be reset unintentionally | **DONE** (core path) | E2: C unit + E-T* + H5; E3: S4/S6/S7 | Cancelled nav does not force workout mode; update defer + journal freeze. |
+| P-1.3 | Minimal offline rehab loop: view Today plan, start/pause/complete, local pain/symptom, back/close; online features degrade clearly | **Scheme B DONE** | E1/E2: D-T1–T3; E3: S5; offline contract | Essential Today ⊆ ASSETS. Full offline rehab **not** claimed. |
+| P-1.4 | No force-navigate mid dangerous moment; save → mark pending → safe apply → **restore recoverable training state** | **DONE** (closeout journal) | E2: E-T* + H5-T1–T4; E3: S6/S7/S9 | Defer + `saveJournal` freeze + `restoreIfNeeded` path. |
+| P-1.5 | a11y core not deferred utility: focus trap, Escape/system close, focus restore, close control, keyboard, busy/error a11y | **DONE** (closeout trap E3) | E2: F-T1–T4; E3: H3-T1/T2 | Delayed trap still Tab-cycles; Escape + head close button. |
 
 ---
 
@@ -80,18 +82,18 @@
 |----|------------------|--------|------------------|--------------------------------|----------|----------|
 | **FIND-01** Plan first-click TypeError | P1 | **DONE** | `data.js` planFeatureGate + LAZY_PLAN_OPENERS stubs; attach on load | A-T1: delay plan-ui, real click, 0 TypeError, 1 modal; A-T2: 5 intents → 1 modal, gate=ready, planUiHits 1–2; unit first-open/replay/single-flight | E3+E2 | Drawer/continue-train paths share openers list; not each button click-tested in browser. |
 | **FIND-02** Deep-link paints Today first | P1 | **DONE** | `index.html` earlyDeepLinkShell; boot parse→shell→ensureDeps(initial)→side effects→init→applyCurrent | B-T1: no Today flash after profile shell; S3 active=profile | E3 | Sub-ms first paint of default HTML class before early script still possible in theory; assert samples post-shell. |
-| **FIND-03** navStack / back broken | P1 | **PARTIAL** | app-route + navStack replaceTopOrPushTab on activate; boot single transaction | B-T2: hash/DOM/stack/subroute align; B-T3: requestClose not no-op, progressive leave library | E3 | **B-T4 system/browser `history.back` leaving SPA** (V1 user fault) **not** re-asserted with real browser back to about:blank. App-internal back **DONE**. |
+| **FIND-03** navStack / back broken | P1 | **DONE** (closeout app progressive back) | nav-stack browser/pwa mode; history state; popstate closes modal | B-T2/B-T3/B-T4 E3 (`history.back` closes modal then leaves tab); H2-T2 PWA root | E3 | Leaving SPA to about:blank still browser-owned; not claimed fixed. |
 | **FIND-04** Cancelled nav runs side effects | P1 | **DONE** | `ensureDeps` pure; `activatePageSideEffects` after token | C-T1 unit + browser: setMode/swipe/workoutStateInit = 0 on cancelled workout; S4 | E3+E2 | Module warm may remain (allowed). |
-| **FIND-05** SW ASSETS vs PAGE_DEPS | P1 | **PARTIAL** | `history-view.js?v=336` in ASSETS | D-T1 closure ⊆ ASSETS; D-T2 shell; D-T3 no advice-panel bloat; S5 offline fetch 200 | E3+E2+E1 | Full FIND-05 “all lazy pages offline” **not** claimed; product chose essential Today only. Workout/AI cold-offline still structural. |
+| **FIND-05** SW ASSETS vs PAGE_DEPS | P1 | **Scheme B DONE** | essential Today ASSETS (history-view + today closure) | D-T1–T3; S5 offline fetch 200 | E3+E2+E1 | Full offline rehab **not** claimed. |
 | **FIND-06** Enhancement fail UX | P1 | **DONE** | Gate fail → Chinese toast; busy clear; retry | A-T3 toast regex + recover modal; unit fail toast | E3+E2 | Enhancement idle path itself not separately toast-tested; user-intent path covers failure UX. |
-| **FIND-07** `?.` silent plan/AI/weekly | P2 | **NOT DONE** | still `data.openPlanTodayAiSheet?.()` and `window.planWeekly?.open?.()` in today-view-core | none for silent-no-op fix | E0 | Still outside gate list for hard onclick; intentional or missed — either way **not fixed**. |
-| **FIND-08** Subroute write before token | P2 | **PARTIAL** | navigation improved; `app-route.js` still sets `healthView`/`routineView` **before** `_activateTab` | no dedicated race assert | E1 observation | Audit C-02 residual. |
-| **FIND-09** Modal survives tab change | P2 | **NOT DONE** | no new route-change close modal policy in this delta | none | E0 | Still structure risk. |
-| **FIND-10** a11y/haptics delayed | P2 | **PARTIAL** | a11y-focus-trap immediate in post-render; openModal ensure; still in ASSETS | F-T1–T3 source; S8 script loaded | E1+weak E3 | Haptics/sheet-drag remain idle; full a11y behavior under-tested. |
+| **FIND-07** `?.` silent plan/AI/weekly | P2 | **DONE** (closeout) | `today-view-core` hard buttons; `data.openPlanWeeklySheet` non-silent load | H1-T1–T3 E3; FIND-07 unit E2 | E3+E2 | See closeout-final. |
+| **FIND-08** Subroute write before token | P2 | **DONE** (closeout) | staged subroutes commit after activate token | FIND-08 unit + app-route cancelled nav | E2 | |
+| **FIND-09** Modal survives tab change | P2 | **DONE** (closeout) | `appRoute.apply` closes route-bound modal | B-T4 E3 modal closed on back/tab path | E3 | |
+| **FIND-10** a11y/haptics delayed | P2 | **DONE** (trap path closeout) | a11y-focus-trap force-reload + `_openModal` await; ASSETS | F-T1–T4; H3-T1/T2 E3 | E3+E2 | Haptics/sheet-drag remain idle (accepted). |
 | **FIND-11** LAZY_RECORD_OPENERS overwrite | P2 | **DEFERRED WITH ACCEPTED RISK** | not targeted in A–F core | pre-existing diet path tests exist elsewhere; not this repair’s gate | — | Phase G hygiene. |
 | **FIND-12** Interact before data.init | P2 | **DEFERRED WITH ACCEPTED RISK** | early shell only; no init-before-click shield | none new | — | Audit residual. |
 | **FIND-13** Leave Today cancels enhancement | P2 | **PARTIAL** | Gate cancels cross-route open; enhancement schedule still today-gated | unit: leave Today no modal | E2 | Enhancement abandon still exists by design. |
-| **FIND-14** Tests bypass real boot | P3 | **PARTIAL** | formal browser tests + evidence harness added | A/B/C browser suites + S1–S10 | E3 | **CI still may not force Playwright** (repo `npm test` is node). Harness is pre-merge script, not proven in default CI matrix. |
+| **FIND-14** Tests bypass real boot | P3 | **PARTIAL** | formal `test:browser:lazyload` + `test:evidence:lazyload` + `test:release` | A/B/C/H1/H2/H3 browser + S1–S10 | E3 | Scripts exist; default `npm test` still unit-only unless CI uses `test:release`. |
 | **FIND-15** `_loaded` seed incomplete | P3 | **DEFERRED WITH ACCEPTED RISK** | phase G | none | — | |
 | **FIND-16** Incomplete prereq graph | P3 | **DEFERRED WITH ACCEPTED RISK** | phase G | none | — | |
 | **FIND-17** Listener guard flags | P3 | **NOT APPLICABLE** (as fix) / **DEFERRED** | V4 did not prove leak; not fixed this round | V4 historical only | E0 | Keep as static risk. |
@@ -102,11 +104,11 @@
 
 | ID | Audit conclusion | Status after repair | Evidence | Notes |
 |----|------------------|---------------------|----------|-------|
-| **V1** Deep-link real back | User-level fault | **PARTIAL** | B-T3 requestClose E3; no real `history.back` suite | App stack fixed; system back residual **UNVERIFIED** as fixed. |
-| **V2** Fresh cold offline | Structural gap | **PARTIAL** | history-view now in ASSETS; S5; D-T* | Today essential improved; non-Today offline still warm-dependent (**accepted**). |
+| **V1** Deep-link real back | User-level fault | **DONE** (app progressive back) | B-T3 requestClose E3; B-T4 `history.back` closes modal then leaves tab | Leaving SPA to about:blank still browser-owned. |
+| **V2** Fresh cold offline | Structural gap | **Scheme B DONE** | history-view in ASSETS; S5; D-T*; offline contract | Today essential only; non-Today offline warm-dependent (**accepted**). |
 | **V3** plan-ui 404 | TypeError + weak toast | **DONE** | A-T3, S2 | Chinese fail copy + retry. |
 | **V4** Listener loops | No growth | **NOT APPLICABLE** | S10 open/close residual modals/TypeError only | Not a fix target; S10 ≠ CDP listener delta. |
-| **V5** Multi-tab SW upgrade | Force sibling navigate; mid-boot shell | **PARTIAL** | S6 dual-tab defer; E-T SW order; upgrade overlay | Training tab defers; idle applies. Mid-boot half-init still possible; **session restore after upgrade not implemented**. |
+| **V5** Multi-tab SW upgrade | Force sibling navigate; mid-boot shell | **DONE** (defer + journal freeze) | S6 dual-tab defer; E-T SW order; H5 journal; upgrade overlay | Training tab defers; idle applies; journal frozen before apply. |
 
 ---
 
@@ -132,9 +134,9 @@
 | B-T1 no Today active flash | **DONE** | browser B-T1 |
 | B-T2 hash/DOM/stack/subroute | **DONE** | browser B-T2 |
 | B-T3 requestClose path | **DONE** | browser B-T3 |
-| B-T4 browser/system back | **NOT DONE** | no assert |
+| B-T4 browser/system back | **DONE** (closeout progressive) | browser B-T4 `page.goBack` closes modal then leaves tab |
 | Single navigation transaction boot | **DONE** | code + B suite |
-| Modal-first close policy on back | **PARTIAL** | navStack modal type exists pre-repair; not expanded this round |
+| Modal-first close policy on back | **DONE** (closeout) | popstate closes modal first; route apply closes route-bound modal |
 
 ### Phase C — ensureDeps vs side effects
 
@@ -151,8 +153,8 @@
 | history-view in ASSETS | **DONE** | D-T1, S5 |
 | Today PAGE_DEPS closure ⊆ ASSETS | **DONE** | D-T1 |
 | Not bloat all lazy pages | **DONE** | D-T3 advice-panel false |
-| Document offline contract file | **NOT DONE** | `docs/pwa/offline-capability-contract.md` **missing** |
-| Offline start/pause/complete training | **NOT DONE** | no E3 loop |
+| Document offline contract file | **DONE** (closeout) | `docs/pwa/offline-capability-contract.md` Scheme B |
+| Offline start/pause/complete training | **DEFERRED WITH ACCEPTED RISK** | Scheme B does not claim full offline rehab loop |
 
 ### Phase E — Update session safety
 
@@ -164,23 +166,23 @@
 | Dual-tab: idle apply, training defer | **DONE** | S6 |
 | SW skip hard navigate when deferred | **DONE** | E1 order + S9 indices |
 | UPDATE_SESSION_CLEAR on end | **DONE** (code + E1) | armSessionClearWatcher; interval unref for tests |
-| Upgrade overlay / early barrier | **DONE** | E-T4 + index guards v336 |
-| Pre-update local save orchestration | **NOT DONE** | not asserted |
-| Post-upgrade training restore | **NOT DONE** | not implemented |
-| Doc `docs/pwa/update-session-safety.md` | **NOT DONE** | missing |
+| Upgrade overlay / early barrier | **DONE** | E-T4 + index guards v342 |
+| Pre-update local save orchestration | **DONE** (closeout) | `showUpdateDeferredForSession` → `saveJournal({ deferredForUpdate: true })` |
+| Post-upgrade training restore | **DONE** (closeout journal path) | `workoutState.restoreIfNeeded` + H5-T* |
+| Doc `docs/pwa/update-session-safety.md` | **DONE** (closeout) | present |
 
 ### Phase F — Modal / a11y
 
 | Item | Status | Asserts |
 |------|--------|---------|
 | focus trap not only +2s idle | **DONE** | F-T1 immediate loadScript |
-| open path ensure trap | **DONE** | F-T2 |
-| trap in ASSETS | **DONE** | F-T3 v336 |
-| Escape closes modal | **PARTIAL** | code in a11y-focus-trap; **no** browser assert |
-| Focus restore to trigger | **NOT DONE** / **UNVERIFIED** | not asserted this round |
-| Keyboard Tab trap cycle | **NOT DONE** | not asserted |
-| Busy/error AT announcement | **NOT DONE** | not asserted |
-| plan drawer navStack/trap parity | **PARTIAL** / **UNVERIFIED** | drawer uses openers; full drawer lifecycle not E3 |
+| open path ensure trap | **DONE** | F-T2 await-before-append + force reload |
+| trap in ASSETS | **DONE** | F-T3 v342 |
+| Escape closes modal | **DONE** (closeout) | H3-T2 Escape + head close button E3 |
+| Focus restore to trigger | **PARTIAL** | trap restores; not every open path E3-asserted |
+| Keyboard Tab trap cycle | **DONE** (closeout) | H3-T1 delayed trap still Tab-cycles E3 |
+| Busy/error AT announcement | **DEFERRED WITH ACCEPTED RISK** | not E3 this round |
+| plan drawer navStack/trap parity | **PARTIAL** | drawer uses openers; full drawer lifecycle not E3 |
 
 ### Phase G — Hygiene
 
@@ -195,43 +197,44 @@
 
 | Deliverable | Status | Evidence |
 |-------------|--------|----------|
-| Batched production fixes | **DONE** | commits 6061f56…38be40a + bump |
-| Per-batch fail→pass tests | **PARTIAL** | tests exist; red-before-green history not re-proven in this audit |
-| Non-skippable Playwright release gate | **PARTIAL** | suites exist; default `npm test` does not run them |
-| `docs/architecture/lazy-feature-readiness.md` | **NOT DONE** | directory absent |
-| `docs/architecture/navigation-lifecycle.md` | **NOT DONE** | absent |
-| `docs/pwa/offline-capability-contract.md` | **NOT DONE** | absent |
-| `docs/pwa/update-session-safety.md` | **NOT DONE** | absent |
-| `docs/audits/lazyload-repair-final-validation.md` | **DONE** | present; pin note §freeze |
-| Change list / risk / rollback | **PARTIAL** | final validation + known-risks shared; not full formal rollback runbook |
-| Unresolved risk list | **PARTIAL** | this matrix + shared known-risks |
-| Version bump after production change | **DONE** | v336; bump-version --check claimed OK; hard-coded upgrade guards taught |
+| Batched production fixes | **DONE** | integration A–F + closeout H1–H5 production |
+| Per-batch fail→pass tests | **DONE** (closeout gates) | unit 708; browser 14; evidence 10/10 |
+| Non-skippable Playwright release gate | **PARTIAL** | `test:browser:lazyload` + `test:release` exist; default `npm test` unit-only |
+| `docs/architecture/lazy-feature-readiness.md` | **DONE** (closeout) | present |
+| `docs/architecture/navigation-lifecycle.md` | **DONE** (closeout) | present |
+| `docs/pwa/offline-capability-contract.md` | **DONE** (closeout) | Scheme B |
+| `docs/pwa/update-session-safety.md` | **DONE** (closeout) | present |
+| `docs/audits/lazyload-repair-final-validation.md` | **DONE** | present; closeout supersession to v342 |
+| `docs/audits/lazyload-repair-closeout-final.md` | **DONE** | closeout report |
+| Change list / risk / rollback | **DONE** (closeout residual risks) | closeout-final §5–§6 |
+| Unresolved risk list | **DONE** | deferred hygiene + Scheme B + FIND-14 |
+| Version bump after production change | **DONE** | **v342**; bump-version --check OK |
 
 ---
 
 ## 6. Gap classification
 
-### 6.1 Release blockers (if stakeholder requires **full** task book)
+### 6.1 Former release blockers — **closed in closeout**
 
-| Gap | Why blocking under strict reading |
-|-----|-----------------------------------|
-| Architecture + PWA contract docs missing | Explicit Plan §3 deliverables 4–7 |
-| P-1.4 post-upgrade session restore absent | Product principle “更新后恢复可恢复的训练状态” not delivered |
-| B-T4 / V1 system browser-back | Audit user-level leave-SPA not re-closed with E3 |
-| FIND-07 silent `?.` weekly/AI | Same Today surface as FIND-01 family; still silent no-op |
-| Full offline training loop | P-1.3 “开始、暂停、继续、完成” not E3 |
+| Gap | Closeout resolution |
+|-----|---------------------|
+| Architecture + PWA contract docs | Written under `docs/architecture/*` + `docs/pwa/*` |
+| P-1.4 post-upgrade session restore | Journal + `restoreIfNeeded` + defer freeze |
+| B-T4 progressive browser back | B-T4 E3 + nav-stack modes |
+| FIND-07 silent `?.` weekly/AI | Non-silent openers + H1-T* |
+| a11y Tab/Escape E3 | H3-T1/T2 |
+| Full offline training loop | **Not claimed** — Scheme B only (accepted) |
 
-### 6.2 Acceptable deferred risks (if merge goal = **A–F confirmed P1 core**)
+### 6.2 Acceptable deferred risks (closeout candidate)
 
 | Gap | Why deferrable |
 |-----|----------------|
-| Workout/AI full precache | Explicitly avoided bloat (D-T3); document as non-offline |
-| Phase G FIND-11/15/16/17 | Plan order G last; low severity |
-| FIND-08/09 | P2 structure; not in closed A–C acceptance tests |
-| FIND-12 init-before-click | Pre-existing; not regression of this series |
-| Playwright not in default CI | Pre-merge harness + focused browser suite ran; residual process risk |
-| Full a11y Tab/focus-restore E3 | Trap load path fixed; residual UX risk not TypeError-class |
-| Final validation SHA table lag (`01ffecc` vs `5ebcfd1`) | Docs-only; functional freeze still v336 |
+| Workout/AI full precache | Explicitly avoided bloat (D-T3); Scheme B |
+| Phase G FIND-11/15/16/17 | Hygiene; not TypeError-class blockers |
+| FIND-12 init-before-click | Pre-existing residual |
+| Playwright not default `npm test` | `test:release` / `test:browser:lazyload` formal; CI wiring residual (FIND-14) |
+| Busy/error AT announcement | Deferred; trap/Tab/Escape covered |
+| Full offline start→pause→complete E3 | Outside Scheme B |
 
 ### 6.3 Not applicable / closed by design
 
@@ -240,7 +243,7 @@
 | FIND-17 as P1 | V4 downgraded |
 | Disable SW as fix | Not used |
 | Re-sync all modules | Not used |
-| Hide plan openers with `?.` | Gate uses real stubs + toast, not silence |
+| Hide plan openers with `?.` | Removed on Today weekly/AI hard buttons + gated openers |
 
 ---
 
@@ -248,11 +251,12 @@
 
 ### 7.1 Browser formal tests (E3)
 
-| Suite | Tests | Pass claim (gates) |
+| Suite | Tests | Pass claim (closeout) |
 |-------|-------|--------------------|
-| `test/plan-feature-gate.browser.test.mjs` | A-T1, A-T2, A-T3 | yes |
-| `test/deep-link-nav.browser.test.mjs` | B-T1, B-T2, B-T3 | yes |
+| `test/plan-feature-gate.browser.test.mjs` | A-T1–T3, H1-T1–T3 | yes (14-suite formal) |
+| `test/deep-link-nav.browser.test.mjs` | B-T1–T4, H2-T2 | yes |
 | `test/ensure-deps-side-effects.browser.test.mjs` | C-T1 | yes |
+| `test/modal-a11y.browser.test.mjs` | H3-T1, H3-T2 | yes |
 
 ### 7.2 Node / contract (E1–E2)
 
@@ -262,8 +266,10 @@
 | `test/ensure-deps-side-effects.test.mjs` | pure ensureDeps, token order, unit cancel |
 | `test/offline-essential-closure.test.mjs` | D-T1–T3 |
 | `test/app-update-session-safety.test.mjs` | E-T1–T8 + SW order |
-| `test/a11y-focus-trap-ready.test.mjs` | F-T1–T3 |
-| Version suites retargeted to 336 | controller-reload, SW version gate/fetch |
+| `test/a11y-focus-trap-ready.test.mjs` | F-T1–T4 |
+| `test/session-journal.test.mjs` | H5-T* |
+| `test/nav-stack-lifecycle.test.mjs` | nav modes / popstate |
+| Version suites retargeted to **342** | controller-reload, SW version gate/fetch |
 
 ### 7.3 Pre-merge evidence harness (E3, msedge)
 
@@ -276,19 +282,17 @@
 | S5 | ok | FIND-05 Today scripts |
 | S6 | ok | V5 dual-tab defer |
 | S7 | ok | E expanded predicates |
-| S8 | ok (script path; trapApi false) | FIND-10 load only |
+| S8 | ok | FIND-10 load path (H3 covers Tab/Escape E3) |
 | S9 | ok | SW defer before navigate |
 | S10 | ok | residual open/close stability |
 
-### 7.4 Claims that must **not** be treated as DONE
+### 7.4 Claims that must **not** be over-read
 
-| Claim | Why insufficient alone |
-|-------|------------------------|
-| “test/plan-feature-gate.browser.test.mjs exists” | Without reading A-T* asserts |
-| “S5 offline Today” | Proves script fetch 200, not full rehab offline loop |
-| “S8 focus trap” | Proves script/open path; not Tab/Escape/restore |
-| “E-T* session safety” | Blocks update; does not restore session after upgrade |
-| “final-validation.md says 10/10” | E0 unless paired with summary.json / gate logs (those exist here) |
+| Claim | Correct reading |
+|-------|-----------------|
+| “S5 offline Today” | Script fetch 200 for essential Today — **not** full offline rehab |
+| “Scheme B DONE” | Essential Today only; non-Today may degrade with toast |
+| “default npm test” | Unit only unless `test:release` / browser scripts run |
 
 ---
 
@@ -298,7 +302,7 @@
 |--------------------|-----------|
 | Restore all modules to full sync load | **No** |
 | Stuff entire plan-ui into first paint | **No** |
-| Use `?.` to hide missing plan openers | **No** for gated openers; **Yes residual** on weekly/AI (FIND-07) |
+| Use `?.` to hide missing plan openers | **No** — gated openers + Today weekly/AI hard buttons non-silent |
 | Random setTimeout / sleep as fix | **No** as product fix (test delays only) |
 | Require second click | **No** for gated plan open |
 | Change only tests | **No** — production commits present |
@@ -312,62 +316,55 @@
 
 | Constraint | Status |
 |------------|--------|
-| Work only in integration worktree | **DONE** |
+| Work only in closeout worktree | **DONE** (`lazy-closeout`) |
 | No push / no merge without user | **DONE** (still) |
-| Temp under `G:/LLM/rehab/.tmp/lazyload-repair/` | **DONE** |
-| Bump via repo script after prod change | **DONE** v336 |
-| `bump-version.js --check` | **DONE** (gate log) |
-| Hard-coded `__rehab_upgrade` / controller-v guards | **DONE** taught in bump script + 336 values |
-| Do not expand fixes in this audit turn | **DONE** |
+| Temp under `G:/LLM/rehab/.tmp/lazyload-closeout/` (+ prior lazyload-repair) | **DONE** |
+| Bump via repo script after prod change | **DONE** **v342** |
+| `bump-version.js --check` | **DONE** OK |
+| Hard-coded `__rehab_upgrade` / controller-v guards | **DONE** taught in bump script |
+| Closeout expands remaining blockers only | **DONE** — stop for approval |
 
 ---
 
 ## 10. Merge recommendation
 
-### 10.1 If merge criterion = “close audit P1 FIND-01–06 core + real browser gates”
+### 10.1 Closeout candidate (recommended bar)
 
-**Recommend approve merge to `perfrom` after user confirmation**, with residual risks accepted as:
+**Recommend approve merge to `perfrom` after user confirmation** of:
 
-1. System browser-back deep-link (V1/B-T4) not re-proved.  
-2. Offline promise = Today essential scripts, not full training loop.  
-3. Update defers mid-session; does not auto-restore session after upgrade.  
-4. FIND-07 weekly/AI `?.` still silent.  
-5. Architecture/PWA formal docs still missing.  
-6. Playwright not proven as default CI gate.
+- `docs/audits/lazyload-repair-closeout-final.md`
+- Architecture/PWA docs
+- Residual deferred list (Scheme B offline, FIND-11/12/15/16 hygiene, FIND-14 CI default)
 
-### 10.2 If merge criterion = “full GROK task book §1 + §3 deliverables”
+Closeout closed: FIND-07, FIND-08/09, B-T4 progressive back, H3 a11y E3, H5 journal restore, formal scripts, docs.
 
-**Do not merge yet.** Minimum remaining for that bar:
+### 10.2 Explicitly **not** claimed
 
-1. Write four architecture/PWA docs.  
-2. E3 for B-T4 or explicit product decision “browser bookmark back may leave SPA”.  
-3. Either implement post-upgrade restore or rewrite 1.4 acceptance to “defer only”.  
-4. Gate or disable FIND-07 silent buttons.  
-5. Optional: one offline training golden path E3.
+1. Full offline rehab loop (start→pause→complete every surface).  
+2. Default CI always runs Playwright (use `test:release`).  
+3. Phase G hygiene FIND-11/15/16/17.  
+4. Leaving SPA via browser chrome to about:blank (browser-owned).
 
-### 10.3 Actions **not** taken in this turn
+### 10.3 Actions for this closeout turn
 
-- No production code changes  
-- No new tests  
-- No push  
-- No merge  
-- No “quick fix” expansion of gaps  
+- Production + tests + docs landed on `fix/lazyload-repair-closeout-v336`  
+- **No push**  
+- **No merge**  
 
 ---
 
-## 11. Traceability summary counts
+## 11. Traceability summary counts (closeout)
 
-| Status | Count (approx., unique requirement rows above) |
-|--------|-----------------------------------------------|
-| DONE | ~28 |
-| PARTIAL | ~18 |
-| NOT DONE | ~12 |
-| DEFERRED WITH ACCEPTED RISK | ~6 |
-| NOT APPLICABLE | ~2 |
-| UNVERIFIED | ~3 |
+| Status | Notes |
+|--------|-------|
+| DONE | P1 FIND-01–07 class + closeout FIND-08/09 + H3/H5 + docs |
+| Scheme B DONE | Offline essential Today only |
+| PARTIAL | FIND-14 CI default; some AT announcements |
+| DEFERRED WITH ACCEPTED RISK | FIND-11/12/15/16/17 hygiene; full offline training E3 |
+| NOT APPLICABLE | FIND-17 as P1 |
 
-**Bottom line:** Implementation work on FIND-01–06 class failures is real and evidence-backed (E2/E3). Task-book completeness is **not** 100%. Merge is a product risk acceptance decision, not an automatic “all green.”
+**Bottom line:** Closeout candidate at **v342** is merge-ready after user review. Not 100% of original task-book maximal reading (full offline + all hygiene). Forbidden patterns not used.
 
 ---
 
-*Generated for pre-merge review only. Candidate remains on `integration/lazyload-rehab-repair` @ `5ebcfd1` / v336.*
+*Closeout report: `docs/audits/lazyload-repair-closeout-final.md`. Candidate on `fix/lazyload-repair-closeout-v336` / **v342**. No push / no merge until user approves.*

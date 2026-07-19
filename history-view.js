@@ -217,7 +217,7 @@
                     <div class="ai-usage-detail-row"><span>本月输入</span><span>${fmtTok(usage.month.in)} tok</span></div>
                     <div class="ai-usage-detail-row"><span>本月输出</span><span>${fmtTok(usage.month.out)} tok</span></div>
                 </div>`;
-            this._openModal({
+            return this._openModal({
                 title: 'AI 用量',
                 icon: 'monitoring',
                 bodyHtml,

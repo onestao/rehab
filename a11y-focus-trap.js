@@ -1,6 +1,8 @@
 // @ts-nocheck
 (function () {
-    if (window.focusTrap?.__installed) return;
+    // Skip only when a live trap API is still bound. Nulling window.focusTrap
+    // (or a failed partial install) must allow re-exec after force reload.
+    if (window.focusTrap?.trap && window.focusTrap?.__installed) return;
 
     /** @type {{ root: HTMLElement|null, handler: any, previous: Element|null }} */
     const state = { root: null, handler: null, previous: null };

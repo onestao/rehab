@@ -1,6 +1,8 @@
 // @ts-nocheck
 const workoutState = {
     KEY: 'rehab_active_session',
+    /** H5 session journal schema — survives SW upgrade when snapshot is written before apply. */
+    SCHEMA_VERSION: 1,
 
     init() {
         this.installVisibilityHandler();
@@ -19,6 +21,8 @@ const workoutState = {
 
     snapshot() {
         return {
+            schemaVersion: this.SCHEMA_VERSION,
+            journal: 'rehab-session',
             mode: workout.mode,
             isPaused: workout.isPaused,
             isPlaying: workout.isPlaying,
@@ -44,12 +48,36 @@ const workoutState = {
         };
     },
 
+    /** Persist journal without requiring isPlaying (used by app-update pre-apply). */
+    saveJournal(extra = {}) {
+        try {
+            const base = this.snapshot();
+            const payload = { ...base, ...extra, schemaVersion: this.SCHEMA_VERSION, journal: 'rehab-session', updatedAt: new Date().toISOString() };
+            localStorage.setItem(this.KEY, JSON.stringify(payload));
+            return payload;
+        } catch {
+            return null;
+        }
+    },
+
+    readJournal() {
+        try {
+            const raw = localStorage.getItem(this.KEY);
+            if (!raw) return null;
+            const data = JSON.parse(raw);
+            if (!data || typeof data !== 'object') return null;
+            return data;
+        } catch {
+            return null;
+        }
+    },
+
     markActive() {
         if (!workout.isPlaying) {
             this.clear();
             return;
         }
-        try { localStorage.setItem(this.KEY, JSON.stringify(this.snapshot())); } catch {}
+        this.saveJournal();
         workout._lastActiveAt = Date.now();
     },
 

@@ -159,6 +159,62 @@ test('does not open plan modal after leaving Today', async () => {
     assert.equal(h.openCalls, 0);
 });
 
+test('FIND-07: openPlanWeeklySheet loads plan-weekly without silent no-op', async () => {
+    const h = createGateContext();
+    let weeklyOpenCalls = 0;
+    h.context.window.planWeekly = null;
+    const originalLoad = h.context.window.loadAppScript;
+    h.context.window.loadAppScript = async (name) => {
+        h.loadLog.push(name);
+        if (name === 'plan-weekly' || name === 'plan-ui') {
+            h.context.window.planWeekly = {
+                open(...args) {
+                    weeklyOpenCalls += 1;
+                    return { weekly: true, args };
+                }
+            };
+            return;
+        }
+        return originalLoad(name);
+    };
+    assert.equal(typeof h.data.openPlanWeeklySheet, 'function');
+    const result = await h.data.openPlanWeeklySheet();
+    assert.deepEqual(result, { weekly: true, args: [] });
+    assert.equal(weeklyOpenCalls, 1);
+    assert.ok(h.loadLog.some((n) => n === 'plan-weekly' || n === 'plan-ui'));
+});
+
+test('FIND-07: openPlanWeeklySheet failure shows Chinese toast', async () => {
+    const h = createGateContext();
+    h.context.window.planWeekly = null;
+    h.context.window.loadAppScript = async () => {
+        throw new Error('network');
+    };
+    const result = await h.data.openPlanWeeklySheet();
+    assert.equal(result, undefined);
+    assert.ok(h.toasts.some((t) => /近期计划功能暂时未加载成功|计划/.test(t.msg)));
+});
+
+test('FIND-07: Today hard buttons do not use silent optional chaining', () => {
+    const core = read('today-view-core.js');
+    assert.match(core, /data\.openPlanWeeklySheet\(\)/);
+    assert.match(core, /data\.openPlanTodayAiSheet\(\)/);
+    assert.doesNotMatch(core, /planWeekly\?\.open\?\.?\(/);
+    assert.doesNotMatch(core, /openPlanTodayAiSheet\?\./);
+});
+
+test('FIND-08: appRoute commits subroute only after activate token check', () => {
+    const src = read('app-route.js');
+    const applyStart = src.indexOf('async apply(route');
+    assert.ok(applyStart > 0);
+    const body = src.slice(applyStart, applyStart + 2500);
+    assert.match(body, /stagedHealth|stagedRoutine/);
+    const activateIdx = body.indexOf('_activateTab');
+    const commitIdx = body.indexOf('window.data.healthView = stagedHealth');
+    assert.ok(activateIdx > 0 && commitIdx > activateIdx, 'subroute write must follow activate');
+    assert.match(body, /_closeActiveModalInternal/);
+});
+
 test('source contracts: plan openers and fail toast are wired', () => {
     const source = read('data.js');
     assert.match(source, /planFeatureGate/);

@@ -1,5 +1,5 @@
 /**
- * Pre-merge browser evidence for lazyload rehab repair (v336).
+ * Pre-merge browser evidence for lazyload rehab repair (v342).
  * Runs real Chromium/Edge against a local HTTP server with SW enabled.
  * Evidence: G:/LLM/rehab/.tmp/lazyload-repair/evidence/
  */
@@ -288,7 +288,7 @@ async function main() {
                 // Register SW and wait controller
                 await page.evaluate(async () => {
                     if (!('serviceWorker' in navigator)) return;
-                    const reg = await navigator.serviceWorker.register('./sw.js?v=336', { updateViaCache: 'none' });
+                    const reg = await navigator.serviceWorker.register('./sw.js?v=342', { updateViaCache: 'none' });
                     await reg.update?.();
                     await navigator.serviceWorker.ready;
                 });
@@ -302,7 +302,7 @@ async function main() {
                     let historyView = typeof window.historyView;
                     let todayCore = typeof window.todayViewCore || typeof window.renderToday;
                     // Fetch essential assets via SW cache
-                    const assets = ['history-view.js?v=336', 'today-view-core.js?v=336', 'data.js?v=336'];
+                    const assets = ['history-view.js?v=342', 'today-view-core.js?v=342', 'data.js?v=342'];
                     const fetchResults = {};
                     for (const a of assets) {
                         try {
@@ -315,8 +315,8 @@ async function main() {
                     return { hasToday, historyView, todayCore, fetchResults, controller: !!navigator.serviceWorker?.controller };
                 });
                 const ok = offlineSnap.hasToday
-                    && offlineSnap.fetchResults['history-view.js?v=336']?.ok
-                    && offlineSnap.fetchResults['today-view-core.js?v=336']?.ok;
+                    && offlineSnap.fetchResults['history-view.js?v=342']?.ok
+                    && offlineSnap.fetchResults['today-view-core.js?v=342']?.ok;
                 record('S5-offline-today-history-view', ok, offlineSnap);
                 save('s5-offline-today.json', offlineSnap);
                 await ctx.close();
@@ -343,7 +343,7 @@ async function main() {
                         if (window.appUpdate?.apply) return;
                         await new Promise((resolve, reject) => {
                             const s = document.createElement('script');
-                            s.src = 'app-update.js?v=336';
+                            s.src = 'app-update.js?v=342';
                             s.onload = resolve;
                             s.onerror = reject;
                             document.head.appendChild(s);
@@ -361,7 +361,7 @@ async function main() {
                     window.appUpdate?.notifyServiceWorkerSessionDefer?.();
                     navigator.serviceWorker?.controller?.postMessage?.({
                         type: 'UPDATE_DEFER_FOR_SESSION',
-                        version: '336',
+                        version: '342',
                         reason: 'active-rehab-session'
                     });
                 });
@@ -432,7 +432,7 @@ async function main() {
                     if (!window.appUpdate) {
                         await new Promise((resolve, reject) => {
                             const s = document.createElement('script');
-                            s.src = 'app-update.js?v=336';
+                            s.src = 'app-update.js?v=342';
                             s.onload = resolve;
                             s.onerror = reject;
                             document.head.appendChild(s);
@@ -576,7 +576,7 @@ async function main() {
     const summary = {
         durationMs: Date.now() - t0,
         channel,
-        version: '336',
+        version: '342',
         results,
         pass: results.filter((r) => r.ok).length,
         fail: results.filter((r) => !r.ok).length

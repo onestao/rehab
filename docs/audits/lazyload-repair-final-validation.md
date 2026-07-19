@@ -1,13 +1,15 @@
 # Lazyload Rehab Repair — Final Validation (pre-merge)
 
-**Branch:** `integration/lazyload-rehab-repair`
-**Worktree:** `G:/LLM/rehab/.claude/worktrees/lazy-integration`
-**Baseline:** `0fa29d9` / `perfrom` / was v335
-**Candidate HEAD:** `01ffecc3a54f566e521f6661c178a7f6cf65e6d6`
-**Release version:** **v336** (bumped via `node scripts/bump-version.js --patch`)
-**Date:** 2026-07-20
-**Status:** implementation + full gates complete on integration branch —
+**Branch (closeout):** `fix/lazyload-repair-closeout-v336`  
+**Worktree:** `G:/LLM/rehab/.claude/worktrees/lazy-closeout`  
+**Baseline:** `0fa29d9` / `perfrom` / was v335  
+**Pre-closeout freeze:** `fc83ab8` (matrix)  
+**Release version:** **v342** (closeout production fingerprint)  
+**Date:** 2026-07-20  
+**Status:** closeout gates green — see `docs/audits/lazyload-repair-closeout-final.md`.  
 **no push / no merge to `perfrom` until user approves**
+
+> Historical integration validation below used v336 @ `01ffecc` / `5ebcfd1`. Closeout supersedes residual PARTIAL/NOT DONE rows for FIND-07/08/09, B-T4, H3, H5.
 
 ## Freeze candidate
 
@@ -126,8 +128,22 @@ Summary JSON: `G:/LLM/rehab/.tmp/lazyload-repair/evidence/summary.json`
 5. Sibling idle tab may upgrade; training tab posts defer and SW will not hard-navigate it.
 6. Focus trap is available for first modal without waiting for utility idle.
 
+## Closeout supersession (v342)
+
+| Item | Value |
+|------|--------|
+| Closeout branch | `fix/lazyload-repair-closeout-v336` |
+| Worktree | `G:/LLM/rehab/.claude/worktrees/lazy-closeout` |
+| Fingerprint | **v342** / `training-assistant-v342` |
+| Unit | **708 pass / 0 fail** |
+| Formal browser | `test:browser:lazyload` **14 pass** |
+| Evidence | `test:evidence:lazyload` **10/10** |
+| Report | `docs/audits/lazyload-repair-closeout-final.md` |
+
+Historical integration freeze table above remains as v336-era record. Closeout residual blockers (FIND-07/08/09, B-T4 progressive back, H3 trap E3, H5 journal, architecture/PWA docs) are **DONE** at v342.
+
 ## Stop conditions
 
-- **Do not push** `integration/lazyload-rehab-repair`.
-- **Do not merge** into `perfrom` until user confirms after reviewing this report and gates.
-- Candidate ready for user approval: **v336 @ `01ffecc`**.
+- **Do not push** `fix/lazyload-repair-closeout-v336` or `integration/lazyload-rehab-repair`.
+- **Do not merge** into `perfrom` until user confirms after reviewing closeout-final and gates.
+- Candidate ready for user approval: **v342 on `fix/lazyload-repair-closeout-v336`**.

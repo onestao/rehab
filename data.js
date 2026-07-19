@@ -286,8 +286,32 @@ function attachPlanFeatureGate() {
 }
 
 function attachPlanAliases() {
-    data.openPlanWeeklySheet = data.openPlanWeeklySheet || function (...args) {
-        return window['planWeekly']?.open?.(...args);
+    // Weekly dock: never silent no-op; load plan-ui (pulls plan-weekly) then open once.
+    data.openPlanWeeklySheet = data.openPlanWeeklySheet || async function (...args) {
+        if (typeof window.planWeekly?.open === 'function') {
+            return window.planWeekly.open.apply(window.planWeekly, args);
+        }
+        if (!data.beginActionBusy?.('openPlanWeeklySheet', '加载中')) return;
+        try {
+            if (typeof window.loadAppScript === 'function') {
+                // plan-ui lists plan-weekly as prerequisite; either path is fine.
+                try {
+                    await window.loadAppScript('plan-weekly');
+                } catch {
+                    await window.loadAppScript('plan-ui');
+                }
+            }
+            data.refreshModules?.();
+            if (typeof window.planWeekly?.open === 'function') {
+                return window.planWeekly.open.apply(window.planWeekly, args);
+            }
+            window.toast?.show?.('近期计划功能暂时未加载成功。请检查网络后重试。', 'error');
+        } catch (e) {
+            window.errorBus?.report?.('lazy-plan.openPlanWeeklySheet', e);
+            window.toast?.show?.('近期计划功能暂时未加载成功。请检查网络后重试。', 'error');
+        } finally {
+            data.endActionBusy?.('openPlanWeeklySheet');
+        }
     };
     data.openPlanAiSheet = data.openPlanAiSheet || async function (...args) {
         if (typeof window.dataPlanAi?.openPlanAiSheet === 'function') {

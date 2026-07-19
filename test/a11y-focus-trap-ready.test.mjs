@@ -30,19 +30,36 @@ test('F-T1: a11y-focus-trap is loaded immediately in schedulePostRenderUtilityLo
     assert.match(idleBlock, /loadScript\('sheet-drag'\)/);
 });
 
-test('F-T2: modal open ensures focusTrap, loading script if missing', () => {
+test('F-T2: modal open awaits focusTrap ready before display', () => {
     const ui = read('data-ui-state.js');
-    const openStart = ui.indexOf('_openModal({');
+    // Prefer async _openModal body (H3 contract).
+    let openStart = ui.indexOf('async _openModal({');
+    if (openStart < 0) openStart = ui.indexOf('_openModal({');
     assert.ok(openStart > 0);
-    // Include full modal open body through onMount (focus trap is near the end).
     const nextFn = ui.indexOf('\n        _confirmModal', openStart);
     const body = ui.slice(openStart, nextFn > openStart ? nextFn : openStart + 4000);
-    assert.match(body, /focusTrap/);
-    assert.match(body, /loadAppScript\('a11y-focus-trap'\)/);
+    assert.match(body, /ensureFocusTrapReady|loadAppScript\('a11y-focus-trap'\)/);
+    assert.match(body, /await\s+this\.ensureFocusTrapReady|await\s+window\.loadAppScript\('a11y-focus-trap'\)/);
+    // When trap is missing, must await ensure before append.
+    const awaitIdx = body.search(/await\s+this\.ensureFocusTrapReady|await\s+window\.loadAppScript\('a11y-focus-trap'\)/);
+    const appendIdx = body.indexOf('appendChild(modal)');
+    assert.ok(awaitIdx >= 0 && appendIdx > awaitIdx, 'must await focus trap before appending modal when trap missing');
+    // Fast path: do not force await when focusTrap already present (sync modal open).
+    assert.match(body, /if\s*\(\s*!window\.focusTrap\?\.trap\s*\)|if\s*\(\s*!window\.focusTrap/);
     assert.match(body, /\.trap\(/);
 });
 
 test('F-T3: a11y module is in SW ASSETS for offline modals', () => {
     const sw = read('sw.js');
-    assert.match(sw, /a11y-focus-trap\.js\?v=336/);
+    assert.match(sw, /a11y-focus-trap\.js\?v=342/);
+});
+
+test('F-T4: focus trap implements Tab cycle Escape and release restore', () => {
+    const trap = read('a11y-focus-trap.js');
+    assert.match(trap, /function trap\(/);
+    assert.match(trap, /function release\(/);
+    assert.match(trap, /e\.key === 'Escape'|e\.key === \"Escape\"/);
+    assert.match(trap, /e\.key !== 'Tab'|e\.key === 'Tab'/);
+    assert.match(trap, /e\.shiftKey/);
+    assert.match(trap, /state\.previous\?\.focus|previous\?\.focus/);
 });

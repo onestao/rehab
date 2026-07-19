@@ -4,11 +4,11 @@ const appUpdate = {
     waitingWorker: null,
     checking: false,
     controllerReloadBound: false,
-    swUrl: './sw.js?v=336',
-    version: '336',
+    swUrl: './sw.js?v=342',
+    version: '342',
 
     controllerReloadKey() {
-        return 'rehab-sw-controller-reload-v336';
+        return 'rehab-sw-controller-reload-v342';
     },
 
     claimControllerReload() {
@@ -296,6 +296,8 @@ const appUpdate = {
     },
 
     showUpdateDeferredForSession() {
+        // H5: freeze session journal before any later upgrade can navigate the client.
+        try { window.workoutState?.saveJournal?.({ deferredForUpdate: true }); } catch {}
         this.notify('训练进行中，更新已推迟。结束后可在设置中完成更新。', 'info');
         const banner = document.getElementById('appUpdateBanner');
         if (!banner) return;
@@ -352,6 +354,12 @@ const appUpdate = {
 
         this.bindControllerReload(!!navigator.serviceWorker.controller);
         try {
+            // H5: final pre-apply journal flush if a residual session snapshot exists.
+            try {
+                if (window.workoutState?.readJournal?.()?.isPlaying) {
+                    window.workoutState.saveJournal({ preApply: true });
+                }
+            } catch {}
             window.errorBus?.event?.('appUpdate', 'apply:prepare', { state: worker.state || '' });
             await this.prepareWaitingWorker(worker);
             if (this.hasActiveRehabSession()) {

@@ -114,7 +114,9 @@ test('today card removes Today kicker and shows recent plan dock', () => {
   assert.match(html, /openPlanTodayAiSheet/);
   assert.match(html, /aria-label="近期计划"/);
   assert.match(html, /3-7天/);
-  assert.match(html, /planWeekly\?\.open/);
+  // FIND-07: hard buttons must call data.openPlanWeeklySheet (no silent planWeekly?.open).
+  assert.match(html, /data\.openPlanWeeklySheet\(\)/);
+  assert.doesNotMatch(html, /planWeekly\?\.open/);
   assert.doesNotMatch(html, /aria-label="暂无待集中拉伸"/);
 });
 

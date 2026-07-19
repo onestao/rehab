@@ -281,10 +281,11 @@ test('modal core has one owner and plan-ui has no hidden routine-library depende
     const combinedOwners = `${uiState}\n${routine}`;
 
     for (const method of ['_openModal', '_confirmModal', '_closeActiveModal', '_closeActiveModalInternal']) {
-        const definitions = combinedOwners.match(new RegExp(`\\n\\s*${method}\\s*\\(`, 'g')) || [];
+        // Allow async method definitions (H3: _openModal awaits focus trap).
+        const definitions = combinedOwners.match(new RegExp(`\\n\\s*(?:async\\s+)?${method}\\s*\\(`, 'g')) || [];
         assert.equal(definitions.length, 1, `${method} must have one implementation`);
-        assert.doesNotMatch(routine, new RegExp(`\\n\\s*${method}\\s*\\(`));
-        assert.match(uiState, new RegExp(`\\n\\s*${method}\\s*\\(`));
+        assert.doesNotMatch(routine, new RegExp(`\\n\\s*(?:async\\s+)?${method}\\s*\\(`));
+        assert.match(uiState, new RegExp(`\\n\\s*(?:async\\s+)?${method}\\s*\\(`));
     }
 
     assert.doesNotMatch(planUi, /this\._(?:openModal|confirmModal|closeActiveModal)\?\./);

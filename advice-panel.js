@@ -2212,7 +2212,7 @@ const advicePanel = {
             this.saveAdviceRoutine(messageId, blockIndex, routine.name, (routine.tags || ['AI']).join(', '));
             return;
         }
-        this._openModal({
+        return this._openModal({
             title: '保存到方案库',
             icon: 'library_books',
             bodyHtml: `
@@ -2762,7 +2762,7 @@ const advicePanel = {
             if (next != null) commit(next);
             return;
         }
-        this._openModal({
+        return this._openModal({
             title: '编辑并重新提问',
             icon: 'edit_note',
             bodyHtml: `

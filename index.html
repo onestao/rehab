@@ -34,7 +34,7 @@
         (function installNonBlockingStartup() {
             'use strict';
 
-            const releaseVersion = '336';
+            const releaseVersion = '342';
             let applicationLaunchStarted = false;
 
             function acknowledgeReleasePage() {
@@ -392,7 +392,7 @@
         })();
         /* APP_STARTUP_NON_BLOCKING_BOOT_END */
     </script>
-    <link data-rehab-stylesheet="primary" data-href="build/generated.css?v=336">
+    <link data-rehab-stylesheet="primary" data-href="build/generated.css?v=342">
 </head>
 <body>
     <div id="appUpdateBanner" class="app-update-banner hidden">
@@ -788,7 +788,7 @@
         (function earlyUpgradeOverlay() {
             try {
                 const url = new URL(window.location.href);
-                if (url.searchParams.get('__rehab_upgrade') !== '336') return;
+                if (url.searchParams.get('__rehab_upgrade') !== '342') return;
                 const el = document.createElement('div');
                 el.id = 'rehabUpgradeOverlay';
                 el.setAttribute('role', 'alertdialog');
@@ -808,26 +808,26 @@
         })();
     </script>
 
-    <script data-rehab-entry data-kind="classic" data-src="m3e-ripple.js?v=336"></script>
-    <script data-rehab-entry data-kind="classic" data-src="toast.js?v=336"></script>
-    <script data-rehab-entry data-kind="classic" data-src="error-bus.js?v=336"></script>
-    <script data-rehab-entry data-kind="classic" data-src="i18n.js?v=336"></script>
-    <script data-rehab-entry data-kind="classic" data-src="theme.js?v=336"></script>
-    <script data-rehab-entry data-kind="classic" data-src="render-safe.js?v=336"></script>
-    <script data-rehab-entry data-kind="classic" data-src="nav-stack.js?v=336"></script>
-    <script data-rehab-entry data-kind="classic" data-src="app-route.js?v=336"></script>
-    <script data-rehab-entry data-kind="module" data-src="data-utils-pure.js?v=336"></script>
-    <script data-rehab-entry data-kind="module" data-src="action-identity.js?v=336"></script>
-    <script data-rehab-entry data-kind="classic" data-src="data-utils.js?v=336"></script>
-    <script data-rehab-entry data-kind="classic" data-src="storage/idb.js?v=336"></script>
-    <script data-rehab-entry data-kind="classic" data-src="storage/migrate.js?v=336"></script>
-    <script data-rehab-entry data-kind="classic" data-src="data-records.js?v=336"></script>
-    <script data-rehab-entry data-kind="classic" data-src="data-schema.js?v=336"></script>
-    <script data-rehab-entry data-kind="classic" data-src="data-store.js?v=336"></script>
-    <script data-rehab-entry data-kind="classic" data-src="data-ui-state.js?v=336"></script>
-    <script data-rehab-entry data-kind="classic" data-src="data-views.js?v=336"></script>
-    <script data-rehab-entry data-kind="classic" data-src="data.js?v=336"></script>
-    <script data-rehab-entry data-kind="classic" data-src="sync-status.js?v=336"></script>
+    <script data-rehab-entry data-kind="classic" data-src="m3e-ripple.js?v=342"></script>
+    <script data-rehab-entry data-kind="classic" data-src="toast.js?v=342"></script>
+    <script data-rehab-entry data-kind="classic" data-src="error-bus.js?v=342"></script>
+    <script data-rehab-entry data-kind="classic" data-src="i18n.js?v=342"></script>
+    <script data-rehab-entry data-kind="classic" data-src="theme.js?v=342"></script>
+    <script data-rehab-entry data-kind="classic" data-src="render-safe.js?v=342"></script>
+    <script data-rehab-entry data-kind="classic" data-src="nav-stack.js?v=342"></script>
+    <script data-rehab-entry data-kind="classic" data-src="app-route.js?v=342"></script>
+    <script data-rehab-entry data-kind="module" data-src="data-utils-pure.js?v=342"></script>
+    <script data-rehab-entry data-kind="module" data-src="action-identity.js?v=342"></script>
+    <script data-rehab-entry data-kind="classic" data-src="data-utils.js?v=342"></script>
+    <script data-rehab-entry data-kind="classic" data-src="storage/idb.js?v=342"></script>
+    <script data-rehab-entry data-kind="classic" data-src="storage/migrate.js?v=342"></script>
+    <script data-rehab-entry data-kind="classic" data-src="data-records.js?v=342"></script>
+    <script data-rehab-entry data-kind="classic" data-src="data-schema.js?v=342"></script>
+    <script data-rehab-entry data-kind="classic" data-src="data-store.js?v=342"></script>
+    <script data-rehab-entry data-kind="classic" data-src="data-ui-state.js?v=342"></script>
+    <script data-rehab-entry data-kind="classic" data-src="data-views.js?v=342"></script>
+    <script data-rehab-entry data-kind="classic" data-src="data.js?v=342"></script>
+    <script data-rehab-entry data-kind="classic" data-src="sync-status.js?v=342"></script>
     <div id="weightModal" class="md-modal md-modal-sheet hidden" aria-hidden="true">
         <div class="md-modal-backdrop" onclick="data.closeWeightModal()"></div>
         <div class="md-modal-card md-modal-sheet-card">
@@ -1331,7 +1331,7 @@
             return true;
         }
         window.claimServiceWorkerReload = claimServiceWorkerReload;
-        const SERVICE_WORKER_CONTROLLER_RELOAD_KEY = 'rehab-sw-controller-reload-v336';
+        const SERVICE_WORKER_CONTROLLER_RELOAD_KEY = 'rehab-sw-controller-reload-v342';
         void SERVICE_WORKER_CONTROLLER_RELOAD_KEY;
         function scheduleServiceWorkerRegistration() {
             if (scheduleServiceWorkerRegistration._scheduled) return;
@@ -1358,7 +1358,7 @@
                     return;
                 }
                 const script = document.createElement('script');
-                script.src = (typeof window.resolveAssetUrl === 'function' ? window.resolveAssetUrl('app-update.js?v=336') : 'app-update.js?v=336');
+                script.src = (typeof window.resolveAssetUrl === 'function' ? window.resolveAssetUrl('app-update.js?v=342') : 'app-update.js?v=342');
                 script.async = true;
                 script.dataset.rehabAppUpdate = '1';
                 script.onload = () => resolve(window.appUpdate);
@@ -1370,11 +1370,11 @@
                 try {
                     // Do not re-register / normalize while an intentional SW navigate is in flight.
                     try {
-                        if (new URL(window.location.href).searchParams.get('__rehab_upgrade') === '336') {
+                        if (new URL(window.location.href).searchParams.get('__rehab_upgrade') === '342') {
                             return;
                         }
                     } catch {}
-                    const registration = await navigator.serviceWorker.register('./sw.js?v=336', { updateViaCache: 'none' });
+                    const registration = await navigator.serviceWorker.register('./sw.js?v=342', { updateViaCache: 'none' });
                     await registration.update?.();
                     // Never auto-activate a waiting worker here. Quiet registration only discovers
                     // updates; activation must wait for explicit user apply (or the post-apply
@@ -1390,7 +1390,7 @@
                                 return null;
                             }
                         })();
-                        const alreadyCurrent = controllerUrl && controllerUrl.searchParams.get('v') === '336';
+                        const alreadyCurrent = controllerUrl && controllerUrl.searchParams.get('v') === '342';
                         // Bare controllers are normal for legacy installs until the user applies.
                         // Only suppress the banner when the controller scriptURL is already versioned.
                         if (!alreadyCurrent) {
@@ -1462,7 +1462,7 @@
             const p = new Promise((res, rej) => {
                 const link = document.createElement('link');
                 link.rel = 'stylesheet';
-                link.href = (typeof window.resolveAssetUrl === 'function' ? window.resolveAssetUrl(`css-src/${name}.css?v=336`) : `css-src/${name}.css?v=336`);
+                link.href = (typeof window.resolveAssetUrl === 'function' ? window.resolveAssetUrl(`css-src/${name}.css?v=342`) : `css-src/${name}.css?v=342`);
                 link.dataset.appCss = name;
                 link.onload = () => {
                     link.dataset.loaded = 'true';
@@ -1494,13 +1494,24 @@
                 reportLazyCssFailure(name, result.reason, { page });
             });
         }
-        function loadScript(name) {
+        function loadScript(name, options = {}) {
+            // force: re-exec when runtime side-effect (e.g. window.focusTrap) was cleared
+            // after the script was already marked loaded.
+            const forceReload = !!(options && options.force);
+            if (forceReload) {
+                _loaded.delete(name);
+                _loadingPromises.delete(name);
+                try {
+                    document.querySelectorAll(`script[src*="${name}.js"],script[src*="${name}.mjs"]`)
+                        .forEach((el) => el.remove());
+                } catch { /* ignore */ }
+            }
             if (_loaded.has(name)) return Promise.resolve();
             if (_loadingPromises.has(name)) return _loadingPromises.get(name);
             const prereqs = SCRIPT_PREREQUISITES[name] || [];
             const wait = prereqs.length ? Promise.all(prereqs.map(loadScript)) : Promise.resolve();
             const p = wait.then(() => new Promise((res, rej) => {
-                if (_loaded.has(name)) {
+                if (_loaded.has(name) && !forceReload) {
                     res();
                     return;
                 }
@@ -1523,19 +1534,27 @@
                         rej(error);
                         return;
                     }
+                    // Stale success after force-reload must not mark loaded or block the new request.
+                    if (_loadingPromises.get(name) !== p) {
+                        res();
+                        return;
+                    }
                     _loaded.add(name);
-                    if (_loadingPromises.get(name) === p) _loadingPromises.delete(name);
+                    _loadingPromises.delete(name);
                     res();
                 };
                 if (MODULE_SCRIPTS.has(name)) s.type = 'module';
-                s.src = (typeof window.resolveAssetUrl === 'function' ? window.resolveAssetUrl(`${name}${MJS_SCRIPTS.has(name) ? '.mjs' : '.js'}?v=336`) : `${name}${MJS_SCRIPTS.has(name) ? '.mjs' : '.js'}?v=336`);
+                const ext = MJS_SCRIPTS.has(name) ? '.mjs' : '.js';
+                let href = `${name}${ext}?v=342`;
+                if (forceReload) href += `&_rl=${Date.now()}`;
+                s.src = (typeof window.resolveAssetUrl === 'function' ? window.resolveAssetUrl(href) : href);
                 s.onload = () => settle();
                 s.onerror = () => settle(new Error(`Failed to load script: ${name}`));
                 timer = window.setTimeout(() => settle(new Error(`Timed out loading script: ${name}`)), scriptLoadTimeoutMs());
                 document.head.appendChild(s);
             }));
             _loadingPromises.set(name, p);
-            if (_loaded.has(name)) _loadingPromises.delete(name);
+            if (_loaded.has(name) && !forceReload) _loadingPromises.delete(name);
             p.catch(() => {
                 if (_loadingPromises.get(name) === p) _loadingPromises.delete(name);
             });

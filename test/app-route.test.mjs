@@ -156,6 +156,45 @@ test('late completion from an older navigation cannot replace the latest page or
     assert.equal(window.location.hash, '#/ai/advice?range=all');
 });
 
+test('FIND-08: cancelled older navigation does not commit staged healthView', async () => {
+    const context = loadRouteHarness();
+    const { window } = context;
+    const gates = {
+        records: deferred(),
+        'ai-coach': deferred()
+    };
+    let navigationToken = 0;
+    window.data.healthView = 'diet';
+    window.data.adviceRange = 'today';
+    window.ui = {
+        beginNavigation() {
+            navigationToken += 1;
+            return navigationToken;
+        },
+        isCurrentNavigation(token) {
+            return token === navigationToken;
+        },
+        async _activateTab(page, _nav, options) {
+            await gates[page].promise;
+            if (!this.isCurrentNavigation(options.navigationToken)) return false;
+            window.data._activePageId = page;
+            return true;
+        }
+    };
+
+    const older = window.appRoute.apply(window.appRoute.parseHash('#/records/calendar'));
+    const latest = window.appRoute.apply(window.appRoute.parseHash('#/ai/advice?range=all'));
+    gates['ai-coach'].resolve();
+    assert.equal(await latest, true);
+    assert.equal(window.data.adviceRange, 'all');
+    // Older still pending — healthView must not already be calendar.
+    assert.notEqual(window.data.healthView, 'calendar');
+    gates.records.resolve();
+    assert.equal(await older, false);
+    assert.notEqual(window.data.healthView, 'calendar');
+    assert.equal(window.data.adviceRange, 'all');
+});
+
 test('appRoute.apply updates navStack for deep-linked tabs and subroutes', async () => {
     const context = loadRouteHarness();
     const { window } = context;

@@ -10,6 +10,7 @@
         if (key === 'handlePlanTaskTap') return '[onclick*="handlePlanTaskTap"]';
         if (key === 'selectTodayPlan') return '[onclick*="selectTodayPlan"]';
         if (key === 'openPlanTodayAiSheet') return '[onclick*="openPlanTodayAiSheet"]';
+        if (key === 'openPlanWeeklySheet') return '[onclick*="openPlanWeeklySheet"],.today-weekly-plan-btn';
         if (key === 'enhanceTodayPage') return '';
         if (key === 'openPlanTaskEdit') return '[onclick*="openPlanTaskEdit"]';
         if (key === 'checkAppUpdate') return '#profileUpdateCheckBtn';
@@ -49,14 +50,44 @@
             if (!window.navStack?.requestClose?.('modal')) this._closeActiveModalInternal();
         },
 
-        _openModal({ title, icon, bodyHtml, actionsHtml, onMount }) {
+        async ensureFocusTrapReady() {
+            if (window.focusTrap?.trap) return true;
+            // Boot loader may not be bound yet on very early modal opens.
+            if (typeof window.loadAppScript !== 'function') {
+                for (let i = 0; i < 40 && typeof window.loadAppScript !== 'function'; i += 1) {
+                    await new Promise((r) => setTimeout(r, 25));
+                }
+            }
+            if (typeof window.loadAppScript !== 'function') return false;
+            try {
+                // force when trap is missing: script may be marked loaded from boot
+                // while window.focusTrap was cleared or never bound.
+                await window.loadAppScript('a11y-focus-trap', { force: !window.focusTrap?.trap });
+            } catch {
+                return false;
+            }
+            if (window.focusTrap?.trap) return true;
+            // Rare: network settled before classic script body bound the API.
+            for (let i = 0; i < 20 && !window.focusTrap?.trap; i += 1) {
+                await new Promise((r) => setTimeout(r, 25));
+            }
+            return !!window.focusTrap?.trap;
+        },
+
+        async _openModal({ title, icon, bodyHtml, actionsHtml, onMount }) {
             if (this._activeModalEl) window.navStack?.popType?.('modal');
             this._closeActiveModalInternal();
+            // H3: trap must be ready before display. Skip await when already loaded so
+            // sync callers (onclick / unit harnesses) still see the modal immediately.
+            if (!window.focusTrap?.trap) {
+                await this.ensureFocusTrapReady();
+            }
             const modal = document.createElement('div');
             modal.className = 'md-modal';
             modal.setAttribute('data-rl-modal', '1');
             modal.setAttribute('role', 'dialog');
             modal.setAttribute('aria-modal', 'true');
+            modal.tabIndex = -1;
             modal.innerHTML = `
                 <div class="md-modal-backdrop" data-modal-close></div>
                 <div class="md-modal-card">
@@ -85,25 +116,19 @@
                 id: `routine-${Date.now()}`,
                 close: () => this._closeActiveModalInternal(),
             });
-            const applyFocusTrap = () => {
-                if (this._activeModalEl === modal && window.focusTrap?.trap) {
-                    window.focusTrap.trap(modal);
-                }
-            };
-            applyFocusTrap();
-            // Phase F: do not wait solely on +2s utility idle — ensure trap before first modal use.
-            if (!window.focusTrap?.trap && typeof window.loadAppScript === 'function') {
-                window.loadAppScript('a11y-focus-trap').then(applyFocusTrap).catch(() => {});
+            if (window.focusTrap?.trap) {
+                window.focusTrap.trap(modal);
             }
             try {
                 onMount?.(modal, close);
             } catch {}
+            return modal;
         },
 
         _confirmModal({ title, icon, message, okText, cancelText, danger, onOk }) {
             const msg = this.escapeHtml(message || '').replace(/\n/g, '<br>');
             const showCancel = cancelText !== '';
-            this._openModal({
+            return this._openModal({
                 title,
                 icon,
                 bodyHtml: `<div style="color:var(--md-sys-on-surface-variant);font-size:13px;line-height:1.45">${msg}</div>`,

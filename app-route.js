@@ -122,12 +122,21 @@
             this._applying = true;
             this._applyingToken = intentToken;
             try {
-                if (page === 'records') window.data.healthView = next.healthView || 'diet';
-                if (page === 'profile') window.data.routineView = next.routineView || 'home';
-                if (page === 'ai-coach') window.data.adviceRange = next.adviceRange || 'today';
+                // FIND-08: write subroute only after navigation generation is claimed by this apply.
+                // Values are staged locally; commit only when token still current after activate.
+                const stagedHealth = page === 'records' ? (next.healthView || 'diet') : null;
+                const stagedRoutine = page === 'profile' ? (next.routineView || 'home') : null;
+                const stagedAdvice = page === 'ai-coach' ? (next.adviceRange || 'today') : null;
+                // FIND-09: route-bound (data-rl-modal) dialogs close on tab change.
+                if (!options.preserveModal) {
+                    window.data?._closeActiveModalInternal?.();
+                }
                 const activated = await window.ui._activateTab(page, nav, { preserveSubroute: true, navigationToken });
                 if (intentToken !== this._intentToken || (navigationToken != null && !window.ui.isCurrentNavigation?.(navigationToken))) return false;
                 if (activated === false) return false;
+                if (stagedHealth != null) window.data.healthView = stagedHealth;
+                if (stagedRoutine != null) window.data.routineView = stagedRoutine;
+                if (stagedAdvice != null) window.data.adviceRange = stagedAdvice;
                 // Deep-link / hash paths must maintain the same stack contract as ui.tab.
                 if (page === 'today') window.navStack?.resetToRoot?.();
                 else window.navStack?.replaceTopOrPushTab?.(page);

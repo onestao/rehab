@@ -318,16 +318,40 @@ test('A-T3 browser: plan-ui 404 surfaces toast, no TypeError, recovers after unf
             page.on('pageerror', (err) => pageErrors.push(err.message));
             await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
             await waitBoot(page);
-            // Force immediate load path (bypass idle enhancement wait)
-            await page.evaluate(async () => {
+            // Capture toast API — body.innerText can miss #appToast when it auto-hides.
+            const toastCapture = await page.evaluate(async () => {
+                const captured = [];
+                const prev = window.toast?.show?.bind(window.toast);
+                if (window.toast) {
+                    window.toast.show = (msg, type, ...rest) => {
+                        captured.push({ msg: String(msg || ''), type: type || '' });
+                        return prev ? prev(msg, type, ...rest) : undefined;
+                    };
+                } else {
+                    window.toast = {
+                        show(msg, type) { captured.push({ msg: String(msg || ''), type: type || '' }); }
+                    };
+                }
                 await window.data.openNewPlanSheet();
+                return captured;
             });
             await delay(800);
-            const toastText = await page.evaluate(() => {
-                const nodes = [...document.querySelectorAll('.toast, [class*="toast"], .md-snackbar, body')];
-                return document.body.innerText;
+            const toastDom = await page.evaluate(() => {
+                const el = document.getElementById('appToast');
+                return {
+                    toast: el?.textContent || '',
+                    body: document.body.innerText || ''
+                };
             });
-            assert.ok(/计划功能暂时未加载成功|加载失败/.test(toastText), 'expected user-facing plan load failure copy');
+            const joined = [
+                ...toastCapture.map((t) => t.msg),
+                toastDom.toast,
+                toastDom.body
+            ].join('\n');
+            assert.ok(
+                /计划功能暂时未加载成功|加载失败/.test(joined),
+                `expected user-facing plan load failure copy, got ${JSON.stringify({ toastCapture, toastDom: toastDom.toast })}`
+            );
             assert.equal(pageErrors.filter((m) => /openNewPlanSheet is not a function/i.test(m)).length, 0);
 
             failMode = false;
@@ -336,8 +360,237 @@ test('A-T3 browser: plan-ui 404 surfaces toast, no TypeError, recovers after unf
             });
             await page.waitForFunction(() => !!document.querySelector('.md-modal[data-rl-modal="1"]'), null, { timeout: 15000 });
             const modals = await page.locator('.md-modal[data-rl-modal="1"]').count();
-            await writeFile(path.join(evidenceRoot, 'a-t3.json'), JSON.stringify({ pageErrors, modals, toastSnippet: toastText.slice(0, 400) }, null, 2));
+            await writeFile(path.join(evidenceRoot, 'a-t3.json'), JSON.stringify({
+                pageErrors,
+                modals,
+                toastCapture,
+                toastSnippet: joined.slice(0, 400)
+            }, null, 2));
             assert.ok(modals >= 1);
+            await context.close();
+        });
+    } finally {
+        await new Promise((resolve) => server.close(resolve));
+    }
+});
+
+test('H1-T1 browser: first click weekly dock with delayed plan-weekly opens sheet once', async () => {
+    await mkdir(evidenceRoot, { recursive: true });
+    let planWeeklyHits = 0;
+    const server = createServer(async (req, res) => {
+        try {
+            const rawUrl = new URL(req.url || '/', 'http://127.0.0.1');
+            const pathname = decodeURIComponent(rawUrl.pathname === '/' ? '/index.html' : rawUrl.pathname);
+            if (/plan-weekly\.js(?:\?|$)/.test(pathname)) {
+                planWeeklyHits += 1;
+                await delay(2500);
+            }
+            const resolved = path.resolve(root, `.${pathname}`);
+            if (!resolved.startsWith(root)) {
+                res.writeHead(403);
+                res.end('Forbidden');
+                return;
+            }
+            const info = await stat(resolved);
+            if (!info.isFile()) {
+                res.writeHead(404);
+                res.end('Not found');
+                return;
+            }
+            res.writeHead(200, {
+                'content-type': mimeFor(resolved),
+                'cache-control': 'no-store'
+            });
+            createReadStream(resolved).pipe(res);
+        } catch {
+            res.writeHead(404);
+            res.end('Not found');
+        }
+    });
+    const port = await freePort();
+    await new Promise((resolve) => server.listen(port, '127.0.0.1', () => resolve(undefined)));
+    const url = `http://127.0.0.1:${port}/index.html`;
+    try {
+        await withBrowser(async (browser) => {
+            const context = await browser.newContext({
+                serviceWorkers: 'block',
+                viewport: { width: 390, height: 844 }
+            });
+            const page = await context.newPage();
+            const pageErrors = [];
+            page.on('pageerror', (err) => pageErrors.push(err.message));
+            await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
+            await waitBoot(page);
+            await page.waitForSelector('.today-weekly-plan-btn, [aria-label="近期计划"]', { timeout: 20000 });
+            await page.evaluate(() => {
+                if (window.data) window.data._activePageId = 'today';
+            });
+            await page.locator('.today-weekly-plan-btn, [aria-label="近期计划"]').first().click({ timeout: 5000 });
+            await page.waitForFunction(() => {
+                const sheet = document.getElementById('planWeeklySheet');
+                return sheet && !sheet.classList.contains('hidden');
+            }, null, { timeout: 20000 });
+            const evidence = {
+                pageErrors,
+                planWeeklyHits,
+                open: await page.evaluate(() => {
+                    const sheet = document.getElementById('planWeeklySheet');
+                    return {
+                        hidden: sheet?.classList.contains('hidden'),
+                        aria: sheet?.getAttribute('aria-hidden'),
+                        hasOpen: typeof window.planWeekly?.open
+                    };
+                })
+            };
+            await writeFile(path.join(evidenceRoot, 'h1-t1-weekly.json'), JSON.stringify(evidence, null, 2));
+            assert.equal(pageErrors.filter((m) => /TypeError|is not a function/i.test(m)).length, 0, String(pageErrors));
+            assert.equal(evidence.open.hidden, false);
+            assert.ok(planWeeklyHits >= 1);
+            await context.close();
+        });
+    } finally {
+        await new Promise((resolve) => server.close(resolve));
+    }
+});
+
+test('H1-T2 browser: AI opener first click with delayed plan-ui opens plan modal', async () => {
+    await mkdir(evidenceRoot, { recursive: true });
+    const http = await startServer({ planUiDelayMs: 2800 });
+    try {
+        await withBrowser(async (browser) => {
+            const context = await browser.newContext({
+                serviceWorkers: 'block',
+                viewport: { width: 390, height: 844 }
+            });
+            const page = await context.newPage();
+            const pageErrors = [];
+            page.on('pageerror', (err) => pageErrors.push(err.message));
+            await page.goto(http.url, { waitUntil: 'domcontentloaded', timeout: 60000 });
+            await waitBoot(page);
+            await page.evaluate(() => {
+                if (window.data) window.data._activePageId = 'today';
+            });
+            const aiBtn = page.locator('button:has-text("AI 生成"), [aria-label="AI"]').first();
+            await aiBtn.waitFor({ state: 'visible', timeout: 20000 });
+            await aiBtn.click({ timeout: 5000 });
+            await page.waitForFunction(() => !!document.querySelector('.md-modal[data-rl-modal="1"]'), null, { timeout: 20000 });
+            const modals = await page.locator('.md-modal[data-rl-modal="1"]').count();
+            const evidence = { pageErrors, modals, planUiHits: http.planUiHits };
+            await writeFile(path.join(evidenceRoot, 'h1-t2-ai.json'), JSON.stringify(evidence, null, 2));
+            assert.equal(pageErrors.filter((m) => /TypeError|is not a function/i.test(m)).length, 0, String(pageErrors));
+            assert.ok(modals >= 1);
+            await context.close();
+        });
+    } finally {
+        await new Promise((resolve) => http.server.close(resolve));
+    }
+});
+
+test('H1-T3 browser: weekly load 404 shows Chinese toast and recovers', async () => {
+    await mkdir(evidenceRoot, { recursive: true });
+    let failWeekly = true;
+    const server = createServer(async (req, res) => {
+        try {
+            const rawUrl = new URL(req.url || '/', 'http://127.0.0.1');
+            const pathname = decodeURIComponent(rawUrl.pathname === '/' ? '/index.html' : rawUrl.pathname);
+            if (/plan-weekly\.js(?:\?|$)/.test(pathname) && failWeekly) {
+                res.writeHead(404, { 'cache-control': 'no-store' });
+                res.end('missing');
+                return;
+            }
+            // Also block plan-ui fallback while failing weekly so toast path is exercised.
+            if (/plan-ui\.js(?:\?|$)/.test(pathname) && failWeekly) {
+                res.writeHead(404, { 'cache-control': 'no-store' });
+                res.end('missing');
+                return;
+            }
+            const resolved = path.resolve(root, `.${pathname}`);
+            if (!resolved.startsWith(root)) {
+                res.writeHead(403);
+                res.end('Forbidden');
+                return;
+            }
+            const info = await stat(resolved);
+            if (!info.isFile()) {
+                res.writeHead(404);
+                res.end('Not found');
+                return;
+            }
+            res.writeHead(200, {
+                'content-type': mimeFor(resolved),
+                'cache-control': 'no-store'
+            });
+            createReadStream(resolved).pipe(res);
+        } catch {
+            res.writeHead(404);
+            res.end('Not found');
+        }
+    });
+    const port = await freePort();
+    await new Promise((resolve) => server.listen(port, '127.0.0.1', () => resolve(undefined)));
+    const url = `http://127.0.0.1:${port}/index.html`;
+    try {
+        await withBrowser(async (browser) => {
+            const context = await browser.newContext({
+                serviceWorkers: 'block',
+                viewport: { width: 390, height: 844 }
+            });
+            const page = await context.newPage();
+            const pageErrors = [];
+            page.on('pageerror', (err) => pageErrors.push(err.message));
+            await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
+            await waitBoot(page);
+            const toastCapture = await page.evaluate(async () => {
+                const seen = [];
+                const prev = window.toast?.show?.bind(window.toast);
+                if (window.toast) {
+                    window.toast.show = (msg, type, ...rest) => {
+                        seen.push({ msg: String(msg || ''), type });
+                        return prev?.(msg, type, ...rest);
+                    };
+                } else {
+                    window.toast = {
+                        show(msg, type) { seen.push({ msg: String(msg || ''), type }); }
+                    };
+                }
+                window.planWeekly = null;
+                // Force unload so load path is exercised even if already cached in page.
+                try { delete window.planWeekly; } catch { window.planWeekly = null; }
+                await window.data.openPlanWeeklySheet();
+                return seen;
+            });
+            await delay(500);
+            const toastText = await page.evaluate(() => {
+                const el = document.getElementById('appToast');
+                return {
+                    body: document.body.innerText,
+                    toast: el?.textContent || '',
+                    toastClass: el?.className || ''
+                };
+            });
+            const joined = [
+                ...toastCapture.map((t) => t.msg),
+                toastText.toast,
+                toastText.body
+            ].join('\n');
+            assert.ok(
+                /近期计划功能暂时未加载成功|计划功能暂时未加载成功|加载失败|尚未加载/.test(joined),
+                `expected weekly fail toast, got ${JSON.stringify({ toastCapture, toastText: toastText.toast })}`
+            );
+            failWeekly = false;
+            await page.evaluate(async () => {
+                await window.data.openPlanWeeklySheet();
+            });
+            await page.waitForFunction(() => {
+                const sheet = document.getElementById('planWeeklySheet');
+                return sheet && !sheet.classList.contains('hidden');
+            }, null, { timeout: 20000 });
+            await writeFile(path.join(evidenceRoot, 'h1-t3-weekly-retry.json'), JSON.stringify({
+                pageErrors,
+                toastCapture,
+                toastSnippet: joined.slice(0, 400)
+            }, null, 2));
+            assert.equal(pageErrors.filter((m) => /TypeError|is not a function/i.test(m)).length, 0);
             await context.close();
         });
     } finally {

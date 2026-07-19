@@ -12,7 +12,7 @@
             onOk,
         }) {
             const escVal = (v) => this.escapeHtml(v || '');
-            this._openModal({
+            return this._openModal({
                 title,
                 icon,
                 bodyHtml: `
@@ -131,7 +131,7 @@
                 return;
             }
             const currentCount = this._planActions().length;
-            this._openModal({
+            return this._openModal({
                 title: '导入方案',
                 icon: 'library_books',
                 bodyHtml: `
@@ -1121,7 +1121,7 @@
         },
 
         openAddPrescriptionActionModal() {
-            this._openModal({
+            return this._openModal({
                 title: '添加处方动作',
                 icon: 'add',
                 bodyHtml: `<div class="md-field"><input id="prescriptionNewName" type="text" placeholder=" "><label>标准动作名</label></div>`,
@@ -1179,7 +1179,7 @@
                 .filter(Boolean);
             const actions = this.filterPrescriptionActions();
             const esc = (value) => this.escapeHtml(value || '');
-            this._openModal({
+            return this._openModal({
                 title: '合并处方动作',
                 icon: 'compare_arrows',
                 bodyHtml: `<div class="prescription-merge-modal">
@@ -1501,7 +1501,7 @@
             const action = this.findPrescriptionActionById(actionId);
             if (!action) return;
             const esc = (value) => this.escapeHtml(value || '');
-            this._openModal({
+            return this._openModal({
                 title: '处方动作详情',
                 icon: 'clinical_notes',
                 bodyHtml: `<div class="prescription-detail">
@@ -1587,7 +1587,7 @@
             const action = this.findActionById(actionId);
             if (!action || action.deleted) return;
             const esc = (v) => (this.escapeHtml ? this.escapeHtml(v || '') : String(v || ''));
-            this._openModal({
+            return this._openModal({
                 title: '编辑动作',
                 icon: 'tune',
                 bodyHtml: `
@@ -1715,7 +1715,7 @@
             const action = this.findActionById(actionId);
             if (!action || action.deleted) return;
             const current = Array.isArray(action.tags) ? action.tags.join(', ') : '';
-            this._openModal({
+            return this._openModal({
                 title: '编辑动作标签',
                 icon: 'bookmark_add',
                 bodyHtml: `
@@ -1824,7 +1824,7 @@
             const routine = this.findRoutineById(routineId);
             if (!routine || routine.deleted) return;
             const current = Array.isArray(routine.tags) ? routine.tags.join(', ') : '';
-            this._openModal({
+            return this._openModal({
                 title: '编辑方案标签',
                 icon: 'bookmark_add',
                 bodyHtml: `
@@ -1929,7 +1929,7 @@
             const actions = this.activeRecords(this.db.actions || []);
             if (!actions.length) return;
             const esc = (v) => (this.escapeHtml ? this.escapeHtml(v || '') : String(v || ''));
-            this._openModal({
+            return this._openModal({
                 title: '替换为…',
                 icon: 'swap_horiz',
                 bodyHtml: `
