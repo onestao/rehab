@@ -290,6 +290,9 @@ function bumpVersion() {
     html = html.replace(/\?v=\d+/g, `?v=${next}`);
     html = html.replace(/const releaseVersion = ['"]\d+['"]/, `const releaseVersion = '${next}'`);
     html = html.replace(/rehab-sw-controller-reload-v\d+/g, `rehab-sw-controller-reload-v${next}`);
+    // Hard-coded upgrade/controller version guards outside releaseVersion scope.
+    html = html.replace(/(searchParams\.get\(['"]__rehab_upgrade['"]\)\s*(?:!==|===)\s*['"])\d+(['"])/g, `$1${next}$2`);
+    html = html.replace(/(searchParams\.get\(['"]v['"]\)\s*===\s*['"])\d+(['"])/g, `$1${next}$2`);
     fs.writeFileSync(htmlPath, html);
 
     let appUpdate = fs.readFileSync(appUpdatePath, 'utf8');
