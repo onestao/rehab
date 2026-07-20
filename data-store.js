@@ -15,6 +15,12 @@
         _dbDirty: false,
         _quotaWarned: false,
         _storageMigrationScheduled: false,
+        // FIND-12: first-paint write barrier until data.init settles.
+        _readyState: 'pending',
+        _readyPromise: null,
+        _resolveReady: null,
+        _rejectReady: null,
+        _readyWaiters: null,
 
         /** Try localStorage.setItem; on QuotaExceededError run eviction once and retry.
          *  Returns true on success, false on permanent failure. */
@@ -147,90 +153,213 @@
             }, 3000);
         },
 
+        _ensureReadyDeferred() {
+            if (this._readyPromise) return this._readyPromise;
+            this._readyPromise = new Promise((resolve, reject) => {
+                this._resolveReady = resolve;
+                this._rejectReady = reject;
+            });
+            return this._readyPromise;
+        },
+
+        /**
+         * FIND-12: await until data.init settles. Resolves true when ready, false when failed.
+         * Does not throw on init failure so callers can cancel cleanly.
+         */
+        async ensureDataReady() {
+            if (this._readyState === 'ready') return true;
+            if (this._readyState === 'failed') return false;
+            this._ensureReadyDeferred();
+            try {
+                await this._readyPromise;
+                return this._readyState === 'ready';
+            } catch {
+                return false;
+            }
+        },
+
+        /**
+         * FIND-12 unified write/action gate for first-paint handlers.
+         * Queues a single-flight action until init is ready; cancels on failure / route change.
+         * @param {Function} action
+         * @param {{ busyKey?: string, busyLabel?: string, routeAtClick?: string, navigationGeneration?: number, requireRoute?: boolean }} [options]
+         */
+        async whenReady(action, options = {}) {
+            if (typeof action !== 'function') return undefined;
+            const busyKey = options.busyKey || 'whenReady';
+            const routeAtClick = options.routeAtClick
+                || this._activePageId
+                || document.querySelector?.('.page.active')?.id
+                || '';
+            const navAtClick = options.navigationGeneration
+                ?? (Number.isFinite(window.ui?._navigationToken) ? window.ui._navigationToken : 0);
+
+            if (this._readyState === 'ready') {
+                return action.call(this);
+            }
+            if (this._readyState === 'failed') {
+                window.toast?.show?.('数据初始化失败，请刷新页面后重试。已阻止写入，避免覆盖已有数据。', 'error');
+                return undefined;
+            }
+
+            // Single-flight queue per busyKey so rapid double-clicks share one run.
+            this._readyWaiters = this._readyWaiters || Object.create(null);
+            if (this._readyWaiters[busyKey]) {
+                return this._readyWaiters[busyKey];
+            }
+
+            if (this.beginActionBusy) {
+                this.beginActionBusy(busyKey, options.busyLabel || '数据加载中');
+            }
+
+            const run = (async () => {
+                try {
+                    const ok = await this.ensureDataReady();
+                    if (!ok) {
+                        window.toast?.show?.('数据初始化失败，请刷新页面后重试。已阻止写入，避免覆盖已有数据。', 'error');
+                        return undefined;
+                    }
+                    const active = this._activePageId
+                        || document.querySelector?.('.page.active')?.id
+                        || '';
+                    const stillSameRoute = !routeAtClick || !active || active === routeAtClick;
+                    const gen = Number.isFinite(window.ui?._navigationToken) ? window.ui._navigationToken : 0;
+                    const generationOk = !navAtClick || navAtClick === 0 || gen === 0 || gen === navAtClick;
+                    if (options.requireRoute !== false && (!stillSameRoute || !generationOk)) {
+                        return undefined;
+                    }
+                    return await action.call(this);
+                } finally {
+                    if (this._readyWaiters && this._readyWaiters[busyKey] === run) {
+                        delete this._readyWaiters[busyKey];
+                    }
+                    this.endActionBusy?.(busyKey);
+                }
+            })();
+
+            this._readyWaiters[busyKey] = run;
+            return run;
+        },
+
+        markDataReady() {
+            if (this._readyState === 'ready') return;
+            this._readyState = 'ready';
+            this._ensureReadyDeferred();
+            this._resolveReady?.(true);
+        },
+
+        markDataFailed(error) {
+            if (this._readyState === 'ready') return;
+            this._readyState = 'failed';
+            this._ensureReadyDeferred();
+            this._rejectReady?.(error || new Error('data.init failed'));
+            // Allow ensureDataReady to settle as false instead of throwing forever.
+            this._readyPromise = Promise.resolve(false);
+        },
+
         async init() {
+            this._readyState = 'pending';
+            this._readyPromise = null;
+            this._resolveReady = null;
+            this._rejectReady = null;
+            this._readyWaiters = Object.create(null);
+            this._ensureReadyDeferred();
+
             const started = Date.now();
             window.errorBus?.event?.('storage', 'init:start');
-            let done = this._bootPerf('storage-adapter');
-            let migrationResult = null;
-            const migrationOptions = this._storageMigrationOptions();
-            if (window.storageMigrate && typeof window.storageMigrate.createAdapter === 'function') {
-                migrationResult = await window.storageMigrate.createAdapter({
-                    ...migrationOptions,
-                    deferMigration: true
-                });
-                this._storage = migrationResult.adapter;
-                this._storageMode = migrationResult.mode;
-                window.errorBus?.event?.('storage', 'adapter:resolved', {
-                    mode: migrationResult.mode,
-                    migrationOk: !!migrationResult.migration?.ok,
-                    migrationReason: migrationResult.migration?.reason || ''
-                });
-                if (migrationResult.migration && !migrationResult.migration.ok && migrationResult.migration.reason) {
-                    if (window.toast) toast.show(`迁移失败，继续使用本地存储：${migrationResult.migration.reason}`, 'error');
+            try {
+                let done = this._bootPerf('storage-adapter');
+                let migrationResult = null;
+                const migrationOptions = this._storageMigrationOptions();
+                if (window.storageMigrate && typeof window.storageMigrate.createAdapter === 'function') {
+                    migrationResult = await window.storageMigrate.createAdapter({
+                        ...migrationOptions,
+                        deferMigration: true
+                    });
+                    this._storage = migrationResult.adapter;
+                    this._storageMode = migrationResult.mode;
+                    window.errorBus?.event?.('storage', 'adapter:resolved', {
+                        mode: migrationResult.mode,
+                        migrationOk: !!migrationResult.migration?.ok,
+                        migrationReason: migrationResult.migration?.reason || ''
+                    });
+                    if (migrationResult.migration && !migrationResult.migration.ok && migrationResult.migration.reason) {
+                        if (window.toast) toast.show(`迁移失败，继续使用本地存储：${migrationResult.migration.reason}`, 'error');
+                    }
+                } else {
+                    this._storage = this.createLocalStorageAdapter();
+                    this._storageMode = this._storage.mode;
                 }
-            } else {
-                this._storage = this.createLocalStorageAdapter();
-                this._storageMode = this._storage.mode;
-            }
-            done();
-
-            done = this._bootPerf('storage-read');
-            const storage = this.resolveStorageAdapter();
-            const localDb = await Promise.resolve(storage.read(this.DB_KEY));
-            const localCfg = await Promise.resolve(storage.read(this.CFG_KEY));
-            done();
-            if (localDb) this.db = localDb;
-            else {
-                done = this._bootPerf('legacy-migrate');
-                await this.migrateLegacy();
                 done();
-            }
-            if (window.storageMigrate?.migrateAdviceToVersioned) {
-                done = this._bootPerf('advice-migrate');
-                this.db = window.storageMigrate.migrateAdviceToVersioned(this.db);
-                done();
-            }
-            if (localCfg) this.cfg = localCfg;
-            done = this._bootPerf('normalize');
-            this.normalizeDb();
-            done();
-            done = this._bootPerf('api-init');
-            this._initHistoryApi();
-            this._initAdviceApi();
-            done();
-            done = this._bootPerf('advice-active-records');
-            this.advice.setActiveRecords(this.activeRecords(this.db.health.aiAdviceChat || []), 'recent');
-            done();
-            done = this._bootPerf('startup-hooks');
-            this.scheduleAdviceColdStart?.();
-            if (migrationResult?.migration?.deferred) this.scheduleDeferredStorageMigration(migrationOptions);
-            this.bindFlushHooks();
-            if (window.sync && typeof sync.initUI === 'function') sync.initUI();
-            done();
-            done = this._bootPerf('ai-init');
-            if (typeof ai !== 'undefined') await ai.init({ saveData: true, renderData: false });
-            done();
-            done = this._bootPerf('render');
-            this.render();
-            done();
-            done = this._bootPerf('post-render');
-            this.restoreActionDraft();
-            if (window.cardio) cardio.initUI();
-            done();
-            window.errorBus?.event?.('storage', 'init:success', {
-                mode: this._storageMode,
-                elapsedMs: Date.now() - started,
-                hasDb: !!localDb,
-                hasCfg: !!localCfg,
-                schemaVersion: Number(this.db?.schemaVersion || 0),
-                counts: this.storageDebugCounts?.()
-            });
 
-            setTimeout(() => {
-                if (window.sync) {
-                    sync.processRetryQueue?.().catch(() => {});
+                done = this._bootPerf('storage-read');
+                const storage = this.resolveStorageAdapter();
+                const localDb = await Promise.resolve(storage.read(this.DB_KEY));
+                const localCfg = await Promise.resolve(storage.read(this.CFG_KEY));
+                done();
+                if (localDb) this.db = localDb;
+                else {
+                    done = this._bootPerf('legacy-migrate');
+                    await this.migrateLegacy();
+                    done();
                 }
-            }, 3000);
+                if (window.storageMigrate?.migrateAdviceToVersioned) {
+                    done = this._bootPerf('advice-migrate');
+                    this.db = window.storageMigrate.migrateAdviceToVersioned(this.db);
+                    done();
+                }
+                if (localCfg) this.cfg = localCfg;
+                done = this._bootPerf('normalize');
+                this.normalizeDb();
+                done();
+                done = this._bootPerf('api-init');
+                this._initHistoryApi();
+                this._initAdviceApi();
+                done();
+                done = this._bootPerf('advice-active-records');
+                this.advice.setActiveRecords(this.activeRecords(this.db.health.aiAdviceChat || []), 'recent');
+                done();
+                done = this._bootPerf('startup-hooks');
+                this.scheduleAdviceColdStart?.();
+                if (migrationResult?.migration?.deferred) this.scheduleDeferredStorageMigration(migrationOptions);
+                this.bindFlushHooks();
+                if (window.sync && typeof sync.initUI === 'function') sync.initUI();
+                done();
+                done = this._bootPerf('ai-init');
+                if (typeof ai !== 'undefined') await ai.init({ saveData: true, renderData: false });
+                done();
+                done = this._bootPerf('render');
+                this.render();
+                done();
+                done = this._bootPerf('post-render');
+                this.restoreActionDraft();
+                if (window.cardio) cardio.initUI();
+                done();
+                window.errorBus?.event?.('storage', 'init:success', {
+                    mode: this._storageMode,
+                    elapsedMs: Date.now() - started,
+                    hasDb: !!localDb,
+                    hasCfg: !!localCfg,
+                    schemaVersion: Number(this.db?.schemaVersion || 0),
+                    counts: this.storageDebugCounts?.()
+                });
+
+                this.markDataReady();
+
+                setTimeout(() => {
+                    if (window.sync) {
+                        sync.processRetryQueue?.().catch(() => {});
+                    }
+                }, 3000);
+            } catch (error) {
+                this.markDataFailed(error);
+                window.errorBus?.event?.('storage', 'init:failed', {
+                    mode: this._storageMode,
+                    elapsedMs: Date.now() - started,
+                    error
+                });
+                throw error;
+            }
         },
 
         restoreActionDraft() {
@@ -646,6 +775,20 @@
         },
 
         save(options = {}) {
+            // Block empty-default writes while init is still pending or has failed (FIND-12).
+            if (this._readyState === 'pending') {
+                window.errorBus?.event?.('storage', 'save:blocked-pending');
+                return this.whenReady(() => this.save(options), {
+                    busyKey: options.busyKey || 'save',
+                    busyLabel: options.busyLabel || '数据加载中',
+                    requireRoute: false
+                });
+            }
+            if (this._readyState === 'failed') {
+                window.errorBus?.event?.('storage', 'save:blocked-failed');
+                window.toast?.show?.('数据初始化失败，请刷新页面后重试。已阻止写入，避免覆盖已有数据。', 'error');
+                return undefined;
+            }
             const shouldRender = options.render !== false;
             this.db.lastModified = Math.max(Date.now(), Number(this.db.lastModified || 0) + 1);
             this.db.deviceId = this.db.deviceId || `dev-${Math.random().toString(36).slice(2,10)}`;
@@ -713,4 +856,25 @@
             }
         }
     };
+
+    Object.defineProperty(window.dataStore, '__runtimeStateKeys', {
+        value: [
+            '_storage',
+            '_storageMode',
+            '_flushHooksBound',
+            '_persistTimer',
+            '_pendingPersistPromise',
+            '_resolvePersist',
+            '_rejectPersist',
+            '_dbDirty',
+            '_quotaWarned',
+            '_storageMigrationScheduled',
+            '_readyState',
+            '_readyPromise',
+            '_resolveReady',
+            '_rejectReady',
+            '_readyWaiters'
+        ],
+        enumerable: false
+    });
 })();
