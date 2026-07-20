@@ -336,12 +336,32 @@ function attachPlanAliases() {
     data.renderPlanEquipmentPanel = data.renderPlanEquipmentPanel || data.renderPlanEquipmentCard;
 }
 
+/**
+ * Only the lazy owner module counts as the real opener.
+ * data-ui-state first-paint methods are intentional stand-ins and must stay
+ * replaceable by stubs until the owner script loads (FIND-11).
+ */
+function resolveRecordOpener(method, cfg) {
+    const fromOwner = window[cfg.owner]?.[method];
+    if (typeof fromOwner === 'function') return fromOwner;
+    return null;
+}
+
 function attachLazyRecordOpeners() {
     Object.entries(LAZY_RECORD_OPENERS).forEach(([method, cfg]) => {
-        if (typeof window[cfg.owner]?.[method] === 'function') return;
-        data[method] = async function (...args) {
-            if (typeof window[cfg.owner]?.[method] === 'function') {
-                return window[cfg.owner][method].apply(this, args);
+        const ownerImpl = resolveRecordOpener(method, cfg);
+        if (ownerImpl) {
+            // Promote owner identity onto data; never reinstall stub over owner.
+            data[method] = ownerImpl;
+            return;
+        }
+        if (typeof data[method] === 'function' && data[method].__isLazyRecordOpenerStub) return;
+
+        const stub = async function (...args) {
+            const ready = resolveRecordOpener(method, cfg);
+            if (ready) {
+                data[method] = ready;
+                return ready.apply(this, args);
             }
             if (!data.beginActionBusy?.(method, '加载中')) return;
             try {
@@ -352,8 +372,12 @@ function attachLazyRecordOpeners() {
                         .finally(() => { delete data._lazyRecordLoadPromises[key]; });
                 }
                 await data._lazyRecordLoadPromises[key];
-                const open = window[cfg.owner]?.[method];
-                if (typeof open === 'function') return open.apply(this, args);
+                data.refreshModules?.();
+                const open = resolveRecordOpener(method, cfg);
+                if (typeof open === 'function') {
+                    data[method] = open;
+                    return open.apply(this, args);
+                }
                 throw new Error(`${cfg.label}模块未注册`);
             } catch (e) {
                 window.errorBus?.report?.(`lazy-record.${method}`, e);
@@ -362,8 +386,62 @@ function attachLazyRecordOpeners() {
                 data.endActionBusy?.(method);
             }
         };
+        stub.__isLazyRecordOpenerStub = true;
+        data[method] = stub;
     });
 }
+
+/**
+ * Machine-checkable method-owner registry (FIND-11).
+ * Lists lazy openers + plan gate methods with owner, stub/real identity, and runtime keys.
+ */
+data.getMethodOwnerRegistry = function getMethodOwnerRegistry() {
+    const runtimeStateKeys = [];
+    dataModules().forEach((module) => {
+        const keys = module?.__runtimeStateKeys;
+        if (Array.isArray(keys)) runtimeStateKeys.push(...keys);
+    });
+
+    const entries = [];
+    Object.entries(LAZY_RECORD_OPENERS).forEach(([method, cfg]) => {
+        const current = data[method];
+        const ownerImpl = window[cfg.owner]?.[method];
+        const isStub = !!(current && current.__isLazyRecordOpenerStub);
+        const hasOwner = typeof ownerImpl === 'function';
+        entries.push({
+            method,
+            ownerModule: cfg.owner,
+            scripts: [...cfg.scripts],
+            gateOrStubIdentity: isStub ? 'lazy-record-stub' : null,
+            isStub,
+            hasRealImplementation: hasOwner,
+            realImplementationIdentity: hasOwner ? `${cfg.owner}.${method}` : null,
+            currentIsOwnerImpl: hasOwner && current === ownerImpl
+        });
+    });
+    LAZY_PLAN_OPENERS.forEach((method) => {
+        const current = data[method];
+        const ownerImpl = window.dataPlanUi?.[method];
+        const isStub = !!(current && current.__isPlanFeatureGateStub);
+        entries.push({
+            method,
+            ownerModule: 'dataPlanUi',
+            scripts: ['plan-ui'],
+            gateOrStubIdentity: isStub ? 'plan-feature-gate-stub' : null,
+            isStub,
+            hasRealImplementation: typeof ownerImpl === 'function' || (typeof current === 'function' && !isStub),
+            realImplementationIdentity: typeof ownerImpl === 'function'
+                ? `dataPlanUi.${method}`
+                : (typeof current === 'function' && !isStub ? `data.${method}` : null),
+            currentIsOwnerImpl: typeof ownerImpl === 'function' && current === ownerImpl
+        });
+    });
+    return {
+        methods: entries,
+        runtimeStateKeys: [...new Set(runtimeStateKeys)],
+        planFeatureGateState: data.planFeatureGate?.getState?.() || null
+    };
+};
 
 attachPlanAliases();
 attachLazyRecordOpeners();
