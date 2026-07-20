@@ -121,7 +121,7 @@ npm run test:release                     pass
 
 | Item | Value |
 |---|---|
-| Final candidate HEAD | *(pin commit tip after this freeze report — see `git rev-parse hotfix/today-ai-picker-readiness-v343`) |
+| Final candidate HEAD | `b3346c78be2d4572fe70fbce898bbde0c9e48784` (freeze report; merge tip = pin commit after this) |
 | Branch | `hotfix/today-ai-picker-readiness-v343` |
 | Base | `perfrom` @ `4aed61659ea6e830346c66405fb6f90823f04c1a` |
 | Working tree | **clean** (no tracked dirt; no .tmp/trace/profile/log in commits) |
@@ -141,7 +141,7 @@ npm run test:release                     pass
 2. `8aab1c6` test: cover cold Today AI picker readiness T1-T8
 3. `d55d78a` chore: bump release assets to v343
 4. `d7a78fb` docs: audit Today AI picker readiness hotfix
-5. *(freeze report commit)* docs: freeze Today AI picker v343 candidate
+5. `b3346c78be2d4572fe70fbce898bbde0c9e48784` docs: freeze Today AI picker v343 candidate
 6. *(pin commit tip)* docs: pin freeze tip SHA after freeze report
 
 ### Final gates (re-run on freeze candidate)
