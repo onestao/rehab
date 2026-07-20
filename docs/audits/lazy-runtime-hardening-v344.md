@@ -30,7 +30,7 @@ v343 Today AI picker readiness (`ensureAiPickerRuntime` + diet/plan mounts) is p
 
 | Check | Result |
 |---|---|
-| Worktree HEAD at freeze evidence | see **ACTUAL_FINAL_HEAD** below (includes FIND-17 instrumentation commit if present) |
+| Worktree HEAD at freeze evidence | **ACTUAL_FINAL_HEAD** = `git rev-parse HEAD` on `hardening/lazy-runtime-v344` (freeze protocol: no separate pin commit; chat freeze report is authoritative) |
 | Version | **v345** |
 | Path rule | All work under `G:/LLM/rehab` worktree/tmp only |
 | Production code changed for FIND-17 re-verify | **no** (test instrumentation only; no real leak found) |
@@ -176,25 +176,31 @@ Test-only probe installed via Playwright `addInitScript` before app scripts:
 6. `8728add` chore: bump release assets to v344
 7. `d31e455` docs: close remaining lazy runtime findings
 8. `6ef5e38` chore: bump release assets to v345
-9. (pending/included) test+docs: instrument FIND-17 real resource counts for freeze evidence
+9. `343426d` test: instrument FIND-17 real listener and observer counts
+10. docs: freeze evidence / ACTUAL_FINAL_HEAD notes (tip of branch at freeze)
 
 ## Git freeze report (read-only)
 
 | Item | Value |
 |---|---|
+| Item | Value |
+|---|---|
+| **ACTUAL_FINAL_HEAD** | `git rev-parse HEAD` on this branch at freeze time (authoritative value is in the freeze chat report; no separate pin commit) |
 | Worktree | `G:/LLM/rehab/.claude/worktrees/lazy-runtime-v344` |
 | Branch | `hardening/lazy-runtime-v344` |
 | Upstream | **none** (not pushed) |
 | Base | `e94fea70a71b73c83a1dc4e38670e975b204cbeb` (= local `perfrom` = `origin/perfrom`) |
 | Main repo current branch | `perfrom` @ `e94fea7` |
 | `origin/main` / `main` | `207ed0da5d89bf6793c28f24c7269f662933f3d8` (not target of this freeze) |
+| Product assets commit | `6ef5e3864b34a2249b95eae741ba20bc77bc5760` (v345 bump) |
+| FIND-17 instrumentation commit | `343426d45f9d9256f3ec5ed9639e9f62d84bbf78` |
 | FF-only into `perfrom` | **yes** (`perfrom` is ancestor of hardening HEAD) |
 | FF-only from `origin/perfrom` | **yes** |
 | Pin commit for final SHA | **not created** (protocol) |
 | Push | **no** |
 | Merge | **no** |
 
-> **Note:** After the FIND-17 instrumentation commit lands, `ACTUAL_FINAL_HEAD` is that commit’s SHA. Prior product HEAD remains `6ef5e38` (v345 assets). Instrumentation is **test + docs only** — no production fingerprint change, version stays **v345**.
+> Product assets remain v345 at `6ef5e38`. FIND-17 instrumentation and freeze docs after that are **test + docs only** — no production fingerprint change.
 
 ## Final state
 
