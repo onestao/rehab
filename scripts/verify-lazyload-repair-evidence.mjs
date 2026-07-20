@@ -130,8 +130,124 @@ async function waitBoot(page, timeout = 45000) {
     await page.waitForFunction(() => {
         return window.data
             && typeof window.data.openNewPlanSheet === 'function'
+            && typeof window.loadAppScript === 'function'
             && document.querySelector('#today, .page');
     }, null, { timeout });
+}
+
+/**
+ * Deterministic toast/error capture for evidence S2.
+ * Install BEFORE page.goto so first toast.show is never missed
+ * (body.innerText after auto-hide is flaky — formal A-T3 wraps toast.show instead).
+ */
+async function installToastCapture(context) {
+    await context.addInitScript(() => {
+        const store = {
+            toasts: [],
+            errors: [],
+            patched: false
+        };
+        window.__lazyEvidenceCapture = store;
+
+        function pushToast(msg, type) {
+            store.toasts.push({
+                msg: String(msg || ''),
+                type: type || '',
+                at: Date.now()
+            });
+        }
+
+        function wrapToast(toastObj) {
+            if (!toastObj || typeof toastObj !== 'object') return;
+            const prev = typeof toastObj.show === 'function' ? toastObj.show.bind(toastObj) : null;
+            if (toastObj.__lazyEvidenceWrapped) return;
+            toastObj.show = (msg, type, ...rest) => {
+                pushToast(msg, type);
+                return prev ? prev(msg, type, ...rest) : undefined;
+            };
+            toastObj.__lazyEvidenceWrapped = true;
+        }
+
+        // Patch existing toast immediately if present, and re-patch when assigned later.
+        wrapToast(window.toast);
+        try {
+            let current = window.toast;
+            Object.defineProperty(window, 'toast', {
+                configurable: true,
+                enumerable: true,
+                get() { return current; },
+                set(v) {
+                    current = v;
+                    wrapToast(v);
+                }
+            });
+        } catch {
+            // If toast is non-configurable, fall back to polling wrap.
+        }
+
+        // Observe #appToast / toast-like nodes as a secondary evidence channel.
+        const scanNode = (node) => {
+            if (!node || node.nodeType !== 1) return;
+            const text = (node.textContent || '').trim();
+            if (!text) return;
+            const id = node.id || '';
+            const cls = typeof node.className === 'string' ? node.className : '';
+            if (id === 'appToast' || /toast/i.test(id) || /toast/i.test(cls)) {
+                store.toasts.push({ msg: text, type: 'dom', at: Date.now() });
+            }
+        };
+        const mo = new MutationObserver((mutations) => {
+            for (const m of mutations) {
+                m.addedNodes?.forEach(scanNode);
+                if (m.type === 'characterData' || m.type === 'childList') {
+                    scanNode(m.target);
+                }
+            }
+        });
+        const startMo = () => {
+            if (!document.documentElement) return;
+            mo.observe(document.documentElement, {
+                childList: true,
+                subtree: true,
+                characterData: true
+            });
+            const existing = document.getElementById('appToast');
+            if (existing) scanNode(existing);
+        };
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', startMo, { once: true });
+        } else {
+            startMo();
+        }
+
+        // errorBus surface if present later
+        const patchErrorBus = () => {
+            if (window.errorBus && typeof window.errorBus.emit === 'function' && !window.errorBus.__lazyEvidenceWrapped) {
+                const prev = window.errorBus.emit.bind(window.errorBus);
+                window.errorBus.emit = (payload, ...rest) => {
+                    try {
+                        const msg = typeof payload === 'string'
+                            ? payload
+                            : (payload?.message || payload?.msg || JSON.stringify(payload));
+                        store.errors.push({ msg: String(msg || ''), at: Date.now() });
+                    } catch { /* ignore */ }
+                    return prev(payload, ...rest);
+                };
+                window.errorBus.__lazyEvidenceWrapped = true;
+            }
+        };
+        patchErrorBus();
+        const busTimer = setInterval(patchErrorBus, 50);
+        setTimeout(() => clearInterval(busTimer), 60000);
+        store.patched = true;
+    });
+}
+
+function toastJoined(capture) {
+    const parts = [];
+    for (const t of capture?.toasts || []) parts.push(t.msg);
+    for (const e of capture?.errors || []) parts.push(e.msg);
+    return parts.join('\n');
 }
 
 function save(name, data) {
@@ -177,17 +293,25 @@ async function main() {
             }
         }
 
-        // 2. Plan 404 toast + recover
+        // 2. Plan 404 toast + recover (deterministic toast capture; no body.innerText race)
+        // Product semantics: fail first open → user-facing Chinese toast → busy cleared →
+        // user actively retries after unfail (not auto-replay of the failed click).
         {
             let failMode = true;
+            let planUi404Hits = 0;
+            let planUiOkHits = 0;
             const server = createServer(async (req, res) => {
                 try {
                     const rawUrl = new URL(req.url || '/', 'http://127.0.0.1');
                     const pathname = decodeURIComponent(rawUrl.pathname === '/' ? '/index.html' : rawUrl.pathname);
-                    if (/plan-ui\.js(?:\?|$)/.test(pathname) && failMode) {
-                        res.writeHead(404, { 'cache-control': 'no-store' });
-                        res.end('missing');
-                        return;
+                    if (/plan-ui\.js(?:\?|$)/.test(pathname)) {
+                        if (failMode) {
+                            planUi404Hits += 1;
+                            res.writeHead(404, { 'cache-control': 'no-store' });
+                            res.end('missing');
+                            return;
+                        }
+                        planUiOkHits += 1;
                     }
                     const resolved = path.resolve(root, `.${pathname}`);
                     const info = await stat(resolved);
@@ -203,19 +327,113 @@ async function main() {
             const url = `http://127.0.0.1:${port}/index.html`;
             try {
                 const ctx = await browser.newContext({ serviceWorkers: 'block', viewport: { width: 390, height: 844 } });
+                await installToastCapture(ctx);
                 const page = await ctx.newPage();
+                const pageErrors = [];
+                page.on('pageerror', (e) => pageErrors.push(e.message));
                 await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
                 await waitBoot(page);
-                await page.evaluate(async () => { await window.data.openNewPlanSheet(); });
-                await delay(800);
-                const toastText = await page.evaluate(() => document.body.innerText);
-                const toastOk = /计划功能暂时未加载成功|加载失败/.test(toastText);
+                // Ensure plan-ui path will actually hit the network (loader ready).
+                await page.waitForFunction(() => typeof window.loadAppScript === 'function', null, { timeout: 20000 });
+
+                // First open while plan-ui 404 — expect toast, no TypeError, no modal yet.
+                // Clear prior capture noise (boot-time toasts) so S2 asserts this attempt.
+                await page.evaluate(() => {
+                    if (window.__lazyEvidenceCapture) {
+                        window.__lazyEvidenceCapture.toasts = [];
+                        window.__lazyEvidenceCapture.errors = [];
+                    }
+                });
+
+                const failResult = await page.evaluate(async () => {
+                    let threw = null;
+                    try {
+                        await window.data.openNewPlanSheet();
+                    } catch (e) {
+                        threw = String(e?.message || e);
+                    }
+                    const busy = !!(window.data?._actionBusy?.openNewPlanSheet
+                        || window.ui?._actionBusy?.openNewPlanSheet);
+                    const capture = window.__lazyEvidenceCapture || { toasts: [], errors: [] };
+                    const appToast = document.getElementById('appToast')?.textContent || '';
+                    return {
+                        threw,
+                        busy,
+                        capture,
+                        appToast,
+                        modals: document.querySelectorAll('.md-modal[data-rl-modal="1"]').length
+                    };
+                });
+
+                // Wait until capture records a matching toast (API wrap or DOM observer).
+                await page.waitForFunction(() => {
+                    const c = window.__lazyEvidenceCapture;
+                    if (!c) return false;
+                    const joined = [
+                        ...(c.toasts || []).map((t) => t.msg),
+                        ...(c.errors || []).map((e) => e.msg),
+                        document.getElementById('appToast')?.textContent || ''
+                    ].join('\n');
+                    return /计划功能暂时未加载成功|加载失败/.test(joined);
+                }, null, { timeout: 10000 }).catch(() => null);
+
+                const afterFail = await page.evaluate(() => {
+                    const c = window.__lazyEvidenceCapture || { toasts: [], errors: [] };
+                    const appToast = document.getElementById('appToast')?.textContent || '';
+                    const busy = !!(window.data?._actionBusy?.openNewPlanSheet
+                        || window.ui?._actionBusy?.openNewPlanSheet);
+                    return {
+                        capture: c,
+                        appToast,
+                        busy,
+                        modals: document.querySelectorAll('.md-modal[data-rl-modal="1"]').length
+                    };
+                });
+
+                const toastJoinedText = [
+                    toastJoined(failResult.capture),
+                    toastJoined(afterFail.capture),
+                    failResult.appToast,
+                    afterFail.appToast
+                ].join('\n');
+                const toastOk = /计划功能暂时未加载成功|加载失败/.test(toastJoinedText);
+                const typeErrorOk = pageErrors.filter((m) => /TypeError|is not a function/i.test(m)).length === 0
+                    && !/TypeError|is not a function/i.test(String(failResult.threw || ''));
+                const busyCleared = afterFail.busy === false && failResult.busy === false;
+                const noModalOnFail = (failResult.modals || 0) === 0 && (afterFail.modals || 0) === 0;
+                const first404Ok = planUi404Hits >= 1;
+
+                // Explicit user retry after unfail (not auto-replay of the failed first click).
                 failMode = false;
-                await page.evaluate(async () => { await window.data.openNewPlanSheet(); });
+                await page.evaluate(async () => {
+                    await window.data.openNewPlanSheet();
+                });
                 await page.waitForFunction(() => !!document.querySelector('.md-modal[data-rl-modal="1"]'), null, { timeout: 15000 });
                 const modals = await page.locator('.md-modal[data-rl-modal="1"]').count();
-                record('S2-plan-404-recover', toastOk && modals >= 1, { toastOk, modals });
-                save('s2-plan-404.json', { toastOk, modals, toastSnippet: toastText.slice(0, 400) });
+                const retryOk = modals === 1 && planUiOkHits >= 1;
+
+                const ok = first404Ok
+                    && typeErrorOk
+                    && toastOk
+                    && busyCleared
+                    && noModalOnFail
+                    && retryOk;
+
+                const detail = {
+                    toastOk,
+                    typeErrorOk,
+                    busyCleared,
+                    first404Ok,
+                    planUi404Hits,
+                    planUiOkHits,
+                    noModalOnFail,
+                    modals,
+                    retrySemantics: 'user-active-retry-after-unfail',
+                    pageErrors,
+                    toastSnippet: toastJoinedText.slice(0, 400)
+                };
+                record('S2-plan-404-recover', ok, detail);
+                save('s2-plan-404.json', detail);
                 await ctx.close();
             } finally {
                 await new Promise((r) => server.close(r));

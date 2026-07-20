@@ -4,32 +4,32 @@
 **Worktree:** `G:/LLM/rehab/.claude/worktrees/lazy-closeout`
 **Base (matrix freeze):** `fc83ab8` / `integration/lazyload-rehab-repair`
 **Final product candidate:** `9393be8929e61869cf450970cf82659b1eed4e55` (v342 production + tests)
-**Branch tip at freeze write:** see `git rev-parse HEAD` on `fix/lazyload-repair-closeout-v336` (includes freeze docs only after product)
+**Branch tip:** includes freeze docs + S2 evidence test-only fix after product (see §0.2)
 **Release fingerprint:** **v342** (`training-assistant-v342`)
 **Date:** 2026-07-20
-**Status:** frozen candidate for user approval — **no push / no merge**
+**Status:** merge-ready for local **FF-only** after user approval — **no push / no merge performed**
 
 ---
 
-## 0. Freeze record (this turn)
+## 0. Freeze record
 
 ### 0.1 Working tree
 
 | Check | Result |
 |-------|--------|
 | Branch | `fix/lazyload-repair-closeout-v336` |
-| Product HEAD | `9393be8929e61869cf450970cf82659b1eed4e55` |
-| Working tree | clean of product code; freeze docs may add tip commits on branch |
-| `.tmp` / logs / traces / browser profiles in git | **not committed** (temp under `G:/LLM/rehab/.tmp/lazyload-closeout/` and `.tmp/lazyload-repair/`) |
+| Product freeze | `9393be8929e61869cf450970cf82659b1eed4e55` (**unchanged**) |
+| Post-product commits | freeze docs + S2 evidence harness only |
+| Product files vs `9393be8` | **no product code changes** |
+| `.tmp` / profiles | not committed |
 
 ### 0.2 Closeout commit list (`fc83ab8..HEAD`)
 
-| SHA | Message |
-|-----|---------|
-| `9393be8` | `fix: closeout PWA lazyload residual blockers at v342` (**product freeze**) |
-| `6a8117a`+ | freeze/docs pins on tip (non-product) |
-
-Product merge content is fully contained in `9393be8` and its ancestors. Tip docs commits only update this report/matrix.
+| SHA | Message | Kind |
+|-----|---------|------|
+| `9393be8` | `fix: closeout PWA lazyload residual blockers at v342` | **product freeze** |
+| docs tips | freeze report / matrix P-1.4 wording | docs |
+| S2 test tip | `test: make plan failure toast evidence deterministic` | test/evidence only |
 
 ### 0.3 Topology vs integration / perfrom
 
@@ -38,54 +38,26 @@ Product merge content is fully contained in `9393be8` and its ancestors. Tip doc
 | `perfrom` | `0fa29d9a8379dc0f1551d3b90961337307232d8b` |
 | `origin/perfrom` | `0fa29d9a8379dc0f1551d3b90961337307232d8b` (not advanced) |
 | `integration/lazyload-rehab-repair` | `fc83ab8859a4eeb4501bb47a9f3ee2a68f20f556` |
-| closeout product | `9393be8929e61869cf450970cf82659b1eed4e55` |
-| `merge-base(fc83ab8, closeout)` | `fc83ab8859a4eeb4501bb47a9f3ee2a68f20f556` |
+| product freeze | `9393be8929e61869cf450970cf82659b1eed4e55` |
 
-| Direction | Commits |
-|-----------|---------|
-| `integration..closeout` | product `9393be8` + freeze docs tip commits |
+| Direction | Result |
+|-----------|--------|
 | `closeout..integration` | **empty** |
-| `perfrom..closeout` | full repair series + closeout + freeze docs |
 | `closeout..perfrom` | **empty** |
-
-| Ancestor check | Result |
-|----------------|--------|
 | integration ancestor of closeout | **yes** |
 | perfrom ancestor of closeout | **yes** |
-| closeout ancestor of perfrom | no |
 | bidirectional unique commits | **none** |
 
-**Conclusion:** linear history. Fast-forward is possible both:
+**FF path:** `closeout → integration → perfrom` with `--ff-only`. **Do not squash.**
 
-1. `integration` ← FF `closeout`
-2. `perfrom` ← FF `closeout` (or FF integration after step 1)
+### 0.4 S2 root cause (test-only)
 
-`perfrom` did **not** move during this work. **No rebase required. Do not squash.**
+| Formal A-T3 | Evidence S2 (old) |
+|-------------|-------------------|
+| Wraps `window.toast.show` during `openNewPlanSheet` | Sampled `document.body.innerText` after fixed 800ms |
+| Captures API text even if toast auto-hides | Missed ephemeral `#appToast` after hide |
 
-### 0.4 Recommended merge path (do not squash)
-
-```text
-fix/lazyload-repair-closeout-v336
-  → fast-forward integration/lazyload-rehab-repair
-  → fast-forward perfrom
-```
-
-Preserve root-cause commit boundaries from the integration series:
-
-- plan gate / intent replay
-- deep-link navigation transaction
-- gated page side effects
-- offline history-view precache
-- SW session defer
-- focus trap / plan gate harden
-- broadened session defer + SW hard navigate
-- v336 bump + retarget tests
-- evidence harness
-- matrix freeze docs
-- **closeout v342 residual blockers** (`9393be8`)
-
-Only if a future remote advance breaks FF should rebase/ordinary merge be reconsidered. Default is **linear FF**.
-
+**Fix (evidence only):** `context.addInitScript` before `goto` wraps `toast.show` + MutationObserver on toast DOM; wait for `loadAppScript`; assert 404 hit, Chinese fail copy, busy cleared, no TypeError, no modal on fail; unfail then **user-active retry** → exactly 1 modal. No product/toast/SW changes.
 ---
 
 ## 1. Executive result
@@ -98,8 +70,8 @@ Only if a future remote advance breaks FF should rebase/ordinary merge be recons
 | Offline full rehab | **Scheme B only** |
 | Architecture / PWA docs | **DONE** |
 | Formal release scripts | present (`test:unit`, `test:browser:lazyload`, `test:evidence:lazyload`, `test:release`) |
-| Final `npm run test:release` this freeze | **FAIL** — unit 708/0 + browser 14/0 **PASS**; evidence harness **S2 FAIL** (toast capture), see §4 |
-| Recommend FF after user approval? | **Yes for product code**, after accepting S2 harness residual **or** fixing evidence toast capture in a docs/test-only follow-up |
+| Final `npm run test:release` | **exit 0** — unit 708/0, browser 14/0, evidence **10/10** |
+| Recommend FF after user approval? | **Yes** — product `9393be8` + test/docs only; S2 deterministic |
 | Push / merge performed? | **No** |
 
 ---
@@ -140,37 +112,33 @@ Only if a future remote advance breaks FF should rebase/ordinary merge be recons
 
 ---
 
-## 4. Final gate results (freeze re-run)
+## 4. Final gate results
 
-Commands run in worktree `G:/LLM/rehab/.claude/worktrees/lazy-closeout`.
+| Gate | Exit | Result | Notes |
+|------|------|--------|-------|
+| `node scripts/bump-version.js --check` | **0** | v342 OK | fingerprint unchanged |
+| unit (`test/*.test.mjs`) | **0** | **708 pass / 0 fail** | via `test:release` |
+| `test:browser:lazyload` | **0** | **14 pass / 0 fail** | msedge |
+| `test:evidence:lazyload` | **0** | **10 pass / 0 fail** | S2 deterministic |
+| `npm run test:release` | **0** | all stages green | ~124s log: `.tmp/lazyload-closeout/gates/final-test-release-s2fix.txt` |
 
-| Gate | Exit | Result | Duration / notes |
-|------|------|--------|------------------|
-| `node scripts/bump-version.js --check` | **0** | version sync OK (**v342**) | — |
-| `git diff --check fc83ab8..HEAD` | **2** | trailing whitespace in **docs only** (markdown double-space hard breaks) | no code whitespace errors |
-| `npm run test:release` | **1** | composite fail | **~130s** |
-| → unit (`test/*.test.mjs`) | **0** | **708 pass / 0 fail** | part of release |
-| → `test:browser:lazyload` | **0** | **14 pass / 0 fail** | A-T1–3, H1-T1–3, B-T1–4, H2-T2, C-T1, H3-T1–2 |
-| → `test:evidence:lazyload` | **1** | **9 pass / 1 fail** | **S2-plan-404-recover** only |
-| Evidence re-run alone | **1** | same S2 fail | **~36s**, channel **msedge** |
+### S2 evidence asserts (now)
 
-### Evidence detail (S2)
+- `planUi404Hits >= 1` on first open
+- Chinese fail toast via `toast.show` wrap + DOM observer (`toastOk`)
+- no TypeError / is not a function
+- busy cleared (`_actionBusy.openNewPlanSheet` false)
+- no modal on fail
+- after unfail: user-active retry → `modals === 1`, `planUiOkHits >= 1`
+- semantics labeled `user-active-retry-after-unfail` (not auto-replay of failed click)
 
-- Artifact: `G:/LLM/rehab/.tmp/lazyload-repair/evidence/s2-plan-404.json`
-- Detail: `{ "toastOk": false, "modals": 1 }`
-- Recovery path **works** (`modals: 1` after unfail).
-- `toastOk` fails because harness samples `document.body.innerText` after 800ms; toast text is not reliably present there (toast host / ephemeral UI). Formal browser **A-T3** still **PASS** (captures `window.toast.show` messages).
-- Product fail copy in `data.js`: `PLAN_FEATURE_FAIL_TOAST = '计划功能暂时未加载成功。请检查网络后重试，已保存的训练记录不会丢失。'`
-- **Classification:** evidence **harness detection gap**, not product 404-toast regression. Formal A-T3 is the stronger contract.
-
-### Logs / artifacts
+### Logs
 
 | Item | Path |
 |------|------|
-| Full `test:release` log | `G:/LLM/rehab/.tmp/lazyload-closeout/gates/final-test-release.txt` |
-| Evidence re-run | `G:/LLM/rehab/.tmp/lazyload-closeout/gates/evidence-rerun-1.txt` |
-| Evidence JSON | `G:/LLM/rehab/.tmp/lazyload-repair/evidence/` |
-| Fingerprint | `training-assistant-v342` / asset `?v=342` |
+| `test:release` after S2 fix | `G:/LLM/rehab/.tmp/lazyload-closeout/gates/final-test-release-s2fix.txt` |
+| Evidence S2 JSON | `G:/LLM/rehab/.tmp/lazyload-repair/evidence/s2-plan-404.json` |
+| Fingerprint | `training-assistant-v342` / `?v=342` |
 
 ---
 
@@ -234,14 +202,13 @@ H5 is **E2** (unit/source). E3 dual-tab defer is S6 (update defer), not full pos
 
 ---
 
-## 6. Residual risks (accepted for this candidate)
+## 6. Residual risks (accepted)
 
-1. **Scheme B offline only** — non-Today / uncached modules may toast-fail offline.
-2. **FIND-14** — default `npm test` is unit-only unless pipeline uses `test:release`.
+1. **Scheme B offline only** — non-Today modules may toast-fail offline.
+2. **FIND-14** — default `npm test` unit-only unless CI uses `test:release`.
 3. **FIND-11/12/15/16** — hygiene deferred.
-4. **Evidence S2 toast capture** — harness false negative; formal A-T3 green. Prefer test-only fix later, not product churn.
-5. **P-1.4 partial** — workout/cardio restore-on-init, not full draft universe.
-6. **Docs `git diff --check` trailing spaces** — markdown hard-break spaces only.
+4. **P-1.4 limited restore** — workout/cardio + confirm; no pain/symptom/dirty-modal/anti-duplicate completion restore.
+5. **Docs trailing spaces** — markdown hard-break only (non-blocking).
 
 ---
 
@@ -249,29 +216,33 @@ H5 is **E2** (unit/source). E3 dual-tab defer is S6 (update defer), not full pos
 
 | Forbidden | Status |
 |-----------|--------|
-| Full sync plan-ui as only fix | Not used |
-| Silent `?.` on Today weekly/AI hard buttons | Removed |
-| SW-off as product fix | Not used |
-| Bloat all pages into ASSETS | Not done (Scheme B) |
-| Whole router rewrite | Not done |
-| Squash entire series into one commit on merge | **Do not** — preserve boundaries |
+| Product change in S2 fix | **Not done** — harness only |
+| Full sync plan-ui | Not used |
+| Silent `?.` weekly/AI | Removed (product freeze) |
+| SW-off as fix | Not used |
+| Squash on merge | **Do not** |
 
 ---
 
 ## 8. Stop rule
 
-**Freeze complete. No push. No merge.**
+**S2 evidence deterministic. `test:release` exit 0. Product still `9393be8`.**
+**No push. No merge.** Await user approval for local FF:
 
-User decision needed:
-
-1. Accept product candidate **v342 @ `9393be8`** (branch tip may include freeze docs) with S2 evidence residual + P-1.4 partial wording, then FF integration → perfrom; **or**
-2. Request test-only S2 toast capture fix before FF (no production change required).
+```text
+git checkout integration/lazyload-rehab-repair && git merge --ff-only fix/lazyload-repair-closeout-v336
+git checkout perfrom && git merge --ff-only integration/lazyload-rehab-repair
+```
 
 ---
 
-## 9. Suggested next user actions
+## 9. User checklist for local FF approval
 
-1. Read this freeze record + architecture/PWA docs.
-2. Spot-check Today weekly/AI first click and `#/profile/library` back.
-3. If approved: **linear FF only** (closeout → integration → perfrom). Do not squash.
-4. Agent will not push/merge unprompted.
+- [x] product freeze = `9393be8`
+- [x] only test/docs after product
+- [x] evidence 10/10
+- [x] test:release exit 0
+- [x] working tree clean (after commit)
+- [x] perfrom not advanced
+- [x] closeout contains full integration
+- [ ] user explicitly approves FF (not performed by agent)
