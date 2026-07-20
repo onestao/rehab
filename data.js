@@ -434,6 +434,74 @@ data.ensureAiRuntime = async function (options = {}) {
     return client;
 };
 
+/**
+ * Shared readiness gate for AI task model pickers opened from Today (or any non-Profile route).
+ * Loads AI runtime + ai-task-settings once (single-flight), verifies real route APIs, then returns mounts.
+ * State: unloaded | loading | ready | failed. Failed clears the promise so callers can retry.
+ */
+data.ensureAiPickerRuntime = async function (options = {}) {
+    const gate = data._aiPickerRuntimeGate || (data._aiPickerRuntimeGate = {
+        state: 'unloaded',
+        promise: null
+    });
+
+    const isReady = () => (
+        gate.state === 'ready'
+        && typeof window.aiTaskSettings?.mountInlinePickers === 'function'
+        && typeof window.ai?.getTaskDefinitions === 'function'
+        && typeof window.ai?.getTaskRoute === 'function'
+        && typeof window.ai?.listSelectableModels === 'function'
+    );
+
+    if (isReady()) {
+        const ai = await data.ensureAiRuntime({ vision: !!options.vision });
+        return { ai, taskSettings: window.aiTaskSettings };
+    }
+
+    if (gate.promise) {
+        const result = await gate.promise;
+        if (options.vision) {
+            await data.ensureAiRuntime({ vision: true });
+        }
+        return result;
+    }
+
+    gate.state = 'loading';
+    gate.promise = (async () => {
+        const ai = await data.ensureAiRuntime({ vision: !!options.vision });
+        await loadAppScripts(['ai-task-settings']);
+        data.refreshModules?.();
+
+        if (typeof window.aiTaskSettings?.mountInlinePickers !== 'function') {
+            throw new Error('AI 模型选择模块未注册');
+        }
+        if (
+            typeof ai.getTaskDefinitions !== 'function'
+            || typeof ai.getTaskRoute !== 'function'
+            || typeof ai.listSelectableModels !== 'function'
+        ) {
+            throw new Error('AI 模型路由尚未就绪');
+        }
+
+        const definitions = ai.getTaskDefinitions();
+        if (!Array.isArray(definitions)) {
+            throw new Error('AI 模型路由尚未就绪');
+        }
+
+        gate.state = 'ready';
+        return {
+            ai,
+            taskSettings: window.aiTaskSettings
+        };
+    })().catch((error) => {
+        gate.state = 'failed';
+        gate.promise = null;
+        throw error;
+    });
+
+    return gate.promise;
+};
+
 data.loadDebugTools = async function () {
     if (window.debugTools) return window.debugTools;
     if (typeof window.loadAppScript !== 'function') {

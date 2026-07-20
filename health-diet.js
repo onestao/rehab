@@ -147,10 +147,66 @@
                 id: 'dietModal',
                 close: () => this.closeDietModalInternal()
             });
+            void this.mountDietAiPickers?.(content);
             window.ai?.loadVisionWhitelist?.().then(() => {
                 const button = document.getElementById('dietPhotoButton');
                 if (button) button.title = this.dietPhotoTitle();
             }).catch(() => {});
+        },
+
+        /**
+         * Deterministically load AI picker runtime and mount food.text / food.vision.
+         * Does not rely on Profile PAGE_DEPS, MutationObserver, or a prior ai:ready race.
+         */
+        async mountDietAiPickers(content) {
+            const scope = content || document.getElementById('dietModalContent');
+            if (!scope) return;
+            const hosts = Array.from(scope.querySelectorAll?.('[data-ai-task-picker]') || []);
+            if (!hosts.length) return;
+
+            const generation = (this._dietAiPickerMountGeneration = (this._dietAiPickerMountGeneration || 0) + 1);
+
+            const paintHosts = (message, { error = false } = {}) => {
+                hosts.forEach((host) => {
+                    if (!host.isConnected) return;
+                    host.replaceChildren();
+                    const status = document.createElement('div');
+                    status.className = `ai-task-settings-empty${error ? ' is-error' : ''}`;
+                    status.textContent = message;
+                    host.append(status);
+                    if (error) {
+                        const retry = document.createElement('button');
+                        retry.type = 'button';
+                        retry.className = 'md-btn md-btn-tonal diet-ai-picker-retry';
+                        retry.textContent = '重试';
+                        retry.addEventListener('click', () => {
+                            void this.mountDietAiPickers(scope);
+                        });
+                        host.append(retry);
+                    }
+                });
+            };
+
+            paintHosts('正在加载模型…');
+
+            try {
+                const ensure = this.ensureAiPickerRuntime || window.data?.ensureAiPickerRuntime;
+                if (typeof ensure !== 'function') {
+                    throw new Error('AI 模型选择器尚未就绪');
+                }
+                const { taskSettings } = await ensure.call(this, { vision: true });
+                if (generation !== this._dietAiPickerMountGeneration) return;
+                const modal = document.getElementById('dietModal');
+                if (!modal || modal.classList.contains('hidden') || !scope.isConnected) return;
+                if (typeof taskSettings?.mountInlinePickers !== 'function') {
+                    throw new Error('AI 模型选择模块未注册');
+                }
+                taskSettings.mountInlinePickers(scope, { force: true });
+            } catch (error) {
+                if (generation !== this._dietAiPickerMountGeneration) return;
+                window.errorBus?.report?.('diet.aiPicker', error);
+                paintHosts(error?.message || '模型加载失败，请重试', { error: true });
+            }
         },
 
         bindDietPhotoControls() {

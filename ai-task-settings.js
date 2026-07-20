@@ -609,7 +609,7 @@
         };
     }
 
-    function mountPlanAiPicker() {
+    function mountPlanAiPicker(options = {}) {
         const body = document.getElementById('planAiSheetBody');
         if (!body || !body.childElementCount) return;
         const taskId = root.data?._planAiMode === 'week' ? 'plan.week' : 'plan.today';
@@ -621,9 +621,10 @@
             const target = resolveInsertionTarget(body, actions);
             target.parent.insertBefore(host, target.before);
         }
-        if (host.dataset.aiTaskPicker === taskId && host.childElementCount) return;
+        // force: true re-mounts after failure/retry or mode switch when host still has children
+        if (!options.force && host.dataset.aiTaskPicker === taskId && host.childElementCount) return;
         host.dataset.aiTaskPicker = taskId;
-        mountInlinePicker(host, taskId);
+        mountInlinePicker(host, taskId, options);
     }
 
     async function render() {

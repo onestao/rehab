@@ -1024,7 +1024,69 @@
             sheet.classList.remove('hidden');
             sheet.setAttribute('aria-hidden', 'false');
             window.navStack?.push?.({ type: 'modal', id: 'planAiSheet', close: () => this.closePlanAiSheet() });
-            window.aiTaskSettings?.mountPlanAiPicker?.();
+            void this.mountPlanAiPickerReady?.();
+        },
+
+        /**
+         * Deterministically ensure AI picker runtime and mount plan.week / plan.today controls.
+         * Replaces optional-chain no-op when ai-task-settings is not yet loaded from Today.
+         */
+        async mountPlanAiPickerReady() {
+            const sheet = document.getElementById('planAiSheet');
+            const body = document.getElementById('planAiSheetBody');
+            if (!sheet || !body || !body.childElementCount) return;
+
+            const generation = (this._planAiPickerMountGeneration = (this._planAiPickerMountGeneration || 0) + 1);
+            const taskId = this._planAiMode === 'week' ? 'plan.week' : 'plan.today';
+
+            let host = document.getElementById('planAiTaskPicker');
+            if (!host) {
+                host = document.createElement('div');
+                host.id = 'planAiTaskPicker';
+                const actions = body.querySelector('.modal-actions');
+                const parent = actions?.parentElement || body;
+                parent.insertBefore(host, actions || null);
+            }
+            host.dataset.aiTaskPicker = taskId;
+            host.replaceChildren();
+            const loading = document.createElement('div');
+            loading.className = 'ai-task-settings-empty';
+            loading.textContent = '正在加载模型…';
+            host.append(loading);
+
+            const paintError = (message) => {
+                if (!host.isConnected) return;
+                host.replaceChildren();
+                const status = document.createElement('div');
+                status.className = 'ai-task-settings-empty is-error';
+                status.textContent = message;
+                const retry = document.createElement('button');
+                retry.type = 'button';
+                retry.className = 'md-btn md-btn-tonal plan-ai-picker-retry';
+                retry.textContent = '重试';
+                retry.addEventListener('click', () => {
+                    void this.mountPlanAiPickerReady();
+                });
+                host.append(status, retry);
+            };
+
+            try {
+                const ensure = this.ensureAiPickerRuntime || window.data?.ensureAiPickerRuntime;
+                if (typeof ensure !== 'function') {
+                    throw new Error('AI 模型选择器尚未就绪');
+                }
+                const { taskSettings } = await ensure.call(this);
+                if (generation !== this._planAiPickerMountGeneration) return;
+                if (sheet.classList.contains('hidden') || !body.isConnected) return;
+                if (typeof taskSettings?.mountPlanAiPicker !== 'function') {
+                    throw new Error('AI 模型选择模块未注册');
+                }
+                taskSettings.mountPlanAiPicker({ force: true });
+            } catch (error) {
+                if (generation !== this._planAiPickerMountGeneration) return;
+                window.errorBus?.report?.('plan.aiPicker', error);
+                paintError(error?.message || '模型加载失败，请重试');
+            }
         },
 
         closePlanAiSheet() {
