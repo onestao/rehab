@@ -1,12 +1,12 @@
 # Today AI Picker Readiness Hotfix (v343)
 
-**Branch:** `hotfix/today-ai-picker-readiness-v343`  
-**Worktree:** `G:/LLM/rehab/.claude/worktrees/today-ai-picker-v343`  
-**Temp / evidence:** `G:/LLM/rehab/.tmp/today-ai-picker-v343/`  
-**Base:** `perfrom` @ `4aed616` (v342 freeze tip)  
-**Date:** 2026-07-20  
-**Push:** no  
-**Merge:** no  
+**Branch:** `hotfix/today-ai-picker-readiness-v343`
+**Worktree:** `G:/LLM/rehab/.claude/worktrees/today-ai-picker-v343`
+**Temp / evidence:** `G:/LLM/rehab/.tmp/today-ai-picker-v343/`
+**Base:** `perfrom` @ `4aed616` (v342 freeze tip)
+**Date:** 2026-07-20
+**Push:** no
+**Merge:** no
 
 ## 根因
 
@@ -29,7 +29,7 @@
 | `openPlanAiSheet()` | `window.aiTaskSettings?.mountPlanAiPicker?.()` **可选链静默 no-op** |
 | `ai-task-settings` boot | 依赖 script 已加载 + MutationObserver / `ai:ready`；Today 从未加载该脚本时这些机制都无效 |
 
-结论：**script loaded ≠ client initialized ≠ models hydrated ≠ routes ready ≠ picker mounted**。  
+结论：**script loaded ≠ client initialized ≠ models hydrated ≠ routes ready ≠ picker mounted**。
 Profile 偶然“修好”只是因为 Profile 的 `PAGE_DEPS` 拉起了 AI 链；不应把 Profile 依赖写进产品路径。
 
 ## 修改文件
@@ -52,8 +52,8 @@ Profile 偶然“修好”只是因为 Profile 的 `PAGE_DEPS` 拉起了 AI 链�
 
 ## 冷启动复现（修复前语义）
 
-R1 饮食：Today 打开饮食 modal → `data-ai-task-picker` 存在但无 `button.ai-compact-model`；`window.aiTaskSettings` 通常不存在。  
-R2 计划：`openPlanAiSheet` 可选链直接结束，`#planAiTaskPicker` 不出现。  
+R1 饮食：Today 打开饮食 modal → `data-ai-task-picker` 存在但无 `button.ai-compact-model`；`window.aiTaskSettings` 通常不存在。
+R2 计划：`openPlanAiSheet` 可选链直接结束，`#planAiTaskPicker` 不出现。
 访问 Profile 后再打开同一入口则恢复。
 
 ## 修复后结果
@@ -68,7 +68,7 @@ R2 计划：`openPlanAiSheet` 可选链直接结束，`#planAiTaskPicker` 不出
 
 ## 新测试
 
-文件：`test/today-ai-picker-readiness.browser.test.mjs`  
+文件：`test/today-ai-picker-readiness.browser.test.mjs`
 Evidence：`G:/LLM/rehab/.tmp/today-ai-picker-v343/playwright/`
 
 | ID | 内容 | 结果 |
@@ -113,6 +113,58 @@ npm run test:release                     pass
 
 ## 是否 push / merge
 
-- **Push:** 否  
-- **Merge:** 否  
+- **Push:** 否
+- **Merge:** 否
 - 仅本地 hotfix 分支 + 项目内 worktree；完成后停止。
+
+## Final candidate freeze
+
+| Item | Value |
+|---|---|
+| Final candidate HEAD | *(pin commit tip after this freeze report — see `git rev-parse hotfix/today-ai-picker-readiness-v343`) |
+| Branch | `hotfix/today-ai-picker-readiness-v343` |
+| Base | `perfrom` @ `4aed61659ea6e830346c66405fb6f90823f04c1a` |
+| Working tree | **clean** (no tracked dirt; no .tmp/trace/profile/log in commits) |
+| `perfrom` | `4aed61659ea6e830346c66405fb6f90823f04c1a` |
+| `origin/perfrom` | `4aed61659ea6e830346c66405fb6f90823f04c1a` |
+| merge-base(perfrom, hotfix) | `4aed61659ea6e830346c66405fb6f90823f04c1a` |
+| `perfrom..hotfix` | product fix + tests + v343 bump + audit + freeze + pin |
+| `hotfix..perfrom` | **empty** |
+| FF-only feasible | **yes** — `git merge --ff-only hotfix/today-ai-picker-readiness-v343` |
+| Production version | **v343** (`node scripts/bump-version.js --check` → version sync OK) |
+| Push | **no** |
+| Merge | **no** |
+
+### Commit list (`4aed616..HEAD`)
+
+1. `df509e2` fix: cold Today diet/plan AI pickers via shared readiness gate
+2. `8aab1c6` test: cover cold Today AI picker readiness T1-T8
+3. `d55d78a` chore: bump release assets to v343
+4. `d7a78fb` docs: audit Today AI picker readiness hotfix
+5. *(freeze report commit)* docs: freeze Today AI picker v343 candidate
+6. *(pin commit tip)* docs: pin freeze tip SHA after freeze report
+
+### Final gates (re-run on freeze candidate)
+
+| Gate | Result |
+|---|---|
+| `git diff --check` | OK |
+| `node scripts/bump-version.js --check` | version sync OK (v343) |
+| unit (`test/*.test.mjs`) | **716 pass / 0 fail** |
+| browser (`test:browser:lazyload`) | **22 pass / 0 fail** |
+| evidence (`test:evidence:lazyload`) | **10 pass / 0 fail** |
+| `npm run test:release` | **exit 0** |
+| duration | **155 s** (2026-07-20T14:42:20 → 14:44:55 +08:00) |
+| Edge / Chromium | **msedge 150.0.4078.83** (`playwright` channel `msedge`) |
+| log | `G:/LLM/rehab/.tmp/today-ai-picker-v343/final-freeze-gates.log` |
+
+### Topology verdict
+
+- `perfrom` is ancestor of hotfix: **yes**
+- `hotfix..perfrom` empty: **yes**
+- `perfrom` not moved past base: **yes** (`perfrom` == `origin/perfrom` == `4aed616`)
+- FF-only merge path: **allowed** (no squash / no ordinary merge / no rebase)
+
+### Files in range (no temp/trace/profile/log)
+
+18 product/test/doc paths under version control. Browser `build/fooddb-diet-profile-*` never committed. Evidence/logs only under `G:/LLM/rehab/.tmp/today-ai-picker-v343/`.
