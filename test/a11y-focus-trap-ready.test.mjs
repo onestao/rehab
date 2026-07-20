@@ -51,7 +51,7 @@ test('F-T2: modal open awaits focusTrap ready before display', () => {
 
 test('F-T3: a11y module is in SW ASSETS for offline modals', () => {
     const sw = read('sw.js');
-    assert.match(sw, /a11y-focus-trap\.js\?v=342/);
+    assert.match(sw, /a11y-focus-trap\.js\?v=343/);
 });
 
 test('F-T4: focus trap implements Tab cycle Escape and release restore', () => {

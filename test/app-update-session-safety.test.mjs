@@ -97,7 +97,7 @@ function createHarness({
     const navigatorObj = {
         serviceWorker: {
             controller: {
-                scriptURL: 'https://example.test/sw.js?v=342',
+                scriptURL: 'https://example.test/sw.js?v=343',
                 postMessage(msg) { swControllerMessages.push(msg); }
             },
             addEventListener() {},
@@ -105,7 +105,7 @@ function createHarness({
         }
     };
     const documentObj = {
-        scripts: [{ src: 'https://example.test/data.js?v=342' }],
+        scripts: [{ src: 'https://example.test/data.js?v=343' }],
         body: {
             appendChild() {},
             removeChild() {}
@@ -224,7 +224,7 @@ test('E-T2: apply without active session still posts SKIP_WAITING', async () => 
 
 test('E-T3: controllerchange reload defers when session is active', () => {
     const { appUpdate, reloads } = createHarness({ isPlaying: true });
-    appUpdate.version = '342';
+    appUpdate.version = '343';
     const original = appUpdate.documentNeedsControllerReload.bind(appUpdate);
     appUpdate.documentNeedsControllerReload = () => true;
     appUpdate.claimControllerReload = () => true;
