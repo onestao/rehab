@@ -574,7 +574,10 @@ test('plan AI picker mounts explicitly instead of on every body mutation', () =>
 
     assert.doesNotMatch(observerBody, /mountPlanAiPicker/);
     assert.match(settingsSource, /ai:ready[\s\S]*?mountInlinePickers\(document, \{ force: true \}\)/);
-    assert.match(planSource, /window\.aiTaskSettings\?\.mountPlanAiPicker\?\.\(\)/);
+    assert.match(settingsSource, /function mountPlanAiPicker\(options = \{\}\)/);
+    assert.match(planSource, /mountPlanAiPickerReady/);
+    assert.match(planSource, /mountPlanAiPicker\(\{\s*force:\s*true\s*\}\)/);
+    assert.doesNotMatch(planSource, /window\.aiTaskSettings\?\.mountPlanAiPicker\?\.\(\)/);
 });
 
 test('task model picker presents capability states as text and keeps every state selectable', async () => {

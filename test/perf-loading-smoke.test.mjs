@@ -31,8 +31,10 @@ test('food AI recognition lazily loads the AI runtime before touching window.ai'
     const healthDiet = readRootFile('health-diet.js');
 
     assert.match(data, /ensureAiRuntime/);
+    assert.match(data, /ensureAiPickerRuntime/);
     assert.match(foodLog, /ensureAiRuntime/);
     assert.match(healthDiet, /ensureAiRuntime\(\{ vision: true \}\)/);
+    assert.match(healthDiet, /mountDietAiPickers|ensureAiPickerRuntime/);
     assert.doesNotMatch(foodLog, /\bai\.cfg|\bai\.parseFood/);
 });
 
