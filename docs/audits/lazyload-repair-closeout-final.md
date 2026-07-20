@@ -3,7 +3,8 @@
 **Branch:** `fix/lazyload-repair-closeout-v336`
 **Worktree:** `G:/LLM/rehab/.claude/worktrees/lazy-closeout`
 **Base (matrix freeze):** `fc83ab8` / `integration/lazyload-rehab-repair`
-**Final candidate HEAD:** `9393be8929e61869cf450970cf82659b1eed4e55`
+**Final candidate HEAD:** `6a8117af99c40e8b66bab2c0a9e0d99ca543e06d`
+**Product closeout commit:** `9393be8929e61869cf450970cf82659b1eed4e55`
 **Release fingerprint:** **v342** (`training-assistant-v342`)
 **Date:** 2026-07-20
 **Status:** frozen candidate for user approval — **no push / no merge**
@@ -17,18 +18,19 @@
 | Check | Result |
 |-------|--------|
 | Branch | `fix/lazyload-repair-closeout-v336` |
-| HEAD (full) | `9393be8929e61869cf450970cf82659b1eed4e55` |
-| Working tree at freeze commit | clean of product/docs (junk Edge profiles under `build/fooddb-diet-profile-*` removed before re-gate; `build/icons.txt` restored) |
+| HEAD (full) | `6a8117af99c40e8b66bab2c0a9e0d99ca543e06d` |
+| Working tree at freeze tip | clean (junk Edge profiles under `build/fooddb-diet-profile-*` removed; not committed) |
 | `.tmp` / logs / traces / browser profiles in git | **not committed** (temp under `G:/LLM/rehab/.tmp/lazyload-closeout/` and `.tmp/lazyload-repair/`) |
-| Uncommitted report edits after freeze doc rewrite | this freeze report only (docs commit if/when landed) |
+| Uncommitted report edits | none after this freeze tip |
 
 ### 0.2 Closeout commit list (`fc83ab8..HEAD`)
 
 | SHA | Message |
 |-----|---------|
 | `9393be8` | `fix: closeout PWA lazyload residual blockers at v342` |
+| `6a8117a` | `docs: freeze closeout candidate HEAD and gate truth` |
 
-Single closeout commit on top of integration matrix freeze. Full integration repair chain is ancestors of `fc83ab8`.
+Product closeout is `9393be8`. Freeze docs tip is `6a8117a`. Full integration repair chain is ancestors of `fc83ab8`.
 
 ### 0.3 Topology vs integration / perfrom
 
@@ -37,14 +39,15 @@ Single closeout commit on top of integration matrix freeze. Full integration rep
 | `perfrom` | `0fa29d9a8379dc0f1551d3b90961337307232d8b` |
 | `origin/perfrom` | `0fa29d9a8379dc0f1551d3b90961337307232d8b` (not advanced) |
 | `integration/lazyload-rehab-repair` | `fc83ab8859a4eeb4501bb47a9f3ee2a68f20f556` |
-| closeout HEAD | `9393be8929e61869cf450970cf82659b1eed4e55` |
+| closeout HEAD | `6a8117af99c40e8b66bab2c0a9e0d99ca543e06d` |
+| product closeout | `9393be8929e61869cf450970cf82659b1eed4e55` |
 | `merge-base(fc83ab8, closeout)` | `fc83ab8859a4eeb4501bb47a9f3ee2a68f20f556` |
 
 | Direction | Commits |
 |-----------|---------|
-| `integration..closeout` | `9393be8` only |
+| `integration..closeout` | `9393be8` + `6a8117a` |
 | `closeout..integration` | **empty** |
-| `perfrom..closeout` | 13 commits (full repair series + closeout) |
+| `perfrom..closeout` | 14 commits (full repair series + closeout + freeze docs) |
 | `closeout..perfrom` | **empty** |
 
 | Ancestor check | Result |
@@ -263,7 +266,7 @@ H5 is **E2** (unit/source). E3 dual-tab defer is S6 (update defer), not full pos
 
 User decision needed:
 
-1. Accept candidate **v342 @ `9393be8`** with S2 evidence residual + P-1.4 partial wording, then FF integration → perfrom; **or**
+1. Accept candidate **v342 @ `6a8117a`** (product `9393be8`) with S2 evidence residual + P-1.4 partial wording, then FF integration → perfrom; **or**
 2. Request test-only S2 toast capture fix before FF (no production change required).
 
 ---
