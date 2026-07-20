@@ -71,7 +71,7 @@
 | P-1.1 | First visible click completes intent or loading→auto-continue; no second click; no silent `?.`; no raw tech error to user | **DONE** | E3: A-T1–T3, H1-T1–T3, S1/S2; E2: plan-feature-gate unit | Plan openers + FIND-07 weekly/AI hard buttons non-silent. |
 | P-1.2 | Active training state independent of DOM/route/SW update; must not be reset unintentionally | **DONE** (core path) | E2: C unit + E-T* + H5; E3: S4/S6/S7 | Cancelled nav does not force workout mode; update defer + journal freeze. |
 | P-1.3 | Minimal offline rehab loop: view Today plan, start/pause/complete, local pain/symptom, back/close; online features degrade clearly | **Scheme B DONE** | E1/E2: D-T1–T3; E3: S5; offline contract | Essential Today ⊆ ASSETS. Full offline rehab **not** claimed. |
-| P-1.4 | No force-navigate mid dangerous moment; save → mark pending → safe apply → **restore recoverable training state** | **DONE** (closeout journal) | E2: E-T* + H5-T1–T4; E3: S6/S7/S9 | Defer + `saveJournal` freeze + `restoreIfNeeded` path. |
+| P-1.4 | No force-navigate mid dangerous moment; save → mark pending → safe apply → **restore recoverable training state** | **PARTIAL** | E2: E-T* + H5-T1–T4; E3: S6/S7/S9; boot `workoutState.init` → `restoreIfNeeded` | **DONE:** defer + journal freeze + cardio/strength restore-on-init (confirm). **NOT full:** pain/symptom/edit drafts; anti-duplicate completion ledger; E3 post-upgrade reload restore. See closeout-final §5. |
 | P-1.5 | a11y core not deferred utility: focus trap, Escape/system close, focus restore, close control, keyboard, busy/error a11y | **DONE** (closeout trap E3) | E2: F-T1–T4; E3: H3-T1/T2 | Delayed trap still Tab-cycles; Escape + head close button. |
 
 ---
@@ -168,7 +168,7 @@
 | UPDATE_SESSION_CLEAR on end | **DONE** (code + E1) | armSessionClearWatcher; interval unref for tests |
 | Upgrade overlay / early barrier | **DONE** | E-T4 + index guards v342 |
 | Pre-update local save orchestration | **DONE** (closeout) | `showUpdateDeferredForSession` → `saveJournal({ deferredForUpdate: true })` |
-| Post-upgrade training restore | **DONE** (closeout journal path) | `workoutState.restoreIfNeeded` + H5-T* |
+| Post-upgrade training restore | **PARTIAL** | boot restore cardio/strength via confirm; not full draft universe; H5 E2 only |
 | Doc `docs/pwa/update-session-safety.md` | **DONE** (closeout) | present |
 
 ### Phase F — Modal / a11y
