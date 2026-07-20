@@ -94,15 +94,15 @@ function createQuietRegistrationHarness() {
     };
 }
 
-test('release assets and controller reload keys are consistently v343', () => {
-    assert.match(sw, /training-assistant-v343/);
+test('release assets and controller reload keys are consistently v344', () => {
+    assert.match(sw, /training-assistant-v344/);
     assert.match(sw, /const CACHE_ASSET_REVISION = '[a-f0-9]{64}'/);
     assert.doesNotMatch(sw, /training-assistant-v326|\?v=326|training-assistant-v327|\?v=327/);
     assert.doesNotMatch(html, /\?v=326|rehab-sw-controller-reload-v326|\?v=327|rehab-sw-controller-reload-v327/);
     assert.doesNotMatch(appUpdate, /version:\s*['"](?:326|327)['"]|rehab-sw-controller-reload-v(?:326|327)/);
-    assert.match(html, /rehab-sw-controller-reload-v343/);
-    assert.match(appUpdate, /version:\s*['"]343['"]/);
-    assert.match(appUpdate, /rehab-sw-controller-reload-v343/);
+    assert.match(html, /rehab-sw-controller-reload-v344/);
+    assert.match(appUpdate, /version:\s*['"]344['"]/);
+    assert.match(appUpdate, /rehab-sw-controller-reload-v344/);
 });
 
 test('plan precache membership stays unchanged while query versions advance', () => {
@@ -118,7 +118,7 @@ test('plan precache membership stays unchanged while query versions advance', ()
         'plan-ui.js'
     ];
     const assetsBlock = sw.match(/const ASSETS = \[([\s\S]*?)\];/)?.[1] || '';
-    const actual = expected.filter((asset) => assetsBlock.includes(`'${asset}?v=343'`));
+    const actual = expected.filter((asset) => assetsBlock.includes(`'${asset}?v=344'`));
     assert.deepEqual(actual, expected);
 });
 
@@ -134,12 +134,12 @@ test('quiet post-render registration does not auto-reload or force app-update', 
 test('startup registration path is non-blocking and loads app-update on demand only', () => {
     const registration = extractBetween(html, 'function scheduleServiceWorkerRegistration', 'function idlePreloadEnabled');
     assert.doesNotMatch(registration, /loadScript\(['"]app-update['"]\)/);
-    assert.match(registration, /serviceWorker\.register\(['"]\.\/sw\.js\?v=343['"]/);
+    assert.match(registration, /serviceWorker\.register\(['"]\.\/sw\.js\?v=344['"]/);
     assert.match(registration, /requestIdleCallback|setTimeout/);
     assert.doesNotMatch(registration, /location\.reload/);
     assert.doesNotMatch(registration, /SKIP_WAITING|GET_VERSION/);
-    assert.match(registration, /app-update\.js\?v=343/);
-    assert.match(appUpdate, /swUrl:\s*['"]\.\/sw\.js\?v=343['"]/);
+    assert.match(registration, /app-update\.js\?v=344/);
+    assert.match(appUpdate, /swUrl:\s*['"]\.\/sw\.js\?v=344['"]/);
 });
 
 test('version gate rejects changed precache, runtime-cache-first, and nested lazy assets without a bump', () => {
