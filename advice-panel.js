@@ -2483,7 +2483,6 @@ const advicePanel = {
                     attachments,
                     maxTokens: outputTokenBudget,
                     signal: controller.signal,
-                    timeoutMs: 45000,
                     routeOverride,
                     onProgress: ({ stage, message }) => {
                         const idx = this.db.health.aiAdviceChat.findIndex(msg => msg.id === pendingId);
@@ -2493,7 +2492,7 @@ const advicePanel = {
                         this.db.health.aiAdviceChat[idx].pending = true;
                         this.rerenderAdvicePanel?.();
                     }
-                }) : await ai.callAdviceWithAttachments(messages, attachments, outputTokenBudget, { signal: controller.signal, timeoutMs: 45000, routeOverride }))
+                }) : await ai.callAdviceWithAttachments(messages, attachments, outputTokenBudget, { signal: controller.signal, routeOverride }))
                 : (typeof ai.runStream === 'function'
                     ? await ai.runStream('advice.chat', messages, outputTokenBudget, onToken, { signal: controller.signal, routeOverride })
                     : (typeof ai.run === 'function'

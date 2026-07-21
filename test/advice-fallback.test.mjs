@@ -415,6 +415,8 @@ test('advice.vision fallback reuses the same in-memory File object', async () =>
     assert.equal(data.__state.calls[0].taskId, 'advice.vision');
     assert.equal(data.__state.calls[1].taskId, 'advice.vision');
     assert.equal(data.__state.calls.length, 2);
+    assert.equal(data.__state.calls[0].timeoutMs, undefined);
+    assert.equal(data.__state.calls[1].timeoutMs, undefined);
     assert.equal(data.__state.calls[0].attachments[0].file, file);
     assert.equal(data.__state.calls[1].attachments[0].file, file);
     assert.deepEqual(json(data.__state.calls[0].routeOverride), initialOverride);

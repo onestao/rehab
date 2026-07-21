@@ -788,3 +788,13 @@ test('text call() honors timeoutMs and maps AbortError to AI_TIMEOUT', async () 
         (err) => err?.code === 'AI_TIMEOUT' && !String(err?.message || '').includes('secret'),
     );
 });
+
+test('AI timeout budget scales with output size and clamps explicit overrides', () => {
+    const { ai } = loadProductionAiApi();
+    assert.equal(ai._resolveTimeoutMs({}, 1000), 90000);
+    assert.equal(ai._resolveTimeoutMs({}, 2000), 120000);
+    assert.equal(ai._resolveTimeoutMs({}, 4000), 180000);
+    assert.equal(ai._resolveTimeoutMs({}, 8192), 240000);
+    assert.equal(ai._resolveTimeoutMs({ timeoutMs: 500 }, 8192), 1000);
+    assert.equal(ai._resolveTimeoutMs({ timeoutMs: 600000 }, 1000), 300000);
+});

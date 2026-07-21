@@ -27,6 +27,8 @@ function loadAi(sequence, route = {}) {
     localStorage: { getItem() { return null; }, setItem() {} },
     TextDecoder,
     AbortController,
+    setTimeout,
+    clearTimeout,
     fetch: async () => { throw new Error('not used'); }
   });
   ai._callOpenAIChat = async (_messages, _maxTokens, _key, _stream, _onChunk, effective) => {

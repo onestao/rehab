@@ -26,6 +26,33 @@ Object.assign(ai, {
         });
     },
 
+    // Client wall-clock budgets. Reasoning / Responses models often spend tens of
+    // seconds before the first token; a hard 30s abort looks like "model broken"
+    // even when the same model works fine in other apps with longer waits.
+    MIN_AI_TIMEOUT_MS: 1000,
+    MAX_AI_TIMEOUT_MS: 300000,
+    DEFAULT_AI_TIMEOUT_MS: 90000,
+
+    _resolveTimeoutMs(opts = {}, maxTokens = 2000) {
+        const minMs = Number(this.MIN_AI_TIMEOUT_MS) || 1000;
+        const maxMs = Number(this.MAX_AI_TIMEOUT_MS) || 300000;
+        const explicit = Number(opts?.timeoutMs);
+        if (Number.isFinite(explicit) && explicit > 0) {
+            return Math.max(minMs, Math.min(maxMs, Math.floor(explicit)));
+        }
+        const tokens = Math.max(1, Number(maxTokens) || 2000);
+        if (tokens >= 6000) return Math.min(maxMs, 240000);
+        if (tokens >= 3500) return Math.min(maxMs, 180000);
+        if (tokens >= 2000) return Math.min(maxMs, 120000);
+        return Math.min(maxMs, Number(this.DEFAULT_AI_TIMEOUT_MS) || 90000);
+    },
+
+    _timeoutErrorMessage(wasTimeout) {
+        return wasTimeout
+            ? 'AI 请求超时：客户端等待时间已用尽（深度推理模型通常更慢，可换更快模型或稍后重试）'
+            : 'AI 请求已取消';
+    },
+
     async run(options = {}) {
         const taskId = options.taskId || 'advice.chat';
         const sequence = this.getTaskRequestSequence
@@ -367,7 +394,7 @@ Object.assign(ai, {
         const key = effective.apiKey;
         if (!key) throw new Error('请先在当前 AI 配置中填写 API Key');
         const provider = effective.provider || 'openai';
-        const timeout = this._makeTimeoutSignal(opts.signal, opts.timeoutMs || 30000);
+        const timeout = this._makeTimeoutSignal(opts.signal, this._resolveTimeoutMs(opts, maxTokens));
         try {
             timeout.signal.throwIfAborted?.();
             if (provider === 'claude')           return await this._callClaude(messages, maxTokens, key, false, null, effective, timeout.signal, opts);
@@ -376,8 +403,9 @@ Object.assign(ai, {
             return await this._callOpenAIChat(messages, maxTokens, key, false, null, effective, timeout.signal, opts);
         } catch (e) {
             if (e?.name === 'AbortError') {
-                throw this._makeAiError(timeout.wasTimeout() ? 'AI_TIMEOUT' : 'AI_CANCELLED', {
-                    code: timeout.wasTimeout() ? 'AI_TIMEOUT' : 'AI_CANCELLED',
+                const wasTimeout = timeout.wasTimeout();
+                throw this._makeAiError(this._timeoutErrorMessage(wasTimeout), {
+                    code: wasTimeout ? 'AI_TIMEOUT' : 'AI_CANCELLED',
                     cause: e
                 });
             }
@@ -485,7 +513,7 @@ Object.assign(ai, {
         });
     },
 
-    _makeTimeoutSignal(externalSignal, timeoutMs = 30000) {
+    _makeTimeoutSignal(externalSignal, timeoutMs = 90000) {
         const controller = new AbortController();
         let timedOut = false;
         const abortFromExternal = () => {
@@ -493,10 +521,13 @@ Object.assign(ai, {
         };
         if (externalSignal?.aborted) abortFromExternal();
         else externalSignal?.addEventListener?.('abort', abortFromExternal, { once: true });
+        const resolved = this._resolveTimeoutMs
+            ? this._resolveTimeoutMs({ timeoutMs }, 0)
+            : Math.max(1000, Number(timeoutMs) || 90000);
         const timer = setTimeout(() => {
             timedOut = true;
             try { controller.abort(); } catch {}
-        }, Math.max(1000, Number(timeoutMs) || 30000));
+        }, resolved);
         return {
             signal: controller.signal,
             wasTimeout: () => timedOut,
@@ -678,7 +709,7 @@ Object.assign(ai, {
         const key = effective.apiKey;
         if (!key) throw new Error('请先在当前 AI 配置中填写 API Key');
         const provider = effective.provider || 'openai';
-        const timeout = this._makeTimeoutSignal(opts.signal, opts.timeoutMs || 30000);
+        const timeout = this._makeTimeoutSignal(opts.signal, this._resolveTimeoutMs(opts, maxTokens));
         try {
             const img = await this.prepareVisionImage(imageFile, { maxDimension: 1024, outMime: 'image/jpeg', quality: 0.85, onProgress: opts.onProgress });
             timeout.signal.throwIfAborted?.();
@@ -689,7 +720,8 @@ Object.assign(ai, {
             return await this._callOpenAIChatVision(promptText, img, maxTokens, key, effective, systemText, timeout.signal, opts);
         } catch (e) {
             if (e?.name === 'AbortError') {
-                throw this._makeAiError(timeout.wasTimeout() ? 'AI_TIMEOUT' : 'AI_CANCELLED', { code: timeout.wasTimeout() ? 'AI_TIMEOUT' : 'AI_CANCELLED', cause: e });
+                const wasTimeout = timeout.wasTimeout();
+                throw this._makeAiError(this._timeoutErrorMessage(wasTimeout), { code: wasTimeout ? 'AI_TIMEOUT' : 'AI_CANCELLED', cause: e });
             }
             if (e instanceof TypeError) throw this._makeAiError(e.message || 'NETWORK_ERROR', { code: 'NETWORK_ERROR', cause: e });
             throw e;
@@ -721,7 +753,7 @@ Object.assign(ai, {
         const key = effective.apiKey;
         if (!key) throw new Error('请先在当前 AI 配置中填写 API Key');
         const provider = effective.provider || 'openai';
-        const timeout = this._makeTimeoutSignal(opts.signal, opts.timeoutMs || 30000);
+        const timeout = this._makeTimeoutSignal(opts.signal, this._resolveTimeoutMs(opts, maxTokens));
         try {
             timeout.signal.throwIfAborted?.();
             if (provider === 'claude')           return await this._callClaude(messages, maxTokens, key, true, onToken, effective, timeout.signal, opts);
@@ -730,8 +762,9 @@ Object.assign(ai, {
             return await this._callOpenAIChat(messages, maxTokens, key, true, onToken, effective, timeout.signal, opts);
         } catch (e) {
             if (e?.name === 'AbortError' || timeout.signal?.aborted || opts.signal?.aborted) {
-                throw this._makeAiError(timeout.wasTimeout() ? 'AI_TIMEOUT' : 'AI_CANCELLED', {
-                    code: timeout.wasTimeout() ? 'AI_TIMEOUT' : 'AI_CANCELLED',
+                const wasTimeout = timeout.wasTimeout();
+                throw this._makeAiError(this._timeoutErrorMessage(wasTimeout), {
+                    code: wasTimeout ? 'AI_TIMEOUT' : 'AI_CANCELLED',
                     cause: e
                 });
             }
