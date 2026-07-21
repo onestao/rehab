@@ -31,6 +31,11 @@ module.exports = {
             env: { node: true }
         },
         {
+            // Browser pure modules: ESM parse only; do not enable Node globals.
+            files: ['*-pure.mjs', 'ai-*-pure.mjs'],
+            parserOptions: { sourceType: 'module' }
+        },
+        {
             files: ['sw.js'],
             env: { serviceworker: true }
         },

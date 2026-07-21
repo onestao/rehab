@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import vm from 'node:vm';
 import { manualFallbackTarget } from '../ai-routing-pure.mjs';
+import * as aiJsonPure from '../ai-json-pure.mjs';
 
 const aiApiSource = readFileSync(new URL('../ai-api.js', import.meta.url), 'utf8');
 const goalPlanSource = readFileSync(new URL('../goal-plan.js', import.meta.url), 'utf8');
@@ -14,6 +15,35 @@ const validPlan = Object.freeze({
     slow: { weeklyLoss: 0.25 },
     tips: ['保持记录']
 });
+
+function mockRunResult(options = {}, text = '') {
+    if (options.returnMeta) {
+        return {
+            text: String(text || ''),
+            meta: {
+                taskId: options.taskId || 'goal.body',
+                profileId: options.routeOverride?.primary?.profileId || options.routeOverride?.profileId || 'p-main',
+                provider: 'openai',
+                modelId: options.routeOverride?.primary?.modelId || options.routeOverride?.modelId || 'm-main',
+                reasoningDepth: options.routeOverride?.reasoningDepth || 'high',
+                fallback: { used: false, index: 0, mode: 'manual' }
+            }
+        };
+    }
+    return String(text || '');
+}
+
+function attachRunAttempt(error, options = {}) {
+    if (!error || typeof error !== 'object') return error;
+    error.aiAttempt = {
+        taskId: options.taskId || 'goal.body',
+        profileId: options.routeOverride?.primary?.profileId || options.routeOverride?.profileId || 'p-main',
+        modelId: options.routeOverride?.primary?.modelId || options.routeOverride?.modelId || 'm-main',
+        provider: 'openai',
+        reasoningDepth: options.routeOverride?.reasoningDepth || 'high'
+    };
+    return error;
+}
 
 function createHarness() {
     const fields = {
@@ -41,6 +71,7 @@ function createHarness() {
         document: { getElementById: (id) => fields[id] || null },
         window: {
             aiRoutingPure: { manualFallbackTarget },
+            aiJsonPure: aiJsonPure.default || aiJsonPure,
             data: { db: {} },
             dataAiTemplates: null,
             toast
@@ -49,6 +80,8 @@ function createHarness() {
     sandbox.globalThis = sandbox;
     sandbox.toast = toast;
     vm.createContext(sandbox);
+    sandbox.window.aiJsonPure = aiJsonPure.default || aiJsonPure;
+    sandbox.aiJsonPure = sandbox.window.aiJsonPure;
     vm.runInContext(aiApiSource, sandbox);
     vm.runInContext(goalPlanSource, sandbox);
     sandbox.window.ai = sandbox.ai;
@@ -80,7 +113,7 @@ test('goal.body carries a safe request-scoped override without changing result s
     harness.sandbox.ai.setTaskRoute = () => { setTaskRouteCalls += 1; };
     harness.sandbox.ai.run = async (options) => {
         runCalls.push(options);
-        return JSON.stringify(validPlan);
+        return mockRunResult(options, JSON.stringify(validPlan));
     };
 
     const routeOverride = Object.freeze({ profileId: ' backup-profile ', modelId: ' backup-goal ', apiKey: 'secret' });
@@ -132,9 +165,9 @@ test('goal.body fallback action retries once with current form values and never 
         if (runCalls.length === 1) {
             const error = new Error('temporary');
             error.aiFallback = { taskId: 'goal.body', target };
-            throw error;
+            throw attachRunAttempt(error, options);
         }
-        return JSON.stringify(validPlan);
+        return mockRunResult(options, JSON.stringify(validPlan));
     };
 
     await harness.data.requestWeightLossPlan();
@@ -178,7 +211,9 @@ test('goal.body JSON parse failure may expose only its configured safe manual fa
     };
     harness.sandbox.ai.run = async (options) => {
         runCalls.push(options);
-        return runCalls.length === 1 ? 'not valid JSON' : JSON.stringify(validPlan);
+        // runJson auto-retries once for parse failure; manual fallback is a new request.
+        if (runCalls.length <= 2) return mockRunResult(options, 'not valid JSON');
+        return mockRunResult(options, JSON.stringify(validPlan));
     };
 
     await harness.data.requestWeightLossPlan();
@@ -186,8 +221,8 @@ test('goal.body JSON parse failure may expose only its configured safe manual fa
     assert.equal(action?.label, '使用备用模型重试');
     await action.onClick();
 
-    assert.equal(runCalls.length, 2);
-    assert.deepEqual(JSON.parse(JSON.stringify(runCalls[1].routeOverride)), {
+    assert.equal(runCalls.length, 3);
+    assert.deepEqual(JSON.parse(JSON.stringify(runCalls[2].routeOverride)), {
         profileId: 'parsed-profile',
         modelId: 'parsed-backup'
     });
@@ -202,7 +237,7 @@ test('bodyGoalPlan gives structured JSON failures an explicit code and safe goal
         fallbackMode: 'manual',
         fallbacks: [{ profileId: ' profile ', modelId: ' model ', headers: { Authorization: 'secret' } }]
     });
-    harness.sandbox.ai.run = async () => '{"tips": [}';
+    harness.sandbox.ai.run = async (options) => mockRunResult(options, '{"tips": [}');
 
     await assert.rejects(
         harness.sandbox.ai.bodyGoalPlan({
@@ -216,6 +251,7 @@ test('bodyGoalPlan gives structured JSON failures an explicit code and safe goal
         }),
         (error) => {
             assert.equal(error.code, 'AI_JSON_PARSE_FAILED');
+            assert.equal(error.retryAttempted, true);
             assert.deepEqual(JSON.parse(JSON.stringify(error.aiFallback)), {
                 taskId: 'goal.body',
                 target: { profileId: 'profile', modelId: 'model' }
@@ -234,10 +270,10 @@ test('goal.body rejects unsafe or cross-task fallback targets', async () => {
     ]) {
         const harness = createHarness();
         harness.sandbox.ai.resolveTaskConfig = () => ({ enabled: true });
-        harness.sandbox.ai.run = async () => {
+        harness.sandbox.ai.run = async (options) => {
             const error = new Error('temporary');
             error.aiFallback = aiFallback;
-            throw error;
+            throw attachRunAttempt(error, options);
         };
 
         await harness.data.requestWeightLossPlan();

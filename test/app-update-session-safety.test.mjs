@@ -121,8 +121,10 @@ function createHarness({
             return {
                 id: '',
                 style: { cssText: '', display: '' },
+                textContent: '',
                 setAttribute() {},
                 innerHTML: '',
+                appendChild() {},
                 querySelector() { return { textContent: '' }; },
                 remove() {},
                 _keyHandler: null

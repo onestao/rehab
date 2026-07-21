@@ -16,7 +16,7 @@ test('weight report fallback retries with routeOverride and never saves it as th
     const target = Object.freeze({ profileId: 'backup-profile', modelId: 'backup-report' });
     const ai = {
         cfg: { enabled: true },
-        run: async (options) => {
+        runJson: async (options) => {
             runCalls.push(options);
             const error = new Error('report failed');
             if (runCalls.length === 1) error.aiFallback = { taskId: options.taskId, target };
@@ -167,14 +167,14 @@ test('weight report fallback action is single-use and appends only one active ve
     const target = Object.freeze({ profileId: 'backup-profile', modelId: 'backup-report' });
     const ai = {
         cfg: { enabled: true },
-        run: async (options) => {
+        runJson: async (options) => {
             runCalls.push(options);
             if (runCalls.length === 1) {
                 const error = new Error('report failed');
                 error.aiFallback = { taskId: options.taskId, target };
                 throw error;
             }
-            return { text: '{"summary":"fallback ok","highlights":[],"suggestions":[]}', meta: { profileId: target.profileId, modelId: target.modelId } };
+            return { value: { summary: 'fallback ok', highlights: ['h'], suggestions: ['s'] }, meta: { profileId: target.profileId, modelId: target.modelId } };
         },
         setTaskRoute: () => { setTaskRouteCalls += 1; }
     };
@@ -323,4 +323,192 @@ test('weekly summary fallback action is single-use and appends only one active v
     assert.equal(data.db.health.reports.length, 1);
     assert.equal(data.db.health.reports[0].versions.length, 1);
     assert.equal(data.db.health.reports[0].activeVersionId, data.db.health.reports[0].versions[0].id);
+});
+
+test('weight report runJson retry succeeds and stores AI model metadata', async () => {
+    const runCalls = [];
+    const ai = {
+        cfg: { enabled: true },
+        async runJson(options = {}) {
+            runCalls.push(options);
+            if (runCalls.length === 1) {
+                // simulate internal first-attempt truncation/retry success contract
+                runCalls.push({ ...options, retry: true, routeOverride: {
+                    primary: { profileId: 'p1', modelId: 'm1' },
+                    reasoningDepth: 'off',
+                    fallbackMode: 'manual',
+                    fallbacks: []
+                }});
+            }
+            return {
+                value: {
+                    summary: '本周体重略有下降',
+                    highlights: ['训练完成度尚可'],
+                    suggestions: ['继续记录饮食']
+                },
+                meta: {
+                    taskId: options.taskId,
+                    profileId: 'p1',
+                    modelId: 'm1',
+                    reasoningDepth: 'off',
+                    fallback: { used: false, index: 0, mode: 'manual' }
+                }
+            };
+        }
+    };
+    const sandbox = {
+        ai,
+        console,
+        document: {},
+        window: {
+            ai,
+            aiRoutingPure: { manualFallbackTarget },
+            reportMetricsPure: {
+                buildWeeklyMetrics: (_db, anchor) => ({ periodStart: anchor, periodEnd: '2026-07-12', metrics: { weight: 78 } }),
+                buildMonthlyMetrics: (_db, anchor) => ({ periodStart: anchor, periodEnd: '2026-07-31', metrics: { weight: 78 } }),
+                summarizeReportPlain: () => ({ summary: 'offline', highlights: ['local'], suggestions: ['local-tip'], model: 'offline', prompt_id: 'weekly_report_offline' })
+            },
+            toast: { show() {} }
+        }
+    };
+    sandbox.globalThis = sandbox;
+    vm.createContext(sandbox);
+    vm.runInContext(versionSource, sandbox);
+    vm.runInContext(reportSource, sandbox);
+    const data = {
+        ...sandbox.window.dataReport,
+        db: { aiProfiles: [], health: { reports: [] } },
+        activeRecords: (records) => records.filter((record) => !record.deleted),
+        buildPeriodReportContext: () => 'CTX',
+        generateRecordId: () => 'report-1',
+        renderWeightReportSheet() {},
+        renderHistory() {},
+        saveAndBackup() {}
+    };
+    await data.generateReport('weekly', '2026-07-06', { useAi: true });
+    assert.equal(runCalls.length, 2);
+    assert.equal(data.db.health.reports.length, 1);
+    const aiMeta = data.db.health.reports[0].versions[0].ai;
+    assert.equal(aiMeta.summary, '本周体重略有下降');
+    assert.equal(aiMeta.model, 'm1');
+    assert.notEqual(aiMeta.model, 'offline');
+    assert.equal(aiMeta.prompt_id, 'weekly_report');
+});
+
+test('weight report final AI failure keeps empty reports and does not save offline as AI success', async () => {
+    const toastCalls = [];
+    const ai = {
+        cfg: { enabled: true },
+        runJson: async () => {
+            const err = new Error('AI 返回的 JSON 缺少当前功能所需字段，请切换模型后重试。');
+            err.code = 'AI_JSON_SHAPE_MISMATCH';
+            err.retryAttempted = true;
+            throw err;
+        }
+    };
+    const sandbox = {
+        ai,
+        console,
+        document: {},
+        window: {
+            ai,
+            aiRoutingPure: { manualFallbackTarget },
+            reportMetricsPure: {
+                buildWeeklyMetrics: (_db, anchor) => ({ periodStart: anchor, periodEnd: '2026-07-12', metrics: { weight: 78 } }),
+                buildMonthlyMetrics: (_db, anchor) => ({ periodStart: anchor, periodEnd: '2026-07-31', metrics: { weight: 78 } }),
+                summarizeReportPlain: () => ({ summary: 'offline', highlights: ['local'], suggestions: ['local-tip'], model: 'offline' })
+            },
+            reportVersionPure: {},
+            toast: { show: (...args) => toastCalls.push(args) }
+        }
+    };
+    sandbox.globalThis = sandbox;
+    vm.createContext(sandbox);
+    vm.runInContext(reportSource, sandbox);
+    const data = {
+        ...sandbox.window.dataReport,
+        db: { aiProfiles: [], health: { reports: [] } },
+        weightReportMetricAnchor: () => '2026-07-06',
+        buildPeriodReportContext: () => 'CTX'
+    };
+    await data.generateReport('weekly', '2026-07-06', { useAi: true });
+    assert.deepEqual(data.db.health.reports, []);
+    assert.match(String(toastCalls[0]?.[0] || ''), /缺少当前功能所需字段|AI/);
+});
+
+test('weight report without runJson reports unavailable and does not save', async () => {
+    const toastCalls = [];
+    const ai = {
+        cfg: { enabled: true },
+        run: async () => ({ text: '{"summary":"should-not-save","highlights":[],"suggestions":[]}', meta: { modelId: 'm1' } })
+    };
+    const sandbox = {
+        ai,
+        console,
+        document: {},
+        window: {
+            ai,
+            aiRoutingPure: { manualFallbackTarget },
+            reportMetricsPure: {
+                buildWeeklyMetrics: (_db, anchor) => ({ periodStart: anchor, periodEnd: '2026-07-12', metrics: { weight: 78 } }),
+                buildMonthlyMetrics: (_db, anchor) => ({ periodStart: anchor, periodEnd: '2026-07-31', metrics: { weight: 78 } }),
+                summarizeReportPlain: () => ({ summary: 'offline', highlights: ['local'], suggestions: ['local-tip'], model: 'offline' })
+            },
+            reportVersionPure: {},
+            toast: { show: (...args) => toastCalls.push(args) }
+        }
+    };
+    sandbox.globalThis = sandbox;
+    vm.createContext(sandbox);
+    vm.runInContext(reportSource, sandbox);
+    const data = {
+        ...sandbox.window.dataReport,
+        db: { aiProfiles: [], health: { reports: [] } },
+        weightReportMetricAnchor: () => '2026-07-06',
+        buildPeriodReportContext: () => 'CTX',
+        saveAndBackup() { data._saved = true; }
+    };
+    await data.generateReport('weekly', '2026-07-06', { useAi: true });
+    assert.deepEqual(data.db.health.reports, []);
+    assert.equal(data._saved, undefined);
+    assert.match(String(toastCalls[0]?.[0] || ''), /JSON 运行时不可用|AI/);
+});
+
+test('weight report offline path still saves when useAi is false', async () => {
+    const ai = { cfg: { enabled: false } };
+    const sandbox = {
+        ai,
+        console,
+        document: {},
+        window: {
+            ai,
+            aiRoutingPure: { manualFallbackTarget },
+            reportMetricsPure: {
+                buildWeeklyMetrics: (_db, anchor) => ({ periodStart: anchor, periodEnd: '2026-07-12', metrics: { weight: 78 } }),
+                buildMonthlyMetrics: (_db, anchor) => ({ periodStart: anchor, periodEnd: '2026-07-31', metrics: { weight: 78 } }),
+                summarizeReportPlain: () => ({ summary: 'offline-summary', highlights: ['local'], suggestions: ['local-tip'], model: 'offline', prompt_id: 'weekly_report_offline' })
+            },
+            toast: { show() {} }
+        }
+    };
+    sandbox.globalThis = sandbox;
+    vm.createContext(sandbox);
+    vm.runInContext(versionSource, sandbox);
+    vm.runInContext(reportSource, sandbox);
+    let saved = 0;
+    const data = {
+        ...sandbox.window.dataReport,
+        db: { aiProfiles: [], health: { reports: [] } },
+        activeRecords: (records) => records.filter((record) => !record.deleted),
+        weightReportMetricAnchor: () => '2026-07-06',
+        buildPeriodReportContext: () => 'CTX',
+        generateRecordId: () => 'report-offline-1',
+        renderWeightReportSheet() {},
+        renderHistory() {},
+        saveAndBackup() { saved += 1; }
+    };
+    await data.generateReport('weekly', '2026-07-06', { useAi: false });
+    assert.equal(data.db.health.reports.length, 1);
+    assert.equal(data.db.health.reports[0].versions[0].ai.model, 'offline');
+    assert.equal(saved, 1);
 });

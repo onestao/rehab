@@ -5,6 +5,7 @@
         { id: 'advice.vision', label: 'AI 图片问答', group: '建议', defaultReasoningDepth: 'medium', requiredCapabilities: ['vision'], localPicker: true },
         { id: 'food.text', label: '文字食物解析', group: '饮食', defaultReasoningDepth: 'off', requiredCapabilities: ['text', 'json'] },
         { id: 'food.vision', label: '食物照片识别', group: '饮食', defaultReasoningDepth: 'low', requiredCapabilities: ['vision', 'json'], localPicker: true },
+        { id: 'rehab.weekly', label: '康复周处方解析', group: '康复', defaultReasoningDepth: 'off', requiredCapabilities: ['text', 'json'], localPicker: true },
         { id: 'plan.today', label: '今日训练计划', group: '训练计划', defaultReasoningDepth: 'medium', requiredCapabilities: ['text', 'json'], localPicker: true },
         { id: 'plan.week', label: '一周训练计划', group: '训练计划', defaultReasoningDepth: 'high', requiredCapabilities: ['text', 'json'], localPicker: true },
         { id: 'plan.adjust', label: '明日自动调整', group: '训练计划', defaultReasoningDepth: 'medium', requiredCapabilities: ['text', 'json'] },

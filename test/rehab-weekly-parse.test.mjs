@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
 import { test } from 'node:test';
+import * as aiJsonPure from '../ai-json-pure.mjs';
 
 async function loadRehabWeeklyHarness(raw) {
     const aiSource = await readFile(new URL('../ai-api.js', import.meta.url), 'utf8');
@@ -17,7 +18,8 @@ async function loadRehabWeeklyHarness(raw) {
         window: {
             dataAiTemplates: null,
             haptics: { success() {} },
-            errorBus: { report() {}, event() {} }
+            errorBus: { report() {}, event() {} },
+            aiJsonPure: aiJsonPure.default || aiJsonPure
         },
         document: {
             getElementById(id) {
@@ -27,8 +29,26 @@ async function loadRehabWeeklyHarness(raw) {
         console
     };
     sandbox.window.ai = sandbox.ai;
+    sandbox.window.aiJsonPure = aiJsonPure.default || aiJsonPure;
+    sandbox.aiJsonPure = sandbox.window.aiJsonPure;
     vm.runInNewContext(`${aiSource}\nai;`, sandbox);
     sandbox.ai.call = async () => raw;
+    sandbox.ai.run = async (options = {}) => {
+        const text = await sandbox.ai.call(options.messages || [], options.maxTokens || 2000, options);
+        return options.returnMeta
+            ? {
+                text,
+                meta: {
+                    taskId: options.taskId || 'rehab.weekly',
+                    profileId: 'p1',
+                    provider: 'openai',
+                    modelId: 'm1',
+                    reasoningDepth: 'off',
+                    fallback: { used: false, index: 0, mode: 'manual' }
+                }
+            }
+            : text;
+    };
     vm.runInNewContext(`${profileSource}\nwindow.dataHealthProfile;`, sandbox);
 
     const profile = sandbox.window.dataHealthProfile;

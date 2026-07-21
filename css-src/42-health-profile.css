@@ -1283,11 +1283,80 @@
     color: var(--md-sys-on-surface-variant);
 }
 
+
+/* ============================================
+   Rehab weekly AI parse row
+   ============================================ */
+
+.rehab-ai-parse-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 8px;
+}
+
+.rehab-ai-parse-row .rehab-ai-model-control {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.rehab-ai-parse-row .rehab-week-actions {
+    flex: 0 0 auto;
+    margin: 0;
+}
+
+.rehab-ai-parse-row .rehab-week-actions .md-btn {
+    min-height: 44px;
+    height: 44px;
+    white-space: nowrap;
+}
+
+.rehab-ai-model-control .ai-task-settings-empty {
+    padding: 0;
+    text-align: right;
+}
+
+.rehab-ai-model-control .ai-task-inline-picker {
+    display: block;
+    padding: 0;
+}
+
+.rehab-ai-model-control .ai-task-inline-title {
+    display: none;
+}
+
+.rehab-ai-model-control .ai-task-inline-controls {
+    display: block;
+}
+
+.rehab-ai-model-control .ai-task-quick-controls {
+    grid-template-columns: minmax(0, 1fr) clamp(28px, 8vw, 34px);
+    gap: 6px;
+}
+
+.rehab-ai-model-control .ai-compact-model {
+    gap: 3px;
+    min-height: 44px;
+    padding-inline: 6px;
+}
+
+.rehab-ai-model-control .ai-task-depth-btn {
+    min-height: 44px;
+}
+
 /* ============================================
    Responsive
    ============================================ */
 
 @media (max-width: 480px) {
+    .rehab-ai-parse-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .rehab-ai-parse-row .rehab-week-actions,
+    .rehab-ai-parse-row .rehab-week-actions .md-btn {
+        width: 100%;
+    }
     .health-profile-card { padding: 14px; }
     .profile-card-icon { width: 42px; height: 42px; border-radius: 16px; font-size: 23px; }
     .profile-head h3 { font-size: 16px; }

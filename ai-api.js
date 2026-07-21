@@ -1,5 +1,10 @@
 ﻿// @ts-nocheck
 Object.assign(ai, {
+    FOOD_WRAPPER_KEYS: Object.freeze([
+        'items', 'foods', 'foodItems', 'food_items', 'foodList', 'food_list',
+        'results', 'result', 'data', 'list', '食物', '食物列表', '结果'
+    ]),
+
     _effectiveConfigForRequest(opts = {}) {
         if (opts?.effective) return opts.effective;
         if (opts?.taskId && this.resolveTaskConfig) return this.resolveTaskConfig(opts.taskId, opts.routeOverride || null);
@@ -80,7 +85,16 @@ Object.assign(ai, {
                     exposedError.name = String(error?.name || 'Error');
                     if (typeof error?.code === 'string') exposedError.code = error.code;
                     if (Number.isFinite(Number(error?.status))) exposedError.status = Number(error.status);
+                    if (typeof error?.finishReason === 'string') exposedError.finishReason = error.finishReason;
+                    if (Number.isFinite(Number(error?.bodyLength))) exposedError.bodyLength = Number(error.bodyLength);
                 }
+                this._attachAiAttempt?.(exposedError, {
+                    taskId,
+                    profileId: effective.profileId || '',
+                    modelId: effective.modelId || effective.model || '',
+                    provider: effective.provider || '',
+                    reasoningDepth: effective.reasoningDepth || ''
+                });
                 lastError = exposedError;
                 const reasoningDepth = String(effective.reasoningDepth || 'auto');
                 if (!['auto', 'off'].includes(reasoningDepth) && [400, 415, 422].includes(Number(exposedError?.status || 0))) {
@@ -105,6 +119,247 @@ Object.assign(ai, {
         return this.run({ ...options, taskId, messages, maxTokens, stream: true, onToken });
     },
 
+    _assertCompleteAiResponse(provider, payload, options = {}) {
+        if (!options.requireCompleteOutput) return;
+        const pure = this._requireAiJsonPure();
+        const classified = pure.classifyAiResponseCompletion(provider, payload, options);
+        if (!classified) return;
+        if (classified.kind === 'blocked') {
+            throw this._makeAiError('AI 输出被内容安全策略拦截', {
+                code: 'AI_OUTPUT_BLOCKED',
+                finishReason: String(classified.finishReason || 'blocked')
+            });
+        }
+        if (classified.kind === 'truncated') {
+            throw this._makeAiError('AI 输出达到长度上限被截断', {
+                code: 'AI_OUTPUT_TRUNCATED',
+                finishReason: String(classified.finishReason || 'max_output_tokens'),
+                outputLength: Number(classified.outputLength) || String(options.text || '').length
+            });
+        }
+    },
+
+    _attachAiAttempt(error, meta = {}) {
+        if (!error || typeof error !== 'object') return error;
+        try {
+            const pure = window.aiJsonPure;
+            const attempt = pure?.safeAiAttempt
+                ? pure.safeAiAttempt({ ...(error.aiAttempt || {}), ...meta })
+                : {
+                    taskId: String(meta.taskId || error.aiAttempt?.taskId || ''),
+                    profileId: String(meta.profileId || error.aiAttempt?.profileId || ''),
+                    modelId: String(meta.modelId || meta.model || error.aiAttempt?.modelId || ''),
+                    provider: String(meta.provider || error.aiAttempt?.provider || ''),
+                    reasoningDepth: String(meta.reasoningDepth || error.aiAttempt?.reasoningDepth || '')
+                };
+            error.aiAttempt = attempt;
+        } catch {}
+        return error;
+    },
+
+    _isJsonFormatRetryable(error) {
+        const pure = window.aiJsonPure;
+        if (pure?.isJsonFormatRetryable) return pure.isJsonFormatRetryable(error);
+        const code = String(error?.code || '');
+        return code === 'AI_OUTPUT_TRUNCATED'
+            || code === 'AI_JSON_PARSE_FAILED'
+            || code === 'AI_JSON_SHAPE_MISMATCH';
+    },
+
+    _isAbortLikeAiError(error) {
+        const pure = window.aiJsonPure;
+        if (pure?.isAbortLikeError) return pure.isAbortLikeError(error);
+        if (!error) return false;
+        if (error.name === 'AbortError') return true;
+        const code = String(error?.code || '');
+        return code === 'AI_REQUEST_ABORTED' || code === 'AI_CANCELLED';
+    },
+
+    _withJsonRetryConstraint(messages, systemText, imageFile, attachments) {
+        const constraint = [
+            '上一次输出不完整或不是有效 JSON。请重新生成完整、精简的严格 JSON。',
+            '只输出 JSON，不要 Markdown、分析过程或解释。',
+            '必须闭合所有字符串、对象和数组，并且保留要求的必需字段。'
+        ].join('\n');
+        const hasVision = !!(imageFile || (Array.isArray(attachments) && attachments.some(item => item?.kind === 'image' && item.file)));
+        if (hasVision) {
+            return {
+                messages,
+                systemText: [String(systemText || '').trim(), constraint].filter(Boolean).join('\n')
+            };
+        }
+        const next = Array.isArray(messages) ? messages.map(item => ({ ...item })) : [];
+        const sysIndex = next.findIndex(item => item?.role === 'system');
+        if (sysIndex >= 0) {
+            next[sysIndex] = {
+                ...next[sysIndex],
+                content: [String(next[sysIndex].content || '').trim(), constraint].filter(Boolean).join('\n')
+            };
+        } else {
+            next.unshift({ role: 'system', content: constraint });
+        }
+        return { messages: next, systemText };
+    },
+
+    async runJson(options = {}) {
+        if (options.stream) throw this._makeAiError('runJson 不支持流式请求', { code: 'AI_JSON_STREAM_UNSUPPORTED' });
+        const pure = window.aiJsonPure;
+        const taskId = options.taskId || '';
+        const maxTokens = Math.max(1, Number(options.maxTokens) || 2000);
+        const parseOptions = options.parseOptions || {};
+        const returnMeta = !!options.returnMeta;
+        let firstAttemptCode = '';
+        let attemptMeta = null;
+        let firstResult = null;
+
+        const finalizeSuccess = (value, meta) => (returnMeta ? { value, meta } : value);
+        const withAttempt = (error, meta) => this._attachAiAttempt(error, {
+            taskId,
+            profileId: meta?.profileId || attemptMeta?.profileId || '',
+            modelId: meta?.modelId || meta?.model || attemptMeta?.modelId || attemptMeta?.model || '',
+            provider: meta?.provider || attemptMeta?.provider || '',
+            reasoningDepth: meta?.reasoningDepth || attemptMeta?.reasoningDepth || ''
+        });
+
+        const failAfterRetry = (error) => {
+            const classification = pure?.classifySecondAttemptError
+                ? pure.classifySecondAttemptError(error, firstAttemptCode)
+                : { action: this._isAbortLikeAiError(error) ? 'abort' : (this._isJsonFormatRetryable(error) ? 'wrap' : 'passthrough'), code: String(error?.code || firstAttemptCode || 'AI_JSON_PARSE_FAILED') };
+
+            if (classification.action === 'abort') {
+                const existingCode = String(error?.code || '');
+                const abortCode = (existingCode === 'AI_CANCELLED' || existingCode === 'AI_REQUEST_ABORTED')
+                    ? existingCode
+                    : 'AI_REQUEST_ABORTED';
+                if (existingCode === 'AI_CANCELLED' || existingCode === 'AI_REQUEST_ABORTED') {
+                    error.retryAttempted = true;
+                    if (firstAttemptCode && !error.firstAttemptCode) error.firstAttemptCode = firstAttemptCode;
+                    throw withAttempt(error, attemptMeta || error?.aiAttempt || {});
+                }
+                const aborted = this._makeAiError(String(error?.message || '请求已取消'), {
+                    code: abortCode,
+                    firstAttemptCode,
+                    retryAttempted: true,
+                    finishReason: String(error?.finishReason || '')
+                });
+                throw withAttempt(aborted, attemptMeta || error?.aiAttempt || {});
+            }
+
+            if (classification.action === 'passthrough') {
+                error.retryAttempted = true;
+                if (firstAttemptCode && !error.firstAttemptCode) error.firstAttemptCode = firstAttemptCode;
+                throw withAttempt(error, attemptMeta || error?.aiAttempt || {});
+            }
+
+            const finalCode = String(classification.code || error?.code || firstAttemptCode || 'AI_JSON_PARSE_FAILED');
+            const message = pure?.buildJsonRetryFailureMessage
+                ? pure.buildJsonRetryFailureMessage(finalCode)
+                : 'AI 重新生成后仍未返回有效 JSON，请切换支持 JSON 输出的模型。';
+            const safeProps = pure?.buildSafeAiDiagnosticProps
+                ? pure.buildSafeAiDiagnosticProps(error, {
+                    code: finalCode,
+                    firstAttemptCode,
+                    retryAttempted: true,
+                    finishReason: error?.finishReason || '',
+                    aiAttempt: attemptMeta || error?.aiAttempt || {},
+                    outputLength: error?.outputLength
+                })
+                : {
+                    code: finalCode,
+                    finishReason: String(error?.finishReason || ''),
+                    firstAttemptCode,
+                    retryAttempted: true,
+                    aiAttempt: attemptMeta || error?.aiAttempt || {},
+                    outputLength: error?.outputLength
+                };
+            throw this._makeAiError(message, safeProps);
+        };
+
+        try {
+            firstResult = await this.run({
+                taskId,
+                messages: options.messages,
+                promptText: options.promptText,
+                systemText: options.systemText,
+                imageFile: options.imageFile,
+                attachments: options.attachments,
+                maxTokens,
+                routeOverride: options.routeOverride || null,
+                signal: options.signal || null,
+                timeoutMs: options.timeoutMs,
+                onProgress: options.onProgress,
+                returnMeta: true,
+                requireCompleteOutput: true,
+                stream: false
+            });
+            attemptMeta = firstResult.meta || null;
+            const value = this._parseAiJsonPayload(firstResult.text, parseOptions);
+            return finalizeSuccess(value, firstResult.meta);
+        } catch (error) {
+            firstAttemptCode = String(error?.code || '');
+            if (!this._isJsonFormatRetryable(error)) throw error;
+            if (firstResult?.meta) attemptMeta = firstResult.meta;
+            else if (error?.aiAttempt?.profileId && error?.aiAttempt?.modelId) attemptMeta = error.aiAttempt;
+            if (!attemptMeta?.profileId || !(attemptMeta.modelId || attemptMeta.model)) throw error;
+        }
+
+        if (options.signal?.aborted) {
+            throw withAttempt(this._makeAiError('请求已取消', {
+                code: 'AI_REQUEST_ABORTED',
+                firstAttemptCode,
+                retryAttempted: false
+            }), attemptMeta);
+        }
+
+        const retryMaxTokens = Math.min(Math.max(maxTokens * 2, 4000), 8000);
+        try {
+            options.onRetry?.({
+                attempt: 2,
+                reasonCode: firstAttemptCode,
+                modelId: attemptMeta.modelId || attemptMeta.model || '',
+                maxTokens: retryMaxTokens
+            });
+        } catch {}
+
+        const constrained = this._withJsonRetryConstraint(
+            options.messages,
+            options.systemText,
+            options.imageFile,
+            options.attachments
+        );
+        try {
+            const retryResult = await this.run({
+                taskId,
+                messages: constrained.messages,
+                promptText: options.promptText,
+                systemText: constrained.systemText,
+                imageFile: options.imageFile,
+                attachments: options.attachments,
+                maxTokens: retryMaxTokens,
+                routeOverride: {
+                    primary: {
+                        profileId: attemptMeta.profileId,
+                        modelId: attemptMeta.modelId || attemptMeta.model
+                    },
+                    reasoningDepth: 'off',
+                    fallbackMode: 'manual',
+                    fallbacks: []
+                },
+                signal: options.signal || null,
+                timeoutMs: options.timeoutMs,
+                onProgress: options.onProgress,
+                returnMeta: true,
+                requireCompleteOutput: true,
+                stream: false
+            });
+            attemptMeta = retryResult.meta || attemptMeta;
+            const value = this._parseAiJsonPayload(retryResult.text, parseOptions);
+            return finalizeSuccess(value, retryResult.meta);
+        } catch (error) {
+            failAfterRetry(error);
+        }
+    },
+
     // --- API Calls (统一入口，按 provider 分发) ---
     async call(messages, maxTokens = 2000, opts = {}) {
         const effective = this._effectiveConfigForRequest(opts);
@@ -112,10 +367,25 @@ Object.assign(ai, {
         const key = effective.apiKey;
         if (!key) throw new Error('请先在当前 AI 配置中填写 API Key');
         const provider = effective.provider || 'openai';
-        if (provider === 'claude')           return this._callClaude(messages, maxTokens, key, false, null, effective);
-        if (provider === 'openai-responses') return this._callOpenAIResponses(messages, maxTokens, key, false, null, effective);
-        if (provider === 'gemini')           return this._callGemini(messages, maxTokens, key, false, null, effective);
-        return this._callOpenAIChat(messages, maxTokens, key, false, null, effective);
+        const timeout = this._makeTimeoutSignal(opts.signal, opts.timeoutMs || 30000);
+        try {
+            timeout.signal.throwIfAborted?.();
+            if (provider === 'claude')           return await this._callClaude(messages, maxTokens, key, false, null, effective, timeout.signal, opts);
+            if (provider === 'openai-responses') return await this._callOpenAIResponses(messages, maxTokens, key, false, null, effective, timeout.signal, opts);
+            if (provider === 'gemini')           return await this._callGemini(messages, maxTokens, key, false, null, effective, timeout.signal, opts);
+            return await this._callOpenAIChat(messages, maxTokens, key, false, null, effective, timeout.signal, opts);
+        } catch (e) {
+            if (e?.name === 'AbortError') {
+                throw this._makeAiError(timeout.wasTimeout() ? 'AI_TIMEOUT' : 'AI_CANCELLED', {
+                    code: timeout.wasTimeout() ? 'AI_TIMEOUT' : 'AI_CANCELLED',
+                    cause: e
+                });
+            }
+            if (e instanceof TypeError) throw this._makeAiError(e.message || 'NETWORK_ERROR', { code: 'NETWORK_ERROR', cause: e });
+            throw e;
+        } finally {
+            timeout.cleanup();
+        }
     },
 
     // --- Vision Helpers ---
@@ -164,117 +434,54 @@ Object.assign(ai, {
         return err;
     },
 
-    _balancedJsonSpans(raw, open, close) {
-        const text = String(raw || '');
-        const spans = [];
-        for (let i = 0; i < text.length; i++) {
-            if (text[i] !== open) continue;
-            let depth = 0;
-            let quote = '';
-            let escaped = false;
-            for (let j = i; j < text.length; j++) {
-                const ch = text[j];
-                if (quote) {
-                    if (escaped) escaped = false;
-                    else if (ch === '\\') escaped = true;
-                    else if (ch === quote) quote = '';
-                    continue;
-                }
-                if (ch === '"' || ch === "'") {
-                    quote = ch;
-                    continue;
-                }
-                if (ch === open) depth += 1;
-                else if (ch === close) {
-                    depth -= 1;
-                    if (depth === 0) {
-                        spans.push({ start: i, text: text.slice(i, j + 1) });
-                        break;
-                    }
-                }
-            }
+    _requireAiJsonPure() {
+        const pure = window.aiJsonPure;
+        if (!pure) {
+            throw this._makeAiError('AI JSON 运行时不可用，请刷新后重试。', {
+                code: 'AI_JSON_RUNTIME_UNAVAILABLE'
+            });
         }
-        return spans;
+        return pure;
+    },
+
+    _balancedJsonSpans(raw, open, close) {
+        return this._requireAiJsonPure().balancedJsonSpans(raw, open, close);
     },
 
     _jsonTextCandidates(raw) {
-        const text = String(raw || '').trim();
-        const seen = new Set();
-        const candidates = [];
-        const add = value => {
-            const next = String(value || '').trim();
-            if (next && !seen.has(next)) {
-                seen.add(next);
-                candidates.push(next);
-            }
-        };
-        add(text);
-        text.replace(/```(?:json|javascript|js)?\s*([\s\S]*?)```/gi, (_m, body) => {
-            add(body);
-            return _m;
-        });
-        add(text.replace(/^```(?:json|javascript|js)?\s*/i, '').replace(/```\s*$/i, ''));
-        const spans = [
-            ...this._balancedJsonSpans(text, '{', '}'),
-            ...this._balancedJsonSpans(text, '[', ']')
-        ].sort((a, b) => a.start - b.start || b.text.length - a.text.length);
-        spans.forEach(span => add(span.text));
-        return candidates;
+        return this._requireAiJsonPure().jsonTextCandidates(raw);
+    },
+
+    _matchesAiJsonFieldType(value, type) {
+        return this._requireAiJsonPure().matchesAiJsonFieldType(value, type);
+    },
+
+    _objectMatchesAiJsonShape(value, opts = {}) {
+        return this._requireAiJsonPure().objectMatchesAiJsonShape(value, opts);
     },
 
     _coerceAiJsonPayload(value, opts = {}) {
-        const expected = opts.expected || 'array';
-        if (expected === 'object') {
-            if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
-            const wrapperKeys = opts.wrapperKeys || ['data', 'result', 'payload', 'item'];
-            const shapeKeys = opts.shapeKeys || [];
-            const hasShape = item => !shapeKeys.length || shapeKeys.some(key => item?.[key] !== undefined);
-            if (hasShape(value)) return value;
-            for (const key of wrapperKeys) {
-                const nested = value[key];
-                if (nested && typeof nested === 'object' && !Array.isArray(nested) && hasShape(nested)) return nested;
-            }
-            return value;
-        }
-        if (expected !== 'array') return value;
-        if (Array.isArray(value)) return value;
-        if (!value || typeof value !== 'object') return null;
-        const wrapperKeys = opts.wrapperKeys || [
-            'items', 'foods', 'foodItems', 'food_items', 'foodList', 'food_list',
-            'results', 'result', 'data', 'list', '食物', '食物列表', '结果'
-        ];
-        for (const key of wrapperKeys) {
-            if (Array.isArray(value[key])) return value[key];
-        }
-        const singleFoodKeys = ['name', 'food', 'foodName', 'dish', '食物', '食物名', '名称', '名字'];
-        if (singleFoodKeys.some(key => value[key] !== undefined && value[key] !== null && value[key] !== '')) return [value];
-        return null;
+        return this._requireAiJsonPure().coerceAiJsonPayload(value, opts);
     },
 
     _parseAiJsonPayload(raw, opts = {}) {
-        let lastError = null;
-        let parsedButWrongShape = false;
-        for (const candidate of this._jsonTextCandidates(raw)) {
-            try {
-                const parsed = JSON.parse(candidate);
-                const coerced = this._coerceAiJsonPayload(parsed, opts);
-                if (coerced !== null) return coerced;
-                parsedButWrongShape = true;
-            } catch (e) {
-                lastError = e;
-            }
-        }
+        const pure = this._requireAiJsonPure();
+        const result = pure.parseAiJsonPayload(raw, opts);
+        if (result?.ok) return result.value;
         throw this._makeAiError('AI 返回格式异常', {
-            code: parsedButWrongShape ? 'AI_JSON_SHAPE_MISMATCH' : 'AI_JSON_PARSE_FAILED',
-            body: String(raw || '').slice(0, 500),
-            cause: lastError || undefined
+            code: result?.code || 'AI_JSON_PARSE_FAILED',
+            outputLength: Number(result?.outputLength) || String(raw || '').length
         });
     },
 
     _makeHttpAiError(status, body = '') {
-        return this._makeAiError(`AI 请求失败: ${status} ${String(body).slice(0, 120)}`, {
-            status,
-            body: String(body || '')
+        const statusNum = Number(status) || 0;
+        const bodyLength = String(body ?? '').length;
+        // Never attach raw provider response bodies (may contain secrets or health data).
+        return this._makeAiError(`AI 请求失败: HTTP ${statusNum}`, {
+            code: 'AI_HTTP_ERROR',
+            status: statusNum,
+            bodyLength
         });
     },
 
@@ -476,10 +683,10 @@ Object.assign(ai, {
             const img = await this.prepareVisionImage(imageFile, { maxDimension: 1024, outMime: 'image/jpeg', quality: 0.85, onProgress: opts.onProgress });
             timeout.signal.throwIfAborted?.();
             opts.onProgress?.({ stage: 'request' });
-            if (provider === 'claude') return await this._callClaudeVision(promptText, img, maxTokens, key, effective, systemText, timeout.signal);
-            if (provider === 'openai-responses') return await this._callOpenAIResponsesVision(promptText, img, maxTokens, key, effective, systemText, timeout.signal);
-            if (provider === 'gemini') return await this._callGeminiVision(promptText, img, maxTokens, key, effective, systemText, timeout.signal);
-            return await this._callOpenAIChatVision(promptText, img, maxTokens, key, effective, systemText, timeout.signal);
+            if (provider === 'claude') return await this._callClaudeVision(promptText, img, maxTokens, key, effective, systemText, timeout.signal, opts);
+            if (provider === 'openai-responses') return await this._callOpenAIResponsesVision(promptText, img, maxTokens, key, effective, systemText, timeout.signal, opts);
+            if (provider === 'gemini') return await this._callGeminiVision(promptText, img, maxTokens, key, effective, systemText, timeout.signal, opts);
+            return await this._callOpenAIChatVision(promptText, img, maxTokens, key, effective, systemText, timeout.signal, opts);
         } catch (e) {
             if (e?.name === 'AbortError') {
                 throw this._makeAiError(timeout.wasTimeout() ? 'AI_TIMEOUT' : 'AI_CANCELLED', { code: timeout.wasTimeout() ? 'AI_TIMEOUT' : 'AI_CANCELLED', cause: e });
@@ -514,22 +721,28 @@ Object.assign(ai, {
         const key = effective.apiKey;
         if (!key) throw new Error('请先在当前 AI 配置中填写 API Key');
         const provider = effective.provider || 'openai';
+        const timeout = this._makeTimeoutSignal(opts.signal, opts.timeoutMs || 30000);
         try {
-            opts.signal?.throwIfAborted?.();
-            if (provider === 'claude')           return await this._callClaude(messages, maxTokens, key, true, onToken, effective, opts.signal);
-            if (provider === 'openai-responses') return await this._callOpenAIResponses(messages, maxTokens, key, true, onToken, effective, opts.signal);
-            if (provider === 'gemini')           return await this._callGemini(messages, maxTokens, key, true, onToken, effective, opts.signal);
-            return await this._callOpenAIChat(messages, maxTokens, key, true, onToken, effective, opts.signal);
+            timeout.signal.throwIfAborted?.();
+            if (provider === 'claude')           return await this._callClaude(messages, maxTokens, key, true, onToken, effective, timeout.signal, opts);
+            if (provider === 'openai-responses') return await this._callOpenAIResponses(messages, maxTokens, key, true, onToken, effective, timeout.signal, opts);
+            if (provider === 'gemini')           return await this._callGemini(messages, maxTokens, key, true, onToken, effective, timeout.signal, opts);
+            return await this._callOpenAIChat(messages, maxTokens, key, true, onToken, effective, timeout.signal, opts);
         } catch (e) {
-            if (e?.name === 'AbortError' || opts.signal?.aborted) {
-                throw this._makeAiError('AI_CANCELLED', { code: 'AI_CANCELLED', cause: e });
+            if (e?.name === 'AbortError' || timeout.signal?.aborted || opts.signal?.aborted) {
+                throw this._makeAiError(timeout.wasTimeout() ? 'AI_TIMEOUT' : 'AI_CANCELLED', {
+                    code: timeout.wasTimeout() ? 'AI_TIMEOUT' : 'AI_CANCELLED',
+                    cause: e
+                });
             }
             if (e instanceof TypeError) throw this._makeAiError(e.message || 'NETWORK_ERROR', { code: 'NETWORK_ERROR', cause: e });
             throw e;
+        } finally {
+            timeout.cleanup();
         }
     },
 
-    async _callOpenAIChatVision(promptText, img, maxTokens, key, effective, systemText = '', signal = null) {
+    async _callOpenAIChatVision(promptText, img, maxTokens, key, effective, systemText = '', signal = null, requestOpts = {}) {
         const url = `${effective.baseUrl}/chat/completions`;
         const messages = [
             ...(systemText ? [{ role: 'system', content: systemText }] : []),
@@ -557,11 +770,13 @@ Object.assign(ai, {
         }
         const raw = await res.text();
         let d;
-        try { d = JSON.parse(raw); } catch (e) { throw this._makeAiError('AI 返回格式异常', { code: 'AI_JSON_PARSE_FAILED', body: raw.slice(0, 200), cause: e }); }
-        return d.choices?.[0]?.message?.content || '';
+        try { d = JSON.parse(raw); } catch (e) { throw this._makeAiError('AI 返回格式异常', { code: 'AI_JSON_PARSE_FAILED', outputLength: String(raw || '').length }); }
+        const text = d.choices?.[0]?.message?.content || '';
+        this._assertCompleteAiResponse('openai', d, { requireCompleteOutput: requestOpts?.requireCompleteOutput, text });
+        return text;
     },
 
-    async _callOpenAIResponsesVision(promptText, img, maxTokens, key, effective, systemText = '', signal = null) {
+    async _callOpenAIResponsesVision(promptText, img, maxTokens, key, effective, systemText = '', signal = null, requestOpts = {}) {
         const url = `${effective.baseUrl}/responses`;
         const reasoning = this._reasoningRequestOptions(effective, maxTokens);
         const body = {
@@ -591,18 +806,21 @@ Object.assign(ai, {
         }
         const raw = await res.text();
         let d;
-        try { d = JSON.parse(raw); } catch (e) { throw this._makeAiError('AI 返回格式异常', { code: 'AI_JSON_PARSE_FAILED', body: raw.slice(0, 200), cause: e }); }
-        if (d.output_text) return d.output_text;
+        try { d = JSON.parse(raw); } catch (e) { throw this._makeAiError('AI 返回格式异常', { code: 'AI_JSON_PARSE_FAILED', outputLength: String(raw || '').length }); }
         let txt = '';
-        for (const item of (d.output || [])) {
-            for (const c of (item.content || [])) {
-                if (c.type === 'output_text' || c.type === 'text') txt += c.text || '';
+        if (d.output_text) txt = d.output_text;
+        else {
+            for (const item of (d.output || [])) {
+                for (const c of (item.content || [])) {
+                    if (c.type === 'output_text' || c.type === 'text') txt += c.text || '';
+                }
             }
         }
+        this._assertCompleteAiResponse('openai-responses', d, { requireCompleteOutput: requestOpts?.requireCompleteOutput, text: txt });
         return txt;
     },
 
-    async _callClaudeVision(promptText, img, maxTokens, key, effective, systemText = '', signal = null) {
+    async _callClaudeVision(promptText, img, maxTokens, key, effective, systemText = '', signal = null, requestOpts = {}) {
         const url = `${effective.baseUrl}/messages`;
         const reasoning = this._reasoningRequestOptions(effective, maxTokens);
         const body = {
@@ -637,11 +855,13 @@ Object.assign(ai, {
         }
         const raw = await res.text();
         let d;
-        try { d = JSON.parse(raw); } catch (e) { throw this._makeAiError('AI 返回格式异常', { code: 'AI_JSON_PARSE_FAILED', body: raw.slice(0, 200), cause: e }); }
-        return (d.content || []).filter(c => c.type === 'text').map(c => c.text).join('');
+        try { d = JSON.parse(raw); } catch (e) { throw this._makeAiError('AI 返回格式异常', { code: 'AI_JSON_PARSE_FAILED', outputLength: String(raw || '').length }); }
+        const text = (d.content || []).filter(c => c.type === 'text').map(c => c.text).join('');
+        this._assertCompleteAiResponse('claude', d, { requireCompleteOutput: requestOpts?.requireCompleteOutput, text });
+        return text;
     },
 
-    async _callGeminiVision(promptText, img, maxTokens, key, effective, systemText = '', signal = null) {
+    async _callGeminiVision(promptText, img, maxTokens, key, effective, systemText = '', signal = null, requestOpts = {}) {
         const action = `generateContent?key=${key}`;
         const url = `${effective.baseUrl}/models/${effective.model}:${action}`;
         const contents = [{
@@ -674,12 +894,14 @@ Object.assign(ai, {
         }
         const raw = await res.text();
         let d;
-        try { d = JSON.parse(raw); } catch (e) { throw this._makeAiError('AI 返回格式异常', { code: 'AI_JSON_PARSE_FAILED', body: raw.slice(0, 200), cause: e }); }
-        return d.candidates?.[0]?.content?.parts?.map(p => p.text).join('') || '';
+        try { d = JSON.parse(raw); } catch (e) { throw this._makeAiError('AI 返回格式异常', { code: 'AI_JSON_PARSE_FAILED', outputLength: String(raw || '').length }); }
+        const text = d.candidates?.[0]?.content?.parts?.map(p => p.text).join('') || '';
+        this._assertCompleteAiResponse('gemini', d, { requireCompleteOutput: requestOpts?.requireCompleteOutput, text });
+        return text;
     },
 
     // ---------- OpenAI Chat Completions ----------
-    async _callOpenAIChat(messages, maxTokens, key, stream, onChunk, effective = this.getEffectiveConfig?.() || this.cfg, signal = null) {
+    async _callOpenAIChat(messages, maxTokens, key, stream, onChunk, effective = this.getEffectiveConfig?.() || this.cfg, signal = null, requestOpts = {}) {
         const url = `${effective.baseUrl}/chat/completions`;
         const reasoning = this._reasoningRequestOptions(effective, maxTokens);
         const body = { model: effective.model, messages, max_tokens: reasoning.maxOutputTokens, ...reasoning.params };
@@ -699,8 +921,11 @@ Object.assign(ai, {
             const raw = await res.text();
             try {
                 const d = JSON.parse(raw);
-                return d.choices?.[0]?.message?.content || '';
-            } catch {
+                const text = d.choices?.[0]?.message?.content || '';
+                this._assertCompleteAiResponse('openai', d, { requireCompleteOutput: requestOpts?.requireCompleteOutput, text });
+                return text;
+            } catch (e) {
+                if (e?.code === 'AI_OUTPUT_TRUNCATED' || e?.code === 'AI_OUTPUT_BLOCKED') throw e;
                 let content = '';
                 const parts = raw.split(/\r?\n/);
                 for (const line of parts) {
@@ -728,7 +953,7 @@ Object.assign(ai, {
     },
 
     // ---------- OpenAI Responses API（最新 /v1/responses） ----------
-    async _callOpenAIResponses(messages, maxTokens, key, stream, onChunk, effective = this.getEffectiveConfig?.() || this.cfg, signal = null) {
+    async _callOpenAIResponses(messages, maxTokens, key, stream, onChunk, effective = this.getEffectiveConfig?.() || this.cfg, signal = null, requestOpts = {}) {
         const url = `${effective.baseUrl}/responses`;
         const sys = messages.filter(m => m.role === 'system').map(m => m.content).join('\n');
         const input = messages.filter(m => m.role !== 'system').map(m => ({
@@ -758,13 +983,16 @@ Object.assign(ai, {
         }
         if (!stream) {
             const d = await res.json();
-            if (d.output_text) return d.output_text;
             let txt = '';
-            for (const item of (d.output || [])) {
-                for (const c of (item.content || [])) {
-                    if (c.type === 'output_text' || c.type === 'text') txt += c.text || '';
+            if (d.output_text) txt = d.output_text;
+            else {
+                for (const item of (d.output || [])) {
+                    for (const c of (item.content || [])) {
+                        if (c.type === 'output_text' || c.type === 'text') txt += c.text || '';
+                    }
                 }
             }
+            this._assertCompleteAiResponse('openai-responses', d, { requireCompleteOutput: requestOpts?.requireCompleteOutput, text: txt });
             return txt;
         }
           return this._readSSE(res, onChunk, (json) => {
@@ -783,7 +1011,7 @@ Object.assign(ai, {
     },
 
     // ---------- Anthropic Claude Messages API ----------
-    async _callClaude(messages, maxTokens, key, stream, onChunk, effective = this.getEffectiveConfig?.() || this.cfg, signal = null) {
+    async _callClaude(messages, maxTokens, key, stream, onChunk, effective = this.getEffectiveConfig?.() || this.cfg, signal = null, requestOpts = {}) {
         const url = `${effective.baseUrl}/messages`;
         const sys = messages.filter(m => m.role === 'system').map(m => m.content).join('\n');
         const msgs = messages.filter(m => m.role !== 'system').map(m => ({
@@ -818,7 +1046,9 @@ Object.assign(ai, {
         }
         if (!stream) {
             const d = await res.json();
-            return (d.content || []).filter(c => c.type === 'text').map(c => c.text).join('');
+            const text = (d.content || []).filter(c => c.type === 'text').map(c => c.text).join('');
+            this._assertCompleteAiResponse('claude', d, { requireCompleteOutput: requestOpts?.requireCompleteOutput, text });
+            return text;
         }
           return this._readSSE(res, onChunk, (json) => {
               if (json.type === 'content_block_delta' && json.delta?.type === 'text_delta') {
@@ -836,7 +1066,7 @@ Object.assign(ai, {
     },
 
     // ---------- Gemini ----------
-    async _callGemini(messages, maxTokens, key, stream, onChunk, effective = this.getEffectiveConfig?.() || this.cfg, signal = null) {
+    async _callGemini(messages, maxTokens, key, stream, onChunk, effective = this.getEffectiveConfig?.() || this.cfg, signal = null, requestOpts = {}) {
         const sys = messages.filter(m => m.role === 'system').map(m => m.content).join('\n');
         const contents = messages.filter(m => m.role !== 'system').map(m => ({
             role: m.role === 'assistant' ? 'model' : 'user',
@@ -866,7 +1096,9 @@ Object.assign(ai, {
         }
         if (!stream) {
             const d = await res.json();
-            return d.candidates?.[0]?.content?.parts?.map(p => p.text).join('') || '';
+            const text = d.candidates?.[0]?.content?.parts?.map(p => p.text).join('') || '';
+            this._assertCompleteAiResponse('gemini', d, { requireCompleteOutput: requestOpts?.requireCompleteOutput, text });
+            return text;
         }
           return this._readSSE(res, onChunk,
               (json) => json.candidates?.[0]?.content?.parts?.map(p => p.text).join('') || '',
@@ -968,6 +1200,19 @@ Object.assign(ai, {
             { role: 'system', content: sysMsg },
             { role: 'user', content: userMsg }
         ];
+        if (typeof this.runJson === 'function') {
+            return this.runJson({
+                taskId: 'food.text',
+                messages,
+                maxTokens: 2000,
+                routeOverride: opts?.routeOverride || null,
+                parseOptions: {
+                    expected: 'array',
+                    wrapperKeys: this.FOOD_WRAPPER_KEYS
+                },
+                onRetry: opts.onRetry
+            });
+        }
         const raw = this.resolveTaskConfig ? await this.run({
             taskId: 'food.text',
             messages,
@@ -976,7 +1221,7 @@ Object.assign(ai, {
         }) : await this.call(messages, 2000);
         return this._parseAiJsonPayload(raw, {
             expected: 'array',
-            wrapperKeys: ['items', 'foods', 'foodItems', 'food_items', 'foodList', 'food_list', 'results', 'result', 'data', '食物', '食物列表', '结果']
+            wrapperKeys: this.FOOD_WRAPPER_KEYS
         });
     },
 
@@ -1028,6 +1273,33 @@ Object.assign(ai, {
         const prefResult = tpl?.buildPromptMessages('food_parse_image', {}, window.data?.db) || {};
         const sysMsg = prefResult.messages?.find(m => m.role === 'system')?.content || '你是营养师助手，只返回纯 JSON 数组，不要 markdown，不要解释。';
         const prompt = prefResult.messages?.find(m => m.role === 'user')?.content || `你是营养师助手。用户给出了一张"这顿饭/食物"的照片。请你根据图片内容识别食物，并严格只返回 JSON 数组，不要其他文字。\n每个元素必须包含核心字段 name、grams、cal、pro、carb、fat，不能省略；这些字段的值必须是数字，即使为 0 也必须明确输出。格式：{"name":"食物名","grams":克数,"cal":热量kcal,"pro":蛋白质g,"carb":碳水g,"fat":脂肪g,"fiber":膳食纤维g,"sugar":糖g,"sodium":钠mg,"saturatedFat":饱和脂肪g,"ingredients":["主要配料"],"cooking":"烹饪方式","source":"估算依据","confidence":0-100,"note":"健康性备注"}\n要求：\n- 如果无法判断克数，请用常见份量估算；\n- 热量可按蛋白质、碳水和脂肪计算，但不要省略 cal；\n- fiber/sugar/sodium/saturatedFat/ingredients/cooking/source/confidence/note 可根据可见信息合理填写，无法判断时使用 0、空数组或空字符串；\n- 如果图片中看不清或不确定，请不要编造，返回空数组 [] 或减少条目；\n- 不要输出 markdown、不要解释。`;
+        if (typeof this.runJson === 'function') {
+            opts.onProgress?.({ stage: 'request' });
+            const result = await this.runJson({
+                taskId: 'food.vision',
+                promptText: prompt,
+                systemText: sysMsg,
+                imageFile: file,
+                maxTokens: 2000,
+                routeOverride: opts?.routeOverride || null,
+                signal: opts?.signal || null,
+                timeoutMs: opts?.timeoutMs,
+                parseOptions: {
+                    expected: 'array',
+                    wrapperKeys: this.FOOD_WRAPPER_KEYS
+                },
+                returnMeta: true,
+                onRetry: info => {
+                    opts.onProgress?.({
+                        stage: 'retry',
+                        ...info
+                    });
+                }
+            });
+            if (result?.meta) opts.onResolvedMeta?.(result.meta);
+            opts.onProgress?.({ stage: 'parse' });
+            return result?.value;
+        }
         const result = this.resolveTaskConfig
             ? await this.run({ ...opts, taskId: 'food.vision', promptText: prompt, imageFile: file, systemText: sysMsg, maxTokens: 2000, returnMeta: true })
             : await this.callVisionTextImage(prompt, file, 2000, sysMsg, opts);
@@ -1037,7 +1309,7 @@ Object.assign(ai, {
         try {
             return this._parseAiJsonPayload(raw, {
                 expected: 'array',
-                wrapperKeys: ['items', 'foods', 'foodItems', 'food_items', 'foodList', 'food_list', 'results', 'result', 'data', '食物', '食物列表', '结果']
+                wrapperKeys: this.FOOD_WRAPPER_KEYS
             });
         } catch (e) {
             console.warn('AI 返回格式异常:', String(raw || '').slice(0, 80));
@@ -1095,24 +1367,43 @@ Object.assign(ai, {
             { role: 'system', content: sysMsg },
             { role: 'user', content: prompt }
         ];
-        const raw = this.resolveTaskConfig ? await this.run({
-            taskId: 'goal.body',
-            messages,
-            maxTokens: 2600,
-            routeOverride
-        }) : await this.call(messages, 2600);
-        try {
-            const match = raw.match(/\{[\s\S]*"tips"[\s\S]*\}/);
-            if (!match) throw new Error('AI 返回格式异常');
-            return JSON.parse(match[0]);
-        } catch (error) {
-            if (error && typeof error === 'object' && !error.code) error.code = 'AI_JSON_PARSE_FAILED';
+        const paceKeys = isGain
+            ? ['conservative', 'moderate', 'aggressive']
+            : ['fast', 'moderate', 'slow'];
+        const parseOptions = {
+            expected: 'object',
+            requiredKeys: [...paceKeys, 'tips'],
+            fieldTypes: Object.fromEntries([...paceKeys.map(k => [k, 'object']), ['tips', 'array']])
+        };
+        const attachGoalFallback = (error) => {
+            if (!error || typeof error !== 'object' || error.aiFallback) return error;
             const route = routeOverride ? null : this.getTaskRoute?.('goal.body');
             const target = (route?.fallbackMode || 'manual') === 'manual'
                 ? window.aiRoutingPure?.manualFallbackTarget?.(route?.fallbacks?.[0])
                 : null;
-            if (target && error && typeof error === 'object') error.aiFallback = { taskId: 'goal.body', target };
-            throw error;
+            if (target) error.aiFallback = { taskId: 'goal.body', target };
+            return error;
+        };
+        try {
+            if (typeof this.runJson === 'function') {
+                return await this.runJson({
+                    taskId: 'goal.body',
+                    messages,
+                    maxTokens: 2600,
+                    routeOverride,
+                    parseOptions
+                });
+            }
+            const raw = this.resolveTaskConfig ? await this.run({
+                taskId: 'goal.body',
+                messages,
+                maxTokens: 2600,
+                routeOverride
+            }) : await this.call(messages, 2600);
+            return this._parseAiJsonPayload(raw, parseOptions);
+        } catch (error) {
+            if (error && typeof error === 'object' && !error.code) error.code = 'AI_JSON_PARSE_FAILED';
+            throw attachGoalFallback(error);
         }
     }
 });

@@ -24,6 +24,7 @@ Training Assistant is a local-first web training timer and health log. It suppor
 - `data.js` is the current app-state facade. Feature modules attach behavior to it through `Object.assign`.
 - CSS source files in `css-src/` are concatenated into `build/generated.css` by `scripts/build-css.mjs`.
 - `sw.js` precaches versioned assets; script additions must be reflected there.
+- Shared AI JSON contract helpers live in `ai-json-pure.mjs` and attach as `window.aiJsonPure` (candidate extraction, shape checks, completion/block classification, safe diagnostics). `ai-api.js` owns request orchestration and `runJson` two-attempt retry only.
 
 ## Safety Invariants
 

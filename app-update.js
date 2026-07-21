@@ -4,11 +4,11 @@ const appUpdate = {
     waitingWorker: null,
     checking: false,
     controllerReloadBound: false,
-    swUrl: './sw.js?v=345',
-    version: '345',
+    swUrl: './sw.js?v=354',
+    version: '354',
 
     controllerReloadKey() {
-        return 'rehab-sw-controller-reload-v345';
+        return 'rehab-sw-controller-reload-v354';
     },
 
     claimControllerReload() {
@@ -396,7 +396,10 @@ const appUpdate = {
             el.setAttribute('aria-live', 'assertive');
             el.setAttribute('aria-modal', 'true');
             el.style.cssText = 'position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;background:rgba(15,23,42,.72);color:#fff;font:600 16px/1.4 system-ui,sans-serif;pointer-events:all;';
-            el.innerHTML = `<div style="padding:20px 24px;border-radius:16px;background:#0f172a;max-width:280px;text-align:center">${message}</div>`;
+            const panel = document.createElement('div');
+            panel.style.cssText = 'padding:20px 24px;border-radius:16px;background:#0f172a;max-width:280px;text-align:center';
+            panel.textContent = message;
+            el.appendChild(panel);
             document.body.appendChild(el);
             // Block keyboard until ready.
             el._keyHandler = (e) => {
@@ -405,7 +408,8 @@ const appUpdate = {
             };
             document.addEventListener('keydown', el._keyHandler, true);
         } else {
-            el.querySelector('div').textContent = message;
+            const panel = el.querySelector('div');
+            if (panel) panel.textContent = message;
             el.style.display = 'flex';
         }
     },

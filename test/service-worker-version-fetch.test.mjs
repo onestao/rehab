@@ -135,6 +135,7 @@ function createFetchHarness({
             /const CACHE = 'training-assistant-v\d+';/,
             `const CACHE = 'training-assistant-v${workerVersion}';`
         )
+        .replace(/\?v=\d+/g, `?v=${workerVersion}`)
         .replace(/const LEGACY_NAVIGATION_TIMEOUT_MS = \d+;/, 'const LEGACY_NAVIGATION_TIMEOUT_MS = 5;')
         .replace(/const LEGACY_NAVIGATION_GRACE_MS = \d+;/, 'const LEGACY_NAVIGATION_GRACE_MS = 1;')
         .replace(

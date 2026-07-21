@@ -1,4 +1,5 @@
 // @ts-nocheck
+import * as aiJsonPure from '../ai-json-pure.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
@@ -19,7 +20,7 @@ function createSandbox(elements = {}) {
         document: {
             createElement: () => ({ appendChild() {}, className: '', textContent: '' }),
             createTextNode: (text) => ({ textContent: text }),
-            getElementById: (id) => elements[id] || null
+            getElementById: (id) => elements[id] || null,
         },
         setTimeout: (callback) => {
             timerCallbacks.push(callback);
@@ -30,11 +31,13 @@ function createSandbox(elements = {}) {
             dataAiTemplates: null,
             errorBus: { event() {}, report() {} },
             haptics: { error() {}, light() {}, success() {} },
-            toast: { sanitize: (error) => String(error?.message || error || ''), show() {} }
-        }
+            toast: { sanitize: (error) => String(error?.message || error || ''), show() {} },
+            aiJsonPure: aiJsonPure.default || aiJsonPure,
+        },
     };
     sandbox.globalThis = sandbox;
     sandbox.toast = sandbox.window.toast;
+    sandbox.aiJsonPure = sandbox.window.aiJsonPure;
     vm.createContext(sandbox);
     vm.runInContext(aiApiSource, sandbox);
     sandbox.window.ai = sandbox.ai;
@@ -53,7 +56,9 @@ test('food.text carries request-scoped routeOverride from the text entry to ai.r
     let setTaskRouteCalls = 0;
     sandbox.ai.resolveTaskConfig = () => ({ enabled: true });
     sandbox.ai.getEffectiveConfig = () => ({ enabled: true });
-    sandbox.ai.setTaskRoute = () => { setTaskRouteCalls += 1; };
+    sandbox.ai.setTaskRoute = () => {
+        setTaskRouteCalls += 1;
+    };
     sandbox.ai.run = async (options) => {
         runCalls.push(options);
         return '[{"name":"鸡胸肉","grams":150,"cal":248,"pro":46,"carb":0,"fat":5}]';
@@ -64,7 +69,7 @@ test('food.text carries request-scoped routeOverride from the text entry to ai.r
         ensureAiRuntime: async () => sandbox.ai,
         normalizeAiFoodItems: (items) => items,
         formatAiDraft: (item) => ({ ...item }),
-        renderAiFoodResults() {}
+        renderAiFoodResults() {},
     };
     await data.aiParseFood({ routeOverride });
 
@@ -87,12 +92,14 @@ test('food.text fallback action retries the captured input once without saving t
     const toastCalls = [];
     let setTaskRouteCalls = 0;
     sandbox.window.aiRoutingPure = {
-        manualFallbackTarget: (value) => value === target ? target : null
+        manualFallbackTarget: (value) => (value === target ? target : null),
     };
     sandbox.window.toast.show = (...args) => toastCalls.push(args);
     sandbox.ai.resolveTaskConfig = () => ({ enabled: true });
     sandbox.ai.getEffectiveConfig = () => ({ enabled: true });
-    sandbox.ai.setTaskRoute = () => { setTaskRouteCalls += 1; };
+    sandbox.ai.setTaskRoute = () => {
+        setTaskRouteCalls += 1;
+    };
     sandbox.ai.parseFood = async (text, options) => {
         parseCalls.push({ text, options });
         if (parseCalls.length === 1) {
@@ -108,7 +115,7 @@ test('food.text fallback action retries the captured input once without saving t
         ensureAiRuntime: async () => sandbox.ai,
         normalizeAiFoodItems: (items) => items,
         formatAiDraft: (item) => ({ ...item }),
-        renderAiFoodResults() {}
+        renderAiFoodResults() {},
     };
 
     await data.aiParseFood();
@@ -134,12 +141,14 @@ test('food.text ordinary failures do not expose an unconfirmed fallback action',
     const toastCalls = [];
     sandbox.window.toast.show = (...args) => toastCalls.push(args);
     sandbox.ai.getEffectiveConfig = () => ({ enabled: true });
-    sandbox.ai.parseFood = async () => { throw new SyntaxError('AI 返回格式异常'); };
+    sandbox.ai.parseFood = async () => {
+        throw new SyntaxError('AI 返回格式异常');
+    };
     const data = {
         ...sandbox.__foodLog,
         ensureAiRuntime: async () => sandbox.ai,
         normalizeAiFoodItems: (items) => items,
-        renderAiFoodResults() {}
+        renderAiFoodResults() {},
     };
 
     await data.aiParseFood();
@@ -150,7 +159,11 @@ test('food.text ordinary failures do not expose an unconfirmed fallback action',
 test('food.vision carries the same in-memory image and routeOverride to ai.run', async () => {
     const sandbox = createSandbox();
     sandbox.window.aiVisionPure = {
-        classifyVisionError: (error) => ({ type: 'unknown', message: error?.message || '', isErrorToast: true })
+        classifyVisionError: (error) => ({
+            type: 'unknown',
+            message: error?.message || '',
+            isErrorToast: true,
+        }),
     };
     vm.runInContext(healthDietSource, sandbox);
 
@@ -160,15 +173,21 @@ test('food.vision carries the same in-memory image and routeOverride to ai.run',
     const clearedFailures = [];
     let setTaskRouteCalls = 0;
     sandbox.ai.resolveTaskConfig = () => ({ enabled: true });
-    sandbox.ai.getEffectiveConfig = () => ({ enabled: true, provider: 'openai', model: 'vision-model' });
+    sandbox.ai.getEffectiveConfig = () => ({
+        enabled: true,
+        provider: 'openai',
+        model: 'vision-model',
+    });
     sandbox.ai._isHeicFile = () => false;
     sandbox.ai.clearVisionFailure = (...args) => clearedFailures.push(args);
-    sandbox.ai.setTaskRoute = () => { setTaskRouteCalls += 1; };
+    sandbox.ai.setTaskRoute = () => {
+        setTaskRouteCalls += 1;
+    };
     sandbox.ai.run = async (options) => {
         runCalls.push(options);
         return {
             text: '[{"name":"米饭","grams":150,"cal":174,"pro":4,"carb":39,"fat":1}]',
-            meta: { provider: 'backup-provider', modelId: 'backup-vision' }
+            meta: { provider: 'backup-provider', modelId: 'backup-vision' },
         };
     };
 
@@ -180,7 +199,7 @@ test('food.vision carries the same in-memory image and routeOverride to ai.run',
         normalizeAiFoodItems: (items) => items,
         formatAiDraft: (item) => ({ ...item }),
         renderAiFoodResults() {},
-        dietPhotoTitle: () => '拍照识别'
+        dietPhotoTitle: () => '拍照识别',
     };
     await data.handleDietPhoto(imageFile, { routeOverride });
 
@@ -201,10 +220,16 @@ test('food.vision fallback reuses the same File once with a fresh controller and
             this.signal = { aborted: false };
             controllers.push(this);
         }
-        abort() { this.signal.aborted = true; }
+        abort() {
+            this.signal.aborted = true;
+        }
     };
     sandbox.window.aiVisionPure = {
-        classifyVisionError: (error) => ({ type: 'network', message: error.message, isErrorToast: true })
+        classifyVisionError: (error) => ({
+            type: 'network',
+            message: error.message,
+            isErrorToast: true,
+        }),
     };
     vm.runInContext(healthDietSource, sandbox);
 
@@ -213,16 +238,24 @@ test('food.vision fallback reuses the same File once with a fresh controller and
     const parseCalls = [];
     const toastCalls = [];
     let setTaskRouteCalls = 0;
-    sandbox.window.aiRoutingPure = { manualFallbackTarget: (value) => value === target ? target : null };
+    sandbox.window.aiRoutingPure = {
+        manualFallbackTarget: (value) => (value === target ? target : null),
+    };
     sandbox.window.toast.show = (...args) => toastCalls.push(args);
-    sandbox.ai.getEffectiveConfig = () => ({ enabled: true, provider: 'openai', model: 'primary-vision' });
+    sandbox.ai.getEffectiveConfig = () => ({
+        enabled: true,
+        provider: 'openai',
+        model: 'primary-vision',
+    });
     sandbox.ai._isHeicFile = () => false;
-    sandbox.ai.setTaskRoute = () => { setTaskRouteCalls += 1; };
+    sandbox.ai.setTaskRoute = () => {
+        setTaskRouteCalls += 1;
+    };
     sandbox.ai.parseFoodFromImage = async (file, options) => {
         parseCalls.push({ file, options });
         if (parseCalls.length === 1) {
             throw Object.assign(new Error('主模型暂时不可用'), {
-                aiFallback: { taskId: 'food.vision', target }
+                aiFallback: { taskId: 'food.vision', target },
             });
         }
         options.onResolvedMeta?.({ provider: 'backup-provider', modelId: 'backup-vision' });
@@ -237,7 +270,7 @@ test('food.vision fallback reuses the same File once with a fresh controller and
         normalizeAiFoodItems: (items) => items,
         formatAiDraft: (item) => ({ ...item }),
         renderAiFoodResults() {},
-        dietPhotoTitle: () => '拍照识别'
+        dietPhotoTitle: () => '拍照识别',
     };
 
     await data.handleDietPhoto(imageFile);
@@ -257,7 +290,11 @@ test('food.vision fallback reuses the same File once with a fresh controller and
 test('food.vision fallback releases its File when the toast expires', async () => {
     const sandbox = createSandbox();
     sandbox.window.aiVisionPure = {
-        classifyVisionError: (error) => ({ type: 'network', message: error.message, isErrorToast: true })
+        classifyVisionError: (error) => ({
+            type: 'network',
+            message: error.message,
+            isErrorToast: true,
+        }),
     };
     vm.runInContext(healthDietSource, sandbox);
 
@@ -267,11 +304,17 @@ test('food.vision fallback releases its File when the toast expires', async () =
     let parseCalls = 0;
     sandbox.window.aiRoutingPure = { manualFallbackTarget: () => target };
     sandbox.window.toast.show = (...args) => toastCalls.push(args);
-    sandbox.ai.getEffectiveConfig = () => ({ enabled: true, provider: 'openai', model: 'primary-vision' });
+    sandbox.ai.getEffectiveConfig = () => ({
+        enabled: true,
+        provider: 'openai',
+        model: 'primary-vision',
+    });
     sandbox.ai._isHeicFile = () => false;
     sandbox.ai.parseFoodFromImage = async () => {
         parseCalls += 1;
-        throw Object.assign(new Error('主模型暂时不可用'), { aiFallback: { taskId: 'food.vision', target } });
+        throw Object.assign(new Error('主模型暂时不可用'), {
+            aiFallback: { taskId: 'food.vision', target },
+        });
     };
 
     const data = {
@@ -279,7 +322,7 @@ test('food.vision fallback releases its File when the toast expires', async () =
         ensureAiRuntime: async () => sandbox.ai,
         getDietPhotoSupportInfo: () => ({ supported: true }),
         setDietPhotoStatus() {},
-        dietPhotoTitle: () => '拍照识别'
+        dietPhotoTitle: () => '拍照识别',
     };
     await data.handleDietPhoto(imageFile);
     const fallbackToast = toastCalls.find((call) => call[3]?.label === '使用备用模型重试');
@@ -296,8 +339,8 @@ test('food.vision records failures against the request-scoped model without reta
             type: 'unsupported',
             message: error.message,
             isErrorToast: true,
-            cacheVisionFailure: true
-        })
+            cacheVisionFailure: true,
+        }),
     };
     vm.runInContext(healthDietSource, sandbox);
 
@@ -307,18 +350,20 @@ test('food.vision records failures against the request-scoped model without reta
     sandbox.ai.resolveTaskConfig = (_taskId, override) => ({
         enabled: true,
         provider: override === routeOverride ? 'backup-provider' : 'primary-provider',
-        modelId: override?.modelId || 'primary-vision'
+        modelId: override?.modelId || 'primary-vision',
     });
     sandbox.ai._isHeicFile = () => false;
     sandbox.ai.markVisionFailure = (...args) => failureCalls.push(args);
-    sandbox.ai.parseFoodFromImage = async () => { throw new Error('模型不支持图片'); };
+    sandbox.ai.parseFoodFromImage = async () => {
+        throw new Error('模型不支持图片');
+    };
 
     const data = {
         ...sandbox.window.dataHealthDiet,
         ensureAiRuntime: async () => sandbox.ai,
         getDietPhotoSupportInfo: () => ({ supported: true }),
         setDietPhotoStatus() {},
-        dietPhotoTitle: () => '拍照识别'
+        dietPhotoTitle: () => '拍照识别',
     };
     await data.handleDietPhoto(imageFile, { routeOverride });
 
@@ -338,18 +383,25 @@ test('food.vision cancellation exposes no fallback and does not persist or log t
     sandbox.console = {
         log: (...args) => logs.push(args),
         warn: (...args) => logs.push(args),
-        error: (...args) => logs.push(args)
+        error: (...args) => logs.push(args),
     };
     sandbox.window.data.db = { health: {} };
-    sandbox.window.errorBus = { event: (...args) => reported.push(args), report: (...args) => reported.push(args) };
+    sandbox.window.errorBus = {
+        event: (...args) => reported.push(args),
+        report: (...args) => reported.push(args),
+    };
     sandbox.window.sync = { push: (...args) => synced.push(args) };
     sandbox.window.backup = { export: (...args) => backedUp.push(args) };
     sandbox.localStorage = { getItem: () => null, setItem: (...args) => persisted.push(args) };
     sandbox.window.aiVisionPure = {
-        classifyVisionError: () => ({ type: 'cancelled', message: '已取消', isErrorToast: false })
+        classifyVisionError: () => ({ type: 'cancelled', message: '已取消', isErrorToast: false }),
     };
     sandbox.window.toast.show = (...args) => toastCalls.push(args);
-    sandbox.ai.getEffectiveConfig = () => ({ enabled: true, provider: 'openai', model: 'primary-vision' });
+    sandbox.ai.getEffectiveConfig = () => ({
+        enabled: true,
+        provider: 'openai',
+        model: 'primary-vision',
+    });
     sandbox.ai._isHeicFile = () => false;
     sandbox.ai.parseFoodFromImage = async () => {
         throw Object.assign(new Error('aborted'), { name: 'AbortError' });
@@ -361,11 +413,14 @@ test('food.vision cancellation exposes no fallback and does not persist or log t
         ensureAiRuntime: async () => sandbox.ai,
         getDietPhotoSupportInfo: () => ({ supported: true }),
         setDietPhotoStatus() {},
-        dietPhotoTitle: () => '拍照识别'
+        dietPhotoTitle: () => '拍照识别',
     };
     await data.handleDietPhoto(imageFile);
 
-    assert.equal(toastCalls.some((call) => call[3]?.label === '使用备用模型重试'), false);
+    assert.equal(
+        toastCalls.some((call) => call[3]?.label === '使用备用模型重试'),
+        false,
+    );
     assert.equal(JSON.stringify(sandbox.window.data.db).includes(imageFile.name), false);
     assert.deepEqual(persisted, []);
     assert.deepEqual(reported, []);

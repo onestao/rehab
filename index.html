@@ -34,7 +34,7 @@
         (function installNonBlockingStartup() {
             'use strict';
 
-            const releaseVersion = '345';
+            const releaseVersion = '354';
             let applicationLaunchStarted = false;
 
             function acknowledgeReleasePage() {
@@ -392,7 +392,7 @@
         })();
         /* APP_STARTUP_NON_BLOCKING_BOOT_END */
     </script>
-    <link data-rehab-stylesheet="primary" data-href="build/generated.css?v=345">
+    <link data-rehab-stylesheet="primary" data-href="build/generated.css?v=354">
 </head>
 <body>
     <div id="appUpdateBanner" class="app-update-banner hidden">
@@ -788,7 +788,7 @@
         (function earlyUpgradeOverlay() {
             try {
                 const url = new URL(window.location.href);
-                if (url.searchParams.get('__rehab_upgrade') !== '345') return;
+                if (url.searchParams.get('__rehab_upgrade') !== '354') return;
                 const el = document.createElement('div');
                 el.id = 'rehabUpgradeOverlay';
                 el.setAttribute('role', 'alertdialog');
@@ -808,26 +808,26 @@
         })();
     </script>
 
-    <script data-rehab-entry data-kind="classic" data-src="m3e-ripple.js?v=345"></script>
-    <script data-rehab-entry data-kind="classic" data-src="toast.js?v=345"></script>
-    <script data-rehab-entry data-kind="classic" data-src="error-bus.js?v=345"></script>
-    <script data-rehab-entry data-kind="classic" data-src="i18n.js?v=345"></script>
-    <script data-rehab-entry data-kind="classic" data-src="theme.js?v=345"></script>
-    <script data-rehab-entry data-kind="classic" data-src="render-safe.js?v=345"></script>
-    <script data-rehab-entry data-kind="classic" data-src="nav-stack.js?v=345"></script>
-    <script data-rehab-entry data-kind="classic" data-src="app-route.js?v=345"></script>
-    <script data-rehab-entry data-kind="module" data-src="data-utils-pure.js?v=345"></script>
-    <script data-rehab-entry data-kind="module" data-src="action-identity.js?v=345"></script>
-    <script data-rehab-entry data-kind="classic" data-src="data-utils.js?v=345"></script>
-    <script data-rehab-entry data-kind="classic" data-src="storage/idb.js?v=345"></script>
-    <script data-rehab-entry data-kind="classic" data-src="storage/migrate.js?v=345"></script>
-    <script data-rehab-entry data-kind="classic" data-src="data-records.js?v=345"></script>
-    <script data-rehab-entry data-kind="classic" data-src="data-schema.js?v=345"></script>
-    <script data-rehab-entry data-kind="classic" data-src="data-store.js?v=345"></script>
-    <script data-rehab-entry data-kind="classic" data-src="data-ui-state.js?v=345"></script>
-    <script data-rehab-entry data-kind="classic" data-src="data-views.js?v=345"></script>
-    <script data-rehab-entry data-kind="classic" data-src="data.js?v=345"></script>
-    <script data-rehab-entry data-kind="classic" data-src="sync-status.js?v=345"></script>
+    <script data-rehab-entry data-kind="classic" data-src="m3e-ripple.js?v=354"></script>
+    <script data-rehab-entry data-kind="classic" data-src="toast.js?v=354"></script>
+    <script data-rehab-entry data-kind="classic" data-src="error-bus.js?v=354"></script>
+    <script data-rehab-entry data-kind="classic" data-src="i18n.js?v=354"></script>
+    <script data-rehab-entry data-kind="classic" data-src="theme.js?v=354"></script>
+    <script data-rehab-entry data-kind="classic" data-src="render-safe.js?v=354"></script>
+    <script data-rehab-entry data-kind="classic" data-src="nav-stack.js?v=354"></script>
+    <script data-rehab-entry data-kind="classic" data-src="app-route.js?v=354"></script>
+    <script data-rehab-entry data-kind="module" data-src="data-utils-pure.js?v=354"></script>
+    <script data-rehab-entry data-kind="module" data-src="action-identity.js?v=354"></script>
+    <script data-rehab-entry data-kind="classic" data-src="data-utils.js?v=354"></script>
+    <script data-rehab-entry data-kind="classic" data-src="storage/idb.js?v=354"></script>
+    <script data-rehab-entry data-kind="classic" data-src="storage/migrate.js?v=354"></script>
+    <script data-rehab-entry data-kind="classic" data-src="data-records.js?v=354"></script>
+    <script data-rehab-entry data-kind="classic" data-src="data-schema.js?v=354"></script>
+    <script data-rehab-entry data-kind="classic" data-src="data-store.js?v=354"></script>
+    <script data-rehab-entry data-kind="classic" data-src="data-ui-state.js?v=354"></script>
+    <script data-rehab-entry data-kind="classic" data-src="data-views.js?v=354"></script>
+    <script data-rehab-entry data-kind="classic" data-src="data.js?v=354"></script>
+    <script data-rehab-entry data-kind="classic" data-src="sync-status.js?v=354"></script>
     <div id="weightModal" class="md-modal md-modal-sheet hidden" aria-hidden="true">
         <div class="md-modal-backdrop" onclick="data.closeWeightModal()"></div>
         <div class="md-modal-card md-modal-sheet-card">
@@ -1159,10 +1159,10 @@
     </div>
     <script type="text/plain" id="rehab-app-main">
         const PAGE_DEPS = {
-            workout: ['voice-engine','voice-cache','voice-webspeech-adapter','voice-legado-adapter','workout-voice','workout-readiness','strength-form','weekly-plan','action-history','plan-chains','plan-progression','plan-store','plan-feedback','plan-cooldown','plan-auto-adjust','plan-weekly','plan-equipment','plan-ui','workout-system','workout-pip','workout-core','workout-cardio-pure','workout-cardio','workout-engine','workout-state','swipe-actions','routine-plan','routine-library','workout-wakelock','workout-media-session','ai-store','ai-profile','ai-routing-pure','ai-routing','ai-api','ai-task-settings'],
-            'ai-coach': ['lib/virtual-core.umd','ai-store','ai-profile','ai-model-catalog-pure','ai-model-cache','ai-models','ai-routing-pure','ai-routing','ai-api','ai-task-settings','ai-provider-manager','ai-pricing','ai-templates','advice-template-manager','advice-rules','plan-analytics','advice-panel','coach-context','advice-attachments','advice-render','advice-prompt','advice-stream-renderer','routine-library','plan-chains','plan-progression','plan-store','plan-ai-pure','plan-ai'],
-            profile: ['voice-engine','voice-cache','voice-webspeech-adapter','voice-legado-adapter','workout-voice','credential-fields','weekly-plan','backup','sync-ui','sync-adapters','sync','routine-library','goal-plan','report-version-pure','weekly-summary','plan-chains','plan-progression','plan-store','plan-equipment','plan-ui','ai-store','ai-profile','ai-model-catalog-pure','ai-model-cache','ai-models','ai-routing-pure','ai-routing','ai-api','ai-task-settings','ai-provider-manager'],
-            records: ['history-view','report-version-pure','weekly-summary','health-diet','health-weight','health-profile','health-exercise','goal-plan','routine-library','food-ai-normalizer-pure','food-log','pr-tracker','volume-heatmap','action-history','report-metrics-pure','report-panel','plan-chains','plan-progression','plan-store','plan-weekly','plan-ui','ai-store','ai-profile','ai-model-catalog-pure','ai-model-cache','ai-models','ai-routing-pure','ai-routing','ai-api','ai-task-settings'],
+            workout: ['voice-engine','voice-cache','voice-webspeech-adapter','voice-legado-adapter','workout-voice','workout-readiness','strength-form','weekly-plan','action-history','plan-chains','plan-progression','plan-store','plan-feedback','plan-cooldown','plan-auto-adjust','plan-weekly','plan-equipment','plan-ui','workout-system','workout-pip','workout-core','workout-cardio-pure','workout-cardio','workout-engine','workout-state','swipe-actions','routine-plan','routine-library','workout-wakelock','workout-media-session','ai-store','ai-profile','ai-routing-pure','ai-routing','ai-json-pure','ai-api','ai-task-settings'],
+            'ai-coach': ['lib/virtual-core.umd','ai-store','ai-profile','ai-model-catalog-pure','ai-model-cache','ai-models','ai-routing-pure','ai-routing','ai-json-pure','ai-api','ai-task-settings','ai-provider-manager','ai-pricing','ai-templates','advice-template-manager','advice-rules','plan-analytics','advice-panel','coach-context','advice-attachments','advice-render','advice-prompt','advice-stream-renderer','routine-library','plan-chains','plan-progression','plan-store','plan-ai-pure','plan-ai'],
+            profile: ['voice-engine','voice-cache','voice-webspeech-adapter','voice-legado-adapter','workout-voice','credential-fields','weekly-plan','backup','sync-ui','sync-adapters','sync','routine-library','goal-plan','report-version-pure','weekly-summary','plan-chains','plan-progression','plan-store','plan-equipment','plan-ui','ai-store','ai-profile','ai-model-catalog-pure','ai-model-cache','ai-models','ai-routing-pure','ai-routing','ai-json-pure','ai-api','ai-task-settings','ai-provider-manager'],
+            records: ['history-view','report-version-pure','weekly-summary','health-diet','health-weight','health-profile','health-exercise','goal-plan','routine-library','food-ai-normalizer-pure','food-log','pr-tracker','volume-heatmap','action-history','report-metrics-pure','report-panel','plan-chains','plan-progression','plan-store','plan-weekly','plan-ui','ai-store','ai-profile','ai-model-catalog-pure','ai-model-cache','ai-models','ai-routing-pure','ai-routing','ai-json-pure','ai-api','ai-task-settings'],
             today: ['history-view', 'today-view-core']
         };
         const CSS_DEPS = {
@@ -1173,8 +1173,8 @@
         const _loadingPromises = new Map();
         const _loadedCss = new Set();
         const _loadingCssPromises = new Map();
-        const MODULE_SCRIPTS = new Set(['data-utils-pure','action-identity','sync-pure','workout-cardio-pure','voice-engine','report-metrics-pure','ai-vision-pure','ai-model-catalog-pure','ai-routing-pure','backup-ring-pure','backup-import-pure','mi-scale-pure']);
-        const MJS_SCRIPTS = new Set(['ai-vision-pure','ai-model-catalog-pure','ai-routing-pure']);
+        const MODULE_SCRIPTS = new Set(['data-utils-pure','action-identity','sync-pure','workout-cardio-pure','voice-engine','report-metrics-pure','ai-vision-pure','ai-model-catalog-pure','ai-routing-pure','ai-json-pure','backup-ring-pure','backup-import-pure','mi-scale-pure']);
+        const MJS_SCRIPTS = new Set(['ai-vision-pure','ai-model-catalog-pure','ai-routing-pure','ai-json-pure']);
         const SCRIPT_PREREQUISITES = {
             'history-view': ['health-summary-pure'],
             'today-view-core': ['health-summary-pure'],
@@ -1185,7 +1185,7 @@
             'ai-model-cache': ['ai-store','ai-model-catalog-pure'],
             'ai-models': ['ai-store','ai-profile','ai-model-cache','ai-vision-pure'],
             'ai-routing': ['ai-store','ai-profile','ai-model-cache','ai-routing-pure'],
-            'ai-api': ['ai-store','ai-profile','ai-routing'],
+            'ai-api': ['ai-store','ai-profile','ai-routing','ai-json-pure'],
             'ai-task-settings': ['ai-model-visual','ai-routing','ai-models'],
             'ai-provider-manager': ['ai-profile','ai-model-cache','ai-models','ai-routing','ai-task-settings'],
             'data-utils': ['render-safe'],
@@ -1332,7 +1332,7 @@
             return true;
         }
         window.claimServiceWorkerReload = claimServiceWorkerReload;
-        const SERVICE_WORKER_CONTROLLER_RELOAD_KEY = 'rehab-sw-controller-reload-v345';
+        const SERVICE_WORKER_CONTROLLER_RELOAD_KEY = 'rehab-sw-controller-reload-v354';
         void SERVICE_WORKER_CONTROLLER_RELOAD_KEY;
         function scheduleServiceWorkerRegistration() {
             if (scheduleServiceWorkerRegistration._scheduled) return;
@@ -1359,7 +1359,7 @@
                     return;
                 }
                 const script = document.createElement('script');
-                script.src = (typeof window.resolveAssetUrl === 'function' ? window.resolveAssetUrl('app-update.js?v=345') : 'app-update.js?v=345');
+                script.src = (typeof window.resolveAssetUrl === 'function' ? window.resolveAssetUrl('app-update.js?v=354') : 'app-update.js?v=354');
                 script.async = true;
                 script.dataset.rehabAppUpdate = '1';
                 script.onload = () => resolve(window.appUpdate);
@@ -1371,11 +1371,11 @@
                 try {
                     // Do not re-register / normalize while an intentional SW navigate is in flight.
                     try {
-                        if (new URL(window.location.href).searchParams.get('__rehab_upgrade') === '345') {
+                        if (new URL(window.location.href).searchParams.get('__rehab_upgrade') === '354') {
                             return;
                         }
                     } catch {}
-                    const registration = await navigator.serviceWorker.register('./sw.js?v=345', { updateViaCache: 'none' });
+                    const registration = await navigator.serviceWorker.register('./sw.js?v=354', { updateViaCache: 'none' });
                     await registration.update?.();
                     // Never auto-activate a waiting worker here. Quiet registration only discovers
                     // updates; activation must wait for explicit user apply (or the post-apply
@@ -1391,7 +1391,7 @@
                                 return null;
                             }
                         })();
-                        const alreadyCurrent = controllerUrl && controllerUrl.searchParams.get('v') === '345';
+                        const alreadyCurrent = controllerUrl && controllerUrl.searchParams.get('v') === '354';
                         // Bare controllers are normal for legacy installs until the user applies.
                         // Only suppress the banner when the controller scriptURL is already versioned.
                         if (!alreadyCurrent) {
@@ -1463,7 +1463,7 @@
             const p = new Promise((res, rej) => {
                 const link = document.createElement('link');
                 link.rel = 'stylesheet';
-                link.href = (typeof window.resolveAssetUrl === 'function' ? window.resolveAssetUrl(`css-src/${name}.css?v=345`) : `css-src/${name}.css?v=345`);
+                link.href = (typeof window.resolveAssetUrl === 'function' ? window.resolveAssetUrl(`css-src/${name}.css?v=354`) : `css-src/${name}.css?v=354`);
                 link.dataset.appCss = name;
                 link.onload = () => {
                     link.dataset.loaded = 'true';
@@ -1546,7 +1546,7 @@
                 };
                 if (MODULE_SCRIPTS.has(name)) s.type = 'module';
                 const ext = MJS_SCRIPTS.has(name) ? '.mjs' : '.js';
-                let href = `${name}${ext}?v=345`;
+                let href = `${name}${ext}?v=354`;
                 if (forceReload) href += `&_rl=${Date.now()}`;
                 s.src = (typeof window.resolveAssetUrl === 'function' ? window.resolveAssetUrl(href) : href);
                 s.onload = () => settle();

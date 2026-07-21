@@ -38,24 +38,6 @@
         return start;
     }
 
-    function parseReportAiText(text, fallback = {}) {
-        const raw = String(text || '').trim();
-        const jsonText = raw.match(/```json\s*([\s\S]*?)```/i)?.[1] || raw.match(/\{[\s\S]*\}/)?.[0] || '';
-        if (jsonText) {
-            try {
-                const parsed = JSON.parse(jsonText);
-                return {
-                    ...fallback,
-                    summary: String(parsed.summary || fallback.summary || '').trim(),
-                    highlights: Array.isArray(parsed.highlights) ? parsed.highlights.map(String).filter(Boolean).slice(0, 3) : fallback.highlights,
-                    suggestions: Array.isArray(parsed.suggestions) ? parsed.suggestions.map(String).filter(Boolean).slice(0, 3) : fallback.suggestions,
-                    raw
-                };
-            } catch {}
-        }
-        return { ...fallback, summary: raw.slice(0, 240) || fallback.summary, raw };
-    }
-
     window.dataReport = {
         openWeightReport(kind = 'weekly') {
             this.db.health.reports = this.db.health.reports || [];
@@ -157,17 +139,55 @@
             if (useAi) {
                 try {
                     if (!window.ai?.cfg?.enabled && !this.db?.aiProfiles?.length) throw new Error('请先在设置中配置 AI');
+                    if (typeof window.ai?.runJson !== 'function') {
+                        const err = new Error('AI JSON 运行时不可用，请刷新后重试。');
+                        err.code = 'AI_JSON_RUNTIME_UNAVAILABLE';
+                        throw err;
+                    }
                     const context = this.buildPeriodReportContext?.(metrics.periodStart, metrics.periodEnd) || '';
                     const messages = [
                         { role: 'system', content: '你是严谨的体重、饮食和训练复盘助手。必须只依据用户提供的周期数据。返回严格 JSON：{"summary":"≤100字","highlights":["≤3条"],"suggestions":["≤3条"]}。不要编造不存在的数据。' },
                         { role: 'user', content: `请生成${kind === 'monthly' ? '月' : '周'}体重复盘。\n\n【聚合指标】\n${JSON.stringify(metrics.metrics, null, 2)}\n\n${context}` }
                     ];
                     const taskId = kind === 'monthly' ? 'report.weight.monthly' : 'report.weight.weekly';
-                    const result = window.ai?.run
-                        ? await window.ai.run({ taskId, messages, maxTokens: 1800, returnMeta: true, routeOverride: opts.routeOverride || null })
-                        : await window.ai.call(messages, 1800);
-                    const resultMeta = window.reportVersionPure.metaFromResult(result, window.ai?.resolveTaskConfig?.(taskId) || window.ai?.getEffectiveConfig?.() || {});
-                    ai = parseReportAiText(resultMeta.text, ai);
+                    const parseOptions = {
+                        expected: 'object',
+                        requiredKeys: ['summary', 'highlights', 'suggestions'],
+                        fieldTypes: {
+                            summary: 'string',
+                            highlights: 'array',
+                            suggestions: 'array'
+                        }
+                    };
+                    const result = await window.ai.runJson({
+                        taskId,
+                        messages,
+                        maxTokens: 1800,
+                        returnMeta: true,
+                        routeOverride: opts.routeOverride || null,
+                        parseOptions
+                    });
+                    const parsed = result?.value || null;
+                    if (!parsed || typeof parsed !== 'object') {
+                        const err = new Error('AI 返回的 JSON 缺少当前功能所需字段，请切换模型后重试。');
+                        err.code = 'AI_JSON_SHAPE_MISMATCH';
+                        throw err;
+                    }
+                    const resultMeta = window.reportVersionPure.metaFromResult(
+                        { text: JSON.stringify(parsed), meta: result?.meta || {} },
+                        window.ai?.resolveTaskConfig?.(taskId) || window.ai?.getEffectiveConfig?.() || {}
+                    );
+                    ai = {
+                        ...ai,
+                        summary: String(parsed.summary || '').trim(),
+                        highlights: Array.isArray(parsed.highlights) ? parsed.highlights.map(String).filter(Boolean).slice(0, 3) : [],
+                        suggestions: Array.isArray(parsed.suggestions) ? parsed.suggestions.map(String).filter(Boolean).slice(0, 3) : []
+                    };
+                    if (!ai.summary) {
+                        const err = new Error('AI 返回的 JSON 缺少当前功能所需字段，请切换模型后重试。');
+                        err.code = 'AI_JSON_SHAPE_MISMATCH';
+                        throw err;
+                    }
                     ai.model = resultMeta.model || ai.model || 'ai';
                     ai.profileId = resultMeta.profileId || '';
                     ai.reasoningEffort = resultMeta.reasoningEffort || '';

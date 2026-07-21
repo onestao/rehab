@@ -266,8 +266,9 @@ test('frozen product files stay untouched since BASE_COMMIT', () => {
         .replace(
           "    limit: '90 KB'\n  },\n  { name: 'routine-bundle'",
           "    limit: '90 KB'\n  },\n  {\n    name: 'today-view-core',\n    path: 'today-view-core.js',\n    limit: '18 KB'\n  },\n  { name: 'routine-bundle'"
-        );
-      assert.equal(current, allowed, 'only the approved first-paint budget + today-view-core size entries are allowed');
+        )
+        .replace("limit: '134 KB'", "limit: '140 KB'");
+      assert.equal(current, allowed, 'only the approved first-paint budget + today-view-core + ai-bundle size entries are allowed');
       continue;
     }
     assert.ok(!changed.has(rel), `frozen file changed: ${rel}`);

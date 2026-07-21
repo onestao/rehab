@@ -21,6 +21,7 @@ declare const swipeActions: any;
 declare const errorBus: any;
 declare const miScalePure: any;
 declare const miScaleBluetooth: any;
+declare const aiJsonPure: any;
 
 interface Window {
   data: any;
@@ -69,6 +70,7 @@ interface Window {
   adviceAttachments: any;
   aiPricing: any;
   aiRoutingPure: any;
+  aiJsonPure: any;
   aiModelCatalogPure: any;
   aiTaskSettings: any;
   syncPure: any;
