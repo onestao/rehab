@@ -10,6 +10,9 @@ const testDir = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(testDir, '..');
 const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 const appUpdateSource = fs.readFileSync(path.join(root, 'app-update.js'), 'utf8');
+const releaseVersion = (html.match(/const releaseVersion = ['"](\d+)['"]/) || appUpdateSource.match(/version:\s*['"](\d+)['"]/) || [])[1];
+assert.ok(releaseVersion, 'release version missing');
+const v = releaseVersion;
 
 function extractBetween(source, start, end) {
     const from = source.indexOf(start);
@@ -47,8 +50,8 @@ function createClaimHarness() {
 }
 
 function createAppUpdateHarness({
-    controllerScriptURL = 'https://example.test/sw.js?v=355',
-    scriptSources = ['https://example.test/data.js?v=355']
+    controllerScriptURL = `https://example.test/sw.js?v=${v}`,
+    scriptSources = [`https://example.test/data.js?v=${v}`]
 } = {}) {
     const reloads = [];
     const documentScripts = scriptSources.map((src) => ({ src }));
@@ -98,7 +101,7 @@ function createAppUpdateHarness({
 test('claimServiceWorkerReload is per-document and does not use shared sessionStorage', () => {
     const first = createClaimHarness();
     const second = createClaimHarness();
-    const key = 'rehab-sw-controller-reload-v355';
+    const key = `rehab-sw-controller-reload-v${v}`;
 
     assert.equal(first.claim(key), true);
     assert.equal(first.claim(key), false, 'same document cannot claim twice');
@@ -119,13 +122,13 @@ test('appUpdate claim fallback stays per-instance, never session-wide', () => {
 
 test('documentNeedsControllerReload skips reload when scripts already match target version', () => {
     const current = createAppUpdateHarness({
-        controllerScriptURL: 'https://example.test/sw.js?v=355',
-        scriptSources: ['https://example.test/data.js?v=355']
+        controllerScriptURL: `https://example.test/sw.js?v=${v}`,
+        scriptSources: [`https://example.test/data.js?v=${v}`]
     });
     assert.equal(current.needsReload(), false);
 
     const stale = createAppUpdateHarness({
-        controllerScriptURL: 'https://example.test/sw.js?v=355',
+        controllerScriptURL: `https://example.test/sw.js?v=${v}`,
         scriptSources: ['https://example.test/data.js?v=328']
     });
     assert.equal(stale.needsReload(), true);

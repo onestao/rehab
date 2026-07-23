@@ -881,6 +881,8 @@
     });
 
     try {
-        window.dataUiState.bindHealthCssIntent?.call(window.dataUiState);
+        if (!window.__rehabHealthCssIntentBound) {
+            window.dataUiState.bindHealthCssIntent?.call(window.dataUiState);
+        }
     } catch {}
 })();

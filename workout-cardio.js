@@ -203,6 +203,7 @@ const cardio = {
 
     reset() {
         clearInterval(this.timer);
+        this.timer = null;
         this.isRunning = false;
         this.isPaused = false;
         this.seconds = 0;
@@ -211,6 +212,7 @@ const cardio = {
         workout.isPaused = false;
         workout.totalSec = 0;
         clearInterval(workout._speechWatchdog); clearInterval(workout._audioKeepAliveInt);
+        workout._speechWatchdog = null; workout._audioKeepAliveInt = null;
         workout.closePip();
         (window.workoutVoice?.cancel?.() ?? window.speechSynthesis.cancel());
         if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'none';

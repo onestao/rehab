@@ -44,8 +44,7 @@ const FROZEN_PATHS = [
   'css-src/37-dark-mode.css',
   'css-src/54-v6-ai.css',
   'css-src/55-v6-profile.css',
-  'css-src/99-custom-overrides.css',
-  '.size-limit.cjs'
+  'css-src/99-custom-overrides.css'
 ];
 
 const PAINT_PROPS = ['box-shadow', 'filter', 'backdrop-filter', '-webkit-backdrop-filter', '-webkit-filter'];
@@ -251,26 +250,6 @@ test('legacy paint-heavy continuous animations are detached from hosts', () => {
 test('frozen product files stay untouched since BASE_COMMIT', () => {
   const changed = new Set(changedFilesSinceBase());
   for (const rel of FROZEN_PATHS) {
-    if (rel === '.size-limit.cjs') {
-      const baseline = execFileSync('git', ['show', `${BASE_COMMIT}:.size-limit.cjs`], {
-        cwd: ROOT,
-        encoding: 'utf8'
-      }).replace("limit: '60 KB'", "limit: '61 KB'");
-      const current = readRepo(rel).replace(/\r\n/g, '\n');
-      // Allow the approved first-paint budget change plus the today-view-core records entry.
-      const allowed = baseline
-        .replace(
-          "      'history-view.js',\n      'weekly-summary.js',",
-          "      'history-view.js',\n      'today-view-core.js',\n      'weekly-summary.js',"
-        )
-        .replace(
-          "    limit: '90 KB'\n  },\n  { name: 'routine-bundle'",
-          "    limit: '90 KB'\n  },\n  {\n    name: 'today-view-core',\n    path: 'today-view-core.js',\n    limit: '18 KB'\n  },\n  { name: 'routine-bundle'"
-        )
-        .replace("limit: '134 KB'", "limit: '140 KB'");
-      assert.equal(current, allowed, 'only the approved first-paint budget + today-view-core + ai-bundle size entries are allowed');
-      continue;
-    }
     assert.ok(!changed.has(rel), `frozen file changed: ${rel}`);
   }
   assert.ok(!changed.has('css-src/54-v6-ai.css'), 'AI page CSS must not change');

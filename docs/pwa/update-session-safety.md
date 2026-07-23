@@ -1,47 +1,62 @@
-# Update + Session Safety (v342)
+# Update + Session Safety
 
-Prevents mid-rehab forced reload when a new Service Worker is ready.
+Prevents Service Worker activation and legacy migration from reloading a client
+while it owns active training state, pending persistence, or unsaved edits.
 
-## Active session definition
+## Update blocker classification
 
-`appUpdate.hasActiveRehabSession()` is true when any of:
+`appUpdate.getUpdateBlockReason()` returns one of:
 
-- `workout` / `workoutSystem` playing, paused, phase timer, or live intervals
-- `cardio` running / paused with elapsed time
-- `localStorage` key `rehab_active_session` (session journal) present
-- Pending local write / edit drafts / dirty pain-symptom inputs / dirty open modal fields
+| Reason | Source | Journal write |
+| --- | --- | --- |
+| `active-session` | Live workout/cardio state or a recoverable session journal | Yes, for a live workout only |
+| `pending-write` | `_dbDirty`, `_pendingPersistPromise`, or compatibility `_pendingLocalWrite` | No |
+| `unsaved-draft` | Active edit drafts or dirty rehab inputs | No |
 
-## Session journal (H5)
+Residual timer handles, elapsed phase values, `isPaused` without `isPlaying`, and
+`lastActionDraft` parameter memory are not update blockers.
 
-| Field | Source |
-| --- | --- |
-| Storage key | `workoutState.KEY` = `rehab_active_session` |
-| Schema | `schemaVersion: 1`, `journal: 'rehab-session'` |
-| Write | `workoutState.markActive` (visibility hidden), `saveJournal` |
-| Pre-update freeze | `showUpdateDeferredForSession` → `saveJournal({ deferredForUpdate: true })` |
-| Pre-apply flush | `apply()` if journal still `isPlaying` |
-| Restore | `workoutState.restoreIfNeeded()` on init (confirm dialog) |
+## Session journal
 
-## SW coordination
+The shared `rehab_active_session` journal is recoverable only when all schema,
+identity, mode, timestamp, and mode-specific payload checks pass. Both the lazy
+workout module and `app-update.js` apply the same contract. This lets a profile-only
+tab protect a workout running in a sibling tab before `workout-state.js` loads.
 
-Client messages:
+Invalid, malformed, incomplete, expired, or future-dated journals are removed.
+Only a real live workout may write or refresh the journal.
 
-- `UPDATE_DEFER_FOR_SESSION` — client id enters `sessionDeferClientIds`
-- `UPDATE_SESSION_CLEAR` — remove defer after session ends
-- Hard `client.navigate` skip while deferred
+## Service Worker coordination
 
-## User-visible defer
+Every blocked client registers navigation deferral with both the current controller
+and the waiting worker:
 
-- Banner: “更新已就绪（训练中推迟）”
-- Toast: “训练进行中，更新已推迟…”
-- `armSessionClearWatcher` re-shows normal update when session clears
+- `UPDATE_DEFER_FOR_CLIENT` adds the source client to `clientDeferClientIds`.
+- `UPDATE_CLIENT_CLEAR` removes it after all blocker reasons clear.
+- Legacy `UPDATE_DEFER_FOR_SESSION` and `UPDATE_SESSION_CLEAR` remain aliases.
+- `V327_PAGE_READY` also clears the ready client's deferral.
+
+The waiting worker must receive deferral before activation so a sibling tab cannot
+activate it and hard-navigate a blocked client. Deferral is per client: one blocked
+tab does not prevent safe migration of another tab.
+
+## Client lifecycle
+
+When a waiting worker is discovered, `appUpdate.show(worker)` immediately classifies
+the client. A blocked client registers deferral and arms a watcher even when the
+update banner is unavailable. The watcher checks the full blocker classification,
+sends clear only after it becomes `null`, and then restores the normal update UI.
 
 ## Forbidden
 
-- Force `SKIP_WAITING` + hard reload while session active
-- Clearing journal without user decline of restore confirm
+- Sending `SKIP_WAITING` from a blocked client.
+- Hard-navigating a client present in `clientDeferClientIds`.
+- Treating ordinary drafts or pending writes as training journals.
+- Restoring a journal before its complete mode-specific schema is validated.
+- Relying on a workout-page-only module to protect sibling or profile-only tabs.
 
 ## Tests
 
 - `test/app-update-session-safety.test.mjs`
 - `test/session-journal.test.mjs`
+- `test/sw-client-defer-protocol.test.mjs`

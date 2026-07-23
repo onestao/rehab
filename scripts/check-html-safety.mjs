@@ -12,6 +12,7 @@ const REVIEWED_HTML_SINK_FILES = new Map([
   ['ai-models.js', { sinks: 2, review: 'model labels and ids are escaped before list rendering.' }],
   ['ai-profile.js', { sinks: 1, review: 'select options are built from escaped profile names.' }],
   ['credential-fields.js', { sinks: 1, review: 'static icon-only button markup.' }],
+  ['data-ui-core.js', { sinks: 1, review: 'boot-shared modal shell escapes title/icon; caller-provided modal bodies remain separately reviewed.' }],
   ['data-ui-state.js', { sinks: 3, review: 'shared modal shell escapes title/icon; caller-provided modal bodies and diet/exercise renderers remain separately reviewed.' }],
   ['data-views.js', { sinks: 11, review: 'page shells compose reviewed renderer outputs, not raw user strings.' }],
   ['food-log.js', { sinks: 9, review: 'food search and modal renderers escape names before HTML insertion.' }],

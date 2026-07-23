@@ -53,6 +53,7 @@ Object.assign(workout, {
             this._countResolve();
             this._countResolve = null;
             clearInterval(this.timer);
+            this.timer = null;
         }
     },
 
@@ -220,7 +221,7 @@ Object.assign(workout, {
             if (sec > 12 && status !== 'HOLD') this.speak(`${sub}，${sec}秒`);
             this.timer = setInterval(() => {
                 if (!this.isPlaying || this.skipFlag) {
-                    clearInterval(this.timer); this.skipFlag = false;
+                    clearInterval(this.timer); this.timer = null; this.skipFlag = false;
                     this._phaseLeft = null;
                     this._countResolve = null; resolve(); return;
                 }
@@ -238,7 +239,7 @@ Object.assign(workout, {
                 this.renderPip();
                 if (window.workoutState) workoutState.markActive();
                 if (this._phaseLeft <= 3 && this._phaseLeft > 0) this.speak(this._phaseLeft.toString());
-                if (this._phaseLeft <= 0) { clearInterval(this.timer); this._phaseLeft = null; this._countResolve = null; resolve(); }
+                if (this._phaseLeft <= 0) { clearInterval(this.timer); this.timer = null; this._phaseLeft = null; this._countResolve = null; resolve(); }
             }, 1000);
         });
     },
@@ -263,6 +264,7 @@ Object.assign(workout, {
         if (this._speakResolve) { this._speakResolve(); this._speakResolve = null; }
         if (this._countResolve) { this._countResolve(); this._countResolve = null; }
         clearInterval(this.timer);
+        this.timer = null;
         this._phaseLeft = null;
         this.skipFlag = false;
     },
@@ -294,7 +296,9 @@ Object.assign(workout, {
         this.isPaused = false;
         this.updateStateClasses();
         clearInterval(this.timer); clearInterval(this.sessionInt);
+        this.timer = null; this.sessionInt = null;
         clearInterval(this._speechWatchdog); clearInterval(this._audioKeepAliveInt);
+        this._speechWatchdog = null; this._audioKeepAliveInt = null;
         this.closePip();
         (window.workoutVoice?.cancel?.() ?? window.speechSynthesis.cancel());
         if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'none';

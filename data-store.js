@@ -121,36 +121,24 @@
         scheduleDeferredStorageMigration(options) {
             if (this._storageMigrationScheduled || !window.storageMigrate?.migrateLocalToIdb) return;
             this._storageMigrationScheduled = true;
-            const run = async () => {
-                if (typeof window.loadAppScript === 'function') {
-                    await Promise.all([
-                        window.loadAppScript('storage/idb-collections'),
-                        window.loadAppScript('storage/idb-advice-collections')
-                    ]);
-                }
-                const localAdapter = window.storageMigrate.createLocalAdapter?.({ dbKey: options.dbKey }) || this.createLocalStorageAdapter();
-                window.errorBus?.event?.('storage.migration', 'start:deferred', { targetVersion: Number(options.targetVersion || 2) });
-                const migration = await window.storageMigrate.migrateLocalToIdb(options, localAdapter);
-                window.errorBus?.event?.('storage.migration', migration.ok ? 'success:deferred' : 'failed:deferred', {
-                    targetVersion: Number(options.targetVersion || 2),
-                    reason: migration.reason || ''
-                });
-                if (!migration.ok) return;
-                if (typeof window.storageMigrate.createIdbAdapter === 'function') {
-                    this._storage = window.storageMigrate.createIdbAdapter(options);
-                    this._storageMode = 'idb';
-                    await Promise.resolve(this._storage.write(this.DB_KEY, this.db));
-                    if (this.cfg) await Promise.resolve(this._storage.write(this.CFG_KEY, this.cfg));
-                }
-            };
             setTimeout(() => {
                 const idle = window.requestIdleCallback || ((cb) => setTimeout(cb, 0));
                 idle(() => {
-                    run().catch((e) => {
-                        window.errorBus?.event?.('storage.migration', 'exception:deferred', { error: e });
+                    this.runDeferredStoreTask('runStorageMigration', options).catch((error) => {
+                        window.errorBus?.event?.('storage.migration', 'exception:deferred', { error });
                     });
                 }, { timeout: 5000 });
             }, 3000);
+        },
+
+        async runDeferredStoreTask(method, ...args) {
+            if (!window.dataStoreDeferred?.[method]) {
+                if (typeof window.loadAppScript !== 'function') throw new Error('延迟存储加载器尚未就绪');
+                await window.loadAppScript('data-store-deferred');
+            }
+            const task = window.dataStoreDeferred?.[method];
+            if (typeof task !== 'function') throw new Error(`延迟存储任务未注册: ${method}`);
+            return task.apply(this, args);
         },
 
         _ensureReadyDeferred() {
@@ -668,21 +656,9 @@
             this._adviceColdStartScheduled = true;
             const idle = window.requestIdleCallback || ((cb) => setTimeout(cb, 1500));
             idle(() => {
-                this.loadRecentAdviceColdStart?.().catch((e) => console.error('Load recent advice failed', e));
+                this.runDeferredStoreTask('loadRecentAdviceColdStart')
+                    .catch((e) => console.error('Load recent advice failed', e));
             }, { timeout: 5000 });
-        },
-
-        async loadRecentAdviceColdStart() {
-            if (!this.advice) return;
-            const recentAdvice = await this.advice.getRecent(50);
-            if (recentAdvice && recentAdvice.length > 0) {
-                const localAdvice = Array.isArray(this.db.health.aiAdviceChat) ? this.db.health.aiAdviceChat : [];
-                const recentChronological = recentAdvice.slice().reverse();
-                this.db.health.aiAdviceChat = this.advice._mergeChronological(localAdvice, recentChronological);
-                this.advice.workingSet = this.db.health.aiAdviceChat;
-                this.advice.setActiveRecords(this.activeRecords(this.db.health.aiAdviceChat || []), 'recent');
-            }
-            this.advice.initSearchWorker?.();
         },
 
         purgeBefore(ts, retentionMs = 30 * 24 * 60 * 60 * 1000) {
@@ -869,6 +845,7 @@
             '_dbDirty',
             '_quotaWarned',
             '_storageMigrationScheduled',
+            '_adviceColdStartScheduled',
             '_readyState',
             '_readyPromise',
             '_resolveReady',

@@ -4,11 +4,11 @@ const appUpdate = {
     waitingWorker: null,
     checking: false,
     controllerReloadBound: false,
-    swUrl: './sw.js?v=356',
-    version: '356',
+    swUrl: './sw.js?v=360',
+    version: '360',
 
     controllerReloadKey() {
-        return 'rehab-sw-controller-reload-v356';
+        return 'rehab-sw-controller-reload-v360';
     },
 
     claimControllerReload() {
@@ -70,13 +70,13 @@ const appUpdate = {
                 this.hideUpgradeOverlay();
                 return;
             }
-            if (this.hasActiveRehabSession()) {
-                this.deferredForSession = true;
-                this.notifyServiceWorkerSessionDefer();
-                this.showUpdateDeferredForSession();
+            const blockReason = this.getUpdateBlockReason();
+            if (blockReason) {
+                this.showUpdateBlocked(blockReason);
                 window.errorBus?.event?.('appUpdate', 'controllerchange:deferred-for-session', {
                     version: this.version,
-                    reason
+                    reason,
+                    blockReason
                 });
                 return;
             }
@@ -180,6 +180,11 @@ const appUpdate = {
     show(worker) {
         this.waitingWorker = worker || this.waitingWorker;
         window.errorBus?.event?.('appUpdate', 'waiting:show', { state: worker?.state || '' });
+        const blockReason = this.getUpdateBlockReason();
+        if (blockReason) {
+            this.showUpdateBlocked(blockReason, worker);
+            return;
+        }
         const banner = document.getElementById('appUpdateBanner');
         if (!banner) return;
         banner.classList.remove('hidden');
@@ -229,35 +234,8 @@ const appUpdate = {
         });
     },
 
-    hasActiveRehabSession() {
+    hasDirtyRehabForm() {
         try {
-            const w = window.workoutSystem || window.workout;
-            // Playing, paused, or started-not-finished all block forced updates.
-            if (w?.isPlaying) return true;
-            if (w?.isPaused) return true;
-            if (Number.isFinite(w?._phaseLeft) && Number(w._phaseLeft) > 0) return true;
-            if (w?.timer || w?.sessionInt) return true;
-            if (Number(w?.totalSec || 0) > 0 && w?.isPlaying !== false && w?.mode) {
-                // totalSec advances only during an active/paused session window.
-                if (w.isPlaying || w.isPaused) return true;
-            }
-            const cardio = window.cardio;
-            if (cardio?.isRunning) return true;
-            if (cardio?.isPaused && Number(cardio?.seconds || 0) > 0) return true;
-            const engine = window.workoutEngine;
-            if (engine?.state && (w?.isPlaying || w?.isPaused)) return true;
-            if (Number.isFinite(engine?.state?.phaseLeft) && Number(engine.state.phaseLeft) > 0) return true;
-            // Persisted mid-session snapshot (visibility/background restore).
-            try {
-                if (localStorage.getItem(window.workoutState?.KEY || 'rehab_active_session')) return true;
-            } catch {}
-            const data = window.data;
-            if (data?._pendingLocalWrite) return true;
-            // Unsaved action / pain-adjacent drafts and open edit sheets.
-            if (data?.db?.lastActionDraft) return true;
-            if (data?._editingExerciseDraft || data?._editingFoodDraft) return true;
-            if (data?._aiFoodDrafts?.length) return true;
-            // Visible pain/symptom inputs with non-empty values.
             const draftInputs = document.querySelectorAll?.(
                 '#painScore, #painLevel, [name="painScore"], [name="painLevel"], #symptomNote, [name="symptomNote"], #symptomDraft, textarea[data-rehab-draft="1"], input[data-rehab-draft="1"]'
             );
@@ -267,7 +245,6 @@ const appUpdate = {
                     if (val && val !== '0') return true;
                 }
             }
-            // Open modal with dirty text inputs (symptom/pain forms often live here).
             const openModal = document.querySelector?.('.md-modal[data-rl-modal="1"], .md-modal:not(.hidden)[role="dialog"]');
             if (openModal) {
                 const dirty = openModal.querySelectorAll('input, textarea, select');
@@ -285,19 +262,126 @@ const appUpdate = {
         }
     },
 
-    notifyServiceWorkerSessionDefer() {
+    /**
+     * Classify update blockers without conflating residual timers / parameter memory.
+     * @returns {'active-session'|'pending-write'|'unsaved-draft'|null}
+     */
+    getUpdateBlockReason() {
         try {
-            navigator.serviceWorker?.controller?.postMessage?.({
-                type: 'UPDATE_DEFER_FOR_SESSION',
-                version: this.version,
-                reason: 'active-rehab-session'
-            });
-        } catch {}
+            const workout = window.workoutSystem || window.workout;
+            const cardio = window.cardio;
+            const journal = this.readRecoverableSessionJournal();
+            // Production pause keeps isPlaying === true; do not treat lone isPaused / timers as session.
+            if (workout?.isPlaying === true || cardio?.isRunning === true || journal) {
+                return 'active-session';
+            }
+
+            const data = window.data;
+            if (data?._dbDirty || data?._pendingPersistPromise || data?._pendingLocalWrite) {
+                return 'pending-write';
+            }
+            if (
+                data?._editingExerciseDraft
+                || data?._editingFoodDraft
+                || data?._aiFoodDrafts?.length
+                || this.hasDirtyRehabForm?.()
+            ) {
+                return 'unsaved-draft';
+            }
+            return null;
+        } catch {
+            return null;
+        }
     },
 
-    showUpdateDeferredForSession() {
-        // H5: freeze session journal before any later upgrade can navigate the client.
-        try { window.workoutState?.saveJournal?.({ deferredForUpdate: true }); } catch {}
+    isRecoverableSessionJournal(snapshot, now = Date.now()) {
+        if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot)) return false;
+        if (snapshot.schemaVersion !== 1 || snapshot.journal !== 'rehab-session') return false;
+        if (snapshot.isPlaying !== true) return false;
+        if (snapshot.mode !== 'strength' && snapshot.mode !== 'cardio') return false;
+        if (!Number.isFinite(snapshot.totalSec) || snapshot.totalSec < 0) return false;
+        const updatedAt = new Date(snapshot.updatedAt).getTime();
+        const ageMs = now - updatedAt;
+        if (!Number.isFinite(updatedAt) || ageMs < 0 || ageMs > 12 * 60 * 60 * 1000) return false;
+        if (snapshot.mode === 'cardio') {
+            return !!snapshot.cardio
+                && typeof snapshot.cardio === 'object'
+                && !Array.isArray(snapshot.cardio)
+                && snapshot.cardio.isRunning === true
+                && Number.isFinite(snapshot.cardio.seconds)
+                && snapshot.cardio.seconds >= 0;
+        }
+        return !!snapshot.strength
+            && typeof snapshot.strength === 'object'
+            && !Array.isArray(snapshot.strength)
+            && typeof snapshot.strength.phase === 'string'
+            && snapshot.strength.phase.trim().length > 0;
+    },
+
+    readRecoverableSessionJournal() {
+        const key = 'rehab_active_session';
+        let raw = null;
+        try {
+            raw = window.localStorage?.getItem?.(key);
+            if (raw == null) return null;
+            const snapshot = JSON.parse(raw);
+            if (this.isRecoverableSessionJournal(snapshot)) return snapshot;
+        } catch {}
+        try { window.localStorage?.removeItem?.(key); } catch {}
+        return null;
+    },
+
+    hasActiveRehabSession() {
+        return this.getUpdateBlockReason() === 'active-session';
+    },
+
+    updateClientMessageTargets(worker) {
+        const targets = [
+            navigator.serviceWorker?.controller,
+            worker,
+            this.waitingWorker,
+            this.registration?.waiting
+        ];
+        return targets.filter((target, index) => (
+            target
+            && typeof target.postMessage === 'function'
+            && targets.indexOf(target) === index
+        ));
+    },
+
+    postUpdateClientMessage(type, reason, worker) {
+        const message = reason == null
+            ? { type, version: this.version }
+            : { type, version: this.version, reason };
+        for (const target of this.updateClientMessageTargets(worker)) {
+            try { target.postMessage(message); } catch {}
+        }
+    },
+
+    notifyServiceWorkerClientDefer(reason, worker) {
+        this.postUpdateClientMessage('UPDATE_DEFER_FOR_CLIENT', reason, worker);
+    },
+
+    clearServiceWorkerClientDefer(worker) {
+        this.postUpdateClientMessage('UPDATE_CLIENT_CLEAR', null, worker);
+    },
+
+    // Compatibility wrapper retained for callers that still use the session-specific name.
+    notifyServiceWorkerSessionDefer(worker) {
+        this.notifyServiceWorkerClientDefer('active-session', worker);
+    },
+
+    showUpdateDeferredForSession(worker) {
+        this.deferredForSession = true;
+        this.notifyServiceWorkerSessionDefer(worker);
+        this.armSessionClearWatcher();
+        // H5: freeze session journal only when a real playing session is active.
+        try {
+            const workout = window.workoutSystem || window.workout;
+            if (workout?.isPlaying === true) {
+                window.workoutState?.saveJournal?.({ deferredForUpdate: true });
+            }
+        } catch {}
         this.notify('训练进行中，更新已推迟。结束后可在设置中完成更新。', 'info');
         const banner = document.getElementById('appUpdateBanner');
         if (!banner) return;
@@ -306,68 +390,91 @@ const appUpdate = {
         const detail = banner.querySelector('small');
         if (title) title.textContent = '更新已就绪（训练中推迟）';
         if (detail) detail.textContent = '当前训练不会被打断。训练结束后再点“立即更新”。';
-        this.armSessionClearWatcher();
     },
 
-    armSessionClearWatcher() {
-        if (this._sessionClearWatch) return;
-        this._sessionClearWatch = window.setInterval(() => {
-            if (this.hasActiveRehabSession()) return;
-            window.clearInterval(this._sessionClearWatch);
+    armUpdateBlockClearWatcher() {
+        if (this._updateBlockClearWatch != null || this._sessionClearWatch != null) return;
+        const watch = window.setInterval(() => {
+            if (this.getUpdateBlockReason()) return;
+            window.clearInterval(this._updateBlockClearWatch);
+            this._updateBlockClearWatch = null;
             this._sessionClearWatch = null;
             this.deferredForSession = false;
-            try {
-                navigator.serviceWorker?.controller?.postMessage?.({
-                    type: 'UPDATE_SESSION_CLEAR',
-                    version: this.version
-                });
-            } catch {}
+            this.clearServiceWorkerClientDefer();
             // If a waiting worker is still present, re-show normal update banner.
             const worker = this.waitingWorker || this.registration?.waiting;
             if (worker) this.show(worker);
         }, 2000);
+        this._updateBlockClearWatch = watch;
+        this._sessionClearWatch = watch;
+    },
+
+    // Compatibility wrapper retained for existing public/session API users.
+    armSessionClearWatcher() {
+        return this.armUpdateBlockClearWatcher();
+    },
+
+    showUpdateBlocked(reason, worker) {
+        if (reason === 'active-session') {
+            this.showUpdateDeferredForSession(worker);
+            return;
+        }
+        this.notifyServiceWorkerClientDefer(reason, worker);
+        this.armUpdateBlockClearWatcher();
+        const copy = reason === 'pending-write'
+            ? ['数据正在保存，请稍后重试更新。', '更新已就绪（保存中）', '本地数据正在写入，请稍后再点“立即更新”。']
+            : reason === 'unsaved-draft'
+                ? ['有未保存编辑，请先保存或关闭后再更新。', '更新已就绪（未保存编辑）', '请先保存或关闭当前编辑，再点“立即更新”。']
+                : null;
+        if (!copy) return;
+        this.notify(copy[0], 'info');
+        const banner = document.getElementById('appUpdateBanner');
+        if (!banner) return;
+        banner.classList.remove('hidden');
+        const title = banner.querySelector('strong');
+        const detail = banner.querySelector('small');
+        if (title) title.textContent = copy[1];
+        if (detail) detail.textContent = copy[2];
     },
 
     async apply() {
         const worker = this.waitingWorker || this.registration?.waiting;
         if (!worker) {
-            if (this.hasActiveRehabSession()) {
-                this.deferredForSession = true;
-                this.notifyServiceWorkerSessionDefer();
-                this.showUpdateDeferredForSession();
-                window.errorBus?.event?.('appUpdate', 'apply:deferred-no-worker');
-                return { ok: false, reason: 'active-session' };
+            const blockNoWorker = this.getUpdateBlockReason();
+            if (blockNoWorker) {
+                this.showUpdateBlocked(blockNoWorker);
+                window.errorBus?.event?.('appUpdate', 'apply:deferred-no-worker', { blockReason: blockNoWorker });
+                return { ok: false, reason: blockNoWorker };
             }
             window.errorBus?.event?.('appUpdate', 'apply:reloadFallback');
             window.location.reload();
             return;
         }
 
-        if (this.hasActiveRehabSession()) {
-            this.deferredForSession = true;
+        const blockReason = this.getUpdateBlockReason();
+        if (blockReason) {
             this.waitingWorker = worker;
-            this.notifyServiceWorkerSessionDefer();
-            this.showUpdateDeferredForSession();
-            window.errorBus?.event?.('appUpdate', 'apply:deferred-for-session');
-            return { ok: false, reason: 'active-session' };
+            this.showUpdateBlocked(blockReason);
+            window.errorBus?.event?.('appUpdate', 'apply:deferred-for-session', { blockReason });
+            return { ok: false, reason: blockReason };
         }
 
         this.bindControllerReload(!!navigator.serviceWorker.controller);
         try {
             // H5: final pre-apply journal flush if a residual session snapshot exists.
             try {
-                if (window.workoutState?.readJournal?.()?.isPlaying) {
+                const journal = window.workoutState?.readJournal?.();
+                if (window.workoutState?.isRecoverableJournal?.(journal) && (window.workoutSystem || window.workout)?.isPlaying === true) {
                     window.workoutState.saveJournal({ preApply: true });
                 }
             } catch {}
             window.errorBus?.event?.('appUpdate', 'apply:prepare', { state: worker.state || '' });
             await this.prepareWaitingWorker(worker);
-            if (this.hasActiveRehabSession()) {
-                this.deferredForSession = true;
-                this.notifyServiceWorkerSessionDefer();
-                this.showUpdateDeferredForSession();
-                window.errorBus?.event?.('appUpdate', 'apply:deferred-after-prepare');
-                return { ok: false, reason: 'active-session' };
+            const blockAfterPrepare = this.getUpdateBlockReason();
+            if (blockAfterPrepare) {
+                this.showUpdateBlocked(blockAfterPrepare);
+                window.errorBus?.event?.('appUpdate', 'apply:deferred-after-prepare', { blockReason: blockAfterPrepare });
+                return { ok: false, reason: blockAfterPrepare };
             }
             this.showUpgradeOverlay('正在完成更新…');
             window.errorBus?.event?.('appUpdate', 'apply:skipWaiting', { state: worker.state || '' });

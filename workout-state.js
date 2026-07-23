@@ -20,6 +20,10 @@ const workoutState = {
     },
 
     snapshot() {
+        const strengthSnapshot = window.workoutEngine?.snapshot?.()
+            || (workout.mode === 'strength' && workout.isPlaying
+                ? window.workoutEngine?.createInitialState?.() || null
+                : null);
         return {
             schemaVersion: this.SCHEMA_VERSION,
             journal: 'rehab-session',
@@ -44,15 +48,29 @@ const workoutState = {
                 seconds: cardio.seconds,
                 targetAnnounced: cardio.targetAnnounced
             },
-            strength: window.workoutEngine?.snapshot() || null
+            strength: strengthSnapshot
         };
     },
 
-    /** Persist journal without requiring isPlaying (used by app-update pre-apply). */
+    /** Persist journal only for a real playing session (prevents idle/false lock-in). */
     saveJournal(extra = {}) {
         try {
+            if (!workout?.isPlaying) {
+                this.clear();
+                return null;
+            }
             const base = this.snapshot();
-            const payload = { ...base, ...extra, schemaVersion: this.SCHEMA_VERSION, journal: 'rehab-session', updatedAt: new Date().toISOString() };
+            const payload = {
+                ...extra,
+                ...base,
+                schemaVersion: this.SCHEMA_VERSION,
+                journal: 'rehab-session',
+                updatedAt: new Date().toISOString()
+            };
+            if (!this.isRecoverableJournal(payload)) {
+                this.clear();
+                return null;
+            }
             localStorage.setItem(this.KEY, JSON.stringify(payload));
             return payload;
         } catch {
@@ -70,6 +88,32 @@ const workoutState = {
         } catch {
             return null;
         }
+    },
+
+    /** Shared validity gate for restore + update defer (true mid-session only). */
+    isRecoverableJournal(snapshot, now = Date.now()) {
+        if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot)) return false;
+        if (snapshot.schemaVersion !== this.SCHEMA_VERSION) return false;
+        if (snapshot.journal !== 'rehab-session') return false;
+        if (snapshot.isPlaying !== true) return false;
+        if (snapshot.mode !== 'strength' && snapshot.mode !== 'cardio') return false;
+        if (!Number.isFinite(snapshot.totalSec) || snapshot.totalSec < 0) return false;
+        const updatedAt = new Date(snapshot.updatedAt).getTime();
+        const ageMs = now - updatedAt;
+        if (!Number.isFinite(ageMs) || ageMs < 0 || ageMs > 1000 * 60 * 60 * 12) return false;
+        if (snapshot.mode === 'cardio') {
+            return !!snapshot.cardio
+                && typeof snapshot.cardio === 'object'
+                && !Array.isArray(snapshot.cardio)
+                && snapshot.cardio.isRunning === true
+                && Number.isFinite(snapshot.cardio.seconds)
+                && snapshot.cardio.seconds >= 0;
+        }
+        return !!snapshot.strength
+            && typeof snapshot.strength === 'object'
+            && !Array.isArray(snapshot.strength)
+            && typeof snapshot.strength.phase === 'string'
+            && snapshot.strength.phase.trim().length > 0;
     },
 
     markActive() {
@@ -105,10 +149,11 @@ const workoutState = {
         let snapshot = null;
         try {
             snapshot = JSON.parse(localStorage.getItem(this.KEY) || 'null');
-        } catch {}
-        if (!snapshot?.isPlaying) return;
-        const ageMs = Date.now() - new Date(snapshot.updatedAt || 0).getTime();
-        if (!Number.isFinite(ageMs) || ageMs > 1000 * 60 * 60 * 12) {
+        } catch {
+            this.clear();
+            return;
+        }
+        if (!this.isRecoverableJournal(snapshot)) {
             this.clear();
             return;
         }
@@ -121,7 +166,11 @@ const workoutState = {
             this.restoreCardio(snapshot);
             return;
         }
-        this.restoreStrength(snapshot);
+        if (snapshot.mode === 'strength') {
+            this.restoreStrength(snapshot);
+            return;
+        }
+        this.clear();
     },
 
     restoreCardio(snapshot) {

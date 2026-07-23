@@ -1,87 +1,89 @@
 // @ts-nocheck
-const CACHE = 'training-assistant-v356';
-const CACHE_ASSET_REVISION = '4d2b56232741707fcc31ad6451f8e13c2d3b54bf62974832e0a461bbfca68838';
+const CACHE = 'training-assistant-v360';
+const CACHE_ASSET_REVISION = '824e5d9551ce02c941792e3fa17c82a9eb2489895203f44c5f292883c39d81e5';
 const CACHE_VERSION = CACHE.replace(/^training-assistant-v/, '');
 const ASSETS = [
     'index.html',
-    'build/generated.css?v=356',
+    'build/generated.css?v=360',
     'assets/app-icon.svg',
     'assets/material-symbols-rounded.woff2',
     'assets/screenshots/android-today.svg',
     'assets/screenshots/android-workout.svg',
-    'pwa-support.js?v=356',
+    'pwa-support.js?v=360',
     // Lazy CSS: loaded on profile or records/training entry, still precached for offline use.
-    'css-src/42-health-profile.css?v=356',
-    'theme.js?v=356',
-    'haptics.js?v=356',
-    'fooddb.js?v=356',
-    'food-ai-normalizer-pure.js?v=356',
-    'render-safe.js?v=356',
-    'nav-stack.js?v=356',
-    'app-route.js?v=356',
-    'data-utils-pure.js?v=356',
-    'action-identity.js?v=356',
-    'data-utils.js?v=356',
-    'data-records.js?v=356',
-    'data-schema.js?v=356',
-    'storage/idb.js?v=356',
-    'storage/idb-collections.js?v=356',
-    'storage/idb-advice-collections.js?v=356',
-    'storage/migrate.js?v=356',
-    'advice-virtual-list.js?v=356',
-    'data-store.js?v=356',
-    'data-ui-state.js?v=356',
-    'data-views.js?v=356',
-    'data.js?v=356',
-    'health-summary-pure.js?v=356',
+    'css-src/42-health-profile.css?v=360',
+    'theme.js?v=360',
+    'haptics.js?v=360',
+    'fooddb.js?v=360',
+    'food-ai-normalizer-pure.js?v=360',
+    'render-safe.js?v=360',
+    'nav-stack.js?v=360',
+    'app-route.js?v=360',
+    'data-utils-pure.js?v=360',
+    'action-identity.js?v=360',
+    'data-utils.js?v=360',
+    'data-records.js?v=360',
+    'data-schema.js?v=360',
+    'storage/idb.js?v=360',
+    'storage/idb-collections.js?v=360',
+    'storage/idb-advice-collections.js?v=360',
+    'storage/migrate.js?v=360',
+    'advice-virtual-list.js?v=360',
+    'data-store.js?v=360',
+    'data-store-deferred.js?v=360',
+    'data-ui-core.js?v=360',
+    'data-ui-state.js?v=360',
+    'data-views.js?v=360',
+    'data.js?v=360',
+    'health-summary-pure.js?v=360',
     // Today essential: PAGE_DEPS.today requires history-view (FIND-05).
-    'history-view.js?v=356',
-    'today-view-core.js?v=356',
-    'ai-model-catalog-pure.mjs?v=356',
-    'ai-routing-pure.mjs?v=356',
-    'ai-json-pure.mjs?v=356',
-    'ai-routing.js?v=356',
-    'ai-model-visual.js?v=356',
-    'ai-task-settings.js?v=356',
-    'ai-provider-manager.js?v=356',
-    'report-version-pure.js?v=356',
-    'plan-chains.js?v=356',
-    'plan-progression.js?v=356',
-    'rehab-policy.js?v=356',
-    'plan-store.js?v=356',
-    'plan-feedback.js?v=356',
-    'plan-cooldown.js?v=356',
-    'plan-weekly.js?v=356',
-    'plan-equipment.js?v=356',
-    'plan-ui.js?v=356',
-    'rehab-progression-pure.js?v=356',
-    'plan-store-pure.js?v=356',
-    'backup-import-pure.js?v=356',
-    'backup-ring-pure.js?v=356',
-    'backup.js?v=356',
-    'sync-ui.js?v=356',
-    'sync-adapters.js?v=356',
-    'sync.js?v=356',
-    'sync-pure.js?v=356',
-    'sync-status.js?v=356',
-    'workout-system.js?v=356',
-    'workout-wakelock.js?v=356',
-    'workout-media-session.js?v=356',
-    'workout-pip.js?v=356',
-    'workout-core.js?v=356',
-    'workout-cardio-pure.js?v=356',
-    'workout-cardio.js?v=356',
-    'workout-engine.js?v=356',
-    'workout-state.js?v=356',
-    'app-update.js?v=356',
-    'sheet-drag.js?v=356',
-    'm3e-ripple.js?v=356',
-    'toast.js?v=356',
-    'error-bus.js?v=356',
-    'i18n.js?v=356',
-    'a11y-focus-trap.js?v=356',
-    'i18n/zh-CN.json?v=356',
-    'i18n/en-US.json?v=356',
+    'history-view.js?v=360',
+    'today-view-core.js?v=360',
+    'ai-model-catalog-pure.mjs?v=360',
+    'ai-routing-pure.mjs?v=360',
+    'ai-json-pure.mjs?v=360',
+    'ai-routing.js?v=360',
+    'ai-model-visual.js?v=360',
+    'ai-task-settings.js?v=360',
+    'ai-provider-manager.js?v=360',
+    'report-version-pure.js?v=360',
+    'plan-chains.js?v=360',
+    'plan-progression.js?v=360',
+    'rehab-policy.js?v=360',
+    'plan-store.js?v=360',
+    'plan-feedback.js?v=360',
+    'plan-cooldown.js?v=360',
+    'plan-weekly.js?v=360',
+    'plan-equipment.js?v=360',
+    'plan-ui.js?v=360',
+    'rehab-progression-pure.js?v=360',
+    'plan-store-pure.js?v=360',
+    'backup-import-pure.js?v=360',
+    'backup-ring-pure.js?v=360',
+    'backup.js?v=360',
+    'sync-ui.js?v=360',
+    'sync-adapters.js?v=360',
+    'sync.js?v=360',
+    'sync-pure.js?v=360',
+    'sync-status.js?v=360',
+    'workout-system.js?v=360',
+    'workout-wakelock.js?v=360',
+    'workout-media-session.js?v=360',
+    'workout-pip.js?v=360',
+    'workout-core.js?v=360',
+    'workout-cardio-pure.js?v=360',
+    'workout-cardio.js?v=360',
+    'workout-engine.js?v=360',
+    'workout-state.js?v=360',
+    'app-update.js?v=360',
+    'sheet-drag.js?v=360',
+    'm3e-ripple.js?v=360',
+    'toast.js?v=360',
+    'error-bus.js?v=360',
+    'i18n.js?v=360',
+    'a11y-focus-trap.js?v=360',
+    'i18n/zh-CN.json?v=360',
+    'i18n/en-US.json?v=360',
     'manifest.json'
     , 'favicon.ico'
 ];
@@ -102,8 +104,8 @@ let legacyMigrationRounds = 0;
 let cleanupOldCachesPromise = null;
 const legacyNavigationAttempts = new Map();
 const pageReadyClientIds = new Set();
-/** Clients that reported an active rehab session — hard navigate must not interrupt them. */
-const sessionDeferClientIds = new Set();
+/** Clients with update-sensitive work — hard navigate must not interrupt them. */
+const clientDeferClientIds = new Set();
 
 async function isReleaseCacheReady() {
     const cache = await caches.open(CACHE);
@@ -272,7 +274,7 @@ async function navigateLegacyUpgradeClient(cache, request) {
         }
         // Active training / drafts: never hard-navigate this tab. Keep marker + soft notify
         // so it upgrades only after the client clears deferral (session end / save).
-        if (sessionDeferClientIds.has(clientId)) {
+        if (clientDeferClientIds.has(clientId)) {
             const stillDeferred = await self.clients.get(clientId);
             if (stillDeferred) notifyLegacyRefreshRequired(stillDeferred);
             return 'deferred-for-session';
@@ -551,7 +553,7 @@ self.addEventListener('message', (e) => {
                 return;
             }
             const readyId = String(e.source?.id || '');
-            if (readyId) sessionDeferClientIds.delete(readyId);
+            if (readyId) clientDeferClientIds.delete(readyId);
             await acknowledgeV327Page(e.source);
             // Ready only clears this client's marker. Old caches stay until every
             // live client is ready (or gone) — never on the first PAGE_READY alone.
@@ -559,11 +561,11 @@ self.addEventListener('message', (e) => {
             scheduleLegacyUpgradeMigration(0);
         })());
     }
-    if (e.data && e.data.type === 'UPDATE_DEFER_FOR_SESSION') {
+    if (e.data && (e.data.type === 'UPDATE_DEFER_FOR_CLIENT' || e.data.type === 'UPDATE_DEFER_FOR_SESSION')) {
         e.waitUntil((async () => {
-            const clientId = String(e.source?.id || e.data.clientId || '');
+            const clientId = String(e.source?.id || '');
             if (!clientId) return;
-            sessionDeferClientIds.add(clientId);
+            clientDeferClientIds.add(clientId);
             // Soft-notify only; do not hard-navigate while deferred.
             try {
                 const client = await self.clients.get(clientId);
@@ -571,11 +573,12 @@ self.addEventListener('message', (e) => {
             } catch {}
         })());
     }
-    if (e.data && e.data.type === 'UPDATE_SESSION_CLEAR') {
+    if (e.data && (e.data.type === 'UPDATE_CLIENT_CLEAR' || e.data.type === 'UPDATE_SESSION_CLEAR')) {
         e.waitUntil((async () => {
-            const clientId = String(e.source?.id || e.data.clientId || '');
-            if (clientId) sessionDeferClientIds.delete(clientId);
-            // Session ended — re-evaluate pending legacy migrations for this client.
+            const clientId = String(e.source?.id || '');
+            if (!clientId) return;
+            clientDeferClientIds.delete(clientId);
+            // Deferral ended — re-evaluate pending legacy migrations for this client.
             scheduleLegacyUpgradeMigration(0);
         })());
     }

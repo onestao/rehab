@@ -12,6 +12,9 @@ const root = path.resolve(testDir, '..');
 const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 const sw = fs.readFileSync(path.join(root, 'sw.js'), 'utf8');
 const appUpdate = fs.readFileSync(path.join(root, 'app-update.js'), 'utf8');
+const releaseVersion = (html.match(/const releaseVersion = ['"](\d+)['"]/) || [])[1];
+assert.ok(releaseVersion, 'index.html releaseVersion missing');
+const v = releaseVersion;
 
 function extractBetween(source, startMarker, endMarker) {
     const start = source.indexOf(startMarker);
@@ -94,15 +97,15 @@ function createQuietRegistrationHarness() {
     };
 }
 
-test('release assets and controller reload keys are consistently v355', () => {
-    assert.match(sw, /training-assistant-v355/);
+test('release assets and controller reload keys are consistently versioned', () => {
+    assert.match(sw, new RegExp(`training-assistant-v${v}`));
     assert.match(sw, /const CACHE_ASSET_REVISION = '[a-f0-9]{64}'/);
     assert.doesNotMatch(sw, /training-assistant-v326|\?v=326|training-assistant-v327|\?v=327/);
     assert.doesNotMatch(html, /\?v=326|rehab-sw-controller-reload-v326|\?v=327|rehab-sw-controller-reload-v327/);
     assert.doesNotMatch(appUpdate, /version:\s*['"](?:326|327)['"]|rehab-sw-controller-reload-v(?:326|327)/);
-    assert.match(html, /rehab-sw-controller-reload-v355/);
-    assert.match(appUpdate, /version:\s*['"]355['"]/);
-    assert.match(appUpdate, /rehab-sw-controller-reload-v355/);
+    assert.match(html, new RegExp(`rehab-sw-controller-reload-v${v}`));
+    assert.match(appUpdate, new RegExp(`version:\\s*['\"]${v}['\"]`));
+    assert.match(appUpdate, new RegExp(`rehab-sw-controller-reload-v${v}`));
 });
 
 test('plan precache membership stays unchanged while query versions advance', () => {
@@ -118,7 +121,7 @@ test('plan precache membership stays unchanged while query versions advance', ()
         'plan-ui.js'
     ];
     const assetsBlock = sw.match(/const ASSETS = \[([\s\S]*?)\];/)?.[1] || '';
-    const actual = expected.filter((asset) => assetsBlock.includes(`'${asset}?v=355'`));
+    const actual = expected.filter((asset) => assetsBlock.includes(`'${asset}?v=${v}'`));
     assert.deepEqual(actual, expected);
 });
 
@@ -134,12 +137,12 @@ test('quiet post-render registration does not auto-reload or force app-update', 
 test('startup registration path is non-blocking and loads app-update on demand only', () => {
     const registration = extractBetween(html, 'function scheduleServiceWorkerRegistration', 'function idlePreloadEnabled');
     assert.doesNotMatch(registration, /loadScript\(['"]app-update['"]\)/);
-    assert.match(registration, /serviceWorker\.register\(['"]\.\/sw\.js\?v=355['"]/);
+    assert.match(registration, new RegExp(`serviceWorker\\.register\\(['\"]\\.\\/sw\\.js\\?v=${v}['\"]`));
     assert.match(registration, /requestIdleCallback|setTimeout/);
     assert.doesNotMatch(registration, /location\.reload/);
     assert.doesNotMatch(registration, /SKIP_WAITING|GET_VERSION/);
-    assert.match(registration, /app-update\.js\?v=355/);
-    assert.match(appUpdate, /swUrl:\s*['"]\.\/sw\.js\?v=355['"]/);
+    assert.match(registration, new RegExp(`app-update\\.js\\?v=${v}`));
+    assert.match(appUpdate, new RegExp(`swUrl:\\s*['\"]\\.\\/sw\\.js\\?v=${v}['\"]`));
 });
 
 test('version gate rejects changed precache, runtime-cache-first, and nested lazy assets without a bump', () => {
