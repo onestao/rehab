@@ -412,7 +412,6 @@
                         <button class="md-btn" type="button" data-modal-close>取消</button><button class="md-btn md-btn-filled" type="button" onclick="data.confirmPlanTaskSuggestion('${planId}','${taskId}', { silent: true, keepModalOpen: true }); data.markPlanTaskDone('${planId}','${taskId}')">确认并完成</button>
                     `
                 });
-                return;
             }
             this.updateItemStatus?.(planId, taskId, 'done');
             this.openPlanFeedback?.(planId, taskId);

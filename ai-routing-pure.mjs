@@ -58,7 +58,15 @@ export function manualFallbackTarget(value) {
   if (typeof profile !== 'string' || typeof model !== 'string') return null;
   profile = profile.trim();
   model = model.trim();
-  if (!profile || !model || profile.length > 256 || model.length > 256 || /[\u0000-\u001f\u007f]/.test(profile + model)) return null;
+  if (!profile || !model || profile.length > 256 || model.length > 256) return null;
+  for (let i = 0; i < profile.length; i += 1) {
+    const c = profile.charCodeAt(i);
+    if (c <= 0x1f || c === 0x7f) return null;
+  }
+  for (let i = 0; i < model.length; i += 1) {
+    const c = model.charCodeAt(i);
+    if (c <= 0x1f || c === 0x7f) return null;
+  }
   return freeze({ profileId: profile, modelId: model });
 }
 

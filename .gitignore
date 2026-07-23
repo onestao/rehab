@@ -14,3 +14,8 @@ AGENTS.disabled.md
 _grok_fix_staging/
 docs/lazyload-*.md
 grok-fix.patch
+
+.claude/
+.tmp/
+build/fooddb-diet-profile-*/
+docs/temp-and-worktree-cleanup.md
