@@ -17,6 +17,7 @@
   "include": [
     "*.js",
     "globals.d.ts",
+    "test/globals.d.ts",
     "storage/**/*.js",
     "scripts/**/*.mjs",
     "test/**/*.mjs"

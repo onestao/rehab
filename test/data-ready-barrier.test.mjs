@@ -87,7 +87,7 @@ function createStoreContext(options = {}) {
     `, context);
     vm.runInContext(read('data-store.js'), context);
     // Merge store methods onto a data-like host the same way data.js would.
-    const data = Object.assign({
+    const data = /** @type {any} */ (Object.assign({
         DB_KEY: 'rehab_pro_universal_db',
         CFG_KEY: 'rehab_pro_universal_cfg',
         db: {
@@ -107,7 +107,7 @@ function createStoreContext(options = {}) {
         activeRecords(list) { return Array.isArray(list) ? list.filter((r) => !r?.deleted) : []; },
         generateRecordId(prefix) { return `${prefix}-1`; },
         _initHistoryApi() {
-            this.history = {
+            /** @type {any} */ (this).history = {
                 append() {},
                 update() {},
                 deleteById() { return false; },
@@ -117,14 +117,14 @@ function createStoreContext(options = {}) {
             };
         },
         _initAdviceApi() {
-            this.advice = {
+            /** @type {any} */ (this).advice = {
                 setActiveRecords() {},
                 flush() { return Promise.resolve(); }
             };
         },
         beginActionBusy() { return true; },
         endActionBusy() {}
-    }, context.window.dataStore);
+    }, context.window.dataStore));
 
     context.window.data = data;
     return {

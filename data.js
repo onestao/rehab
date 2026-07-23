@@ -155,6 +155,7 @@ function resolvePlanMethod(actionName) {
 function createPlanFeatureGate() {
     const gate = {
         state: 'unloaded',
+        /** @type {Promise<boolean> | null} */
         _loadPromise: null,
         _pendingByAction: Object.create(null),
         _intentSeq: 0,
@@ -212,6 +213,7 @@ function createPlanFeatureGate() {
                 navigationGeneration,
                 status: 'loading',
                 createdAt: Date.now(),
+                /** @type {Promise<any> | null} */
                 promise: null
             };
 
@@ -341,6 +343,11 @@ function attachPlanAliases() {
  * data-ui-state first-paint methods are intentional stand-ins and must stay
  * replaceable by stubs until the owner script loads (FIND-11).
  */
+/**
+ * @param {string} method
+ * @param {{ owner: string, scripts: string[], label: string }} cfg
+ * @returns {((...args: any[]) => any) | null}
+ */
 function resolveRecordOpener(method, cfg) {
     const fromOwner = window[cfg.owner]?.[method];
     if (typeof fromOwner === 'function') return fromOwner;
@@ -365,6 +372,7 @@ function attachLazyRecordOpeners() {
             }
             if (!data.beginActionBusy?.(method, '加载中')) return;
             try {
+                /** @type {Record<string, Promise<any>>} */
                 data._lazyRecordLoadPromises = data._lazyRecordLoadPromises || {};
                 const key = cfg.scripts.join('|');
                 if (!data._lazyRecordLoadPromises[key]) {

@@ -12,7 +12,9 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 function loadNav({ standalone = false } = {}) {
     const history = {
+        /** @type {any} */
         state: null,
+        /** @type {any[]} */
         stack: [],
         replaceState(state) { this.state = state; },
         pushState(state) {

@@ -80,10 +80,16 @@ interface Window {
   prTracker: any;
   volumeHeatmap: any;
   dataPlanAi: any;
+  dataPlanUi: any;
   planAiPure: any;
+  planWeekly: any;
   debugTools: any;
   aiDebug: any;
   backupRingPure: any;
   backupImportPure: any;
+  ui: any;
+  navStack: any;
+  focusTrap: any;
+  ensureDeps: (...args: any[]) => any;
   loadAppScript: (name: string) => Promise<void>;
 }

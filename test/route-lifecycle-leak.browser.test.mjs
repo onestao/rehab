@@ -22,14 +22,20 @@ function delay(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/** @returns {Promise<number>} */
 async function freePort() {
     return await new Promise((resolve, reject) => {
         const server = net.createServer();
         server.on('error', reject);
         server.listen(0, '127.0.0.1', () => {
             const address = server.address();
-            const port = typeof address === 'object' && address ? address.port : 0;
-            server.close(() => resolve(port));
+            const port = (typeof address === 'object' && address && typeof address.port === 'number')
+                ? address.port
+                : 0;
+            server.close((err) => {
+                if (err) reject(err);
+                else resolve(port);
+            });
         });
     });
 }
@@ -73,7 +79,10 @@ async function startServer() {
         }
     });
     const port = await freePort();
-    await new Promise((resolve) => server.listen(port, '127.0.0.1', resolve));
+    await new Promise((resolve, reject) => {
+        server.once('error', reject);
+        server.listen(port, '127.0.0.1', () => resolve(undefined));
+    });
     return { server, url: `http://127.0.0.1:${port}/`, port };
 }
 
@@ -312,7 +321,7 @@ async function cycleRoutes(page) {
             const nav = [...document.querySelectorAll('.nav-item')];
             const map = { today: 0, workout: 1, records: 2, 'ai-coach': 3, profile: 4 };
             const idx = map[id] ?? 0;
-            nav[idx]?.click?.();
+            /** @type {HTMLElement | undefined} */ (nav[idx])?.click?.();
             if (window.data) window.data._activePageId = id;
             if (typeof window.ensureDeps === 'function') {
                 try { await window.ensureDeps(id); } catch { /* ignore */ }
@@ -332,7 +341,7 @@ async function cycleRoutes(page) {
                 // Prefer real close path when available, then force-clean residue.
                 try {
                     document.querySelectorAll('[data-modal-close], .md-modal [data-close]').forEach((el) => {
-                        try { el.click(); } catch { /* ignore */ }
+                        try { /** @type {HTMLElement} */ (el).click(); } catch { /* ignore */ }
                     });
                 } catch { /* ignore */ }
                 document.querySelectorAll('.md-modal, [data-rl-modal="1"]').forEach((el) => el.remove());

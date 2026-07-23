@@ -136,13 +136,15 @@ test('C-T1 browser: Today→Workout→Records→Today cancelled workout does not
 
             // Instrument side-effect markers before rapid navigation.
             await page.evaluate(() => {
-                window.__sideFx = { setMode: [], swipeInit: 0, workoutStateInit: 0 };
+                /** @type {any} */
+                const sideFx = { setMode: [], swipeInit: 0, workoutStateInit: 0 };
+                window.__sideFx = sideFx;
                 const wrap = (obj, key, bucket) => {
                     if (!obj || typeof obj[key] !== 'function') return;
                     const orig = obj[key].bind(obj);
                     obj[key] = (...args) => {
-                        window.__sideFx[bucket] = (window.__sideFx[bucket] || 0) + 1;
-                        if (bucket === 'setMode') window.__sideFx.setMode.push(args[0]);
+                        sideFx[bucket] = (sideFx[bucket] || 0) + 1;
+                        if (bucket === 'setMode') sideFx.setMode.push(args[0]);
                         return orig(...args);
                     };
                 };
@@ -168,7 +170,7 @@ test('C-T1 browser: Today→Workout→Records→Today cancelled workout does not
             await delay(2500);
 
             const snap = await page.evaluate(() => {
-                clearInterval(window.__sideFxWatch);
+                if (window.__sideFxWatch != null) clearInterval(/** @type {any} */ (window.__sideFxWatch));
                 return {
                     active: document.querySelector('.page.active')?.id || null,
                     activePageId: window.data?._activePageId || null,

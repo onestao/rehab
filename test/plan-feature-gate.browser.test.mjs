@@ -221,13 +221,14 @@ test('A-T2 browser: five rapid clicks open only one modal and load plan-ui once'
             }));
             // Rapid programmatic intents (native disabled buttons drop force-clicks mid-busy).
             await page.evaluate(() => {
-                window.__planOpenErrors = [];
+                const planOpenErrors = [];
+                window.__planOpenErrors = planOpenErrors;
                 window.__planOpenResults = Promise.all(
                     [0, 1, 2, 3, 4].map(async () => {
                         try {
                             return await window.data.openNewPlanSheet();
                         } catch (e) {
-                            window.__planOpenErrors.push(String(e?.message || e));
+                            planOpenErrors.push(String(e?.message || e));
                             return null;
                         }
                     })

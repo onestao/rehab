@@ -42,6 +42,7 @@ function createGateContext() {
             toast: { show(msg, type) { toasts.push({ msg, type }); } },
             errorBus: { report(tag, e) { errors.push({ tag, message: e?.message || String(e) }); } },
             ui: { _navigationToken: 0 },
+            /** @type {any} */
             dataPlanUi: null,
             async loadAppScript(name) {
                 loadLog.push(name);

@@ -49,6 +49,7 @@ test('C-T1 unit: cancelled navigation loads modules but skips workout side effec
     // Lightweight harness mirroring the split contract without full PAGE_DEPS network.
     const state = {
         loaded: new Set(),
+        /** @type {string | null} */
         mode: null,
         workoutStateInit: false,
         swipeInit: false,

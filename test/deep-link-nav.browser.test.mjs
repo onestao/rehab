@@ -145,7 +145,8 @@ test('B-T1 browser: deep-link #/profile/library never paints Today as active', a
                 window.__seenActivePages = [];
                 const push = () => {
                     const id = document.querySelector('.page.active')?.id || null;
-                    const list = window.__seenActivePages;
+                    const list = window.__seenActivePages || [];
+                    window.__seenActivePages = list;
                     if (list[list.length - 1] !== id) list.push(id);
                 };
                 const obs = new MutationObserver(push);
@@ -396,13 +397,15 @@ test('H2-T2 browser: PWA mode re-pushes root instead of silent blank dump', asyn
             const page = await context.newPage();
             await page.addInitScript(() => {
                 Object.defineProperty(window.navigator, 'standalone', { get: () => true, configurable: true });
-                window.matchMedia = (q) => ({
+                window.matchMedia = (q) => /** @type {MediaQueryList} */ ({
                     matches: String(q).includes('standalone') || String(q).includes('minimal-ui'),
                     media: q,
+                    onchange: null,
                     addEventListener() {},
                     removeEventListener() {},
                     addListener() {},
-                    removeListener() {}
+                    removeListener() {},
+                    dispatchEvent() { return false; }
                 });
             });
             await page.goto(`${http.base}/index.html#/today`, { waitUntil: 'domcontentloaded', timeout: 60000 });

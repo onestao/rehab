@@ -215,7 +215,7 @@ async function withBrowser(fn) {
 
 async function seedAiStorage(page) {
     await page.addInitScript((seed) => {
-        const openDb = () => new Promise((resolve, reject) => {
+        const openDb = () => /** @type {Promise<IDBDatabase>} */ (new Promise((resolve, reject) => {
             const req = indexedDB.open(seed.IDB_NAME, 1);
             req.onupgradeneeded = () => {
                 const db = req.result;
@@ -225,13 +225,13 @@ async function seedAiStorage(page) {
             };
             req.onsuccess = () => resolve(req.result);
             req.onerror = () => reject(req.error);
-        });
-        const put = (db, key, value) => new Promise((resolve, reject) => {
+        }));
+        const put = (db, key, value) => /** @type {Promise<void>} */ (new Promise((resolve, reject) => {
             const tx = db.transaction(seed.IDB_STORE, 'readwrite');
             tx.objectStore(seed.IDB_STORE).put(value, key);
             tx.oncomplete = () => resolve();
             tx.onerror = () => reject(tx.error);
-        });
+        }));
         window.__rehabSeedAi = async () => {
             localStorage.setItem(seed.KEY, JSON.stringify(seed.cfg));
             localStorage.setItem(seed.MODELS_KEY, JSON.stringify(seed.models));
@@ -484,11 +484,13 @@ test('T5 single-flight concurrent diet open loads ai-task-settings once', async 
             await bootColdToday(page, http.url);
 
             await page.evaluate(async () => {
-                window.__pickerRuntimeCalls = 0;
+                let pickerRuntimeCalls = 0;
+                window.__pickerRuntimeCalls = pickerRuntimeCalls;
                 const original = window.data.ensureAiRuntime?.bind(window.data);
                 if (original) {
                     window.data.ensureAiRuntime = async function (...args) {
-                        window.__pickerRuntimeCalls += 1;
+                        pickerRuntimeCalls += 1;
+                        window.__pickerRuntimeCalls = pickerRuntimeCalls;
                         return original(...args);
                     };
                 }
