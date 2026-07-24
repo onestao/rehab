@@ -19,3 +19,6 @@ grok-fix.patch
 .tmp/
 build/fooddb-diet-profile-*/
 docs/temp-and-worktree-cleanup.md
+
+.learnings/
+.codex-remote-attachments/
