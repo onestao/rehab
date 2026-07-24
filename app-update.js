@@ -4,11 +4,11 @@ const appUpdate = {
     waitingWorker: null,
     checking: false,
     controllerReloadBound: false,
-    swUrl: './sw.js?v=361',
-    version: '361',
+    swUrl: './sw.js?v=362',
+    version: '362',
 
     controllerReloadKey() {
-        return 'rehab-sw-controller-reload-v361';
+        return 'rehab-sw-controller-reload-v362';
     },
 
     claimControllerReload() {
@@ -49,6 +49,41 @@ const appUpdate = {
         }
     },
 
+    isPendingUpdateWorker(worker) {
+        return !!(worker && worker.state === 'installed');
+    },
+
+    resolvePendingUpdateWorker(registration, preferredWorker) {
+        const candidates = [
+            preferredWorker,
+            registration?.waiting,
+            this.waitingWorker,
+            registration?.installing
+        ];
+        for (const worker of candidates) {
+            if (this.isPendingUpdateWorker(worker)) return worker;
+        }
+        // Drop stale remembered refs that are no longer waiting to activate.
+        if (this.waitingWorker && !this.isPendingUpdateWorker(this.waitingWorker)) {
+            this.waitingWorker = null;
+        }
+        return null;
+    },
+
+    clearCompletedUpdateState() {
+        this.waitingWorker = null;
+        this.deferredForSession = false;
+        if (this._updateBlockClearWatch != null) {
+            try { window.clearInterval(this._updateBlockClearWatch); } catch {}
+            this._updateBlockClearWatch = null;
+        }
+        if (this._sessionClearWatch != null) {
+            try { window.clearInterval(this._sessionClearWatch); } catch {}
+            this._sessionClearWatch = null;
+        }
+        this.dismiss();
+        this.hideUpgradeOverlay();
+    },
     bindControllerReload(hadController) {
         if (!hadController || this.controllerReloadBound) return;
         this.controllerReloadBound = true;
@@ -67,7 +102,7 @@ const appUpdate = {
                         version: this.version
                     });
                 } catch {}
-                this.hideUpgradeOverlay();
+                this.clearCompletedUpdateState();
                 return;
             }
             const blockReason = this.getUpdateBlockReason();
@@ -178,12 +213,19 @@ const appUpdate = {
     },
 
     show(worker) {
-        this.waitingWorker = worker || this.waitingWorker;
-        window.errorBus?.event?.('appUpdate', 'waiting:show', { state: worker?.state || '' });
+        const candidate = worker || this.waitingWorker;
+        if (!this.isPendingUpdateWorker(candidate)) {
+            if (this.waitingWorker && !this.isPendingUpdateWorker(this.waitingWorker)) {
+                this.waitingWorker = null;
+            }
+            return false;
+        }
+        this.waitingWorker = candidate;
+        window.errorBus?.event?.('appUpdate', 'waiting:show', { state: candidate.state || '' });
         const blockReason = this.getUpdateBlockReason();
         if (blockReason) {
-            this.showUpdateBlocked(blockReason, worker);
-            return;
+            this.showUpdateBlocked(blockReason, candidate);
+            return true;
         }
         const banner = document.getElementById('appUpdateBanner');
         if (!banner) return;
@@ -201,6 +243,7 @@ const appUpdate = {
             buttons[1].textContent = '立即更新';
             buttons[1].onclick = () => { void this.apply(); };
         }
+        return true;
     },
 
     async prepareWaitingWorker(worker) {
@@ -402,7 +445,7 @@ const appUpdate = {
             this.deferredForSession = false;
             this.clearServiceWorkerClientDefer();
             // If a waiting worker is still present, re-show normal update banner.
-            const worker = this.waitingWorker || this.registration?.waiting;
+            const worker = this.resolvePendingUpdateWorker(this.registration, this.waitingWorker);
             if (worker) this.show(worker);
         }, 2000);
         this._updateBlockClearWatch = watch;
@@ -438,7 +481,7 @@ const appUpdate = {
     },
 
     async apply() {
-        const worker = this.waitingWorker || this.registration?.waiting;
+        const worker = this.resolvePendingUpdateWorker(this.registration, this.waitingWorker);
         if (!worker) {
             const blockNoWorker = this.getUpdateBlockReason();
             if (blockNoWorker) {
@@ -550,11 +593,12 @@ const appUpdate = {
             const registration = await this.ensureRegistration();
             await registration?.update?.();
 
-            const worker = registration?.waiting
-                || this.waitingWorker
-                || await this.waitForInstalling(registration?.installing);
-            if (worker) {
-                this.show(worker);
+            let worker = this.resolvePendingUpdateWorker(registration);
+            if (!worker && registration?.installing) {
+                worker = await this.waitForInstalling(registration.installing);
+                if (!this.isPendingUpdateWorker(worker)) worker = null;
+            }
+            if (worker && this.show(worker)) {
                 this.notify('发现新版本，点击“立即更新”完成刷新', 'success');
                 window.errorBus?.event?.('appUpdate', 'check:updateFound', {
                     elapsedMs: Date.now() - started,
