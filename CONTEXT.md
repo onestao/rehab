@@ -6,7 +6,7 @@ Training Assistant is a local-first web training timer and health log. It suppor
 
 ## Domain Terms
 
-- Action: a strength movement in the current plan or action library.
+- Action: a reusable movement in the current plan or action library. Only the `training` category uses strength-style sets/reps fields; cardio, stretch, and other categories remain distinct.
 - Routine: a saved workout plan containing ordered actions.
 - History Record: a completed workout or cardio session saved into `data.db.history`.
 - Cardio Session: a timed aerobic workout with MET-based calorie estimation.

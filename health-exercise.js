@@ -37,7 +37,7 @@
                 if (!action || action.libOnly !== true || !action.exerciseLogEnabled) return false;
                 const category = normalizeCategory(action.category);
                 if (kind === 'cardio') return category === 'cardio' && Number(action.met || 0) > 0;
-                if (kind === 'strength') return category !== 'cardio';
+                if (kind === 'strength') return category === 'training';
                 return true;
             });
         },
@@ -124,7 +124,10 @@
             const action = this.findActionById?.(actionId) || (this.db.actions || []).find((item) => item && item.id === actionId);
             if (!action || action.deleted) return;
             const category = this.normalizeActionCategory?.(action.category) || '';
-            const type = category === 'cardio' ? 'custom' : 'strength';
+            const type = {
+                training: 'strength',
+                stretch: 'stretch'
+            }[category] || 'custom';
             const typeEl = document.getElementById('manualExerciseType');
             if (typeEl) typeEl.value = type;
             this.toggleManualCustomExercise(type);

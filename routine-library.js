@@ -908,7 +908,7 @@
                 if (!action || action.libOnly !== true || !action.exerciseLogEnabled) return false;
                 const category = this.normalizeActionCategory(action.category);
                 if (kind === 'cardio') return category === 'cardio' && Number(action.met || 0) > 0;
-                if (kind === 'strength') return category !== 'cardio';
+                if (kind === 'strength') return category === 'training';
                 return true;
             });
         },
@@ -976,6 +976,21 @@
             const category = this.normalizeActionCategory(action.category);
             const met = Number(action.met || 0);
             return category === 'cardio' && met > 0 ? `可记运动 · ${met} MET` : '可记运动';
+        },
+
+        actionLibraryMetadata(action = {}) {
+            const category = this.normalizeActionCategory(action.category);
+            const details = [this.actionCategoryLabel(action.category), action.bodyPart];
+            if (category === 'training') {
+                details.push(
+                    `${action.sets || 1}组 × ${action.reps || 1}次`,
+                    `${action.work || 5}s`,
+                    action.phase || 'main',
+                    action.isAlt ? '双侧' : ''
+                );
+            }
+            details.push(this.actionExerciseLogLabel(action));
+            return details.filter(Boolean);
         },
 
         renderActionCategoryOptions(value = '') {
@@ -1587,18 +1602,20 @@
             const action = this.findActionById(actionId);
             if (!action || action.deleted) return;
             const esc = (v) => (this.escapeHtml ? this.escapeHtml(v || '') : String(v || ''));
+            const isTraining = this.normalizeActionCategory(action.category) === 'training';
+            const trainingFieldClass = isTraining ? '' : ' hidden';
             return this._openModal({
                 title: '编辑动作',
                 icon: 'tune',
                 bodyHtml: `
                     <div class="md-grid modal-grid" style="gap:10px">
-                        <div class="md-field"><input id="rlAeSets" type="number" min="1" placeholder=" " value="${esc(String(action.sets || 1))}"><label>组数</label></div>
-                        <div class="md-field"><input id="rlAeReps" type="number" min="1" placeholder=" " value="${esc(String(action.reps || 1))}"><label>次数</label></div>
-                        <div class="md-field"><input id="rlAeWork" type="number" min="1" placeholder=" " value="${esc(String(action.work || 5))}"><label>单次秒数</label></div>
-                        <div class="md-field"><input id="rlAeRepRest" type="number" min="0" placeholder=" " value="${esc(String(action.repRest ?? 2))}"><label>次休秒数</label></div>
-                        <div class="md-field"><input id="rlAeActionRest" type="number" min="0" placeholder=" " value="${esc(String(action.actionRest ?? 10))}"><label>组休秒数</label></div>
-                        <div class="md-field"><input id="rlAeGroupRest" type="number" min="0" placeholder=" " value="${esc(String(action.groupRest ?? 15))}"><label>项休秒数</label></div>
-                        <div class="md-field">
+                        <div class="md-field${trainingFieldClass}" data-rl-strength-field><input id="rlAeSets" type="number" min="1" placeholder=" " value="${esc(String(action.sets || 1))}"><label>组数</label></div>
+                        <div class="md-field${trainingFieldClass}" data-rl-strength-field><input id="rlAeReps" type="number" min="1" placeholder=" " value="${esc(String(action.reps || 1))}"><label>次数</label></div>
+                        <div class="md-field${trainingFieldClass}" data-rl-strength-field><input id="rlAeWork" type="number" min="1" placeholder=" " value="${esc(String(action.work || 5))}"><label>单次秒数</label></div>
+                        <div class="md-field${trainingFieldClass}" data-rl-strength-field><input id="rlAeRepRest" type="number" min="0" placeholder=" " value="${esc(String(action.repRest ?? 2))}"><label>次休秒数</label></div>
+                        <div class="md-field${trainingFieldClass}" data-rl-strength-field><input id="rlAeActionRest" type="number" min="0" placeholder=" " value="${esc(String(action.actionRest ?? 10))}"><label>组休秒数</label></div>
+                        <div class="md-field${trainingFieldClass}" data-rl-strength-field><input id="rlAeGroupRest" type="number" min="0" placeholder=" " value="${esc(String(action.groupRest ?? 15))}"><label>项休秒数</label></div>
+                        <div class="md-field${trainingFieldClass}" data-rl-strength-field>
                             <select id="rlAePhase" required>
                                 <option value="warmup" ${(action.phase || 'main') === 'warmup' ? 'selected' : ''}>暖身</option>
                                 <option value="main" ${(action.phase || 'main') === 'main' ? 'selected' : ''}>正式</option>
@@ -1610,7 +1627,7 @@
                         <div class="md-field"><input id="rlAeBodyPart" type="text" placeholder=" " value="${esc(action.bodyPart || '')}"><label>训练部位</label></div>
                         <div class="md-field" id="rlAeMetField"><input id="rlAeMet" type="number" min="0" step="0.1" placeholder=" " value="${esc(String(action.met || ''))}"><label>MET（有氧热量）</label></div>
                         <div style="grid-column:1/-1;display:flex;align-items:center;gap:10px;padding:4px 2px">
-                            <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
+                            <label class="${isTraining ? '' : 'hidden'}" data-rl-strength-field style="display:flex;align-items:center;gap:10px;cursor:pointer">
                                 <input id="rlAeIsAlt" type="checkbox" ${action.isAlt ? 'checked' : ''}>
                                 <span style="color:var(--md-sys-on-surface)">双侧交替</span>
                             </label>
@@ -1627,15 +1644,18 @@
                 `,
                 onMount: (root, close) => {
                     const q = (sel) => root.querySelector(sel);
-                    const syncMetField = () => {
+                    const syncCategoryFields = () => {
                         const category = this.normalizeActionCategory(q('#rlAeCategory')?.value || '');
                         const enabled = !!q('#rlAeExerciseLogEnabled')?.checked;
+                        root.querySelectorAll('[data-rl-strength-field]').forEach((field) => {
+                            field.classList.toggle('hidden', category !== 'training');
+                        });
                         q('#rlAeMetField')?.classList.toggle('hidden', category !== 'cardio' && !enabled);
                     };
-                    q('#rlAeSets')?.focus?.();
-                    q('#rlAeCategory')?.addEventListener('change', syncMetField);
-                    q('#rlAeExerciseLogEnabled')?.addEventListener('change', syncMetField);
-                    syncMetField();
+                    (isTraining ? q('#rlAeSets') : q('#rlAeCategory'))?.focus?.();
+                    q('#rlAeCategory')?.addEventListener('change', syncCategoryFields);
+                    q('#rlAeExerciseLogEnabled')?.addEventListener('change', syncCategoryFields);
+                    syncCategoryFields();
                     q('[data-rl-save]')?.addEventListener('click', (e) => {
                         e.preventDefault();
                         action.sets = Math.max(1, parseInt(q('#rlAeSets')?.value, 10) || 1);
@@ -1780,7 +1800,7 @@
                     <div class="library-card-head">
                         <div style="flex:1;min-width:0">
                             <strong>${this.escapeHtml(a.name || '未命名动作')}</strong>
-                            <small>${[this.actionCategoryLabel?.(a.category), a.bodyPart, `${a.sets || 1}组 × ${a.reps || 1}次`, `${a.work || 5}s`, a.phase || 'main', a.isAlt ? '双侧' : '', this.actionExerciseLogLabel?.(a)].filter(Boolean).join(' · ')}</small>
+                            <small>${this.actionLibraryMetadata(a).join(' · ')}</small>
                             ${Array.isArray(a.tags) && a.tags.length ? `<div class="library-inline-tags">${a.tags.map((t) => `<span>${this.escapeHtml(t)}</span>`).join('')}</div>` : ''}
                         </div>
                     </div>
