@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const BASE_COMMIT = 'e40b29b4bc4a3715d0739880b0dc3dd882da1753';
+const BASE_COMMIT = 'e575601cd3018677fed29ed409e12ce7185cf9c2';
 
 const TODAY_CSS = 'css-src/51-v6-today.css';
 const WORKOUT_CSS = 'css-src/52-v6-workout.css';
