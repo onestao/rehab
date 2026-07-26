@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import vm from 'node:vm';
+import actionTaxonomy from '../action-taxonomy-pure.js';
 
 const policySource = readFileSync(new URL('../rehab-policy.js', import.meta.url), 'utf8');
 const autoAdjustSource = readFileSync(new URL('../plan-auto-adjust.js', import.meta.url), 'utf8');
@@ -12,6 +13,7 @@ function loadAutoAdjust(toastCalls = [], runStreamCalls = []) {
     const sandbox = {
         console,
         window: {
+            actionTaxonomy,
             ai: {
                 runStream: async (...args) => {
                     runStreamCalls.push(args);

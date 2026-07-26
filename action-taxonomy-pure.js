@@ -8,7 +8,11 @@
  *
  *  - nature  动作性质：training/stretch/mobility/warmup/recovery/cardio/other（可为空 = 未分类）
  *  - phase   计划阶段：warmup/main/cooldown —— AI 计划 JSON 的对外契约，不可改名改值
- *  - bucket  训练负荷桶：push/pull/lower/core/cardio/rehab —— 周容量分析用
+ *  - bucket  训练负荷桶：push/pull/lower/core/cardio/rehab —— 周容量分析用。
+ *    有两个入口：normalizeTrainingBucket 是单词/别名查表（把已有分类词折算到桶键），
+ *    inferTrainingBucket 是长文本正则扫描（从动作名+备注里认出桶）。
+ *    每个桶另有一个中文展示标签（如 lower = 「下肢/髋膝踝」），会进 AI 提示词与写给用户看的
+ *    aiReasoning 文案，属用户可见文案，改动即改用户可见输出。
  *  - logType 运动记录种类：strength/stretch/custom 或内置有氧类型键
  *  - bodyPart 部位：膝/踝/髋/腰背/肩/肘腕/颈 —— 诊断、检查、处方动作的主要部位。
  *    存储层保持用户/AI 的自由文本原文（如「膝盖」「左膝内侧」不改写），
@@ -35,6 +39,21 @@ const PLAN_PHASES = ['warmup', 'main', 'cooldown'];
 
 /** 训练负荷桶枚举 */
 const TRAINING_BUCKETS = ['push', 'pull', 'lower', 'core', 'cardio', 'rehab'];
+
+/**
+ * 训练负荷桶推断规则：[桶键, 中文展示标签, 关键词正则]，顺序即优先级，首个命中生效。
+ * 词典与顺序逐字迁自 plan-auto-adjust.js 的 inferBodyPart（名为部位、实为负荷桶），不得随意增删改序。
+ * 中文标签是用户可见文案（AI 提示词与 aiReasoning），不得改写。
+ * @type {ReadonlyArray<readonly [string, string, RegExp]>}
+ */
+const TRAINING_BUCKET_RULES = [
+    ['lower', '下肢/髋膝踝', /膝|踝|足|腿|臀|髋|深蹲|弓步|下肢|knee|ankle|leg|hip|glute|squat|lunge/],
+    ['push', '上肢推/肩胸', /肩|胸|推|俯卧撑|上肢|shoulder|chest|press|push/],
+    ['pull', '上肢拉/背', /背|划船|下拉|拉|row|pull|back/],
+    ['core', '核心/躯干', /核心|腹|腰|平板|躯干|core|abs|plank|trunk/],
+    ['cardio', '有氧', /有氧|跑|走|骑|游泳|cardio|run|walk|bike|cycling|swim/],
+    ['rehab', '活动度/放松', /拉伸|活动度|放松|mobility|stretch/]
+];
 
 /**
  * 部位推断规则：[部位键, 关键词正则]，顺序即优先级，首个命中生效。
@@ -120,6 +139,23 @@ function normalizeTrainingBucket(value = '') {
     return TRAINING_BUCKETS.includes(normalized) ? normalized : '';
 }
 
+/** 从自由文本推断训练负荷桶键；首个命中的规则生效，未命中返回空串。 */
+function inferTrainingBucket(value = '') {
+    const text = String(value || '').toLowerCase();
+    return TRAINING_BUCKET_RULES.find(([, , pattern]) => pattern.test(text))?.[0] || '';
+}
+
+/** 训练负荷桶的中文展示标签（用户可见文案）；未知桶返回空串。 */
+function trainingBucketLabel(value = '') {
+    const key = toKey(value);
+    return TRAINING_BUCKET_RULES.find(([bucket]) => bucket === key)?.[1] || '';
+}
+
+/** 从自由文本推断训练负荷桶的中文展示标签；未命中返回空串。 */
+function inferTrainingBucketLabel(value = '') {
+    return trainingBucketLabel(inferTrainingBucket(value));
+}
+
 /** 从自由文本推断主要部位；首个命中的规则生效，未命中返回空串。 */
 function inferBodyPart(value = '') {
     const text = String(value || '').toLowerCase();
@@ -165,6 +201,9 @@ const actionTaxonomy = {
     actionNatureLabel,
     normalizePlanPhase,
     normalizeTrainingBucket,
+    inferTrainingBucket,
+    trainingBucketLabel,
+    inferTrainingBucketLabel,
     inferBodyPart,
     normalizeBodyPart,
     natureToExerciseLogType,
@@ -184,6 +223,9 @@ export {
     actionNatureLabel,
     normalizePlanPhase,
     normalizeTrainingBucket,
+    inferTrainingBucket,
+    trainingBucketLabel,
+    inferTrainingBucketLabel,
     inferBodyPart,
     normalizeBodyPart,
     natureToExerciseLogType,

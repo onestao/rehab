@@ -50,15 +50,10 @@
         return { done, total: items.length, complete: done >= items.length };
     }
 
+    // 名为 bodyPart，推断的其实是训练负荷桶（下肢/上肢推/上肢拉/核心/有氧/活动度），不是临床部位；
+    // 字段名 bodyPart 属历史遗留。词典已收编进 action-taxonomy-pure.js（boot 常驻），保留函数壳以维持调用点不变。
     function inferBodyPart(text = '') {
-        const value = String(text || '').toLowerCase();
-        if (/膝|踝|足|腿|臀|髋|深蹲|弓步|下肢|knee|ankle|leg|hip|glute|squat|lunge/.test(value)) return '下肢/髋膝踝';
-        if (/肩|胸|推|俯卧撑|上肢|shoulder|chest|press|push/.test(value)) return '上肢推/肩胸';
-        if (/背|划船|下拉|拉|row|pull|back/.test(value)) return '上肢拉/背';
-        if (/核心|腹|腰|平板|躯干|core|abs|plank|trunk/.test(value)) return '核心/躯干';
-        if (/有氧|跑|走|骑|游泳|cardio|run|walk|bike|cycling|swim/.test(value)) return '有氧';
-        if (/拉伸|活动度|放松|mobility|stretch/.test(value)) return '活动度/放松';
-        return '';
+        return window.actionTaxonomy?.inferTrainingBucketLabel?.(text) || '';
     }
 
     function taskMeta(item = {}) {

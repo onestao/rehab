@@ -9,6 +9,9 @@ import {
     actionNatureLabel,
     normalizePlanPhase,
     normalizeTrainingBucket,
+    inferTrainingBucket,
+    trainingBucketLabel,
+    inferTrainingBucketLabel,
     inferBodyPart,
     normalizeBodyPart,
     natureToExerciseLogType,
@@ -71,6 +74,52 @@ test('训练负荷桶归一化', () => {
     assert.equal(normalizeTrainingBucket('拉伸'), 'rehab');
     assert.equal(normalizeTrainingBucket('unknown'), '');
     TRAINING_BUCKETS.forEach((bucket) => assert.equal(normalizeTrainingBucket(bucket), bucket));
+});
+
+test('训练负荷桶推断：六条规则各一个正例，未命中/空/null 留空', () => {
+    assert.equal(inferTrainingBucket('靠墙深蹲'), 'lower');
+    assert.equal(inferTrainingBucket('俯卧撑'), 'push');
+    assert.equal(inferTrainingBucket('坐姿划船'), 'pull');
+    assert.equal(inferTrainingBucket('平板支撑'), 'core');
+    assert.equal(inferTrainingBucket('骑行 30 分钟'), 'cardio');
+    assert.equal(inferTrainingBucket('髋关节活动度'), 'lower', '「髋」比「活动度」靠前，桶推断按顺序取首个命中');
+    assert.equal(inferTrainingBucket('活动度训练'), 'rehab');
+    assert.equal(inferTrainingBucket('Mobility Drill'), 'rehab', '大小写混合同样命中');
+    assert.equal(inferTrainingBucket('冥想'), '');
+    assert.equal(inferTrainingBucket(''), '');
+    assert.equal(inferTrainingBucket(/** @type {any} */ (null)), '');
+    assert.equal(inferTrainingBucket(), '');
+});
+
+test('训练负荷桶中文标签是用户可见文案，逐字锁定', () => {
+    assert.equal(trainingBucketLabel('lower'), '下肢/髋膝踝');
+    assert.equal(trainingBucketLabel('push'), '上肢推/肩胸');
+    assert.equal(trainingBucketLabel('pull'), '上肢拉/背');
+    assert.equal(trainingBucketLabel('core'), '核心/躯干');
+    assert.equal(trainingBucketLabel('cardio'), '有氧');
+    assert.equal(trainingBucketLabel('rehab'), '活动度/放松');
+    assert.equal(trainingBucketLabel('unknown'), '');
+    assert.equal(trainingBucketLabel(''), '');
+});
+
+test('桶推断顺序即优先级：同时命中时靠前的规则赢', () => {
+    assert.equal(inferTrainingBucketLabel('深蹲后拉伸'), '下肢/髋膝踝', 'lower 在 rehab 之前');
+    assert.equal(inferTrainingBucketLabel('肩部拉伸'), '上肢推/肩胸', 'push 在 rehab 之前');
+    assert.equal(inferTrainingBucketLabel('划船机有氧'), '上肢拉/背', 'pull 在 cardio 之前');
+    assert.equal(inferTrainingBucketLabel('核心跑步'), '核心/躯干', 'core 在 cardio 之前');
+    assert.equal(inferTrainingBucketLabel('有氧后放松'), '有氧', 'cardio 在 rehab 之前');
+    assert.equal(inferTrainingBucketLabel('冥想'), '');
+    assert.equal(inferTrainingBucketLabel(/** @type {any} */ (null)), '');
+});
+
+test('bucket 维度的两个入口自洽：单词查表与长文本扫描落到同一批桶键', () => {
+    TRAINING_BUCKETS.forEach((bucket) => assert.equal(normalizeTrainingBucket(bucket), bucket));
+    ['靠墙深蹲', '俯卧撑', '坐姿划船', '平板支撑', '骑行', '活动度'].forEach((text) => {
+        const bucket = inferTrainingBucket(text);
+        assert.ok(TRAINING_BUCKETS.includes(bucket), `${text} 应落在桶枚举内`);
+        assert.equal(normalizeTrainingBucket(bucket), bucket, '推断出的桶键必须能被别名表原样接受');
+        assert.equal(inferTrainingBucketLabel(text), trainingBucketLabel(bucket));
+    });
 });
 
 test('部位枚举：7 个中文键，保持推断规则顺序', () => {
