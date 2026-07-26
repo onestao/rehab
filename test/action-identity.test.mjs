@@ -409,7 +409,7 @@ function unclassifiedDb(records = []) {
     return { health: { rehabWeekly: [], prescriptionActions: records } };
 }
 
-test('待分类清单：只返回 bodyParts 为空的活记录，三种来源已标的都算已分类', () => {
+test('待分类清单：只返回部位与来源双空的活记录，三种来源已标的都算已分类', () => {
     const db = unclassifiedDb([
         { id: 'pa-empty', displayName: '侧卧髋外展', aliases: ['侧卧髋外展', '弹力带侧卧髋部外展'], bodyParts: [], updatedAt: 100 },
         { id: 'pa-user', displayName: '靠墙静蹲', bodyParts: ['膝'], bodyPartsSource: 'user', updatedAt: 200 },
@@ -431,6 +431,36 @@ test('待分类清单：只返回 bodyParts 为空的活记录，三种来源已
         aliases: ['弹力带侧卧髋部外展']
     });
     assert.deepEqual(result.actions[1], { id: 'pa-missing', displayName: '呼吸练习' });
+});
+
+test('待分类清单：user 已表态但枚举装不下的空数组记录不列入，AI 也确实写不进去', () => {
+    const db = unclassifiedDb([
+        { id: 'pa-unspoken', displayName: '呼吸练习', bodyParts: [], bodyPartsSource: '', updatedAt: 100 },
+        // 毒化场景：用户填「全身」派生出空数组 + user 来源。旧筛选每次都把它塞给 AI，
+        // 而 applyAiBodyParts 因 source=user 永远拒写——死循环白占提示词名额。
+        { id: 'pa-user-empty', displayName: '全身放松操', bodyPart: '全身', bodyParts: [], bodyPartsSource: 'user', updatedAt: 200 },
+        { id: 'pa-ai', displayName: '踝泵', bodyParts: ['膝'], bodyPartsSource: 'ai', updatedAt: 300 }
+    ]);
+
+    const result = listUnclassifiedBodyPartActions(db);
+    assert.deepEqual(result.actions.map((item) => item.id), ['pa-unspoken'], '谁都没表过态的才列');
+    assert.equal(result.total, 1);
+    assert.equal(result.truncated, false);
+
+    // 互为印证：清单排除 user 空数组记录，正因 AI 分类结果确实写不进去。
+    globalThis.window = { actionTaxonomy };
+    try {
+        assert.equal(
+            applyAiBodyParts(db, [{ prescriptionActionId: 'pa-user-empty', bodyParts: ['膝'] }], { nowTs: 9000 }),
+            0
+        );
+        const record = db.health.prescriptionActions[1];
+        assert.deepEqual(record.bodyParts, []);
+        assert.equal(record.bodyPartsSource, 'user');
+        assert.equal(record.updatedAt, 200, '拒写就不该动 updatedAt');
+    } finally {
+        delete globalThis.window;
+    }
 });
 
 test('待分类清单：超出上限按 updatedAt 倒序截断，并标出这一批不是全量', () => {
