@@ -48,6 +48,15 @@ function historyDayKey(entry) {
     return dateKey(new Date(entry?.date || Date.now()));
 }
 
+// 有氧场次判定：拉伸和无 MET 的自定义记录不算有氧；
+// 内置有氧类型键（walk/run/…）与带 MET 的自定义记录才算。
+function isCardioExerciseLog(entry) {
+    const type = String(entry?.type || '');
+    if (!type || type === 'strength' || type === 'stretch') return false;
+    if (type === 'custom') return Number(entry.met || 0) > 0;
+    return true;
+}
+
 function buildMetrics(db, period) {
     const health = db?.health || {};
     const weights = active(health.weights).filter(w => inRange(w.date, period.start, period.end)).sort((a, b) => String(a.date).localeCompare(String(b.date)));
@@ -71,7 +80,7 @@ function buildMetrics(db, period) {
     const totalProtein = foodLogs.reduce((sum, f) => sum + Number(f.pro || 0), 0);
 
     const cardioHistories = histories.filter(h => h.type === 'cardio' || h.cardio);
-    const cardioExercises = exerciseLogs.filter(e => e.type && e.type !== 'strength');
+    const cardioExercises = exerciseLogs.filter(isCardioExerciseLog);
     const hrValues = cardioHistories.map(h => Number(h.cardio?.avgHr || h.avgHr || 0)).filter(n => n > 0);
 
     return {

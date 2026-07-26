@@ -23,6 +23,15 @@ export function normalizePrescriptionActionName(value = '') {
         .toLowerCase();
 }
 
+// 处方 category 历史上是 AI 采集的自由文本。能识别的归一到动作性质枚举
+// （action-taxonomy-pure.js），识别不了的保留原文：不丢信息，且重复归一化幂等。
+function normalizeCategoryText(value = '') {
+    const raw = String(value || '').trim();
+    if (!raw) return '';
+    const taxonomy = typeof window !== 'undefined' ? window['actionTaxonomy'] : null;
+    return taxonomy?.normalizeActionNature?.(raw) || raw;
+}
+
 function hashText(value = '') {
     let hash = 2166136261;
     const text = String(value || '');
@@ -57,7 +66,7 @@ export function normalizePrescriptionAction(record = {}, options = {}) {
         linkedActionId: String(record.linkedActionId || '').trim(),
         regressionIds: normalizeRelationIds(record.regressionIds, id),
         progressionIds: normalizeRelationIds(record.progressionIds, id),
-        category: String(record.category || record.actionCategory || record.type || '').trim(),
+        category: normalizeCategoryText(record.category || record.actionCategory || record.type || ''),
         bodyPart: String(record.bodyPart || '').trim(),
         conditionId: String(record.conditionId || '').trim(),
         conditionLabel: String(record.conditionLabel || '').trim(),
@@ -175,9 +184,9 @@ export function ensurePrescriptionActionCatalog(db = {}, options = {}) {
                 action.actionId,
             ]);
         if (!record.category && (action.category || action.actionCategory || action.type))
-            record.category = String(
+            record.category = normalizeCategoryText(
                 action.category || action.actionCategory || action.type || '',
-            ).trim();
+            );
         if (!record.bodyPart && action.bodyPart)
             record.bodyPart = String(action.bodyPart || '').trim();
         if (!record.conditionId && action.conditionId)

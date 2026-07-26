@@ -1,6 +1,7 @@
 // @ts-nocheck
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import actionTaxonomy from '../action-taxonomy-pure.js';
 import {
     addPrescriptionActionRelation,
     ensurePrescriptionActionCatalog,
@@ -8,6 +9,40 @@ import {
     normalizePrescriptionActionName,
     setPrescriptionActionLinkedAction
 } from '../action-identity.js';
+
+function categoryDb(category) {
+    return {
+        health: {
+            rehabWeekly: [
+                { weekStart: '2026-07-20', actions: [{ actionId: 'ra-1', name: '夹砖臀桥', category }] }
+            ],
+            prescriptionActions: []
+        }
+    };
+}
+
+test('处方 category：taxonomy 可用时归一化且幂等，识别不了保留原文', () => {
+    globalThis.window = { actionTaxonomy };
+    try {
+        const db = categoryDb('力量');
+        ensurePrescriptionActionCatalog(db, { nowTs: 1000 });
+        assert.equal(db.health.prescriptionActions[0].category, 'training');
+        ensurePrescriptionActionCatalog(db, { nowTs: 2000 });
+        assert.equal(db.health.prescriptionActions[0].category, 'training');
+
+        const rawDb = categoryDb('医生手写的特殊分类');
+        ensurePrescriptionActionCatalog(rawDb, { nowTs: 1000 });
+        assert.equal(rawDb.health.prescriptionActions[0].category, '医生手写的特殊分类');
+    } finally {
+        delete globalThis.window;
+    }
+});
+
+test('处方 category：无 taxonomy 环境保持原文，不抛错', () => {
+    const db = categoryDb('力量');
+    ensurePrescriptionActionCatalog(db, { nowTs: 1000 });
+    assert.equal(db.health.prescriptionActions[0].category, '力量');
+});
 
 test('ensurePrescriptionActionCatalog creates user-visible standard identities', () => {
     const db = {
