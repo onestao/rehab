@@ -1527,18 +1527,19 @@
                                     target.category ||
                                     '',
                             );
-                            target.bodyPart = String(
-                                root.querySelector('#prescriptionBodyPart')?.value || '',
-                            ).trim();
-                            window.actionTaxonomy?.applyUserBodyParts?.(target);
-                            // 派生字段与 bodyPart 同批打时间戳，字段级同步才不会把新原文配上旧派生值。
+                            const bodyPartChanged = window.actionTaxonomy?.applyUserBodyParts?.(
+                                target,
+                                root.querySelector('#prescriptionBodyPart')?.value,
+                            );
+                            // 部位三字段只在真变化时同批打戳：新原文不会配旧派生值，
+                            // 未变化的空输入也不会拿新戳去覆写别的设备上的 AI/词典分类。
                             this.touchRecord?.(target, [
                                 'displayName',
                                 'aliases',
                                 'category',
-                                'bodyPart',
-                                'bodyParts',
-                                'bodyPartsSource',
+                                ...(bodyPartChanged
+                                    ? ['bodyPart', 'bodyParts', 'bodyPartsSource']
+                                    : []),
                             ]);
                             this.saveAndBackup?.() || this.save();
                             close();
@@ -1648,8 +1649,7 @@
                         action.category = this.normalizeActionCategory(
                             q('#rlAeCategory')?.value || action.category || '',
                         );
-                        action.bodyPart = String(q('#rlAeBodyPart')?.value || '').trim();
-                        window.actionTaxonomy?.applyUserBodyParts?.(action);
+                        window.actionTaxonomy?.applyUserBodyParts?.(action, q('#rlAeBodyPart')?.value);
                         action.isAlt = !!q('#rlAeIsAlt')?.checked;
                         action.exerciseLogEnabled = !!q('#rlAeExerciseLogEnabled')?.checked;
                         action.met = Math.max(0, Number(q('#rlAeMet')?.value || 0));

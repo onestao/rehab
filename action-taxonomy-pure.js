@@ -207,17 +207,23 @@ function normalizeBodyParts(value = '') {
 }
 
 /**
- * 把记录上的自由文本 bodyPart 派生成归一化多值 bodyParts，并标记来源为用户填写。
- * 三处编辑器（处方动作行、处方编辑器、动作库编辑器）的保存路径共用，
- * 免得「派生 + 标来源」这条规则再各抄一份。原文 bodyPart 一字不动。
+ * 三处编辑器保存路径共用：按值变化写入用户填的部位并派生多值字段。
+ * 输入与现存 bodyPart（各自 trim 后）相同 → 不碰任何字段：AI/词典分类的记录
+ * bodyPart 为空、输入框预填也为空，原样保存不得抹掉已派生的 bodyParts。
+ * 不同 → 写入原文（trim，不改写）、派生 bodyParts、来源记 user；
+ * 清空 = 用户撤回表态，派生与来源同步清空，词典/AI 之后可重填。
  * @param {any} record
- * @returns {any}
+ * @param {any} [nextText] 编辑器输入的部位自由文本；缺省视为空串
+ * @returns {boolean} 是否真的变化，调用方据此决定要不要打字段级时间戳
  */
-function applyUserBodyParts(record) {
-    if (!record || typeof record !== 'object') return record;
-    record.bodyParts = normalizeBodyParts(record.bodyPart);
-    record.bodyPartsSource = record.bodyPart ? 'user' : '';
-    return record;
+function applyUserBodyParts(record, nextText) {
+    if (!record || typeof record !== 'object') return false;
+    const next = String(nextText ?? '').trim();
+    if (next === String(record.bodyPart || '').trim()) return false;
+    record.bodyPart = next;
+    record.bodyParts = normalizeBodyParts(next);
+    record.bodyPartsSource = next ? 'user' : '';
+    return true;
 }
 
 /**

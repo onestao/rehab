@@ -1124,8 +1124,7 @@
                 if (!action) return;
                 action.status = normalizeRehabStatus(row.querySelector('[data-field="status"]')?.value);
                 action.name = String(row.querySelector('[data-field="name"]')?.value || action.name).trim() || action.name;
-                action.bodyPart = String(row.querySelector('[data-field="bodyPart"]')?.value || action.bodyPart || inferBodyPart(`${action.name || ''} ${action.rawDescription || ''} ${action.coachNote || ''}`) || '').trim();
-                window.actionTaxonomy?.applyUserBodyParts?.(action);
+                window.actionTaxonomy?.applyUserBodyParts?.(action, row.querySelector('[data-field="bodyPart"]')?.value || action.bodyPart || inferBodyPart(`${action.name || ''} ${action.rawDescription || ''} ${action.coachNote || ''}`));
                 action.conditionId = String(row.querySelector('[data-field="conditionId"]')?.value || '').trim();
                 const matchedCondition = (this.db.health?.profile?.conditions || []).find((condition) => conditionKey(condition) === action.conditionId);
                 action.conditionLabel = matchedCondition?.label || action.conditionLabel || '';

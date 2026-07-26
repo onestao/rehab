@@ -16,6 +16,7 @@ import {
     inferBodyParts,
     normalizeBodyPart,
     normalizeBodyParts,
+    applyUserBodyParts,
     natureToExerciseLogType,
     exerciseLogTypeToNature
 } from '../action-taxonomy-pure.js';
@@ -215,6 +216,77 @@ test('多值化不改变单值入口的既有语义', () => {
     assert.equal(normalizeBodyPart('low back'), '腰背');
     assert.equal(normalizeBodyPart('全身'), '');
     assert.equal(inferBodyPart('股四头肌与臀肌激活'), '膝', '多命中时单值仍取规则表里靠前的那个');
+});
+
+test('applyUserBodyParts：输入未变化不碰派生字段，AI/词典分类存活', () => {
+    // AI 分类的记录 bodyPart 为空，编辑器输入框预填也为空；用户只改动作名保存
+    // 时输入原样传回 —— 未变化必须什么都不动，否则 AI 分类被空值抹掉（数据丢失 bug）。
+    const ai = { bodyPart: '', bodyParts: ['膝'], bodyPartsSource: 'ai' };
+    assert.equal(applyUserBodyParts(ai, ''), false);
+    assert.deepEqual(ai.bodyParts, ['膝'], 'AI 分类不得被未变化的空输入抹掉');
+    assert.equal(ai.bodyPartsSource, 'ai');
+    assert.equal(ai.bodyPart, '');
+
+    const lexicon = { bodyPart: '', bodyParts: ['髋'], bodyPartsSource: 'lexicon' };
+    assert.equal(applyUserBodyParts(lexicon, ''), false);
+    assert.deepEqual(lexicon.bodyParts, ['髋']);
+    assert.equal(lexicon.bodyPartsSource, 'lexicon');
+
+    // 非空同值（含首尾空白差异）同样视为未变化，派生字段一律不碰。
+    const same = { bodyPart: '膝、踝', bodyParts: ['膝', '踝'], bodyPartsSource: 'user' };
+    assert.equal(applyUserBodyParts(same, ' 膝、踝 '), false);
+    assert.equal(same.bodyPart, '膝、踝');
+    assert.deepEqual(same.bodyParts, ['膝', '踝']);
+    assert.equal(same.bodyPartsSource, 'user');
+});
+
+test('applyUserBodyParts：值变化才写原文、派生多值并标 user，返回 true', () => {
+    const record = { bodyPart: '', bodyParts: [], bodyPartsSource: '' };
+    assert.equal(applyUserBodyParts(record, ' 髋/膝 '), true);
+    assert.equal(record.bodyPart, '髋/膝', '原文只 trim 不改写');
+    assert.deepEqual(record.bodyParts, ['膝', '髋']);
+    assert.equal(record.bodyPartsSource, 'user');
+
+    // 用户明确输入了不同的值时覆盖 AI 分类是合法变化。
+    const ai = { bodyPart: '', bodyParts: ['膝'], bodyPartsSource: 'ai' };
+    assert.equal(applyUserBodyParts(ai, '肩'), true);
+    assert.deepEqual(ai.bodyParts, ['肩']);
+    assert.equal(ai.bodyPartsSource, 'user');
+
+    // 派生不出枚举键的自由文本同样保留原文，来源仍是 user。
+    const unknown = { bodyPart: '' };
+    assert.equal(applyUserBodyParts(unknown, '全身'), true);
+    assert.equal(unknown.bodyPart, '全身');
+    assert.deepEqual(unknown.bodyParts, []);
+    assert.equal(unknown.bodyPartsSource, 'user');
+});
+
+test('applyUserBodyParts：清空 = 撤回表态，派生与来源同步清空', () => {
+    const record = { bodyPart: '左膝内侧', bodyParts: ['膝'], bodyPartsSource: 'user' };
+    assert.equal(applyUserBodyParts(record, ''), true);
+    assert.equal(record.bodyPart, '');
+    assert.deepEqual(record.bodyParts, [], '撤回后词典/AI 之后可重填');
+    assert.equal(record.bodyPartsSource, '');
+    // 再次以空保存：已是双空，未变化。
+    assert.equal(applyUserBodyParts(record, ''), false);
+});
+
+test('applyUserBodyParts：record / nextText 的 null、undefined 容错', () => {
+    assert.equal(applyUserBodyParts(null, '膝'), false);
+    assert.equal(applyUserBodyParts(undefined, '膝'), false);
+    assert.equal(applyUserBodyParts('文本不是记录', '膝'), false);
+    // nextText 缺省视为空串：双空未变化，派生字段存活。
+    const record = { bodyPart: '', bodyParts: ['膝'], bodyPartsSource: 'ai' };
+    assert.equal(applyUserBodyParts(record, null), false);
+    assert.equal(applyUserBodyParts(record, undefined), false);
+    assert.equal(applyUserBodyParts(record), false);
+    assert.deepEqual(record.bodyParts, ['膝']);
+    // 旧值非空时 null 输入等价清空。
+    const cleared = { bodyPart: '膝', bodyParts: ['膝'], bodyPartsSource: 'user' };
+    assert.equal(applyUserBodyParts(cleared, null), true);
+    assert.equal(cleared.bodyPart, '');
+    assert.deepEqual(cleared.bodyParts, []);
+    assert.equal(cleared.bodyPartsSource, '');
 });
 
 test('性质 → 运动记录种类：只有力量和拉伸有专属表单', () => {
