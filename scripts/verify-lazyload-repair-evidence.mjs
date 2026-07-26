@@ -15,7 +15,8 @@ import { stat } from 'node:fs/promises';
 const __filename = fileURLToPath(import.meta.url);
 const root = path.resolve(path.dirname(__filename), '..');
 const repoRoot = path.resolve(root, '../../..');
-const evidenceRoot = path.join(repoRoot, '.tmp', 'lazyload-repair', 'evidence');
+// Evidence stays inside the repo (`.tmp/` is gitignored), matching the header comment.
+const evidenceRoot = path.join(root, '.tmp', 'lazyload-repair', 'evidence');
 mkdirSync(evidenceRoot, { recursive: true });
 
 function delay(ms) {
@@ -637,7 +638,14 @@ async function main() {
             }
         }
 
-        // 7. Pause / pain / symptom drafts block update
+        // 7. Update blocker classification (docs/pwa/update-session-safety.md).
+        //    `appUpdate.getUpdateBlockReason()` splits blockers into three kinds and
+        //    `hasActiveRehabSession()` is only the 'active-session' shorthand:
+        //      live workout / cardio / recoverable journal -> 'active-session' (session true)
+        //      _dbDirty / _pendingPersistPromise / _pendingLocalWrite -> 'pending-write' (session false)
+        //      editor drafts / dirty rehab inputs -> 'unsaved-draft' (session false)
+        //    Residual pause state (isPaused without isPlaying) and `db.lastActionDraft`
+        //    parameter memory are explicitly NOT blockers.
         {
             const http = await startServer();
             try {
@@ -660,28 +668,70 @@ async function main() {
                 const cases = await page.evaluate(() => {
                     const out = {};
                     const au = window.appUpdate;
-                    // pause
-                    window.workout = { isPlaying: false, isPaused: true, totalSec: 10, mode: 'strength' };
-                    window.workoutSystem = window.workout;
-                    out.paused = au.hasActiveRehabSession();
-                    // draft
-                    window.workout = { isPlaying: false, isPaused: false };
-                    window.workoutSystem = window.workout;
-                    window.data = window.data || {};
-                    window.data.db = window.data.db || {};
+                    const reset = () => {
+                        try { window.localStorage.removeItem('rehab_active_session'); } catch { /* ignore */ }
+                        window.workout = { isPlaying: false, isPaused: false, totalSec: 0, mode: 'strength' };
+                        window.workoutSystem = window.workout;
+                        window.cardio = { isRunning: false };
+                        window.data = window.data || {};
+                        window.data.db = window.data.db || {};
+                        window.data.db.lastActionDraft = null;
+                        window.data._dbDirty = false;
+                        window.data._pendingPersistPromise = null;
+                        window.data._pendingLocalWrite = false;
+                        window.data._editingExerciseDraft = null;
+                        window.data._editingFoodDraft = null;
+                        window.data._aiFoodDrafts = [];
+                    };
+                    const probe = () => ({
+                        reason: au.getUpdateBlockReason(),
+                        session: au.hasActiveRehabSession()
+                    });
+                    // Baseline: the loaded page must not already look like a dirty rehab form,
+                    // otherwise every "not a blocker" expectation below would be meaningless.
+                    reset();
+                    out.dirtyRehabFormBaseline = au.hasDirtyRehabForm();
+                    // Idle tab: nothing blocks the update.
+                    out.idle = probe();
+                    // Residual pause without isPlaying: not a blocker any more.
+                    reset();
+                    window.workout.isPaused = true;
+                    window.workout.totalSec = 10;
+                    out.pausedOnly = probe();
+                    // db.lastActionDraft is parameter memory, not an unsaved draft.
+                    reset();
                     window.data.db.lastActionDraft = { sets: 3, pain: 5 };
-                    out.draft = au.hasActiveRehabSession();
-                    window.data.db.lastActionDraft = null;
+                    out.lastActionDraft = probe();
+                    // Live workout: the only shape that counts as an active session.
+                    reset();
+                    window.workout.isPlaying = true;
+                    window.workout.totalSec = 42;
+                    out.playing = probe();
+                    // Pending persistence: blocks, but is not an active session.
+                    reset();
                     window.data._pendingLocalWrite = true;
-                    out.pending = au.hasActiveRehabSession();
-                    window.data._pendingLocalWrite = false;
-                    // idle
-                    out.idle = au.hasActiveRehabSession();
+                    out.pendingWrite = probe();
+                    // Open editor draft: blocks, but is not an active session.
+                    reset();
+                    window.data._editingExerciseDraft = { name: 'x' };
+                    out.unsavedDraft = probe();
+                    reset();
                     return out;
                 });
-                const ok = cases.paused && cases.draft && cases.pending && !cases.idle;
-                record('S7-drafts-block-update', ok, cases);
-                save('s7-drafts-block.json', cases);
+                const expected = {
+                    idle: { reason: null, session: false },
+                    pausedOnly: { reason: null, session: false },
+                    lastActionDraft: { reason: null, session: false },
+                    playing: { reason: 'active-session', session: true },
+                    pendingWrite: { reason: 'pending-write', session: false },
+                    unsavedDraft: { reason: 'unsaved-draft', session: false }
+                };
+                const mismatches = Object.entries(expected)
+                    .filter(([key, want]) => cases[key]?.reason !== want.reason || cases[key]?.session !== want.session)
+                    .map(([key, want]) => ({ key, want, got: cases[key] ?? null }));
+                const ok = mismatches.length === 0 && cases.dirtyRehabFormBaseline === false;
+                record('S7-drafts-block-update', ok, { cases, expected, mismatches });
+                save('s7-drafts-block.json', { cases, expected, mismatches });
                 await ctx.close();
             } finally {
                 await new Promise((r) => http.server.close(r));
@@ -736,20 +786,31 @@ async function main() {
             }
         }
 
-        // 9. Source: SW sessionDefer before navigate (static + runtime flag)
+        // 9. Source: SW client-defer guard runs before hard navigate (static contract).
+        //    Contract per docs/pwa/update-session-safety.md:
+        //    - sw.js tracks deferred clients in `clientDeferClientIds` and consults it
+        //      before `client.navigate()`;
+        //    - the current message types are UPDATE_DEFER_FOR_CLIENT / UPDATE_CLIENT_CLEAR,
+        //      with UPDATE_DEFER_FOR_SESSION / UPDATE_SESSION_CLEAR kept as legacy aliases;
+        //    - app-update.js classifies blockers into the three reasons and keeps
+        //      hasActiveRehabSession() as the 'active-session' shorthand.
         {
             const sw = readFileSync(path.join(root, 'sw.js'), 'utf8');
             const app = readFileSync(path.join(root, 'app-update.js'), 'utf8');
-            const deferIdx = sw.indexOf('sessionDeferClientIds.has(clientId)');
+            const deferIdx = sw.indexOf('clientDeferClientIds.has(clientId)');
             const navIdx = sw.indexOf('stillAfterGrace.navigate(target)');
-            const ok = deferIdx > 0 && navIdx > deferIdx
+            const swMessages = /UPDATE_DEFER_FOR_CLIENT/.test(sw)
+                && /UPDATE_CLIENT_CLEAR/.test(sw)
                 && /UPDATE_DEFER_FOR_SESSION/.test(sw)
-                && /UPDATE_SESSION_CLEAR/.test(sw)
+                && /UPDATE_SESSION_CLEAR/.test(sw);
+            const appReasons = /getUpdateBlockReason/.test(app)
                 && /hasActiveRehabSession/.test(app)
-                && /isPaused/.test(app)
-                && /lastActionDraft/.test(app);
-            record('S9-sw-defer-before-navigate', ok, { deferIdx, navIdx });
-            save('s9-sw-defer-contract.json', { deferIdx, navIdx, ok });
+                && /'active-session'/.test(app)
+                && /'pending-write'/.test(app)
+                && /'unsaved-draft'/.test(app);
+            const ok = deferIdx > 0 && navIdx > deferIdx && swMessages && appReasons;
+            record('S9-sw-defer-before-navigate', ok, { deferIdx, navIdx, swMessages, appReasons });
+            save('s9-sw-defer-contract.json', { deferIdx, navIdx, swMessages, appReasons, ok });
         }
 
         // 10. 10-round leak / stability: open/close plan modal 10x no pageerror growth
