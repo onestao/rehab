@@ -1,3 +1,5 @@
+import { normalizePlanPhase } from './action-taxonomy-pure.js';
+
 export const PLAN_PREF_DEFAULTS = {
     stage: 'unset',
     customStageLabel: '',
@@ -30,13 +32,6 @@ function clone(value) {
 
 function uniqueList(values = []) {
     return [...new Set((Array.isArray(values) ? values : []).map((item) => String(item || '').trim()).filter(Boolean))];
-}
-
-function normalizeTaskCategory(value = 'main') {
-    const raw = String(value || '').trim().toLowerCase();
-    if (['warmup', 'warm-up', '热身'].includes(raw)) return 'warmup';
-    if (['cooldown', 'cool-down', 'stretch', 'stretching', '拉伸', '放松'].includes(raw)) return 'cooldown';
-    return 'main';
 }
 
 function normalizeCustomEquipment(values = []) {
@@ -134,7 +129,7 @@ export function normalizeTaskItem(item = {}, options = {}) {
         id: item.id || idFactory('plan-task'),
         name: String(item.name || '未命名任务'),
         planType: PLAN_TYPES.includes(item.planType) ? item.planType : (PLAN_TYPES.includes(options.planType) ? options.planType : 'rehab'),
-        category: normalizeTaskCategory(item.category || item.phase),
+        category: normalizePlanPhase(item.category || item.phase),
         spec: {
             sets: Math.max(1, Number(spec.sets || 1)),
             reps,

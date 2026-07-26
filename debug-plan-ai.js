@@ -16,7 +16,7 @@
 
     function categoryOf(item = {}) {
         const raw = item.category || item.type || item.phase || item.section || 'main';
-        return window.planAiPure?.normalizeAiCategory?.(raw) || String(raw || 'main');
+        return window.planAiPure?.normalizeAiCategory?.(raw) || window.actionTaxonomy?.normalizePlanPhase?.(raw) || 'main';
     }
 
     function collectRawItems(plan = {}) {

@@ -3,12 +3,14 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
+import actionTaxonomy, { normalizePlanPhase } from '../action-taxonomy-pure.js';
 
 function loadPlanAutoAdjust(options = {}) {
     const policyCode = readFileSync(new URL('../rehab-policy.js', import.meta.url), 'utf8');
     const code = readFileSync(new URL('../plan-auto-adjust.js', import.meta.url), 'utf8');
     const sandbox = {
         window: {
+            actionTaxonomy,
             toast: options.toast || { show() {} },
             data: { dateKey: () => '2026-06-23' }
         },
@@ -19,13 +21,6 @@ function loadPlanAutoAdjust(options = {}) {
     vm.runInNewContext(code, sandbox);
     sandbox.window.dataPlanAutoAdjust.__testWindow = sandbox.window;
     return sandbox.window.dataPlanAutoAdjust;
-}
-
-function normalizeCategory(value = 'main') {
-    const raw = String(value || '').trim().toLowerCase();
-    if (['warmup', 'warm-up', '热身'].includes(raw)) return 'warmup';
-    if (['cooldown', 'cool-down', 'stretch', 'stretching', '拉伸', '放松'].includes(raw)) return 'cooldown';
-    return 'main';
 }
 
 function createContext(api, db) {
@@ -51,7 +46,7 @@ function createContext(api, db) {
                 id: item.id || `task-${nextId++}`,
                 name: String(item.name || '未命名任务'),
                 planType: item.planType || options.planType || 'rehab',
-                category: normalizeCategory(item.category),
+                category: normalizePlanPhase(item.category),
                 spec: {
                     sets: Math.max(1, Number(spec.sets || 1)),
                     reps: Math.max(0, Number(spec.reps || 0)),

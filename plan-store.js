@@ -40,10 +40,7 @@
     }
 
     function normalizeTaskCategory(value = 'main') {
-        const raw = String(value || '').trim().toLowerCase();
-        if (['warmup', 'warm-up', '热身'].includes(raw)) return 'warmup';
-        if (['cooldown', 'cool-down', 'stretch', 'stretching', '拉伸', '放松'].includes(raw)) return 'cooldown';
-        return 'main';
+        return window.actionTaxonomy?.normalizePlanPhase?.(value) || 'main';
     }
 
     function normalizeTaskFeedback(feedback = {}, defaultDoneAt = 0) {

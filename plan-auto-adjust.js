@@ -31,10 +31,8 @@
     }
 
     function taskCategory(item = {}) {
-        const raw = String(item.category || item.phase || 'main').trim().toLowerCase();
-        if (['warmup', 'warm-up', '热身'].includes(raw)) return 'warmup';
-        if (['cooldown', 'cool-down', 'stretch', 'stretching', '拉伸', '放松'].includes(raw)) return 'cooldown';
-        return 'main';
+        const raw = item.category || item.phase || 'main';
+        return window.actionTaxonomy?.normalizePlanPhase?.(raw) || 'main';
     }
 
     function mainItems(plan = {}) {

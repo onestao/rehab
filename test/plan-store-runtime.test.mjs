@@ -2,12 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
+import actionTaxonomy from '../action-taxonomy-pure.js';
 
 function loadPlanStore() {
   const policyCode = readFileSync(new URL('../rehab-policy.js', import.meta.url), 'utf8');
   const code = readFileSync(new URL('../plan-store.js', import.meta.url), 'utf8');
   const sandbox = {
-    window: {},
+    window: { actionTaxonomy },
     console,
     Date
   };
