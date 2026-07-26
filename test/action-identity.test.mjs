@@ -468,6 +468,81 @@ test('待分类清单：db 结构缺失或畸形时返回空批次，不抛错',
     assert.deepEqual(listUnclassifiedBodyPartActions(unclassifiedDb([{ id: 'pa-noname', bodyParts: [] }])).actions, []);
 });
 
+test('updatedAt 通胀回归：输入零变化的重复 ensure（次日开机）不 bump 时间戳', () => {
+    globalThis.window = { actionTaxonomy };
+    try {
+        const db = bodyPartDb();
+        ensurePrescriptionActionCatalog(db, { nowTs: 1000 });
+        // 新建记录取当前 nowTs，不受还原逻辑影响。
+        assert.equal(db.health.prescriptionActions[0].updatedAt, 1000);
+        const first = JSON.parse(JSON.stringify(db.health.prescriptionActions));
+
+        // 次日开机：nowTs 与上次相差远超同步的 60 秒字段级合并窗口，但输入零变化。
+        // 通胀会让空记录在整记录 LWW 里胜出，覆写他端 AI 分类并回推。
+        ensurePrescriptionActionCatalog(db, { nowTs: 999000 });
+        assert.equal(db.health.prescriptionActions[0].updatedAt, 1000, '内容没变不得通胀 updatedAt');
+        assert.deepEqual(JSON.parse(JSON.stringify(db.health.prescriptionActions)), first);
+    } finally {
+        delete globalThis.window;
+    }
+});
+
+test('updatedAt 通胀回归：内容真实变化的记录才 bump，未受影响的记录保持原值', () => {
+    globalThis.window = { actionTaxonomy };
+    try {
+        const db = {
+            health: {
+                rehabWeekly: [
+                    {
+                        weekStart: '2026-07-20',
+                        actions: [
+                            { actionId: 'ra-1', name: '靠墙静蹲' },
+                            { actionId: 'ra-2', name: '踝泵' }
+                        ]
+                    }
+                ],
+                prescriptionActions: []
+            }
+        };
+        ensurePrescriptionActionCatalog(db, { nowTs: 1000 });
+
+        // 新一周带来既有动作的新写法（折叠成同名 → 记入别名）和一个全新动作。
+        db.health.rehabWeekly.push({
+            weekStart: '2026-07-27',
+            actions: [
+                { actionId: 'ra-3', name: '靠墙-静蹲' },
+                { actionId: 'ra-4', name: '直腿抬高' }
+            ]
+        });
+        ensurePrescriptionActionCatalog(db, { nowTs: 999000 });
+        const byName = new Map(db.health.prescriptionActions.map((item) => [item.displayName, item]));
+        assert.equal(byName.get('靠墙静蹲').updatedAt, 999000, '新增别名属于内容变化，要 bump 以便同步出去');
+        assert.equal(byName.get('踝泵').updatedAt, 1000, '没被动到的记录保持原时间戳');
+        assert.equal(byName.get('直腿抬高').updatedAt, 999000, '新建记录用当前 nowTs');
+    } finally {
+        delete globalThis.window;
+    }
+});
+
+test('updatedAt 通胀回归：回填发生变化的那次 ensure 才 bump，此后幂等不再 bump', () => {
+    // 首次 ensure 无 taxonomy：词典兜底静默跳过，记录部位留空。
+    const db = bodyPartDb();
+    ensurePrescriptionActionCatalog(db, { nowTs: 1000 });
+    assert.equal(db.health.prescriptionActions[0].updatedAt, 1000);
+    globalThis.window = { actionTaxonomy };
+    try {
+        // taxonomy 就绪后的开机：词典从「台阶下放」猜出「膝」，内容真变了 → bump 同步出去。
+        ensurePrescriptionActionCatalog(db, { nowTs: 5000 });
+        assert.deepEqual(db.health.prescriptionActions[0].bodyParts, ['膝']);
+        assert.equal(db.health.prescriptionActions[0].updatedAt, 5000, '回填变化的那次要 bump');
+
+        ensurePrescriptionActionCatalog(db, { nowTs: 999000 });
+        assert.equal(db.health.prescriptionActions[0].updatedAt, 5000, '回填完成后幂等，不再 bump');
+    } finally {
+        delete globalThis.window;
+    }
+});
+
 test('ensurePrescriptionActionCatalog creates user-visible standard identities', () => {
     const db = {
         health: {

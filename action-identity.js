@@ -280,6 +280,11 @@ export function ensurePrescriptionActionCatalog(db = {}, options = {}) {
         normalizePrescriptionAction(item, { nowTs }),
     );
     const { byId: records, byName } = buildIndex(existing);
+    // 快照既有内容：幂等 ensure 通胀的 updatedAt 会被同步当变更，整记录 LWW 顶掉他端真数据。
+    const stamp = (record) => JSON.stringify({ ...record, updatedAt: 0 });
+    const before = new Map(
+        [...records.values()].map((r) => [r.id, { at: r.updatedAt, json: stamp(r) }]),
+    );
     const rawActionToPrescription = new Map();
     const weeks = sortWeeks(db.health.rehabWeekly || []);
 
@@ -416,6 +421,10 @@ export function ensurePrescriptionActionCatalog(db = {}, options = {}) {
         .sort((a, b) =>
             String(a.displayName || '').localeCompare(String(b.displayName || ''), 'zh-CN'),
         );
+    db.health.prescriptionActions.forEach((record) => {
+        const prev = before.get(record.id);
+        if (prev && stamp(record) === prev.json) record.updatedAt = prev.at;
+    });
     return db.health.prescriptionActions;
 }
 
