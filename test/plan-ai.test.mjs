@@ -428,6 +428,153 @@ test('plan AI writes classified body parts back to the catalog right after parsi
   }
 });
 
+function catalogPayload(extra = {}) {
+  return {
+    date: '2026-05-25',
+    type: 'rehab',
+    items: [{ name: '侧卧髋外展', category: 'main', bodyParts: ['髋'], spec: { sets: 2, reps: 10, work: 3 } }],
+    ...extra
+  };
+}
+
+test('plan AI parser reads the top-level bodyPartCatalog and filters it by the enum', () => {
+  const api = loadPlanAi();
+  const ctx = createContext(api);
+  const parsed = parsePlanAiPayloadPure(api, ctx, JSON.stringify(catalogPayload({
+    bodyPartCatalog: [
+      { name: '髋外展抗阻', bodyParts: ['髋', '腰背'] },
+      { name: '提踵', bodyParts: ['踝', '编造的部位', 42] },
+      { name: '深呼吸', bodyParts: ['全身'] },
+      { name: '', bodyParts: ['膝'] },
+      { name: '字符串部位', bodyParts: '膝' },
+      '裸字符串'
+    ]
+  })), ['rehab']);
+
+  assert.equal(parsed.ok, true);
+  assert.deepEqual(parsed.bodyPartCatalog.map((entry) => [entry.name, [...entry.bodyParts]]), [
+    ['髋外展抗阻', ['髋', '腰背']],
+    ['提踵', ['踝']]
+  ], '非法部位丢弃；过滤后为空、无名字、非数组的条目整条丢弃');
+
+  // week 模式（bodyPartCatalog 与 plans 平级）同样能取到。
+  const weekly = parsePlanAiPayloadPure(api, ctx, JSON.stringify({
+    plans: [catalogPayload()],
+    bodyPartCatalog: [{ name: '髋外展抗阻', bodyParts: ['髋'] }]
+  }), ['rehab']);
+  assert.deepEqual(weekly.bodyPartCatalog.map((entry) => entry.name), ['髋外展抗阻']);
+
+  // 缺失或非数组时是空数组，不是 undefined。
+  assert.deepEqual([...parsePlanAiPayloadPure(api, ctx, JSON.stringify(catalogPayload()), ['rehab']).bodyPartCatalog], []);
+  assert.deepEqual([...parsePlanAiPayloadPure(api, ctx, JSON.stringify(catalogPayload({ bodyPartCatalog: '髋' })), ['rehab']).bodyPartCatalog], []);
+});
+
+test('plan AI parser treats bodyPartCatalog as data, never as a plan or an item container', () => {
+  const api = loadPlanAi();
+  const ctx = createContext(api);
+  // 回归：顶层字段名必须同时避开 …items$ 与 …parts$ 两条容器启发式。踩中的话
+  // 目录里的动作/部位会被当成计划或动作收进来，动作名被顶替（上一轮的原始 bug）。
+  const catalog = [
+    { name: '髋外展抗阻', bodyParts: ['髋'] },
+    { name: '提踵', bodyParts: ['踝'] }
+  ];
+  const shapes = [
+    [catalogPayload(), catalogPayload({ bodyPartCatalog: catalog })],
+    [{ plans: [catalogPayload()] }, { plans: [catalogPayload()], bodyPartCatalog: catalog }]
+  ];
+
+  shapes.forEach(([withoutCatalog, withCatalog]) => {
+    const bare = parsePlanAiPayloadPure(api, ctx, JSON.stringify(withoutCatalog), ['rehab']);
+    const withIt = parsePlanAiPayloadPure(api, ctx, JSON.stringify(withCatalog), ['rehab']);
+    assert.deepEqual(
+      JSON.parse(JSON.stringify(withIt.plans)),
+      JSON.parse(JSON.stringify(bare.plans)),
+      'plans/items 解析结果必须与不带 bodyPartCatalog 时完全一致'
+    );
+    assert.equal(withIt.plans.length, 1);
+    assert.deepEqual(withIt.plans[0].items.map((item) => item.name), ['侧卧髋外展']);
+  });
+
+  assert.equal(validatePlanAiPayloadPure(api, ctx, JSON.stringify(catalogPayload({ bodyPartCatalog: catalog })), ['rehab']).ok, true);
+});
+
+test('plan AI prompt asks the model to classify catalog actions that still lack body parts', () => {
+  const api = loadPlanAi();
+  const ctx = createContext(api);
+  ctx.db.health.prescriptionActions = [
+    { id: 'pa-blocked', displayName: '深蹲跳', aliases: ['深蹲跳'], bodyParts: [], updatedAt: 10 },
+    { id: 'pa-known', displayName: '靠墙静蹲', aliases: ['靠墙静蹲'], bodyParts: ['膝'], bodyPartsSource: 'user', updatedAt: 20 }
+  ];
+  const prompt = api.buildPlanAiContext.call(ctx, 'today', '安排康复训练', ['rehab']);
+
+  const pendingLine = prompt.split('\n').find((line) => line.startsWith('待分类部位的处方动作:')) || '';
+  assert.equal(pendingLine, '待分类部位的处方动作: [{"id":"pa-blocked","displayName":"深蹲跳"}]');
+  assert.equal(pendingLine.includes('靠墙静蹲'), false, '已分类动作不进这批');
+  assert.match(prompt, /也要在 JSON 顶层 bodyPartCatalog 里各给一条/);
+  assert.match(prompt, /顶层再加一个与 items 平级的字段 "bodyPartCatalog":\[\{"name":"\.\.\.","bodyParts":\[\]\}\]/);
+  // 部位枚举仍然只有一份动态拼接的定义，目录条目沿用同一条规则。
+  assert.match(prompt, new RegExp(`只能从这 ${actionTaxonomy.BODY_PARTS.length} 个固定值里取：${actionTaxonomy.BODY_PARTS.join('/')}`));
+
+  const weekPrompt = api.buildPlanAiContext.call(ctx, 'week', '安排一周', ['rehab']);
+  assert.match(weekPrompt, /\{"plans":\[.+\],"bodyPartCatalog":\[\{"name":"\.\.\.","bodyParts":\[\]\}\]\}/);
+
+  // 目录里没有待分类动作时，这一行和这条规则都不该出现，别白花提示词。
+  ctx.db.health.prescriptionActions = [];
+  const lean = api.buildPlanAiContext.call(ctx, 'today', '安排康复训练', ['rehab']);
+  assert.equal(lean.includes('待分类部位的处方动作'), false);
+  assert.equal(lean.includes('bodyPartCatalog'), false);
+});
+
+test('plan AI writes catalog-only classifications back by name without double writing', () => {
+  const api = loadPlanAi();
+  const ctx = createContext(api);
+  let saves = 0;
+  ctx.save = () => { saves += 1; };
+  ctx.db.health.prescriptionActions = [
+    { id: 'pa-abduction', displayName: '侧卧髋外展', aliases: ['侧卧髋外展'], bodyParts: [], bodyPartsSource: '' },
+    { id: 'pa-blocked', displayName: '深蹲跳', aliases: ['深蹲跳', '负重深蹲跳'], bodyParts: [], bodyPartsSource: '' },
+    { id: 'pa-user', displayName: '靠墙静蹲', aliases: ['靠墙静蹲'], bodyParts: ['膝'], bodyPartsSource: 'user' }
+  ];
+  const plans = [{
+    date: '2026-05-25',
+    type: 'rehab',
+    items: [{ name: '侧卧髋外展', prescriptionActionId: 'pa-abduction', bodyParts: ['髋'] }]
+  }];
+  const catalogEntries = [
+    { name: '负重深蹲跳', bodyParts: ['膝', '髋'] },
+    { name: '靠墙静蹲', bodyParts: ['踝'] },
+    { name: '侧卧-髋外展', bodyParts: ['腰背'] },
+    { name: '完全不存在的动作', bodyParts: ['髋'] }
+  ];
+
+  // action-identity 是宿主 realm 的 ESM，它读的是宿主 window；不注入就静默走 taxonomy 缺失的退化路径。
+  const host = /** @type {any} */ (globalThis);
+  host.window = { actionTaxonomy };
+  try {
+    assert.equal(api.applyPlanAiBodyParts.call(ctx, plans, catalogEntries), 2, 'items 1 条 + 目录条目 1 条');
+    const [abduction, blocked, user] = ctx.db.health.prescriptionActions;
+    assert.deepEqual([...abduction.bodyParts], ['髋'], 'items 优先：同名目录条目不覆盖它');
+    assert.equal(abduction.bodyPartsSource, 'ai');
+    assert.deepEqual([...blocked.bodyParts], ['膝', '髋'], '进不了计划的动作靠别名命中回写');
+    assert.equal(blocked.bodyPartsSource, 'ai');
+    assert.deepEqual([...user.bodyParts], ['膝'], 'user 来源不被目录条目覆盖');
+    assert.equal(saves, 1);
+
+    assert.equal(api.applyPlanAiBodyParts.call(ctx, plans, catalogEntries), 0, '幂等');
+    assert.equal(saves, 1);
+
+    // 只有目录条目、没有计划内动作时照样写。
+    const catalogOnly = createContext(api);
+    catalogOnly.save = () => {};
+    catalogOnly.db.health.prescriptionActions = [{ id: 'pa-blocked', displayName: '深蹲跳', aliases: ['深蹲跳'], bodyParts: [] }];
+    assert.equal(api.applyPlanAiBodyParts.call(catalogOnly, [], [{ name: '深蹲跳', bodyParts: ['膝'] }]), 1);
+    // 老调用方式（不传第二个参数）不受影响。
+    assert.equal(api.applyPlanAiBodyParts.call(catalogOnly, []), 0);
+  } finally {
+    delete host.window;
+  }
+});
+
 test('plan AI body part writeback never breaks the preview when the catalog throws', () => {
   const api = loadPlanAi();
   const ctx = createContext(api);
@@ -931,9 +1078,11 @@ test('plan AI context includes six recent rehab prescriptions', () => {
   assert.match(prompt, /近6周康复中心处方/);
   assert.match(prompt, /prescriptionActionId/);
   assert.match(prompt, /必须原样回填 prescriptionActionId/);
-  assert.match(prompt, /康复动作1/);
-  assert.match(prompt, /康复动作6/);
-  assert.doesNotMatch(prompt, /康复动作7/);
+  // 6 周窗口只约束这一行；处方目录的“待分类部位”一行是刻意的全量覆盖，不受窗口限制。
+  const weeklyLine = prompt.split('\n').find((line) => line.startsWith('近6周康复中心处方:')) || '';
+  assert.match(weeklyLine, /康复动作1/);
+  assert.match(weeklyLine, /康复动作6/);
+  assert.doesNotMatch(weeklyLine, /康复动作7/);
   assert.match(prompt, /第4-6周处方仅用于理解长期禁忌/);
 });
 

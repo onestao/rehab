@@ -136,6 +136,32 @@ export function applyAiBodyParts(db = {}, entries = [], options = {}) {
     return written;
 }
 
+/**
+ * 列出处方目录里还没有部位的活动作，供 AI 在生成计划时顺带分类。
+ *
+ * blocked/dropped 的处方动作永远进不了当天计划，只靠计划内动作分类永远补不上它们；
+ * 这个列表把「目录里 bodyParts 为空」的都翻出来，正是最需要部位信息的那批。
+ * 刻意截断：目录条数无上限而提示词有，超过 limit（默认 40）时按 updatedAt 倒序取最近的，
+ * 因此返回值带 total/truncated——调用方必须能看出这一批不是全量，否则「看着全覆盖了其实没有」。
+ * 纯数据筛选，不依赖 taxonomy；db 结构缺失时返回空批次。
+ * @param {any} db
+ * @param {any} [options]
+ * @returns {{actions: any[], total: number, truncated: boolean}}
+ */
+export function listUnclassifiedBodyPartActions(db = {}, options = {}) {
+    const limit = Math.max(0, Number(options.limit ?? 40));
+    const pending = activeRecords(db?.health?.prescriptionActions)
+        .filter((record) => !record.bodyParts?.length && (record.displayName || record.name))
+        .sort((a, b) => Number(b.updatedAt || 0) - Number(a.updatedAt || 0));
+    const actions = pending.slice(0, limit).map((record) => {
+        const displayName = String(record.displayName || record.name || '').trim();
+        // 别名一起给：医嘱里的历史写法能帮 AI 认出同一个动作，代价只是几个字的提示词。
+        const aliases = uniqueList(record.aliases).filter((name) => name !== displayName);
+        return { id: String(record.id || ''), displayName, ...(aliases.length ? { aliases } : {}) };
+    });
+    return { actions, total: pending.length, truncated: pending.length > actions.length };
+}
+
 function hashText(value = '') {
     let hash = 2166136261;
     const text = String(value || '');
@@ -560,6 +586,7 @@ const api = {
     ensurePrescriptionActionCatalog,
     getPrescriptionActionCatalog,
     findPrescriptionAction,
+    listUnclassifiedBodyPartActions,
     mergePrescriptionActions,
     setPrescriptionActionLinkedAction,
     addPrescriptionActionRelation,

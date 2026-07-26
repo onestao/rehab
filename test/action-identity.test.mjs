@@ -6,6 +6,7 @@ import {
     addPrescriptionActionRelation,
     applyAiBodyParts,
     ensurePrescriptionActionCatalog,
+    listUnclassifiedBodyPartActions,
     mergePrescriptionActions,
     normalizePrescriptionActionName,
     setPrescriptionActionLinkedAction
@@ -402,6 +403,69 @@ test('AI 部位回写：无 taxonomy 环境返回 0 且不抛错', () => {
     } finally {
         delete globalThis.window;
     }
+});
+
+function unclassifiedDb(records = []) {
+    return { health: { rehabWeekly: [], prescriptionActions: records } };
+}
+
+test('待分类清单：只返回 bodyParts 为空的活记录，三种来源已标的都算已分类', () => {
+    const db = unclassifiedDb([
+        { id: 'pa-empty', displayName: '侧卧髋外展', aliases: ['侧卧髋外展', '弹力带侧卧髋部外展'], bodyParts: [], updatedAt: 100 },
+        { id: 'pa-user', displayName: '靠墙静蹲', bodyParts: ['膝'], bodyPartsSource: 'user', updatedAt: 200 },
+        { id: 'pa-ai', displayName: '踝泵', bodyParts: ['踝'], bodyPartsSource: 'ai', updatedAt: 300 },
+        { id: 'pa-lexicon', displayName: '猫牛式', bodyParts: ['腰背'], bodyPartsSource: 'lexicon', updatedAt: 400 },
+        { id: 'pa-missing', displayName: '呼吸练习', updatedAt: 50 },
+        { id: 'pa-dead', displayName: '已删除动作', bodyParts: [], deleted: true, updatedAt: 900 }
+    ]);
+
+    const result = listUnclassifiedBodyPartActions(db);
+
+    assert.deepEqual(result.actions.map((item) => item.id), ['pa-empty', 'pa-missing']);
+    assert.equal(result.total, 2);
+    assert.equal(result.truncated, false);
+    // 别名一起给（去掉与 displayName 重复的那份）；没有别名时干脆不带这个键。
+    assert.deepEqual(result.actions[0], {
+        id: 'pa-empty',
+        displayName: '侧卧髋外展',
+        aliases: ['弹力带侧卧髋部外展']
+    });
+    assert.deepEqual(result.actions[1], { id: 'pa-missing', displayName: '呼吸练习' });
+});
+
+test('待分类清单：超出上限按 updatedAt 倒序截断，并标出这一批不是全量', () => {
+    const records = Array.from({ length: 45 }, (_, index) => ({
+        id: `pa-${index}`,
+        displayName: `动作${index}`,
+        bodyParts: [],
+        updatedAt: index
+    }));
+
+    const capped = listUnclassifiedBodyPartActions(unclassifiedDb(records));
+    assert.equal(capped.actions.length, 40, '默认上限 40');
+    assert.equal(capped.total, 45);
+    assert.equal(capped.truncated, true, '刻意截断必须能被调用方看出来');
+    assert.equal(capped.actions[0].id, 'pa-44', '最近更新的排前面');
+    assert.equal(capped.actions[39].id, 'pa-5');
+
+    const custom = listUnclassifiedBodyPartActions(unclassifiedDb(records), { limit: 3 });
+    assert.deepEqual(custom.actions.map((item) => item.id), ['pa-44', 'pa-43', 'pa-42']);
+    assert.equal(custom.truncated, true);
+
+    const all = listUnclassifiedBodyPartActions(unclassifiedDb(records.slice(0, 40)));
+    assert.equal(all.truncated, false, '正好不超上限就不算截断');
+});
+
+test('待分类清单：db 结构缺失或畸形时返回空批次，不抛错', () => {
+    [undefined, {}, { health: {} }, { health: { prescriptionActions: null } }].forEach((db) => {
+        assert.deepEqual(listUnclassifiedBodyPartActions(/** @type {any} */ (db)), {
+            actions: [],
+            total: 0,
+            truncated: false
+        });
+    });
+    // 没有名字的记录匹配不上任何目录条目，给了 AI 也没用，直接不发。
+    assert.deepEqual(listUnclassifiedBodyPartActions(unclassifiedDb([{ id: 'pa-noname', bodyParts: [] }])).actions, []);
 });
 
 test('ensurePrescriptionActionCatalog creates user-visible standard identities', () => {

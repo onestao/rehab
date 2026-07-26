@@ -803,6 +803,8 @@
             };
             const rehabWeekly = summarizeRehabWeekly(this, 6);
             const prescriptionCatalog = summarizePrescriptionActionCatalog(this, rehabWeekly);
+            // blocked/dropped 处方动作进不了计划，永远等不到分类；顺带在同一次请求里交给 AI，空列表则整段不输出。
+            const unclassifiedBodyParts = window.actionIdentity?.listUnclassifiedBodyPartActions?.(this.db || {})?.actions || [];
             const rehabByCondition = partitionRehabWeeklyByConditions(rehabWeekly, selectedConditionIds, temporaryConditions, profile);
             const bodyPartConstraints = summarizeBodyPartConstraints(profile, rehabWeekly, selectedConditionIds, temporaryConditions);
             const recentPlans = this.activeRecords(this.db.dailyPlans || [])
@@ -878,9 +880,10 @@
                 ? '用户补充中的次数/组数/时长/休息=硬约束，写入 spec.sets/reps/work/repRest/actionRest；不安全则 aiReasoning 说明替代值。'
                 : '';
             const planJsonShape = '{"date":"YYYY-MM-DD","type":"<rehab|cut|bulk|maintenance|custom>","title":"...","notes":"...","items":[{"name":"...","prescriptionActionId":"","category":"<warmup|main|cooldown>","bodyParts":[],"chainHint":"","spec":{"sets":<int>,"reps":<int>,"work":<int>,"repRest":<int>,"actionRest":<int>,"isAlt":<bool>,"mode":"<reps|hold|alt-reps|alt-hold>"},"cooldownRefs":[],"aiReasoning":"...","durationEstHint":"","requiresUserConfirm":false}]}';
+            const catalogShape = unclassifiedBodyParts.length ? '"bodyPartCatalog":[{"name":"...","bodyParts":[]}]' : '';
             const promptMode = mode === 'week'
-                ? `输出严格 JSON：{"plans":[${planJsonShape}]}`
-                : `请输出严格 JSON，结构为：${planJsonShape}`;
+                ? `输出严格 JSON：{"plans":[${planJsonShape}]${catalogShape && `,${catalogShape}`}}`
+                : `请输出严格 JSON，结构为：${planJsonShape}${catalogShape && `；顶层再加一个与 items 平级的字段 ${catalogShape}`}`;
             // 枚举由 taxonomy 唯一定义，动态拼进提示词；词表改了提示词自动跟上，不留第二份字面量。
             const bodyPartEnum = (window.actionTaxonomy?.BODY_PARTS || []).join('/');
             const specRules = [
@@ -897,6 +900,9 @@
                 '必须参考今日已完成运动摘要；今日同动作/同部位已高强度训练时，后续降负荷或改恢复，除非用户要求加量。',
                 bodyPartEnum
                     ? `bodyParts 是该动作主要涉及的身体部位，多选数组，只能从这 ${bodyPartEnum.split('/').length} 个固定值里取：${bodyPartEnum}；认不准就给空数组 []，不要编造这些之外的部位名。`
+                    : '',
+                bodyPartEnum && unclassifiedBodyParts.length
+                    ? '“待分类部位的处方动作”里的动作即使不进计划，也要在 JSON 顶层 bodyPartCatalog 里各给一条 {"name":"<displayName 原文>","bodyParts":[...]}；认不准就给空数组 []，不要编造这些之外的部位名。'
                     : ''
             ].filter(Boolean).join('\n');
             const overwriteRules = [
@@ -959,6 +965,7 @@
                 `今日已完成运动摘要: ${JSON.stringify(todayCompleted)}`,
                 `近6周康复中心处方: ${JSON.stringify(rehabWeekly)}`,
                 `处方动作标准库: ${JSON.stringify(prescriptionCatalog)}`,
+                unclassifiedBodyParts.length ? `待分类部位的处方动作: ${JSON.stringify(unclassifiedBodyParts)}` : '',
                 '处方动作标准库规则: 生成动作时优先使用 displayName；来自处方动作标准库或近6周处方的动作必须原样回填 prescriptionActionId，非处方动作留空；aliases 只是识别同一动作的历史写法；linkedActionId 表示可参考普通动作库参数；regression/progression 表示退阶/进阶，只能按疼痛、RPE 和用户反馈选择。不要把关联动作当成合并动作。',
                 `选中病症相关处方强规则: ${JSON.stringify(rehabByCondition.target)}`,
                 `其他病症处方安全限制: ${JSON.stringify(rehabByCondition.safetyOnly)}`,
@@ -1221,10 +1228,13 @@
 
         // 部位是动作自身的属性，与这份计划是否被采纳无关：解析成功就落库，不等 confirmPlanAiPlans。
         // 用户丢弃预览不该连带丢掉分类结果。写失败绝不能影响预览，所以整段吞掉异常只上报。
-        applyPlanAiBodyParts(plans = []) {
+        // catalogEntries（AI 顺带分类的目录动作）没有 prescriptionActionId，靠 name 命中别名索引；
+        // 刻意排在 items 之后：同名先被 items 写成 ai，再撞上「已是 ai 就跳过」自动去重且 items 优先。
+        applyPlanAiBodyParts(plans = [], catalogEntries = []) {
             try {
                 const entries = (Array.isArray(plans) ? plans : [])
                     .flatMap((plan) => Array.isArray(plan?.items) ? plan.items : [])
+                    .concat(Array.isArray(catalogEntries) ? catalogEntries : [])
                     .filter((item) => Array.isArray(item?.bodyParts) && item.bodyParts.length)
                     .map((item) => ({
                         prescriptionActionId: item.prescriptionActionId || '',
@@ -1322,7 +1332,7 @@
                     const head = parsed.warnings.slice(0, 3).join('；');
                     window.toast?.show?.(`AI 漏填字段已用默认值补全：${head}${parsed.warnings.length > 3 ? '…' : ''}`, 'info', 5200);
                 }
-                this.applyPlanAiBodyParts(parsed.plans);
+                this.applyPlanAiBodyParts(parsed.plans, parsed.bodyPartCatalog);
                 this.previewPlanAiPlans(parsed.plans);
             } catch (error) {
                 const message = window.toast?.sanitize ? toast.sanitize(error) : error?.message || error;

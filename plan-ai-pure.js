@@ -323,6 +323,16 @@ function extractPlanAiPlanCandidates(parsed) {
     return [parsed];
 }
 
+// 顶层 bodyPartCatalog：AI 顺带分类的目录动作，与 plans 平级。键名以 catalog 结尾，上面两条容器
+// 启发式（…items$/…parts$）都不命中，不会被当成计划或动作；name 空或部位过滤后为空的条目丢弃。
+function extractPlanAiBodyPartCatalog(parsed) {
+    const raw = Object.entries(isPlainObject(parsed) ? parsed : {})
+        .find(([key]) => normalizeAiKey(key) === 'bodypartcatalog')?.[1];
+    return (Array.isArray(raw) ? raw : [])
+        .map((entry) => ({ name: String(entry?.name || '').trim(), bodyParts: normalizeAiBodyParts(entry?.bodyParts) }))
+        .filter((entry) => entry.name && entry.bodyParts.length);
+}
+
 const normalizePlanAiPlanCandidate = (plan) => Array.isArray(plan) ? { sections: plan } : (isPlainObject(plan) ? plan : {});
 const planAiPlanType = (plan = {}, allowedTypes = [], index = 0) => {
     const type = String(plan.type || plan.planType || plan.goal || '').trim().toLowerCase();
@@ -434,6 +444,7 @@ function parsePlanAiPayload(rawText = '', options = {}) {
     return {
         ok: true,
         plans: validPlans,
+        bodyPartCatalog: extractPlanAiBodyPartCatalog(parsed),
         warnings,
         meta: {
             ...baseMeta,
