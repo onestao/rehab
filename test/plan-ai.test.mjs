@@ -3,13 +3,15 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import * as actionIdentity from '../action-identity.js';
+import actionTaxonomy from '../action-taxonomy-pure.js';
 import * as planAiPure from '../plan-ai-pure.mjs';
 
 function loadPlanAi() {
   const policyCode = readFileSync(new URL('../rehab-policy.js', import.meta.url), 'utf8');
   const code = readFileSync(new URL('../plan-ai.js', import.meta.url), 'utf8');
   const sandbox = {
-    window: { toast: { show() {} }, actionIdentity, planAiPure },
+    // searchText/部位归一化依赖 taxonomy；不注入会静默走退化路径。
+    window: { toast: { show() {} }, actionIdentity, actionTaxonomy, planAiPure },
     document: {},
     console
   };
@@ -208,6 +210,24 @@ test('plan action search includes rehab prescriptions and action library', () =>
   assert.equal(prescription.actionKey, 'side-lying-hip-abduction');
   assert.equal(library.source, 'action-library');
   assert.equal(library.sourceActionId, 'lib-bridge');
+});
+
+test('plan action search matches enum body part against free-text bodyPart', () => {
+  const api = loadPlanAi();
+  const ctx = createContext(api);
+  // bodyPart 是自由文本「小腿」，动作名和描述都不含「踝」；只有归一化后的部位键能命中。
+  ctx.db.health.prescriptionActions = [{
+    id: 'pa-calf-raise',
+    displayName: '直腿弹力带下压',
+    aliases: ['直腿弹力带下压'],
+    bodyPart: '小腿'
+  }];
+
+  const hits = api.searchPlanActionChoices.call(ctx, '踝', 4);
+
+  assert.equal(hits.length, 1);
+  assert.equal(hits[0].name, '直腿弹力带下压');
+  assert.equal(hits[0].source, 'prescription');
 });
 
 test('plan AI parser adapter injects runtime action matching and hides debug meta', () => {

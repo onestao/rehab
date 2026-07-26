@@ -504,7 +504,9 @@
                 enriched.description,
                 enriched.note,
                 Array.isArray(enriched.aliases) ? enriched.aliases.join(' ') : '',
-                Array.isArray(enriched.tags) ? enriched.tags.join(' ') : ''
+                Array.isArray(enriched.tags) ? enriched.tags.join(' ') : '',
+                // 归一化部位（如「膝盖」→「膝」），让搜索枚举键能命中自由文本部位。
+                window.actionTaxonomy?.normalizeBodyPart?.(enriched.bodyPart) || ''
             ].filter(Boolean).join(' ');
             choices.push(enriched);
         };

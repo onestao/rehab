@@ -44,6 +44,71 @@ test('处方 category：无 taxonomy 环境保持原文，不抛错', () => {
     assert.equal(db.health.prescriptionActions[0].category, '力量');
 });
 
+function progressionDb(action = {}) {
+    return {
+        health: {
+            rehabWeekly: [
+                { weekStart: '2026-07-20', actions: [{ actionId: 'ra-1', name: '夹砖臀桥', ...action }] }
+            ],
+            prescriptionActions: []
+        }
+    };
+}
+
+const progressionPolicyStub = {
+    actionMetaForName(name) {
+        return String(name || '').includes('夹砖臀桥')
+            ? { progressionGroup: 'bridge-adduction', progressionLevel: 2 }
+            : { progressionGroup: '', progressionLevel: 0 };
+    }
+};
+
+test('进阶链回填：planPolicy 词典知识落入处方目录，空值回填且重复 ensure 幂等', () => {
+    globalThis.window = { actionTaxonomy, planPolicy: progressionPolicyStub };
+    try {
+        const db = progressionDb();
+        ensurePrescriptionActionCatalog(db, { nowTs: 1000 });
+        assert.equal(db.health.prescriptionActions[0].progressionGroup, 'bridge-adduction');
+        assert.equal(db.health.prescriptionActions[0].progressionLevel, 2);
+
+        const first = JSON.parse(JSON.stringify(db.health.prescriptionActions));
+        ensurePrescriptionActionCatalog(db, { nowTs: 1000 });
+        assert.deepEqual(JSON.parse(JSON.stringify(db.health.prescriptionActions)), first);
+    } finally {
+        delete globalThis.window;
+    }
+});
+
+test('进阶链回填：已有 progressionGroup/progressionLevel 不被词典覆盖', () => {
+    globalThis.window = { actionTaxonomy, planPolicy: progressionPolicyStub };
+    try {
+        const db = progressionDb({ progressionGroup: 'user-defined-group', progressionLevel: 5 });
+        ensurePrescriptionActionCatalog(db, { nowTs: 1000 });
+        assert.equal(db.health.prescriptionActions[0].progressionGroup, 'user-defined-group');
+        assert.equal(db.health.prescriptionActions[0].progressionLevel, 5);
+
+        // 只有 level 已有值而 group 为空：group 回填、已有 level 保留。
+        const levelOnly = progressionDb({ progressionLevel: 3 });
+        ensurePrescriptionActionCatalog(levelOnly, { nowTs: 1000 });
+        assert.equal(levelOnly.health.prescriptionActions[0].progressionGroup, 'bridge-adduction');
+        assert.equal(levelOnly.health.prescriptionActions[0].progressionLevel, 3);
+    } finally {
+        delete globalThis.window;
+    }
+});
+
+test('进阶链回填：planPolicy 未加载（boot 阶段）时静默跳过，不抛错不回填', () => {
+    globalThis.window = { actionTaxonomy };
+    try {
+        const db = progressionDb();
+        ensurePrescriptionActionCatalog(db, { nowTs: 1000 });
+        assert.equal(db.health.prescriptionActions[0].progressionGroup, '');
+        assert.equal(db.health.prescriptionActions[0].progressionLevel, 0);
+    } finally {
+        delete globalThis.window;
+    }
+});
+
 test('ensurePrescriptionActionCatalog creates user-visible standard identities', () => {
     const db = {
         health: {

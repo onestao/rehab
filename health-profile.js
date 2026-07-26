@@ -34,18 +34,17 @@
         };
     }
 
+    // 部位词典已收编进 action-taxonomy-pure.js（boot 常驻）；保留函数壳以维持闭包内调用点不变。
     function inferBodyPart(value = '') {
-        const text = String(value || '').toLowerCase();
-        const rules = [
-            ['膝', /膝|髌|半月板|股四头|台阶|靠墙蹲|knee|patella|quad/],
-            ['踝', /踝|跟腱|足底|小腿|提踵|踝泵|ankle|achilles|calf/],
-            ['髋', /髋|臀|梨状|蚌式|髋外展|后踢腿|hip|glute/],
-            ['腰背', /腰|背|脊柱|竖脊|核心|腰椎|low back|lumbar|spine|core/],
-            ['肩', /肩|肩胛|袖|外旋|内旋|shoulder|scapula|rotator/],
-            ['肘腕', /肘|腕|前臂|手腕|elbow|wrist|forearm/],
-            ['颈', /颈|斜方|neck|cervical/]
-        ];
-        return rules.find(([, pattern]) => pattern.test(text))?.[0] || '';
+        return window.actionTaxonomy?.inferBodyPart?.(value) || '';
+    }
+
+    // 同部位判断：任一为空或字面相等按原语义放行；否则双方归一化后非空且相等（如「膝盖」vs「膝」）也算同部位。
+    function sameBodyPartLoose(a = '', b = '') {
+        if (!a || !b || a === b) return true;
+        const left = window.actionTaxonomy?.normalizeBodyPart?.(a) || '';
+        const right = window.actionTaxonomy?.normalizeBodyPart?.(b) || '';
+        return Boolean(left && left === right);
     }
 
     function conditionKey(condition = {}) {
@@ -154,7 +153,7 @@
                         if (prevId === id) continue;
                         const nameMatch = rehabActionNameMatch(action.name, prevAction.name);
                         if (nameMatch === 'none') continue;
-                        const sameBodyPart = !action.bodyPart || !prevAction.bodyPart || action.bodyPart === prevAction.bodyPart;
+                        const sameBodyPart = sameBodyPartLoose(action.bodyPart, prevAction.bodyPart);
                         if (!sameBodyPart) continue;
                         if (nameMatch === 'exact') { bestMatch = prevAction; bestConfidence = 'high'; break; }
                         if (nameMatch === 'partial' && bestConfidence !== 'high') { bestMatch = prevAction; bestConfidence = 'medium'; }

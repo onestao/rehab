@@ -10,6 +10,9 @@
  *  - phase   计划阶段：warmup/main/cooldown —— AI 计划 JSON 的对外契约，不可改名改值
  *  - bucket  训练负荷桶：push/pull/lower/core/cardio/rehab —— 周容量分析用
  *  - logType 运动记录种类：strength/stretch/custom 或内置有氧类型键
+ *  - bodyPart 部位：膝/踝/髋/腰背/肩/肘腕/颈 —— 诊断、检查、处方动作的主要部位。
+ *    存储层保持用户/AI 的自由文本原文（如「膝盖」「左膝内侧」不改写），
+ *    normalizeBodyPart 只在比较/检索时把自由文本折算到枚举键，识别不了返回空串。
  *
  * nature 与 phase 是两个维度，不是同一枚举的粗细粒度：
  * 「拉伸」性质通常落在 cooldown 阶段，但「热身」性质的动作也可能是 main 阶段的激活动作。
@@ -32,6 +35,24 @@ const PLAN_PHASES = ['warmup', 'main', 'cooldown'];
 
 /** 训练负荷桶枚举 */
 const TRAINING_BUCKETS = ['push', 'pull', 'lower', 'core', 'cardio', 'rehab'];
+
+/**
+ * 部位推断规则：[部位键, 关键词正则]，顺序即优先级，首个命中生效。
+ * 词典逐字迁自 health-profile.js 的 inferBodyPart，不得随意增删改序。
+ * @type {ReadonlyArray<readonly [string, RegExp]>}
+ */
+const BODY_PART_RULES = [
+    ['膝', /膝|髌|半月板|股四头|台阶|靠墙蹲|knee|patella|quad/],
+    ['踝', /踝|跟腱|足底|小腿|提踵|踝泵|ankle|achilles|calf/],
+    ['髋', /髋|臀|梨状|蚌式|髋外展|后踢腿|hip|glute/],
+    ['腰背', /腰|背|脊柱|竖脊|核心|腰椎|low back|lumbar|spine|core/],
+    ['肩', /肩|肩胛|袖|外旋|内旋|shoulder|scapula|rotator/],
+    ['肘腕', /肘|腕|前臂|手腕|elbow|wrist|forearm/],
+    ['颈', /颈|斜方|neck|cervical/]
+];
+
+/** 部位枚举（归一化目标键；顺序与推断规则一致） */
+const BODY_PARTS = BODY_PART_RULES.map(([part]) => part);
 
 const NATURE_ALIASES = {
     train: 'training',
@@ -99,6 +120,19 @@ function normalizeTrainingBucket(value = '') {
     return TRAINING_BUCKETS.includes(normalized) ? normalized : '';
 }
 
+/** 从自由文本推断主要部位；首个命中的规则生效，未命中返回空串。 */
+function inferBodyPart(value = '') {
+    const text = String(value || '').toLowerCase();
+    return BODY_PART_RULES.find(([, pattern]) => pattern.test(text))?.[0] || '';
+}
+
+/** 归一化部位：恰为枚举键直接返回；否则从文本推断；仍无返回空串。 */
+function normalizeBodyPart(value = '') {
+    const text = String(value || '').trim();
+    if (BODY_PARTS.includes(text)) return text;
+    return inferBodyPart(text);
+}
+
 /**
  * 动作性质 → 运动记录种类。
  * 只有力量和拉伸在记录表单里有专属字段，其余性质统一按自定义运动记录。
@@ -126,10 +160,13 @@ const actionTaxonomy = {
     ACTION_NATURES,
     PLAN_PHASES,
     TRAINING_BUCKETS,
+    BODY_PARTS,
     normalizeActionNature,
     actionNatureLabel,
     normalizePlanPhase,
     normalizeTrainingBucket,
+    inferBodyPart,
+    normalizeBodyPart,
     natureToExerciseLogType,
     exerciseLogTypeToNature,
 };
@@ -142,10 +179,13 @@ export {
     ACTION_NATURES,
     PLAN_PHASES,
     TRAINING_BUCKETS,
+    BODY_PARTS,
     normalizeActionNature,
     actionNatureLabel,
     normalizePlanPhase,
     normalizeTrainingBucket,
+    inferBodyPart,
+    normalizeBodyPart,
     natureToExerciseLogType,
     exerciseLogTypeToNature,
 };

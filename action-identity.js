@@ -204,6 +204,20 @@ export function ensurePrescriptionActionCatalog(db = {}, options = {}) {
             action.progressionGroup || record.progressionGroup || '',
         ).trim();
         record.progressionLevel = Number(action.progressionLevel || record.progressionLevel || 0);
+        // 进阶链知识目前硬编码在懒加载的 rehab-policy（window.planPolicy）词典里；
+        // 这里趁 ensure 把它渐进落入可同步的处方目录数据：只填空、不覆盖、幂等。
+        // boot 阶段 planPolicy 尚未加载则静默跳过，等 plan 功能加载后的下一次 ensure 自然回填。
+        if (!record.progressionGroup) {
+            const policy = typeof window !== 'undefined' ? window['planPolicy'] : null;
+            const meta = policy?.actionMetaForName?.(record.displayName);
+            const metaGroup = String(meta?.progressionGroup || '').trim();
+            if (metaGroup) {
+                record.progressionGroup = metaGroup;
+                if (!Number(record.progressionLevel || 0)) {
+                    record.progressionLevel = Number(meta.progressionLevel || 0);
+                }
+            }
+        }
         record.updatedAt = Math.max(
             Number(record.updatedAt || 0),
             Number(action.updatedAt || nowTs),

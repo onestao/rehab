@@ -4,10 +4,13 @@ import {
     ACTION_NATURES,
     PLAN_PHASES,
     TRAINING_BUCKETS,
+    BODY_PARTS,
     normalizeActionNature,
     actionNatureLabel,
     normalizePlanPhase,
     normalizeTrainingBucket,
+    inferBodyPart,
+    normalizeBodyPart,
     natureToExerciseLogType,
     exerciseLogTypeToNature
 } from '../action-taxonomy-pure.js';
@@ -68,6 +71,35 @@ test('训练负荷桶归一化', () => {
     assert.equal(normalizeTrainingBucket('拉伸'), 'rehab');
     assert.equal(normalizeTrainingBucket('unknown'), '');
     TRAINING_BUCKETS.forEach((bucket) => assert.equal(normalizeTrainingBucket(bucket), bucket));
+});
+
+test('部位枚举：7 个中文键，保持推断规则顺序', () => {
+    assert.deepEqual(BODY_PARTS, ['膝', '踝', '髋', '腰背', '肩', '肘腕', '颈']);
+});
+
+test('部位推断：每个部位至少一个关键词正例，未命中留空', () => {
+    assert.equal(inferBodyPart('髌骨轨迹不良'), '膝');
+    assert.equal(inferBodyPart('跟腱离心训练'), '踝');
+    assert.equal(inferBodyPart('梨状肌综合征'), '髋');
+    assert.equal(inferBodyPart('竖脊肌激活'), '腰背');
+    assert.equal(inferBodyPart('肩胛稳定练习'), '肩');
+    assert.equal(inferBodyPart('前臂支撑'), '肘腕');
+    assert.equal(inferBodyPart('斜方肌上束放松'), '颈');
+    assert.equal(inferBodyPart('Knee Extension'), '膝');
+    assert.equal(inferBodyPart('呼吸训练'), '');
+    assert.equal(inferBodyPart(''), '');
+    assert.equal(inferBodyPart(/** @type {any} */ (null)), '');
+});
+
+test('部位归一化：枚举直通、别名折算、未知留空', () => {
+    BODY_PARTS.forEach((part) => assert.equal(normalizeBodyPart(part), part));
+    assert.equal(normalizeBodyPart('膝'), '膝');
+    assert.equal(normalizeBodyPart(' 膝 '), '膝');
+    assert.equal(normalizeBodyPart('膝盖'), '膝');
+    assert.equal(normalizeBodyPart('左膝内侧'), '膝');
+    assert.equal(normalizeBodyPart('全身'), '');
+    assert.equal(normalizeBodyPart(''), '');
+    assert.equal(normalizeBodyPart(/** @type {any} */ (null)), '');
 });
 
 test('性质 → 运动记录种类：只有力量和拉伸有专属表单', () => {
