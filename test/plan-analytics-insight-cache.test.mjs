@@ -2,9 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
+import actionTaxonomy from '../action-taxonomy-pure.js';
 
 function loadPlanAnalytics() {
-    const context = { window: {}, Date };
+    const context = { window: { actionTaxonomy }, Date };
     context.globalThis = context;
     vm.createContext(context);
     const code = fs.readFileSync(new URL('../plan-analytics.js', import.meta.url), 'utf8');
@@ -22,7 +23,7 @@ function loadAdvicePanel() {
         navigator: { maxTouchPoints: 0 },
         performance: { now: () => 0 }
     };
-    context.window = { matchMedia: () => ({ matches: false, addEventListener: () => {} }), haptics: {} };
+    context.window = { matchMedia: () => ({ matches: false, addEventListener: () => {} }), haptics: {}, actionTaxonomy };
     context.globalThis = context;
     vm.createContext(context);
     const code = fs.readFileSync(new URL('../advice-panel.js', import.meta.url), 'utf8');

@@ -11,6 +11,7 @@ module.exports = [
       'nav-stack.js',
       'app-route.js',
       'data-utils-pure.js',
+      'action-taxonomy-pure.js',
       'action-identity.js',
       'data-utils.js',
       'storage/idb.js',

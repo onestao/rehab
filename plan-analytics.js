@@ -15,18 +15,13 @@ const planAnalytics = {
         return String(value || '').trim().toLowerCase().replace(/\s+/g, ' ').slice(0, 80);
     },
 
+    // 负荷桶枚举的唯一定义在 action-taxonomy-pure.js。
+    _actionTaxonomy() {
+        return typeof window !== 'undefined' ? window.actionTaxonomy : null;
+    },
+
     _normalizeTrainingBucket(value) {
-        const key = String(value || '').trim().toLowerCase();
-        const aliases = {
-            pushing: 'push', chest: 'push', shoulder: 'push', triceps: 'push', 推: 'push', 胸: 'push', 肩: 'push',
-            pulling: 'pull', back: 'pull', biceps: 'pull', 拉: 'pull', 背: 'pull',
-            legs: 'lower', leg: 'lower', lowerbody: 'lower', 下肢: 'lower', 腿: 'lower', 臀: 'lower',
-            abs: 'core', trunk: 'core', 核心: 'core', 腹: 'core',
-            aerobic: 'cardio', endurance: 'cardio', 有氧: 'cardio', 跑步: 'cardio', 步行: 'cardio', 骑行: 'cardio',
-            rehabilitation: 'rehab', mobility: 'rehab', stretch: 'rehab', 康复: 'rehab', 拉伸: 'rehab'
-        };
-        const normalized = aliases[key] || key;
-        return ['push', 'pull', 'lower', 'core', 'cardio', 'rehab'].includes(normalized) ? normalized : '';
+        return this._actionTaxonomy()?.normalizeTrainingBucket?.(value) || '';
     },
 
     _cachedTrainingBucket(db, name = '', fallback = '') {

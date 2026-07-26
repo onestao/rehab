@@ -32,7 +32,7 @@
         },
 
         exerciseLibraryActions(kind = '') {
-            const normalizeCategory = this.normalizeActionCategory?.bind(this) || ((value) => String(value || '').trim());
+            const normalizeCategory = (value) => window.actionTaxonomy?.normalizeActionNature?.(value) || '';
             return this.activeRecords(this.db.actions || []).filter((action) => {
                 if (!action || action.libOnly !== true || !action.exerciseLogEnabled) return false;
                 const category = normalizeCategory(action.category);
@@ -108,7 +108,7 @@
             action.name = name;
             action.libOnly = true;
             action.exerciseLogEnabled = true;
-            action.category = this.normalizeActionCategory?.(input.category || action.category || '') || input.category || action.category || '';
+            action.category = window.actionTaxonomy?.normalizeActionNature?.(input.category || action.category || '') || input.category || action.category || '';
             action.met = Math.max(0, Number(input.met || action.met || 0));
             action.sets = Math.max(1, Number(input.sets || action.sets || 1));
             action.reps = Math.max(1, Number(input.reps || action.reps || 1));
@@ -123,11 +123,7 @@
         applyExerciseLibraryAction(actionId) {
             const action = this.findActionById?.(actionId) || (this.db.actions || []).find((item) => item && item.id === actionId);
             if (!action || action.deleted) return;
-            const category = this.normalizeActionCategory?.(action.category) || '';
-            const type = {
-                training: 'strength',
-                stretch: 'stretch'
-            }[category] || 'custom';
+            const type = window.actionTaxonomy?.natureToExerciseLogType?.(action.category) || 'custom';
             const typeEl = document.getElementById('manualExerciseType');
             if (typeEl) typeEl.value = type;
             this.toggleManualCustomExercise(type);
@@ -275,7 +271,7 @@
                 const label = customName || this.exerciseLabel(type, { customName });
                 this.upsertExerciseLibraryAction({
                     name: label,
-                    category: type === 'strength' ? 'training' : (met > 0 ? 'cardio' : type === 'stretch' ? 'stretch' : 'other'),
+                    category: window.actionTaxonomy?.exerciseLogTypeToNature?.(type, met) || 'other',
                     met,
                     weightKg,
                     sets: sets || 1,

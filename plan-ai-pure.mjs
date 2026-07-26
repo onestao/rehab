@@ -1,8 +1,9 @@
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
+import actionTaxonomy from './action-taxonomy-pure.js';
 
 const source = readFileSync(new URL('./plan-ai-pure.js', import.meta.url), 'utf8');
-const sandbox = { window: {} };
+const sandbox = { window: { actionTaxonomy } };
 
 vm.runInNewContext(source, sandbox);
 

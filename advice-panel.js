@@ -3348,7 +3348,7 @@ PR:${a.prLift || '无'} 1RM${a.prDistance || '--'} ${a.prWeight || '--'}kg${a.pr
             || parseJson((text.match(/```(?:json)?\s*([\s\S]*?)```/i) || [])[1] || '')
             || parseJson((text.match(/\{[\s\S]*\}/) || [])[0] || '');
         if (!json || typeof json !== 'object') return { advice: text, classifications: [] };
-        const allowed = new Set(['push', 'pull', 'lower', 'core', 'cardio', 'rehab']);
+        const allowed = new Set((typeof window !== 'undefined' ? window.actionTaxonomy?.TRAINING_BUCKETS : null) || []);
         const classifications = (Array.isArray(json.classifications) ? json.classifications : [])
             .map(item => ({ label: String(item?.label || item?.name || '').trim(), bucket: String(item?.bucket || item?.category || '').trim().toLowerCase() }))
             .filter(item => item.label && allowed.has(item.bucket))

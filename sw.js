@@ -20,6 +20,7 @@ const ASSETS = [
     'nav-stack.js?v=363',
     'app-route.js?v=363',
     'data-utils-pure.js?v=363',
+    'action-taxonomy-pure.js?v=363',
     'action-identity.js?v=363',
     'data-utils.js?v=363',
     'data-records.js?v=363',

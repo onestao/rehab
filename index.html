@@ -817,6 +817,7 @@
     <script data-rehab-entry data-kind="classic" data-src="nav-stack.js?v=363"></script>
     <script data-rehab-entry data-kind="classic" data-src="app-route.js?v=363"></script>
     <script data-rehab-entry data-kind="module" data-src="data-utils-pure.js?v=363"></script>
+    <script data-rehab-entry data-kind="module" data-src="action-taxonomy-pure.js?v=363"></script>
     <script data-rehab-entry data-kind="module" data-src="action-identity.js?v=363"></script>
     <script data-rehab-entry data-kind="classic" data-src="data-utils.js?v=363"></script>
     <script data-rehab-entry data-kind="classic" data-src="storage/idb.js?v=363"></script>
@@ -1169,11 +1170,11 @@
             profile: ['42-health-profile']
         };
         // FIND-15: seed must equal every sync boot entry base name from data-rehab-entry tags above.
-        const _loaded = new Set(['m3e-ripple','toast','error-bus','i18n','theme','render-safe','nav-stack','app-route','data-utils-pure','action-identity','data-utils','storage/idb','storage/migrate','data-records','data-schema','data-store','data-ui-core','data-views','data','sync-status']);
+        const _loaded = new Set(['m3e-ripple','toast','error-bus','i18n','theme','render-safe','nav-stack','app-route','data-utils-pure','action-taxonomy-pure','action-identity','data-utils','storage/idb','storage/migrate','data-records','data-schema','data-store','data-ui-core','data-views','data','sync-status']);
         const _loadingPromises = new Map();
         const _loadedCss = new Set();
         const _loadingCssPromises = new Map();
-        const MODULE_SCRIPTS = new Set(['data-utils-pure','action-identity','sync-pure','workout-cardio-pure','voice-engine','report-metrics-pure','ai-vision-pure','ai-model-catalog-pure','ai-routing-pure','ai-json-pure','backup-ring-pure','backup-import-pure','mi-scale-pure']);
+        const MODULE_SCRIPTS = new Set(['data-utils-pure','action-taxonomy-pure','action-identity','sync-pure','workout-cardio-pure','voice-engine','report-metrics-pure','ai-vision-pure','ai-model-catalog-pure','ai-routing-pure','ai-json-pure','backup-ring-pure','backup-import-pure','mi-scale-pure']);
         const MJS_SCRIPTS = new Set(['ai-vision-pure','ai-model-catalog-pure','ai-routing-pure','ai-json-pure']);
         const SCRIPT_PREREQUISITES = {
             'history-view': ['health-summary-pure'],

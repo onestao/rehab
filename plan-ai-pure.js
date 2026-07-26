@@ -34,11 +34,13 @@ function parseBoolean(value) {
 const VALID_MODES = ['reps', 'hold', 'alt-reps', 'alt-hold'];
 const PLAN_AI_TYPES = ['rehab', 'cut', 'bulk', 'maintenance', 'custom'];
 
+// 计划阶段枚举的唯一定义在 action-taxonomy-pure.js（对外 JSON 契约，不可改名改值）。
+function actionTaxonomy() {
+    return typeof window !== 'undefined' ? window.actionTaxonomy : null;
+}
+
 function normalizeAiCategory(value = 'main') {
-    const text = String(value || '').trim().toLowerCase();
-    if (['warmup', 'warm-up', '热身', 'warm'].includes(text)) return 'warmup';
-    if (['cooldown', 'cool-down', 'stretch', 'stretching', '拉伸', '放松'].includes(text)) return 'cooldown';
-    return 'main';
+    return actionTaxonomy()?.normalizePlanPhase?.(value) || 'main';
 }
 
 function isTimedAiAction(item = {}) {

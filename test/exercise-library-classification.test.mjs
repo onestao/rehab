@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import vm from 'node:vm';
+import actionTaxonomy from '../action-taxonomy-pure.js';
 import { cardioTypes } from '../workout-cardio-pure.js';
 
 const source = [
@@ -11,7 +12,7 @@ const source = [
 
 function loadModules(elements = new Map()) {
     const sandbox = {
-        window: { cardioPure: { cardioTypes } },
+        window: { cardioPure: { cardioTypes }, actionTaxonomy },
         document: { getElementById: (id) => elements.get(id) || null },
         alert(message) { throw new Error(`Unexpected alert: ${message}`); },
         console

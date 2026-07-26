@@ -923,52 +923,18 @@
             }, {});
         },
 
+        // 分类枚举与归一化的唯一定义在 action-taxonomy-pure.js，这里只做转发，
+        // 避免动作库、运动记录、AI 计划三处各写一份映射而逐渐跑偏。
         actionCategoryOptions() {
-            return [
-                ['training', '训练'],
-                ['stretch', '拉伸'],
-                ['mobility', '活动度'],
-                ['warmup', '热身'],
-                ['recovery', '恢复'],
-                ['cardio', '有氧'],
-                ['other', '其他'],
-            ];
+            return (window.actionTaxonomy?.ACTION_NATURES || []).map((entry) => [...entry]);
         },
 
         normalizeActionCategory(value = '') {
-            const raw = String(value || '')
-                .trim()
-                .toLowerCase();
-            const map = {
-                train: 'training',
-                strength: 'training',
-                main: 'training',
-                训练: 'training',
-                力量: 'training',
-                stretch: 'stretch',
-                cooldown: 'stretch',
-                拉伸: 'stretch',
-                放松: 'stretch',
-                mobility: 'mobility',
-                活动度: 'mobility',
-                灵活性: 'mobility',
-                warmup: 'warmup',
-                热身: 'warmup',
-                recovery: 'recovery',
-                rehab: 'recovery',
-                恢复: 'recovery',
-                康复: 'recovery',
-                cardio: 'cardio',
-                有氧: 'cardio',
-            };
-            return (
-                map[raw] || (this.actionCategoryOptions().some(([key]) => key === raw) ? raw : '')
-            );
+            return window.actionTaxonomy?.normalizeActionNature?.(value) || '';
         },
 
         actionCategoryLabel(value = '') {
-            const normalized = this.normalizeActionCategory(value);
-            return this.actionCategoryOptions().find(([key]) => key === normalized)?.[1] || '';
+            return window.actionTaxonomy?.actionNatureLabel?.(value) || '';
         },
 
         actionExerciseLogLabel(action = {}) {
