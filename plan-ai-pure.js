@@ -43,6 +43,15 @@ function normalizeAiCategory(value = 'main') {
     return actionTaxonomy()?.normalizePlanPhase?.(value) || 'main';
 }
 
+// AI 给的部位只信落在固定枚举里的值：非法值直接丢弃（不猜、不改写），非数组或缺失为空数组。
+// 输出按枚举顺序去重，重复解析同一份 JSON 结果完全一致。taxonomy 不可用时退化为空数组。
+function normalizeAiBodyParts(value) {
+    const parts = actionTaxonomy()?.BODY_PARTS;
+    if (!Array.isArray(value) || !Array.isArray(parts)) return [];
+    const hits = new Set(value.map((item) => String(item ?? '').trim()));
+    return parts.filter((part) => hits.has(part));
+}
+
 function isTimedAiAction(item = {}) {
     const text = `${item.name || ''} ${item.category || ''} ${item.phase || ''} ${item.section || ''}`.toLowerCase();
     return /保持|支撑|平板|静蹲|静态|靠墙|拉伸|伸展|放松|呼吸|hold|plank|stretch|mobility|wall\s*sit|isometric|brace/.test(text)
@@ -171,12 +180,18 @@ const AI_ITEM_KEY_SET = new Set(AI_ITEM_KEYS.map(normalizeAiKey));
 const AI_INSTRUCTION_ARRAY_KEYS = new Set(['steps', 'step', 'instructions', 'instruction', 'cues', 'tips'].map(normalizeAiKey));
 const PLAN_AI_SECTION_KEYS = new Set(['sections', 'phases', 'blocks', 'parts', 'groups', 'segments', 'schedule', 'program', 'routine', 'session', 'plan', 'dayplan', 'dailyplan', 'trainingplan', 'workoutplan', 'rehabplan', 'exerciseplan', 'movementplan', 'actionplan', 'workout', 'workouts', 'training']);
 const isPlanAiInstructionArrayKey = (key = '') => AI_INSTRUCTION_ARRAY_KEYS.has(normalizeAiKey(key));
+// item 自身的部位字段，不是动作容器：不挡住的话「…parts$」那条分段启发式会把 bodyParts
+// 里的「膝」「踝」当成动作名收成 items，动作全被部位顶掉。
+const PLAN_AI_ITEM_FIELD_KEYS = new Set(['bodyparts', 'bodypart']);
+const isPlanAiItemFieldKey = (key = '') => PLAN_AI_ITEM_FIELD_KEYS.has(normalizeAiKey(key));
 const isPlanAiItemArrayKey = (key = '') => {
     const text = normalizeAiKey(key);
+    if (isPlanAiItemFieldKey(text)) return false;
     return AI_ITEM_KEY_SET.has(text) || /(?:items|exercises?|actions?|tasks?|movements?|drills?|stretches?|stretching|activities|list)$/.test(text);
 };
 const isPlanAiSectionContainerKey = (key = '') => {
     const text = normalizeAiKey(key);
+    if (isPlanAiItemFieldKey(text)) return false;
     return PLAN_AI_SECTION_KEYS.has(text) || /(?:sections?|phases?|blocks?|parts?|groups?|segments?|schedule|program|routine|session|plan)$/.test(text);
 };
 const aiCategoryFromLabel = (value = '') => {
@@ -375,6 +390,7 @@ function parsePlanAiPayload(rawText = '', options = {}) {
                 canonicalName: item.canonicalName || choice?.canonicalName || meta.canonicalName || name,
                 progressionGroup: item.progressionGroup || choice?.progressionGroup || meta.progressionGroup || '',
                 progressionLevel: Number(item.progressionLevel ?? choice?.progressionLevel ?? meta.progressionLevel ?? 0),
+                bodyParts: normalizeAiBodyParts(item.bodyParts),
                 chainId: progressionAllowed ? String(item.chainId || item.chainHint || choice?.chainId || meta.chainId || '') : '',
                 currentLevel: progressionAllowed && item.currentLevel != null ? Number(item.currentLevel) : null,
                 spec: coerced.spec,

@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import actionTaxonomy from '../action-taxonomy-pure.js';
 import {
     addPrescriptionActionRelation,
+    applyAiBodyParts,
     ensurePrescriptionActionCatalog,
     mergePrescriptionActions,
     normalizePrescriptionActionName,
@@ -146,18 +147,61 @@ test('部位多值：自由文本原文保留，bodyParts 派生为归一化枚�
     }
 });
 
-test('部位多值：无部位信息时留空数组与空来源，本阶段不从动作名臆测', () => {
+test('部位词典兜底：没人标过部位时从动作名猜一次，明确标成 lexicon', () => {
     globalThis.window = { actionTaxonomy };
     try {
-        // 「台阶下放」在词典里能推断出「膝」，但没有用户填写就不写进数据——那是 AI 分类层的职责。
+        // 「台阶下放」在词典里能推断出「膝」；猜测标成 lexicon，是三层优先级里最低的一层。
         const db = bodyPartDb();
         ensurePrescriptionActionCatalog(db, { nowTs: 1000 });
-        assert.deepEqual(db.health.prescriptionActions[0].bodyParts, []);
-        assert.equal(db.health.prescriptionActions[0].bodyPartsSource, '');
-        assert.equal(db.health.prescriptionActions[0].bodyPart, '');
+        assert.deepEqual(db.health.prescriptionActions[0].bodyParts, ['膝']);
+        assert.equal(db.health.prescriptionActions[0].bodyPartsSource, 'lexicon');
+        assert.equal(db.health.prescriptionActions[0].bodyPart, '', '自由文本原文没有就是没有，不倒填');
+
+        // 词典也认不出来的动作名：留空数组 + 空来源，不臆造。
+        const unknown = {
+            health: {
+                rehabWeekly: [{ weekStart: '2026-07-20', actions: [{ actionId: 'ra-x', name: '呼吸练习' }] }],
+                prescriptionActions: []
+            }
+        };
+        ensurePrescriptionActionCatalog(unknown, { nowTs: 1000 });
+        assert.deepEqual(unknown.health.prescriptionActions[0].bodyParts, []);
+        assert.equal(unknown.health.prescriptionActions[0].bodyPartsSource, '');
     } finally {
         delete globalThis.window;
     }
+});
+
+test('部位词典兜底：user/ai 已标过的记录不被词典改写，重复 ensure 幂等', () => {
+    globalThis.window = { actionTaxonomy };
+    try {
+        // 用户写的自由文本「髋」与词典从名字猜的「膝」不同：user 层必须赢。
+        const user = bodyPartDb({ bodyPart: '髋' });
+        ensurePrescriptionActionCatalog(user, { nowTs: 1000 });
+        assert.deepEqual(user.health.prescriptionActions[0].bodyParts, ['髋']);
+        assert.equal(user.health.prescriptionActions[0].bodyPartsSource, 'user');
+
+        const ai = bodyPartDb({ bodyParts: ['髋'], bodyPartsSource: 'ai' });
+        ensurePrescriptionActionCatalog(ai, { nowTs: 1000 });
+        assert.deepEqual(ai.health.prescriptionActions[0].bodyParts, ['髋']);
+        assert.equal(ai.health.prescriptionActions[0].bodyPartsSource, 'ai');
+
+        const db = bodyPartDb();
+        ensurePrescriptionActionCatalog(db, { nowTs: 1000 });
+        const first = JSON.parse(JSON.stringify(db.health.prescriptionActions));
+        ensurePrescriptionActionCatalog(db, { nowTs: 1000 });
+        ensurePrescriptionActionCatalog(db, { nowTs: 1000 });
+        assert.deepEqual(JSON.parse(JSON.stringify(db.health.prescriptionActions)), first);
+    } finally {
+        delete globalThis.window;
+    }
+});
+
+test('部位词典兜底：无 taxonomy 环境静默跳过推断，不抛错', () => {
+    const db = bodyPartDb();
+    ensurePrescriptionActionCatalog(db, { nowTs: 1000 });
+    assert.deepEqual(db.health.prescriptionActions[0].bodyParts, []);
+    assert.equal(db.health.prescriptionActions[0].bodyPartsSource, '');
 });
 
 test('部位多值：重复 ensure 幂等，深比较完全一致', () => {
@@ -209,6 +253,155 @@ test('部位多值：无 taxonomy 环境静默退化为空数组，不抛错也�
     ensurePrescriptionActionCatalog(withParts, { nowTs: 1000 });
     assert.deepEqual(withParts.health.prescriptionActions[0].bodyParts, ['膝']);
     assert.equal(withParts.health.prescriptionActions[0].bodyPartsSource, 'user');
+});
+
+function aiCatalogDb(record = {}) {
+    return {
+        health: {
+            rehabWeekly: [],
+            prescriptionActions: [
+                {
+                    id: 'pa-abduction',
+                    displayName: '侧卧髋外展',
+                    aliases: ['侧卧髋外展', '弹力带侧卧髋部外展'],
+                    bodyParts: [],
+                    bodyPartsSource: '',
+                    updatedAt: 500,
+                    ...record
+                }
+            ]
+        }
+    };
+}
+
+test('AI 部位回写：按 prescriptionActionId 命中，写入并标记来源为 ai', () => {
+    globalThis.window = { actionTaxonomy };
+    try {
+        const db = aiCatalogDb();
+        const written = applyAiBodyParts(
+            db,
+            [{ prescriptionActionId: 'pa-abduction', name: '随便写的名字', bodyParts: ['髋', '腰背'] }],
+            { nowTs: 9000 }
+        );
+        const record = db.health.prescriptionActions[0];
+
+        assert.equal(written, 1);
+        assert.deepEqual(record.bodyParts, ['髋', '腰背']);
+        assert.equal(record.bodyPartsSource, 'ai');
+        assert.equal(record.updatedAt, 9000);
+        // 字段级同步：改过的两个字段各自留下时间戳，跨端合并才不会被整条 updatedAt 淹没。
+        assert.equal(record.__fieldUpdatedAt.bodyParts, new Date(9000).toISOString());
+        assert.equal(record.__fieldUpdatedAt.bodyPartsSource, new Date(9000).toISOString());
+    } finally {
+        delete globalThis.window;
+    }
+});
+
+test('AI 部位回写：没有 id 时按名称/别名索引命中（与 ensure 同一套匹配）', () => {
+    globalThis.window = { actionTaxonomy };
+    try {
+        const byName = aiCatalogDb();
+        assert.equal(applyAiBodyParts(byName, [{ name: '侧卧髋外展', bodyParts: ['髋'] }], { nowTs: 9000 }), 1);
+        assert.deepEqual(byName.health.prescriptionActions[0].bodyParts, ['髋']);
+
+        // 别名同样命中，且标点/大小写差异由 normalizePrescriptionActionName 折叠。
+        const byAlias = aiCatalogDb();
+        assert.equal(
+            applyAiBodyParts(byAlias, [{ name: '弹力带-侧卧髋部外展（右）', bodyParts: ['髋'] }], { nowTs: 9000 }),
+            0,
+            '括号内容属于别名之外的新词，不该硬凑'
+        );
+
+        const exactAlias = aiCatalogDb();
+        assert.equal(applyAiBodyParts(exactAlias, [{ name: '弹力带侧卧髋部外展', bodyParts: ['髋'] }], { nowTs: 9000 }), 1);
+        assert.deepEqual(exactAlias.health.prescriptionActions[0].bodyParts, ['髋']);
+
+        // 谁都对不上：不新建记录、不写入。
+        const miss = aiCatalogDb();
+        assert.equal(applyAiBodyParts(miss, [{ name: '完全不存在的动作', bodyParts: ['髋'] }], { nowTs: 9000 }), 0);
+        assert.deepEqual(miss.health.prescriptionActions[0].bodyParts, []);
+    } finally {
+        delete globalThis.window;
+    }
+});
+
+test('AI 部位回写：只填空不降级——user 不被覆盖，lexicon 可被覆盖', () => {
+    globalThis.window = { actionTaxonomy };
+    try {
+        const user = aiCatalogDb({ bodyPart: '髋', bodyParts: ['髋'], bodyPartsSource: 'user' });
+        assert.equal(applyAiBodyParts(user, [{ prescriptionActionId: 'pa-abduction', bodyParts: ['膝'] }], { nowTs: 9000 }), 0);
+        assert.deepEqual(user.health.prescriptionActions[0].bodyParts, ['髋']);
+        assert.equal(user.health.prescriptionActions[0].bodyPartsSource, 'user');
+        assert.equal(user.health.prescriptionActions[0].updatedAt, 500, '跳过就不该动 updatedAt');
+
+        // 词典猜的部位优先级最低，AI 分类结果可以纠正它。
+        const lexicon = aiCatalogDb({ bodyParts: ['腰背'], bodyPartsSource: 'lexicon' });
+        assert.equal(applyAiBodyParts(lexicon, [{ prescriptionActionId: 'pa-abduction', bodyParts: ['髋'] }], { nowTs: 9000 }), 1);
+        assert.deepEqual(lexicon.health.prescriptionActions[0].bodyParts, ['髋']);
+        assert.equal(lexicon.health.prescriptionActions[0].bodyPartsSource, 'ai');
+    } finally {
+        delete globalThis.window;
+    }
+});
+
+test('AI 部位回写：非法部位被过滤，过滤后为空则整条跳过', () => {
+    globalThis.window = { actionTaxonomy };
+    try {
+        // 解析层已把 AI 值严格收敛到枚举，这里是第二道防线：走 normalizeBodyParts，
+        // 认得出的（'core' → 腰背）归一化，认不出的（'全身'、数字、null）直接丢。
+        const mixed = aiCatalogDb();
+        assert.equal(
+            applyAiBodyParts(mixed, [{ prescriptionActionId: 'pa-abduction', bodyParts: ['髋', '全身', 'core', 42, null] }], { nowTs: 9000 }),
+            1
+        );
+        assert.deepEqual(mixed.health.prescriptionActions[0].bodyParts, ['髋', '腰背']);
+
+        ['全身', '编造的部位'].forEach((bad) => {
+            const db = aiCatalogDb();
+            assert.equal(applyAiBodyParts(db, [{ prescriptionActionId: 'pa-abduction', bodyParts: [bad] }], { nowTs: 9000 }), 0);
+            assert.deepEqual(db.health.prescriptionActions[0].bodyParts, []);
+            assert.equal(db.health.prescriptionActions[0].bodyPartsSource, '');
+        });
+
+        const empty = aiCatalogDb();
+        assert.equal(applyAiBodyParts(empty, [{ prescriptionActionId: 'pa-abduction', bodyParts: [] }], { nowTs: 9000 }), 0);
+        assert.equal(applyAiBodyParts(empty, [{ prescriptionActionId: 'pa-abduction' }], { nowTs: 9000 }), 0);
+    } finally {
+        delete globalThis.window;
+    }
+});
+
+test('AI 部位回写：幂等——重复调用写入 0 条且数据深比较一致', () => {
+    globalThis.window = { actionTaxonomy };
+    try {
+        const db = aiCatalogDb();
+        const entries = [{ prescriptionActionId: 'pa-abduction', name: '侧卧髋外展', bodyParts: ['髋'] }];
+        assert.equal(applyAiBodyParts(db, entries, { nowTs: 9000 }), 1);
+        const first = JSON.parse(JSON.stringify(db.health.prescriptionActions));
+
+        assert.equal(applyAiBodyParts(db, entries, { nowTs: 12000 }), 0);
+        assert.equal(applyAiBodyParts(db, [{ prescriptionActionId: 'pa-abduction', bodyParts: ['膝'] }], { nowTs: 12000 }), 0);
+        assert.deepEqual(JSON.parse(JSON.stringify(db.health.prescriptionActions)), first);
+    } finally {
+        delete globalThis.window;
+    }
+});
+
+test('AI 部位回写：无 taxonomy 环境返回 0 且不抛错', () => {
+    const db = aiCatalogDb();
+    assert.equal(applyAiBodyParts(db, [{ prescriptionActionId: 'pa-abduction', bodyParts: ['髋'] }], { nowTs: 9000 }), 0);
+    assert.deepEqual(db.health.prescriptionActions[0].bodyParts, []);
+    assert.equal(db.health.prescriptionActions[0].bodyPartsSource, '');
+
+    globalThis.window = { actionTaxonomy };
+    try {
+        // 空目录 / 空 entries / 畸形入参都只是无事发生。
+        assert.equal(applyAiBodyParts({}, [{ name: '侧卧髋外展', bodyParts: ['髋'] }]), 0);
+        assert.equal(applyAiBodyParts(aiCatalogDb(), []), 0);
+        assert.equal(applyAiBodyParts(aiCatalogDb(), /** @type {any} */ (null)), 0);
+    } finally {
+        delete globalThis.window;
+    }
 });
 
 test('ensurePrescriptionActionCatalog creates user-visible standard identities', () => {

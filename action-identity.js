@@ -33,7 +33,7 @@ function normalizeCategoryText(value = '') {
 }
 
 /**
- * bodyPartsSource 取值域：谁定的部位。本阶段只会产生 user / lexicon，ai 留给 AI 分类层。
+ * bodyPartsSource 取值域：谁定的部位，同时也是优先级 user > ai > lexicon。
  * 刻意不写成三元素字符串数组字面量：那种形状会被 scripts/collect-icons.mjs 的装备元组
  * 启发式（['id','标签','图标']）当成图标名收走，害得字体子集校验报 stale。
  */
@@ -75,6 +75,65 @@ export function deriveBodyPartFields(record = {}) {
     const bodyPart = String(record.bodyPart || '').trim();
     if (bodyPart) return { bodyParts: normalizeBodyPartList(bodyPart), bodyPartsSource: 'user' };
     return { bodyParts: [], bodyPartsSource: '' };
+}
+
+/** 部位相关字段是可同步字段：改写后除了 updatedAt，还要按字段级同步机制打时间戳。 */
+function touchBodyPartFields(record, nowTs) {
+    record.updatedAt = nowTs;
+    const iso = new Date(nowTs).toISOString();
+    const meta =
+        record.__fieldUpdatedAt && typeof record.__fieldUpdatedAt === 'object'
+            ? record.__fieldUpdatedAt
+            : {};
+    meta.bodyParts = iso;
+    meta.bodyPartsSource = iso;
+    record.__fieldUpdatedAt = meta;
+}
+
+/**
+ * 把 AI 分类出的部位回填进处方目录。
+ *
+ * 三层优先级 user > ai > lexicon，只填空不降级覆盖：
+ *  - 记录来源已是 user（人工/处方填写）→ 一律不动；
+ *  - 记录已有非空 bodyParts 且来源已是 ai → 不重复改写（幂等）；
+ *  - AI 给的部位归一化后为空（认不准或全是非法值）→ 不写，保留原状。
+ * 命中优先按 prescriptionActionId，其次走既有名称/别名索引（与 ensure 用的是同一套匹配）。
+ * taxonomy 未加载时静默返回 0，不抛错。
+ * @param {any} db
+ * @param {any[]} [entries] 形如 [{ prescriptionActionId?, name?, bodyParts }]
+ * @param {any} [options]
+ * @returns {number} 实际写入的记录条数（调用方据此决定是否 save）
+ */
+export function applyAiBodyParts(db = {}, entries = [], options = {}) {
+    const taxonomy = typeof window !== 'undefined' ? window['actionTaxonomy'] : null;
+    if (typeof taxonomy?.normalizeBodyParts !== 'function') return 0;
+    const catalog = Array.isArray(db?.health?.prescriptionActions)
+        ? db.health.prescriptionActions
+        : [];
+    const list = Array.isArray(entries) ? entries : [];
+    if (!catalog.length || !list.length) return 0;
+    // byName 复用 ensure 的索引（含别名与标点归一化）；byId 指向活记录本体，因为要就地改写。
+    const { byName } = buildIndex(catalog);
+    const live = new Map(activeRecords(catalog).map((item) => [String(item.id || ''), item]));
+    const nowTs = Number(options.nowTs || Date.now());
+    let written = 0;
+    list.forEach((entry) => {
+        const explicitId = String(entry?.prescriptionActionId || '').trim();
+        const nameKey = normalizePrescriptionActionName(entry?.name || '');
+        const id = live.has(explicitId) ? explicitId : nameKey ? byName.get(nameKey) || '' : '';
+        const record = live.get(id);
+        if (!record) return;
+        const source = normalizeBodyPartsSource(record.bodyPartsSource);
+        if (source === 'user') return;
+        if (source === 'ai' && record.bodyParts?.length) return;
+        const parts = normalizeBodyPartList(entry?.bodyParts);
+        if (!parts.length) return;
+        record.bodyParts = parts;
+        record.bodyPartsSource = 'ai';
+        touchBodyPartFields(record, nowTs);
+        written += 1;
+    });
+    return written;
 }
 
 function hashText(value = '') {
@@ -246,6 +305,19 @@ export function ensurePrescriptionActionCatalog(db = {}, options = {}) {
             });
             record.bodyParts = derived.bodyParts;
             record.bodyPartsSource = derived.bodyPartsSource;
+        }
+        // 词典兜底（三层优先级最低的一层）：谁都没标过部位时，从动作名与别名猜一次。
+        // 猜测被明确标成 lexicon，随时可被 AI 分类层与用户填写覆盖，因此写下来不算把猜测当事实。
+        // 只填空、幂等（写完 source 非空就不再进来），taxonomy 未加载时静默跳过。
+        if (!record.bodyParts?.length && !record.bodyPartsSource) {
+            const taxonomy = typeof window !== 'undefined' ? window['actionTaxonomy'] : null;
+            const guessed = taxonomy?.inferBodyParts?.(
+                [record.displayName, ...(record.aliases || [])].join(' '),
+            );
+            if (Array.isArray(guessed) && guessed.length) {
+                record.bodyParts = guessed;
+                record.bodyPartsSource = 'lexicon';
+            }
         }
         if (!record.conditionId && action.conditionId)
             record.conditionId = String(action.conditionId || '').trim();
@@ -480,6 +552,7 @@ export function removePrescriptionActionRelation(
 }
 
 const api = {
+    applyAiBodyParts,
     deriveBodyPartFields,
     normalizePrescriptionActionName,
     createPrescriptionActionId,

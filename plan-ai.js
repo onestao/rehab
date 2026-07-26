@@ -877,10 +877,12 @@
             const userSpecRule = /(\d+\s*(组|次|秒|分钟|min)|次数|时长|每组|保持|休息)/i.test(userText)
                 ? '用户补充中的次数/组数/时长/休息=硬约束，写入 spec.sets/reps/work/repRest/actionRest；不安全则 aiReasoning 说明替代值。'
                 : '';
-            const planJsonShape = '{"date":"YYYY-MM-DD","type":"<rehab|cut|bulk|maintenance|custom>","title":"...","notes":"...","items":[{"name":"...","prescriptionActionId":"","category":"<warmup|main|cooldown>","chainHint":"","spec":{"sets":<int>,"reps":<int>,"work":<int>,"repRest":<int>,"actionRest":<int>,"isAlt":<bool>,"mode":"<reps|hold|alt-reps|alt-hold>"},"cooldownRefs":[],"aiReasoning":"...","durationEstHint":"","requiresUserConfirm":false}]}';
+            const planJsonShape = '{"date":"YYYY-MM-DD","type":"<rehab|cut|bulk|maintenance|custom>","title":"...","notes":"...","items":[{"name":"...","prescriptionActionId":"","category":"<warmup|main|cooldown>","bodyParts":[],"chainHint":"","spec":{"sets":<int>,"reps":<int>,"work":<int>,"repRest":<int>,"actionRest":<int>,"isAlt":<bool>,"mode":"<reps|hold|alt-reps|alt-hold>"},"cooldownRefs":[],"aiReasoning":"...","durationEstHint":"","requiresUserConfirm":false}]}';
             const promptMode = mode === 'week'
                 ? `输出严格 JSON：{"plans":[${planJsonShape}]}`
                 : `请输出严格 JSON，结构为：${planJsonShape}`;
+            // 枚举由 taxonomy 唯一定义，动态拼进提示词；词表改了提示词自动跟上，不留第二份字面量。
+            const bodyPartEnum = (window.actionTaxonomy?.BODY_PARTS || []).join('/');
             const specRules = [
                 '只输出 JSON 本体，不要使用 Markdown 代码块、不要前后加自然语言、不要注释。所有数值字段必须是 number 类型，布尔字段必须是 true/false，禁止用字符串如 "3"、"true"。',
                 '字段必填: name、category(warmup/main/cooldown)、spec.sets≥1/reps≥0/work>0/repRest 0..30/actionRest 0..90/isAlt/mode；缺失、0、空都不合规。',
@@ -892,8 +894,11 @@
                 'category 只能是 warmup（热身）/ main（主训练）/ cooldown（拉伸放松）三选一；不要使用其他词。',
                 '阶段难度必须分层：warmup 只用于准备身体，1-2组低中强度；cooldown 只用于拉伸/呼吸/恢复，1-2组低强度，不得作为进阶加量对象；main 才承载主要训练负荷。',
                 'work: 次数动作2-5秒，保持/拉伸20-45秒；拿不准用 reps=12,work=3。repRest: 0-10秒，慢速高强度最多15；actionRest: 康复15-30，主训30-60，大复合最多75。',
-                '必须参考今日已完成运动摘要；今日同动作/同部位已高强度训练时，后续降负荷或改恢复，除非用户要求加量。'
-            ].join('\n');
+                '必须参考今日已完成运动摘要；今日同动作/同部位已高强度训练时，后续降负荷或改恢复，除非用户要求加量。',
+                bodyPartEnum
+                    ? `bodyParts 是该动作主要涉及的身体部位，多选数组，只能从这 ${bodyPartEnum.split('/').length} 个固定值里取：${bodyPartEnum}；认不准就给空数组 []，不要编造这些之外的部位名。`
+                    : ''
+            ].filter(Boolean).join('\n');
             const overwriteRules = [
                 '当前计划覆盖规则: 你正在重写目标日期/类型的计划，而不是只追加动作。必须先参考“目标当前计划完整摘要”。',
                 '同日期同类型保存时客户端会保留已完成任务和用户锁定(userOverride=true)任务；你输出的 items 应作为未完成未锁定部分的替代方案。',
@@ -1214,6 +1219,28 @@
             return stripPlanAiMeta(parsed);
         },
 
+        // 部位是动作自身的属性，与这份计划是否被采纳无关：解析成功就落库，不等 confirmPlanAiPlans。
+        // 用户丢弃预览不该连带丢掉分类结果。写失败绝不能影响预览，所以整段吞掉异常只上报。
+        applyPlanAiBodyParts(plans = []) {
+            try {
+                const entries = (Array.isArray(plans) ? plans : [])
+                    .flatMap((plan) => Array.isArray(plan?.items) ? plan.items : [])
+                    .filter((item) => Array.isArray(item?.bodyParts) && item.bodyParts.length)
+                    .map((item) => ({
+                        prescriptionActionId: item.prescriptionActionId || '',
+                        name: item.name || '',
+                        bodyParts: item.bodyParts
+                    }));
+                if (!entries.length) return 0;
+                const written = window.actionIdentity?.applyAiBodyParts?.(this.db || {}, entries) || 0;
+                if (written > 0) this.save?.({ render: false });
+                return written;
+            } catch (error) {
+                window.errorBus?.report?.('plan.aiBodyParts', error);
+                return 0;
+            }
+        },
+
         validatePlanAiPayload(rawText, fallbackTypes = 'rehab', targetDates = []) {
             const options = buildPlanAiPayloadOptions(this, fallbackTypes);
             const validation = stripPlanAiMeta(validatePlanAiPayloadPure(rawText, options));
@@ -1295,6 +1322,7 @@
                     const head = parsed.warnings.slice(0, 3).join('；');
                     window.toast?.show?.(`AI 漏填字段已用默认值补全：${head}${parsed.warnings.length > 3 ? '…' : ''}`, 'info', 5200);
                 }
+                this.applyPlanAiBodyParts(parsed.plans);
                 this.previewPlanAiPlans(parsed.plans);
             } catch (error) {
                 const message = window.toast?.sanitize ? toast.sanitize(error) : error?.message || error;

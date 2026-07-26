@@ -340,6 +340,111 @@ test('plan preview collection treats edited action name as user override with ne
   assert.notEqual(item.actionKey, 'bridge-basic');
 });
 
+test('plan AI parser keeps only enum body parts returned by the model', () => {
+  const api = loadPlanAi();
+  const ctx = createContext(api);
+  const parsed = parsePlanAiPayloadPure(api, ctx, JSON.stringify({
+    date: '2026-05-25',
+    type: 'rehab',
+    items: [
+      { name: '侧卧髋外展', category: 'main', bodyParts: ['髋', '腰背'], spec: { sets: 2, reps: 10, work: 3 } },
+      { name: '靠墙静蹲', category: 'main', bodyParts: ['膝', '全身', 'core', 42], spec: { sets: 2, work: 30 } },
+      { name: '踝泵', category: 'main', bodyParts: ['编造的部位'], spec: { sets: 2, reps: 15, work: 1 } },
+      { name: '猫牛式', category: 'warmup', bodyParts: '腰背', spec: { sets: 1, reps: 8, work: 2 } },
+      { name: '呼吸练习', category: 'cooldown', spec: { sets: 1, work: 40 } }
+    ]
+  }), ['rehab']);
+
+  assert.equal(parsed.ok, true);
+  const bodyParts = parsed.plans[0].items.map((item) => [...item.bodyParts]);
+  assert.deepEqual(bodyParts[0], ['髋', '腰背'], '合法枚举原样保留');
+  assert.deepEqual(bodyParts[1], ['膝'], '非法值被丢弃，合法值留下');
+  assert.deepEqual(bodyParts[2], [], '全是非法值时退化为空数组');
+  assert.deepEqual(bodyParts[3], [], '非数组不做自由文本推断，直接空数组');
+  assert.deepEqual(bodyParts[4], [], '缺失字段为空数组');
+});
+
+test('plan AI parser normalizes body part order and duplicates for stable rewrites', () => {
+  const api = loadPlanAi();
+  const ctx = createContext(api);
+  const raw = JSON.stringify({
+    date: '2026-05-25',
+    type: 'rehab',
+    items: [{ name: '侧卧髋外展', category: 'main', bodyParts: ['腰背', '膝', '髋', '膝'], spec: { sets: 2, reps: 10, work: 3 } }]
+  });
+  const first = parsePlanAiPayloadPure(api, ctx, raw, ['rehab']);
+  const second = parsePlanAiPayloadPure(api, ctx, raw, ['rehab']);
+
+  // 枚举顺序固定、重复项折叠：同一份 JSON 反复解析出的部位集合完全一致，回写才幂等。
+  assert.deepEqual([...first.plans[0].items[0].bodyParts], ['膝', '髋', '腰背']);
+  assert.deepEqual([...second.plans[0].items[0].bodyParts], [...first.plans[0].items[0].bodyParts]);
+});
+
+test('plan AI prompt contract asks for multi-select body parts from the taxonomy enum', () => {
+  const api = loadPlanAi();
+  const prompt = api.buildPlanAiContext.call(createContext(api), 'today', '安排康复训练', ['rehab']);
+
+  assert.match(prompt, /"bodyParts":\[\]/);
+  assert.match(prompt, /bodyParts 是该动作主要涉及的身体部位，多选数组/);
+  assert.match(prompt, new RegExp(`只能从这 ${actionTaxonomy.BODY_PARTS.length} 个固定值里取：${actionTaxonomy.BODY_PARTS.join('/')}`));
+  assert.match(prompt, /认不准就给空数组/);
+});
+
+test('plan AI writes classified body parts back to the catalog right after parsing', () => {
+  const api = loadPlanAi();
+  const ctx = createContext(api);
+  let saves = 0;
+  ctx.save = () => { saves += 1; };
+  ctx.db.health.prescriptionActions = [
+    { id: 'pa-abduction', displayName: '侧卧髋外展', aliases: ['侧卧髋外展'], bodyParts: [], bodyPartsSource: '' },
+    { id: 'pa-user', displayName: '靠墙静蹲', aliases: ['靠墙静蹲'], bodyParts: ['膝'], bodyPartsSource: 'user' }
+  ];
+
+  const plans = [{
+    date: '2026-05-25',
+    type: 'rehab',
+    items: [
+      { name: '侧卧髋外展', prescriptionActionId: 'pa-abduction', bodyParts: ['髋'] },
+      { name: '靠墙静蹲', prescriptionActionId: 'pa-user', bodyParts: ['踝'] },
+      { name: '呼吸练习', bodyParts: [] }
+    ]
+  }];
+
+  // action-identity 是宿主 realm 的 ESM，它读的是宿主 window；不注入就静默走 taxonomy 缺失的退化路径。
+  const host = /** @type {any} */ (globalThis);
+  host.window = { actionTaxonomy };
+  try {
+    assert.equal(api.applyPlanAiBodyParts.call(ctx, plans), 1);
+    assert.deepEqual([...ctx.db.health.prescriptionActions[0].bodyParts], ['髋']);
+    assert.equal(ctx.db.health.prescriptionActions[0].bodyPartsSource, 'ai');
+    assert.deepEqual([...ctx.db.health.prescriptionActions[1].bodyParts], ['膝'], 'user 来源不被 AI 覆盖');
+    assert.equal(saves, 1, '写入即落库，不等 confirmPlanAiPlans');
+
+    // 幂等：同一份计划再走一遍不写不存。
+    assert.equal(api.applyPlanAiBodyParts.call(ctx, plans), 0);
+    assert.equal(saves, 1);
+  } finally {
+    delete host.window;
+  }
+});
+
+test('plan AI body part writeback never breaks the preview when the catalog throws', () => {
+  const api = loadPlanAi();
+  const ctx = createContext(api);
+  const reports = [];
+  api.__testWindow.errorBus = { report: (scope, error) => reports.push([scope, String(error?.message || error)]) };
+  api.__testWindow.actionIdentity = {
+    applyAiBodyParts() { throw new Error('catalog exploded'); }
+  };
+  try {
+    assert.equal(api.applyPlanAiBodyParts.call(ctx, [{ items: [{ name: '侧卧髋外展', bodyParts: ['髋'] }] }]), 0);
+    assert.deepEqual(reports, [['plan.aiBodyParts', 'catalog exploded']]);
+  } finally {
+    api.__testWindow.actionIdentity = actionIdentity;
+    delete api.__testWindow.errorBus;
+  }
+});
+
 test('plan AI parser fills usable spec defaults and preserves alternation', () => {
   const api = loadPlanAi();
   const ctx = createContext(api);
