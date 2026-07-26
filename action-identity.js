@@ -6,6 +6,13 @@ function activeRecords(records) {
         : [];
 }
 
+// 墓碑穿透重建：整体覆盖目录会丢掉删除标记，同步后被合并掉的动作在他端诈尸。
+function tombstones(list, live) {
+    return (Array.isArray(list) ? list : []).filter(
+        (item) => item && (item.deleted || item.deletedAt) && !live.has(String(item.id || '')),
+    );
+}
+
 function uniqueList(values = []) {
     return [
         ...new Set(
@@ -423,6 +430,7 @@ export function ensurePrescriptionActionCatalog(db = {}, options = {}) {
         record.regressionIds.forEach((id) => addRelation(records, record.id, id, 'regression'));
     });
 
+    const kept = tombstones(db.health.prescriptionActions, records);
     db.health.prescriptionActions = [...records.values()]
         .map((item) => normalizePrescriptionAction(item, { nowTs }))
         .sort((a, b) =>
@@ -432,6 +440,7 @@ export function ensurePrescriptionActionCatalog(db = {}, options = {}) {
         const prev = before.get(record.id);
         if (prev && stamp(record) === prev.json) record.updatedAt = prev.at;
     });
+    db.health.prescriptionActions.push(...kept);
     return db.health.prescriptionActions;
 }
 
@@ -511,9 +520,10 @@ export function mergePrescriptionActions(db = {}, targetId = '', sourceIds = [],
         record.regressionIds = replaceRelationId(record.regressionIds, sources, target.id);
         record.progressionIds = replaceRelationId(record.progressionIds, sources, target.id);
     });
-    db.health.prescriptionActions = [...records.values()].map((item) =>
-        normalizePrescriptionAction(item, { nowTs }),
-    );
+    db.health.prescriptionActions = [
+        ...tombstones(db.health.prescriptionActions, records),
+        ...[...records.values()].map((item) => normalizePrescriptionAction(item, { nowTs })),
+    ];
     ensurePrescriptionActionCatalog(db, { nowTs });
     return findPrescriptionAction(db, target.id);
 }
@@ -549,7 +559,10 @@ export function addPrescriptionActionRelation(
         String(toId || ''),
         relation === 'regression' ? 'regression' : 'progression',
     );
-    db.health.prescriptionActions = [...records.values()];
+    db.health.prescriptionActions = [
+        ...tombstones(db.health.prescriptionActions, records),
+        ...records.values(),
+    ];
     return findPrescriptionAction(db, fromId);
 }
 

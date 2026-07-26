@@ -6,6 +6,8 @@ import {
     addPrescriptionActionRelation,
     applyAiBodyParts,
     ensurePrescriptionActionCatalog,
+    findPrescriptionAction,
+    getPrescriptionActionCatalog,
     listUnclassifiedBodyPartActions,
     mergePrescriptionActions,
     normalizePrescriptionActionName,
@@ -649,6 +651,147 @@ test('relations and linked library actions stay separate from merge', () => {
     assert.deepEqual(brick.regressionIds, ['pa-basic']);
 });
 
+function mergeTombstoneDb() {
+    return {
+        health: {
+            rehabWeekly: [
+                { weekStart: '2026-06-01', actions: [{ actionId: 'ra-1', name: '靠墙蹲' }] },
+                { weekStart: '2026-06-08', actions: [{ actionId: 'ra-2', name: '靠墙静蹲' }] }
+            ],
+            prescriptionActions: []
+        }
+    };
+}
+
+function mergeOnce(db, nowTs = 2000) {
+    ensurePrescriptionActionCatalog(db, { nowTs: 1000 });
+    const ids = db.health.prescriptionActions.map((item) => item.id);
+    mergePrescriptionActions(db, ids[0], [ids[1]], { displayName: '靠墙静蹲', nowTs });
+    return db.health.prescriptionActions.find((item) => item.deleted);
+}
+
+test('删除墓碑：合并产生的墓碑必须穿透目录重建（重启后仍能把删除同步出去）', () => {
+    const db = mergeTombstoneDb();
+    const tombstone = mergeOnce(db);
+    assert.ok(tombstone, '合并必须留下墓碑，否则他端永远不知道这条被删了');
+    const before = JSON.parse(JSON.stringify(tombstone));
+
+    // 模拟重启：normalizeDb 每次开机都会重建目录，过去这一步把墓碑整个丢掉。
+    ensurePrescriptionActionCatalog(db, { nowTs: 999000 });
+    const after = db.health.prescriptionActions.find((item) => item.id === before.id);
+    assert.ok(after, '墓碑被重建丢弃 → 他端记录诈尸并回推本地');
+    assert.equal(after.deleted, true);
+    assert.equal(after.updatedAt, before.updatedAt, '墓碑不该被 bump，否则制造无谓同步流量');
+    assert.deepEqual(JSON.parse(JSON.stringify(after)), before, '墓碑原样保留，不经 normalize 改写');
+    assert.equal(db.health.prescriptionActions.filter((item) => !item.deleted).length, 1);
+    assert.equal(db.health.prescriptionActions.at(-1).id, before.id, '墓碑排在活记录之后');
+});
+
+test('删除墓碑：不泄漏到目录读取方（UI / AI 待分类清单）', () => {
+    const db = mergeTombstoneDb();
+    const tombstone = mergeOnce(db);
+    ensurePrescriptionActionCatalog(db, { nowTs: 999000 });
+
+    const catalog = getPrescriptionActionCatalog(db);
+    assert.deepEqual(catalog.map((item) => item.deleted), [false]);
+    assert.equal(findPrescriptionAction(db, tombstone.id), null);
+    assert.deepEqual(
+        listUnclassifiedBodyPartActions(db).actions.map((item) => item.id),
+        catalog.map((item) => item.id),
+        '墓碑不得白占提示词名额'
+    );
+});
+
+test('删除墓碑：同 id 被重建成活记录时活记录优先，不出现同 id 两条', () => {
+    // 他端的周记录还指着已删 id（合并尚未同步过去），同步回来后 ensure 会按 id 重建活记录。
+    const db = {
+        health: {
+            rehabWeekly: [
+                { weekStart: '2026-06-01', actions: [{ actionId: 'ra-1', name: '新写法动作', prescriptionActionId: 'pa-dead' }] }
+            ],
+            prescriptionActions: [{ id: 'pa-dead', displayName: '老动作', deleted: true, updatedAt: 500 }]
+        }
+    };
+    ensurePrescriptionActionCatalog(db, { nowTs: 1000 });
+
+    const hits = db.health.prescriptionActions.filter((item) => item.id === 'pa-dead');
+    assert.equal(hits.length, 1, '同 id 只能有一条');
+    assert.equal(hits[0].deleted, false, '被复活的活记录优先于墓碑');
+});
+
+test('删除墓碑：反复 ensure 与再次合并都不会丢失或增殖墓碑', () => {
+    const db = mergeTombstoneDb();
+    mergeOnce(db);
+    ensurePrescriptionActionCatalog(db, { nowTs: 999000 });
+    const first = JSON.parse(JSON.stringify(db.health.prescriptionActions));
+
+    ensurePrescriptionActionCatalog(db, { nowTs: 1999000 });
+    ensurePrescriptionActionCatalog(db, { nowTs: 2999000 });
+    assert.deepEqual(
+        JSON.parse(JSON.stringify(db.health.prescriptionActions)),
+        first,
+        '幂等：墓碑数量内容稳定，活记录 updatedAt 仍被还原不通胀'
+    );
+
+    // 第二次合并（另一对动作）不得把上一次的墓碑冲掉。
+    db.health.rehabWeekly.push({
+        weekStart: '2026-06-15',
+        actions: [{ actionId: 'ra-3', name: '踝泵' }, { actionId: 'ra-4', name: '踝-泵动作' }]
+    });
+    ensurePrescriptionActionCatalog(db, { nowTs: 3000 });
+    const extra = db.health.prescriptionActions.filter((item) => !item.deleted && item.displayName.startsWith('踝'));
+    mergePrescriptionActions(db, extra[0].id, [extra[1].id], { nowTs: 4000 });
+    ensurePrescriptionActionCatalog(db, { nowTs: 5000 });
+
+    const tombIds = db.health.prescriptionActions.filter((item) => item.deleted).map((item) => item.id);
+    assert.equal(tombIds.length, 2);
+    assert.equal(new Set(tombIds).size, 2);
+    assert.ok(tombIds.includes(first.at(-1).id), '早先的墓碑不能被后一次合并冲掉');
+});
+
 test('normalizePrescriptionActionName folds punctuation for search', () => {
     assert.equal(normalizePrescriptionActionName(' 靠墙-静蹲（低角度） '), '靠墙静蹲低角度');
+});
+
+test('墓碑穿透：加进阶关系也整体重写目录，同样不得冲掉墓碑', () => {
+    globalThis.window = { actionTaxonomy };
+    try {
+        const db = {
+            health: {
+                rehabWeekly: [{
+                    weekStart: '2026-06-08',
+                    actions: [
+                        { actionId: 'ra-1', name: '靠墙静蹲' },
+                        { actionId: 'ra-2', name: '靠墙蹲' },
+                        { actionId: 'ra-3', name: '踝泵' }
+                    ]
+                }],
+                prescriptionActions: []
+            }
+        };
+        ensurePrescriptionActionCatalog(db, { nowTs: 1000 });
+        const live = getPrescriptionActionCatalog(db);
+        const squats = live.filter((item) => item.displayName.includes('靠墙'));
+        const squat = squats[0];
+        const pump = live.find((item) => item.displayName === '踝泵');
+        assert.equal(squats.length, 2, '前置条件：两种写法应各成一条');
+        // 合并出一个墓碑，随后只加关系、不再 ensure —— addRelation 自己就会整体重写数组。
+        mergePrescriptionActions(db, squat.id, [squats[1].id], { nowTs: 2000 });
+        ensurePrescriptionActionCatalog(db, { nowTs: 3000 });
+        const tombBefore = db.health.prescriptionActions.filter((item) => item.deleted);
+        assert.equal(tombBefore.length, 1, '前置条件：合并后应有一个墓碑');
+
+        addPrescriptionActionRelation(db, squat.id, pump.id, 'progression', { nowTs: 4000 });
+
+        const tombAfter = db.health.prescriptionActions.filter((item) => item.deleted);
+        assert.deepEqual(
+            tombAfter.map((item) => item.id),
+            tombBefore.map((item) => item.id),
+            '加关系不得冲掉已有墓碑'
+        );
+        assert.equal(tombAfter[0].updatedAt, tombBefore[0].updatedAt, '墓碑时间戳不被改写');
+        assert.equal(findPrescriptionAction(db, tombAfter[0].id), null, '墓碑仍不对外可见');
+    } finally {
+        delete globalThis.window;
+    }
 });
