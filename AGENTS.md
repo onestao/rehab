@@ -55,6 +55,7 @@
 
 ## Verification
 
+- On Windows, pass file patterns to `rg` with `--glob` (for example, `rg --glob 'data-*.js' pattern .`); do not pass wildcard filenames as positional paths.
 - Run `npm run build:css` after CSS edits.
 - Run `node scripts/bump-version.js --check` after asset or script loading changes.
 - Run `npm run ci` before considering implementation work complete. `ci` covers:
