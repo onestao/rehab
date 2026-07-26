@@ -3,12 +3,22 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
+import actionTaxonomy from '../action-taxonomy-pure.js';
 
-function loadPlanPolicy() {
+function loadPlanPolicy({ taxonomy = actionTaxonomy } = {}) {
     const code = readFileSync(new URL('../rehab-policy.js', import.meta.url), 'utf8');
-    const sandbox = { window: {}, console };
+    const sandbox = { window: taxonomy ? { actionTaxonomy: taxonomy } : {}, console };
     vm.runInNewContext(code, sandbox);
     return sandbox.window.planPolicy;
+}
+
+function missedPlans() {
+    return [{
+        id: 'plan-1',
+        date: '2026-06-22',
+        type: 'rehab',
+        items: [{ id: 'todo-1', name: '髌骨稳定训练', category: 'main', status: 'todo' }]
+    }];
 }
 
 test('bridge names map to one progression chain in the expected order', () => {
@@ -514,4 +524,21 @@ test('plan policy does not replace user-edited preview actions', () => {
     const items = plans[0].items;
     assert.ok(items.find((item) => item.name === '基础臀桥' && item.userOverride));
     assert.ok(items.find((item) => item.name === '夹砖臀桥'));
+});
+
+test('漏练补偿候选带上推断出的临床部位，不再是恒空字段', () => {
+    const policy = loadPlanPolicy();
+    const candidates = policy.detectMissedPlanCandidates(missedPlans(), { targetDate: '2026-06-23', types: ['rehab'] });
+
+    assert.equal(candidates.length, 1);
+    // 「髌」命中部位词典的膝规则；该字段会随候选一起进 AI 提示词。
+    assert.equal(candidates[0].identity.bodyPart, '膝');
+});
+
+test('缺少分类事实源时漏练候选的部位留空而不抛错', () => {
+    const policy = loadPlanPolicy({ taxonomy: null });
+    const candidates = policy.detectMissedPlanCandidates(missedPlans(), { targetDate: '2026-06-23', types: ['rehab'] });
+
+    assert.equal(candidates.length, 1);
+    assert.equal(candidates[0].identity.bodyPart, '');
 });

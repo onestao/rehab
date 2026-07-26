@@ -60,9 +60,11 @@
         return window.planPolicy?.actionMetaForName?.(`${item.name || ''} ${item.aiReasoning || ''}`) || {};
     }
 
+    // 这里要的是负荷桶标签（inferBodyPart 的实际语义），不是临床部位。
+    // 曾经先读 planPolicy meta.bodyPart，但那份词典给的是临床部位且从未有该字段，
+    // 既是死分支也是语义错配，已移除。
     function itemBodyPart(item = {}) {
-        const meta = taskMeta(item);
-        return meta.bodyPart || inferBodyPart(`${item.bodyPart || ''} ${item.name || ''} ${item.feedback?.painPart || ''} ${item.feedback?.note || ''} ${item.aiReasoning || ''}`);
+        return inferBodyPart(`${item.bodyPart || ''} ${item.name || ''} ${item.feedback?.painPart || ''} ${item.feedback?.note || ''} ${item.aiReasoning || ''}`);
     }
 
     function findProgressionChain(ctx = {}, item = {}) {

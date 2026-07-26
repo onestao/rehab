@@ -197,6 +197,11 @@
     };
   }
 
+  // 临床部位推断走分类事实源（action-taxonomy-pure.js）。
+  function inferActionBodyPart(text) {
+    return (typeof window !== 'undefined' ? window.actionTaxonomy : null)?.inferBodyPart?.(text) || '';
+  }
+
   function inferCategory(type, name) {
     const normalizedType = String(type || '').toLowerCase();
     if (PLAN_TYPES.includes(normalizedType)) return normalizedType;
@@ -932,7 +937,7 @@
               actionKey: item.actionKey || meta.actionKey || '',
               prescriptionActionId: item.prescriptionActionId || '',
               progressionGroup: item.progressionGroup || meta.progressionGroup || '',
-              bodyPart: meta.bodyPart || ''
+              bodyPart: inferActionBodyPart(sourceText(item))
             },
             loadDelta: {
               sets: Number(item.spec?.sets || 0),
