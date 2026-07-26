@@ -14,9 +14,13 @@
  *    每个桶另有一个中文展示标签（如 lower = 「下肢/髋膝踝」），会进 AI 提示词与写给用户看的
  *    aiReasoning 文案，属用户可见文案，改动即改用户可见输出。
  *  - logType 运动记录种类：strength/stretch/custom 或内置有氧类型键
- *  - bodyPart 部位：膝/踝/髋/腰背/肩/肘腕/颈 —— 诊断、检查、处方动作的主要部位。
- *    存储层保持用户/AI 的自由文本原文（如「膝盖」「左膝内侧」不改写），
- *    normalizeBodyPart 只在比较/检索时把自由文本折算到枚举键，识别不了返回空串。
+ *  - bodyPart 部位：膝/踝/髋/腰背/肩/肘腕/颈 —— 诊断、检查、处方动作的部位。
+ *    部位是**多值**维度：一个动作可以同时属于多个部位（「弓步蹲」既是髋也是膝）。
+ *    数据模型上 bodyParts 是归一化后的枚举键**数组**（去重、按 BODY_PARTS 稳定排序），
+ *    bodyPart 是兼容既有消费方的首要部位单值；存储层始终保留用户/AI 的自由文本原文
+ *    （如「膝盖」「左膝内侧」不改写），归一化只发生在派生字段与比较/检索时。
+ *    多值入口是 inferBodyParts（全部命中）与 normalizeBodyParts（数组/自由文本 → 枚举键数组），
+ *    单值入口 inferBodyPart / normalizeBodyPart 保持「首个命中」语义不变，识别不了返回空串。
  *
  * nature 与 phase 是两个维度，不是同一枚举的粗细粒度：
  * 「拉伸」性质通常落在 cooldown 阶段，但「热身」性质的动作也可能是 main 阶段的激活动作。
@@ -72,6 +76,9 @@ const BODY_PART_RULES = [
 
 /** 部位枚举（归一化目标键；顺序与推断规则一致） */
 const BODY_PARTS = BODY_PART_RULES.map(([part]) => part);
+
+/** 自由文本里常见的部位分隔符（「膝、踝」「髋/膝」「膝 踝」）。 */
+const BODY_PART_SEPARATORS = /[、，,;；|｜／\/\s]+/;
 
 const NATURE_ALIASES = {
     train: 'training',
@@ -156,13 +163,67 @@ function inferTrainingBucketLabel(value = '') {
     return trainingBucketLabel(inferTrainingBucket(value));
 }
 
-/** 从自由文本推断主要部位；首个命中的规则生效，未命中返回空串。 */
-function inferBodyPart(value = '') {
+/**
+ * 从自由文本推断**全部**命中的部位键（「弓步蹲」→ 髋 + 膝）。
+ * 顺序与 BODY_PART_RULES 一致，未命中返回空数组。
+ * @returns {string[]}
+ */
+function inferBodyParts(value = '') {
     const text = String(value || '').toLowerCase();
-    return BODY_PART_RULES.find(([, pattern]) => pattern.test(text))?.[0] || '';
+    return BODY_PART_RULES.filter(([, pattern]) => pattern.test(text)).map(([part]) => part);
 }
 
-/** 归一化部位：恰为枚举键直接返回；否则从文本推断；仍无返回空串。 */
+/** 从自由文本推断主要部位；首个命中的规则生效，未命中返回空串（兼容既有单值消费方）。 */
+function inferBodyPart(value = '') {
+    return inferBodyParts(value)[0] || '';
+}
+
+/**
+ * 归一化部位为枚举键数组（多值）。
+ * 接受数组或自由文本，也容忍 null/undefined/非数组：
+ * 文本先按常见分隔符拆分逐项归一（先枚举直通、再推断），再对整串补推断一次
+ * ——拆分会切断含空格的关键词（如 low back），补这一次才不丢信息。
+ * 结果去重、按 BODY_PARTS 稳定排序、剔除空值；无结果返回空数组。
+ * 幂等：normalizeBodyParts(normalizeBodyParts(x)) 恒等于 normalizeBodyParts(x)。
+ * @param {string|string[]|null|undefined} [value]
+ * @returns {string[]}
+ */
+function normalizeBodyParts(value = '') {
+    const hits = new Set();
+    const collect = (item) => {
+        const text = String(item ?? '').trim();
+        if (!text) return;
+        if (BODY_PARTS.includes(text)) hits.add(text);
+        else inferBodyParts(text).forEach((part) => hits.add(part));
+    };
+    if (Array.isArray(value)) {
+        value.forEach(collect);
+    } else {
+        const text = String(value ?? '').trim();
+        text.split(BODY_PART_SEPARATORS).forEach(collect);
+        inferBodyParts(text).forEach((part) => hits.add(part));
+    }
+    return BODY_PARTS.filter((part) => hits.has(part));
+}
+
+/**
+ * 把记录上的自由文本 bodyPart 派生成归一化多值 bodyParts，并标记来源为用户填写。
+ * 三处编辑器（处方动作行、处方编辑器、动作库编辑器）的保存路径共用，
+ * 免得「派生 + 标来源」这条规则再各抄一份。原文 bodyPart 一字不动。
+ * @param {any} record
+ * @returns {any}
+ */
+function applyUserBodyParts(record) {
+    if (!record || typeof record !== 'object') return record;
+    record.bodyParts = normalizeBodyParts(record.bodyPart);
+    record.bodyPartsSource = record.bodyPart ? 'user' : '';
+    return record;
+}
+
+/**
+ * 归一化部位为单值：恰为枚举键直接返回；否则从文本推断；仍无返回空串。
+ * 刻意不走 normalizeBodyParts —— 后者会拆分空格，会让「low back」这类含空格关键词失配。
+ */
 function normalizeBodyPart(value = '') {
     const text = String(value || '').trim();
     if (BODY_PARTS.includes(text)) return text;
@@ -205,7 +266,10 @@ const actionTaxonomy = {
     trainingBucketLabel,
     inferTrainingBucketLabel,
     inferBodyPart,
+    inferBodyParts,
     normalizeBodyPart,
+    normalizeBodyParts,
+    applyUserBodyParts,
     natureToExerciseLogType,
     exerciseLogTypeToNature,
 };
@@ -227,7 +291,10 @@ export {
     trainingBucketLabel,
     inferTrainingBucketLabel,
     inferBodyPart,
+    inferBodyParts,
     normalizeBodyPart,
+    normalizeBodyParts,
+    applyUserBodyParts,
     natureToExerciseLogType,
     exerciseLogTypeToNature,
 };

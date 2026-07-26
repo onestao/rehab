@@ -41,6 +41,12 @@
             this.db.actions = this.db.actions.map(a => {
                 a.tags = Array.isArray(a.tags) ? a.tags.filter(Boolean) : [];
                 if (typeof a.libOnly !== 'boolean') a.libOnly = false;
+                // 部位是多值维度：bodyPart 保持用户自由文本原文，bodyParts 是归一化枚举键数组。
+                // 派生规则与处方动作目录共用 actionIdentity.deriveBodyPartFields（只填空、幂等、
+                // 不从动作名臆测）。actionIdentity 未加载时保留原值，不擦掉已有数据。
+                const derived = window.actionIdentity?.deriveBodyPartFields?.(a);
+                a.bodyParts = derived ? derived.bodyParts : (Array.isArray(a.bodyParts) ? a.bodyParts : []);
+                a.bodyPartsSource = derived ? derived.bodyPartsSource : String(a.bodyPartsSource || '');
                 return a;
             });
             this.db.aiTemplates = Array.isArray(this.db.aiTemplates) ? this.db.aiTemplates : [];

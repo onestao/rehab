@@ -32,6 +32,51 @@ function normalizeCategoryText(value = '') {
     return taxonomy?.normalizeActionNature?.(raw) || raw;
 }
 
+/**
+ * bodyPartsSource 取值域：谁定的部位。本阶段只会产生 user / lexicon，ai 留给 AI 分类层。
+ * 刻意不写成三元素字符串数组字面量：那种形状会被 scripts/collect-icons.mjs 的装备元组
+ * 启发式（['id','标签','图标']）当成图标名收走，害得字体子集校验报 stale。
+ */
+const BODY_PARTS_SOURCES = new Set('user ai lexicon'.split(' '));
+
+function normalizeBodyPartsSource(value = '') {
+    const key = String(value || '').trim().toLowerCase();
+    return BODY_PARTS_SOURCES.has(key) ? key : '';
+}
+
+function normalizeBodyPartList(value) {
+    const taxonomy = typeof window !== 'undefined' ? window['actionTaxonomy'] : null;
+    const normalize = taxonomy?.normalizeBodyParts;
+    // taxonomy 未加载（无 window 的 Node 环境、boot 早期）：已有数组原样留着不丢信息，
+    // 自由文本无从归一化则退化为空数组——静默降级，不抛错。
+    if (typeof normalize !== 'function') return Array.isArray(value) ? uniqueList(value) : [];
+    const list = normalize.call(taxonomy, value);
+    return Array.isArray(list) ? list : [];
+}
+
+/**
+ * 部位字段的派生规则（处方目录与普通动作库共用，保证两处语义一字不差）。
+ *
+ * 部位是多值维度：bodyPart 是用户/AI 写下的自由文本原文（「左膝内侧」一字不改地留着），
+ * bodyParts 是归一化后的枚举键数组（['膝']），两者不互相改写。
+ *  - 已有 bodyParts → 归一化后保留，bodyPartsSource 原样保留；
+ *  - 只有 bodyPart 自由文本 → 派生 bodyParts，source 记为 user（用户/处方填的，优先级最高）；
+ *  - 两者都无 → 空数组 + 空 source。
+ * 本阶段刻意不从动作名自动推断——那是 AI 分类层与显式调用的职责，不把猜测写成数据。
+ * 重复调用幂等：派生结果再次入参会走「已有 bodyParts」分支，结果完全一致。
+ * @param {{bodyPart?: string, bodyParts?: unknown, bodyPartsSource?: string}} record
+ * @returns {{bodyParts: string[], bodyPartsSource: string}}
+ */
+export function deriveBodyPartFields(record = {}) {
+    const existing = Array.isArray(record.bodyParts) ? normalizeBodyPartList(record.bodyParts) : [];
+    if (existing.length) {
+        return { bodyParts: existing, bodyPartsSource: normalizeBodyPartsSource(record.bodyPartsSource) };
+    }
+    const bodyPart = String(record.bodyPart || '').trim();
+    if (bodyPart) return { bodyParts: normalizeBodyPartList(bodyPart), bodyPartsSource: 'user' };
+    return { bodyParts: [], bodyPartsSource: '' };
+}
+
 function hashText(value = '') {
     let hash = 2166136261;
     const text = String(value || '');
@@ -67,7 +112,9 @@ export function normalizePrescriptionAction(record = {}, options = {}) {
         regressionIds: normalizeRelationIds(record.regressionIds, id),
         progressionIds: normalizeRelationIds(record.progressionIds, id),
         category: normalizeCategoryText(record.category || record.actionCategory || record.type || ''),
+        // bodyPart 是自由文本原文，bodyParts/bodyPartsSource 是它的归一化派生值，互不改写。
         bodyPart: String(record.bodyPart || '').trim(),
+        ...deriveBodyPartFields(record),
         conditionId: String(record.conditionId || '').trim(),
         conditionLabel: String(record.conditionLabel || '').trim(),
         defaultSpec:
@@ -189,6 +236,17 @@ export function ensurePrescriptionActionCatalog(db = {}, options = {}) {
             );
         if (!record.bodyPart && action.bodyPart)
             record.bodyPart = String(action.bodyPart || '').trim();
+        // 只填空、不覆盖：处方动作已有部位数组就不动，否则用周处方动作上的数组、
+        // 再退到本记录的 bodyPart 自由文本派生。识别不出时留空数组，重复 ensure 结果一致。
+        if (!record.bodyParts?.length) {
+            const derived = deriveBodyPartFields({
+                bodyPart: record.bodyPart,
+                bodyParts: action.bodyParts,
+                bodyPartsSource: action.bodyPartsSource,
+            });
+            record.bodyParts = derived.bodyParts;
+            record.bodyPartsSource = derived.bodyPartsSource;
+        }
         if (!record.conditionId && action.conditionId)
             record.conditionId = String(action.conditionId || '').trim();
         if (!record.conditionLabel && action.conditionLabel)
@@ -320,6 +378,11 @@ export function mergePrescriptionActions(db = {}, targetId = '', sourceIds = [],
         if (!target.defaultSpec && source.defaultSpec) target.defaultSpec = source.defaultSpec;
         if (!target.category && source.category) target.category = source.category;
         if (!target.bodyPart && source.bodyPart) target.bodyPart = source.bodyPart;
+        // 目标没有部位数组时才继承：保住被合并方显式标注（含后续 AI 分类）的多部位信息。
+        if (!target.bodyParts?.length && source.bodyParts?.length) {
+            target.bodyParts = source.bodyParts;
+            target.bodyPartsSource = source.bodyPartsSource;
+        }
         source.deleted = true;
         source.updatedAt = nowTs;
     });
@@ -417,6 +480,7 @@ export function removePrescriptionActionRelation(
 }
 
 const api = {
+    deriveBodyPartFields,
     normalizePrescriptionActionName,
     createPrescriptionActionId,
     normalizePrescriptionAction,

@@ -109,6 +109,108 @@ test('进阶链回填：planPolicy 未加载（boot 阶段）时静默跳过，�
     }
 });
 
+function bodyPartDb(action = {}) {
+    return {
+        health: {
+            rehabWeekly: [
+                { weekStart: '2026-07-20', actions: [{ actionId: 'ra-1', name: '台阶下放', ...action }] }
+            ],
+            prescriptionActions: []
+        }
+    };
+}
+
+test('部位多值：自由文本原文保留，bodyParts 派生为归一化枚举键，来源记为 user', () => {
+    globalThis.window = { actionTaxonomy };
+    try {
+        const db = bodyPartDb({ bodyPart: '左膝内侧' });
+        ensurePrescriptionActionCatalog(db, { nowTs: 1000 });
+        const record = db.health.prescriptionActions[0];
+        assert.equal(record.bodyPart, '左膝内侧', '用户/处方原文一字不改');
+        assert.deepEqual(record.bodyParts, ['膝']);
+        assert.equal(record.bodyPartsSource, 'user');
+
+        // 一条自由文本可以带出多个部位，集合语义的下游才能同时命中。
+        const multi = bodyPartDb({ bodyPart: '膝、踝' });
+        ensurePrescriptionActionCatalog(multi, { nowTs: 1000 });
+        assert.equal(multi.health.prescriptionActions[0].bodyPart, '膝、踝');
+        assert.deepEqual(multi.health.prescriptionActions[0].bodyParts, ['膝', '踝']);
+
+        // 识别不了的自由文本同样不丢原文，只是派生不出枚举键。
+        const unknown = bodyPartDb({ bodyPart: '全身' });
+        ensurePrescriptionActionCatalog(unknown, { nowTs: 1000 });
+        assert.equal(unknown.health.prescriptionActions[0].bodyPart, '全身');
+        assert.deepEqual(unknown.health.prescriptionActions[0].bodyParts, []);
+    } finally {
+        delete globalThis.window;
+    }
+});
+
+test('部位多值：无部位信息时留空数组与空来源，本阶段不从动作名臆测', () => {
+    globalThis.window = { actionTaxonomy };
+    try {
+        // 「台阶下放」在词典里能推断出「膝」，但没有用户填写就不写进数据——那是 AI 分类层的职责。
+        const db = bodyPartDb();
+        ensurePrescriptionActionCatalog(db, { nowTs: 1000 });
+        assert.deepEqual(db.health.prescriptionActions[0].bodyParts, []);
+        assert.equal(db.health.prescriptionActions[0].bodyPartsSource, '');
+        assert.equal(db.health.prescriptionActions[0].bodyPart, '');
+    } finally {
+        delete globalThis.window;
+    }
+});
+
+test('部位多值：重复 ensure 幂等，深比较完全一致', () => {
+    globalThis.window = { actionTaxonomy };
+    try {
+        ['左膝内侧', '膝、踝', '全身', ''].forEach((bodyPart) => {
+            const db = bodyPartDb(bodyPart ? { bodyPart } : {});
+            ensurePrescriptionActionCatalog(db, { nowTs: 1000 });
+            const first = JSON.parse(JSON.stringify(db.health.prescriptionActions));
+            ensurePrescriptionActionCatalog(db, { nowTs: 1000 });
+            ensurePrescriptionActionCatalog(db, { nowTs: 1000 });
+            assert.deepEqual(
+                JSON.parse(JSON.stringify(db.health.prescriptionActions)),
+                first,
+                `bodyPart=${bodyPart || '<empty>'}`
+            );
+        });
+    } finally {
+        delete globalThis.window;
+    }
+});
+
+test('部位多值：已有 bodyParts 不被自由文本覆盖，来源原样保留', () => {
+    globalThis.window = { actionTaxonomy };
+    try {
+        // AI 分类层（阶段 B）会写入与自由文本不同的部位集合，ensure 不得把它擦回去。
+        const db = bodyPartDb({ bodyPart: '左膝内侧', bodyParts: ['膝', '髋'], bodyPartsSource: 'ai' });
+        ensurePrescriptionActionCatalog(db, { nowTs: 1000 });
+        const record = db.health.prescriptionActions[0];
+        assert.deepEqual(record.bodyParts, ['膝', '髋']);
+        assert.equal(record.bodyPartsSource, 'ai');
+        assert.equal(record.bodyPart, '左膝内侧');
+
+        ensurePrescriptionActionCatalog(db, { nowTs: 2000 });
+        assert.deepEqual(db.health.prescriptionActions[0].bodyParts, ['膝', '髋']);
+        assert.equal(db.health.prescriptionActions[0].bodyPartsSource, 'ai');
+    } finally {
+        delete globalThis.window;
+    }
+});
+
+test('部位多值：无 taxonomy 环境静默退化为空数组，不抛错也不丢已有数组', () => {
+    const db = bodyPartDb({ bodyPart: '左膝内侧' });
+    ensurePrescriptionActionCatalog(db, { nowTs: 1000 });
+    assert.equal(db.health.prescriptionActions[0].bodyPart, '左膝内侧', '原文照旧不丢');
+    assert.deepEqual(db.health.prescriptionActions[0].bodyParts, [], '推断能力缺失只留空，不臆造');
+
+    const withParts = bodyPartDb({ bodyPart: '左膝内侧', bodyParts: ['膝'], bodyPartsSource: 'user' });
+    ensurePrescriptionActionCatalog(withParts, { nowTs: 1000 });
+    assert.deepEqual(withParts.health.prescriptionActions[0].bodyParts, ['膝']);
+    assert.equal(withParts.health.prescriptionActions[0].bodyPartsSource, 'user');
+});
+
 test('ensurePrescriptionActionCatalog creates user-visible standard identities', () => {
     const db = {
         health: {

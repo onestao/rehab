@@ -533,6 +533,23 @@ test('漏练补偿候选带上推断出的临床部位，不再是恒空字段',
     assert.equal(candidates.length, 1);
     // 「髌」命中部位词典的膝规则；该字段会随候选一起进 AI 提示词。
     assert.equal(candidates[0].identity.bodyPart, '膝');
+    // 部位是多值的：单值字段保持首要部位语义不变，另附全部命中部位给 AI。
+    assert.deepEqual(candidates[0].identity.bodyParts, ['膝']);
+});
+
+test('漏练补偿候选给出全部命中部位，跨部位动作不再被截成一个', () => {
+    const policy = loadPlanPolicy();
+    const plans = [{
+        id: 'plan-1',
+        date: '2026-06-22',
+        type: 'rehab',
+        items: [{ id: 'todo-1', name: '髌骨稳定与踝泵', category: 'main', status: 'todo' }]
+    }];
+    const candidates = policy.detectMissedPlanCandidates(plans, { targetDate: '2026-06-23', types: ['rehab'] });
+
+    assert.equal(candidates.length, 1);
+    assert.equal(candidates[0].identity.bodyPart, '膝', '首要部位仍是规则表里靠前的那个');
+    assert.deepEqual([...candidates[0].identity.bodyParts], ['膝', '踝']);
 });
 
 test('缺少分类事实源时漏练候选的部位留空而不抛错', () => {
@@ -541,4 +558,6 @@ test('缺少分类事实源时漏练候选的部位留空而不抛错', () => {
 
     assert.equal(candidates.length, 1);
     assert.equal(candidates[0].identity.bodyPart, '');
+    // 退化分支的空数组由沙箱 realm 创建，展开成宿主数组再比，避免跨 realm 原型不等。
+    assert.deepEqual([...candidates[0].identity.bodyParts], []);
 });

@@ -20,6 +20,8 @@ async function loadRehabWeeklyHarness(raw) {
             dataAiTemplates: null,
             haptics: { success() {} },
             errorBus: { report() {}, event() {} },
+            // 解析出的动作会走部位推断/多值归一化；不注入 taxonomy 会静默测退化路径。
+            actionTaxonomy,
             aiJsonPure: aiJsonPure.default || aiJsonPure
         },
         document: {
@@ -95,6 +97,45 @@ test('retroactive link treats normalized body part aliases as the same part', as
     assert.equal(result.autoLinked[0].fromId, 'ra-old');
     assert.equal(result.autoLinked[0].confidence, 'high');
     assert.equal(weeks[0].actions[0].progressesFrom, 'ra-old');
+});
+
+test('retroactive link uses set intersection so a multi-part action still matches a single-part one', async () => {
+    const profileSource = await readFile(new URL('../health-profile.js', import.meta.url), 'utf8');
+    const sandbox = { window: { actionTaxonomy }, console };
+    vm.runInNewContext(`${profileSource}\nwindow.dataHealthProfile;`, sandbox);
+    // 新动作是跨部位的（bodyParts 髋+膝），旧动作只标了「髋」。
+    // 单值语义下首要部位「膝」≠「髋」会拒绝建链；集合语义下两边在「髋」相交，应当照常建链。
+    const weeks = [
+        {
+            weekStart: '2026-07-13',
+            actions: [{ actionId: 'ra-new', name: '台阶下放', bodyPart: '膝', bodyParts: ['膝', '髋'] }]
+        },
+        { weekStart: '2026-07-06', actions: [{ actionId: 'ra-old', name: '台阶下放', bodyPart: '髋' }] }
+    ];
+    const host = { ...sandbox.window.dataHealthProfile, latestRehabWeekly: () => weeks };
+
+    const result = host.buildRetroactiveLinks();
+
+    assert.equal(result.stats.auto, 1);
+    assert.equal(result.autoLinked[0].fromId, 'ra-old');
+    assert.equal(weeks[0].actions[0].progressesFrom, 'ra-old');
+});
+
+test('retroactive link keeps rejecting genuinely disjoint body part sets', async () => {
+    const profileSource = await readFile(new URL('../health-profile.js', import.meta.url), 'utf8');
+    const sandbox = { window: { actionTaxonomy }, console };
+    vm.runInNewContext(`${profileSource}\nwindow.dataHealthProfile;`, sandbox);
+    // 两边都认得出部位且没有交集：集合语义不得因为「多值」而放宽成随便关联。
+    const weeks = [
+        { weekStart: '2026-07-13', actions: [{ actionId: 'ra-new', name: '台阶下放', bodyParts: ['肩'] }] },
+        { weekStart: '2026-07-06', actions: [{ actionId: 'ra-old', name: '台阶下放', bodyPart: '膝' }] }
+    ];
+    const host = { ...sandbox.window.dataHealthProfile, latestRehabWeekly: () => weeks };
+
+    const result = host.buildRetroactiveLinks();
+
+    assert.equal(result.stats.auto, 0);
+    assert.equal(weeks[0].actions[0].progressesFrom, undefined);
 });
 
 test('rehab weekly parser accepts noisy and wrapped AI JSON responses', async () => {

@@ -497,7 +497,12 @@
                 Array.isArray(enriched.aliases) ? enriched.aliases.join(' ') : '',
                 Array.isArray(enriched.tags) ? enriched.tags.join(' ') : '',
                 // 归一化部位（如「膝盖」→「膝」），让搜索枚举键能命中自由文本部位。
-                window.actionTaxonomy?.normalizeBodyPart?.(enriched.bodyPart) || ''
+                // 部位是多值的：把全部命中部位都写进搜索文本，搜「髋」也能找到弓步蹲这类跨部位动作。
+                (window.actionTaxonomy?.normalizeBodyParts?.(
+                    Array.isArray(enriched.bodyParts) && enriched.bodyParts.length
+                        ? enriched.bodyParts
+                        : enriched.bodyPart
+                ) || []).join(' ')
             ].filter(Boolean).join(' ');
             choices.push(enriched);
         };

@@ -4,6 +4,7 @@ import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
 import { test } from 'node:test';
 import * as aiJsonPure from '../ai-json-pure.mjs';
+import actionTaxonomy from '../action-taxonomy-pure.js';
 
 async function loadRehabWeeklyHarness(rawOrHandler) {
     const aiSource = await readFile(new URL('../ai-api.js', import.meta.url), 'utf8');
@@ -52,6 +53,8 @@ async function loadRehabWeeklyHarness(rawOrHandler) {
         window: {
             dataAiTemplates: null,
             haptics: { success() {} },
+            // 解析出的动作会走部位推断/多值归一化；不注入 taxonomy 会静默测退化路径。
+            actionTaxonomy,
             errorBus: {
                 report(scope, err, meta) {
                     errorReports.push({ scope, err, meta });

@@ -202,6 +202,11 @@
     return (typeof window !== 'undefined' ? window.actionTaxonomy : null)?.inferBodyPart?.(text) || '';
   }
 
+  // 部位是多值维度：这里给出全部命中部位，单值入口保留给既有消费方。
+  function inferActionBodyParts(text) {
+    return (typeof window !== 'undefined' ? window.actionTaxonomy : null)?.inferBodyParts?.(text) || [];
+  }
+
   function inferCategory(type, name) {
     const normalizedType = String(type || '').toLowerCase();
     if (PLAN_TYPES.includes(normalizedType)) return normalizedType;
@@ -923,8 +928,9 @@
         .filter((item) => item.status !== 'done' && item.status !== 'skipped')
         .filter((item) => !isProtectedPlanTask(item, plan) && !item.policy?.blocked && item.policy?.source !== 'blocked')
         .map((item, index) => {
-          const meta = actionMetaForName(sourceText(item));
-          const risk = (plan.type || 'rehab') === 'rehab' || item.prescriptionActionId || item.policy?.source === 'prescription' ? 'low' : 'medium';
+          const itemText = sourceText(item);
+          const meta = actionMetaForName(itemText);
+          const risk =(plan.type || 'rehab') === 'rehab' || item.prescriptionActionId || item.policy?.source === 'prescription' ? 'low' : 'medium';
           return {
             id: `missed-${plan.id || plan.date}-${item.id || index}`,
             type: 'carry-over',
@@ -937,7 +943,10 @@
               actionKey: item.actionKey || meta.actionKey || '',
               prescriptionActionId: item.prescriptionActionId || '',
               progressionGroup: item.progressionGroup || meta.progressionGroup || '',
-              bodyPart: inferActionBodyPart(sourceText(item))
+              // identity 会 JSON.stringify 进 AI 提示词：bodyPart 保持首要部位单值不变，
+              // 另给 bodyParts 全部命中部位，让 AI 知道跨部位动作（如弓步蹲=髋+膝）。
+              bodyPart: inferActionBodyPart(itemText),
+              bodyParts: inferActionBodyParts(itemText)
             },
             loadDelta: {
               sets: Number(item.spec?.sets || 0),

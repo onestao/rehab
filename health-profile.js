@@ -39,12 +39,23 @@
         return window.actionTaxonomy?.inferBodyPart?.(value) || '';
     }
 
-    // 同部位判断：任一为空或字面相等按原语义放行；否则双方归一化后非空且相等（如「膝盖」vs「膝」）也算同部位。
+    // 部位集合：优先用记录上已归一化的 bodyParts，没有再从自由文本 bodyPart 推断。也接受裸字符串。
+    function bodyPartSet(value) {
+        const record = value && typeof value === 'object' ? value : { bodyPart: value };
+        const source = Array.isArray(record.bodyParts) && record.bodyParts.length
+            ? record.bodyParts
+            : record.bodyPart;
+        return new Set(window.actionTaxonomy?.normalizeBodyParts?.(source) || []);
+    }
+
+    // 同部位判断（集合语义）：部位是多值的，两边集合有交集就算同部位
+    //（「弓步蹲」的髋+膝 与单部位「膝」能关联；「膝盖」vs「膝」同样命中）。
+    // 任一边认不出任何部位（空集）时维持原有的宽松放行，不因多值化而收紧自动关联。
     function sameBodyPartLoose(a = '', b = '') {
-        if (!a || !b || a === b) return true;
-        const left = window.actionTaxonomy?.normalizeBodyPart?.(a) || '';
-        const right = window.actionTaxonomy?.normalizeBodyPart?.(b) || '';
-        return Boolean(left && left === right);
+        const left = bodyPartSet(a);
+        const right = bodyPartSet(b);
+        if (!left.size || !right.size) return true;
+        return [...left].some((part) => right.has(part));
     }
 
     function conditionKey(condition = {}) {
@@ -153,7 +164,8 @@
                         if (prevId === id) continue;
                         const nameMatch = rehabActionNameMatch(action.name, prevAction.name);
                         if (nameMatch === 'none') continue;
-                        const sameBodyPart = sameBodyPartLoose(action.bodyPart, prevAction.bodyPart);
+                        // 传整条记录：优先吃已归一化的 bodyParts，缺失时才回落到 bodyPart 自由文本。
+                        const sameBodyPart = sameBodyPartLoose(action, prevAction);
                         if (!sameBodyPart) continue;
                         if (nameMatch === 'exact') { bestMatch = prevAction; bestConfidence = 'high'; break; }
                         if (nameMatch === 'partial' && bestConfidence !== 'high') { bestMatch = prevAction; bestConfidence = 'medium'; }
@@ -1113,6 +1125,7 @@
                 action.status = normalizeRehabStatus(row.querySelector('[data-field="status"]')?.value);
                 action.name = String(row.querySelector('[data-field="name"]')?.value || action.name).trim() || action.name;
                 action.bodyPart = String(row.querySelector('[data-field="bodyPart"]')?.value || action.bodyPart || inferBodyPart(`${action.name || ''} ${action.rawDescription || ''} ${action.coachNote || ''}`) || '').trim();
+                window.actionTaxonomy?.applyUserBodyParts?.(action);
                 action.conditionId = String(row.querySelector('[data-field="conditionId"]')?.value || '').trim();
                 const matchedCondition = (this.db.health?.profile?.conditions || []).find((condition) => conditionKey(condition) === action.conditionId);
                 action.conditionLabel = matchedCondition?.label || action.conditionLabel || '';

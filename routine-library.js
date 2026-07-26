@@ -1530,11 +1530,15 @@
                             target.bodyPart = String(
                                 root.querySelector('#prescriptionBodyPart')?.value || '',
                             ).trim();
+                            window.actionTaxonomy?.applyUserBodyParts?.(target);
+                            // 派生字段与 bodyPart 同批打时间戳，字段级同步才不会把新原文配上旧派生值。
                             this.touchRecord?.(target, [
                                 'displayName',
                                 'aliases',
                                 'category',
                                 'bodyPart',
+                                'bodyParts',
+                                'bodyPartsSource',
                             ]);
                             this.saveAndBackup?.() || this.save();
                             close();
@@ -1645,6 +1649,7 @@
                             q('#rlAeCategory')?.value || action.category || '',
                         );
                         action.bodyPart = String(q('#rlAeBodyPart')?.value || '').trim();
+                        window.actionTaxonomy?.applyUserBodyParts?.(action);
                         action.isAlt = !!q('#rlAeIsAlt')?.checked;
                         action.exerciseLogEnabled = !!q('#rlAeExerciseLogEnabled')?.checked;
                         action.met = Math.max(0, Number(q('#rlAeMet')?.value || 0));

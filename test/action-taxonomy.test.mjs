@@ -13,7 +13,9 @@ import {
     trainingBucketLabel,
     inferTrainingBucketLabel,
     inferBodyPart,
+    inferBodyParts,
     normalizeBodyPart,
+    normalizeBodyParts,
     natureToExerciseLogType,
     exerciseLogTypeToNature
 } from '../action-taxonomy-pure.js';
@@ -149,6 +151,70 @@ test('部位归一化：枚举直通、别名折算、未知留空', () => {
     assert.equal(normalizeBodyPart('全身'), '');
     assert.equal(normalizeBodyPart(''), '');
     assert.equal(normalizeBodyPart(/** @type {any} */ (null)), '');
+});
+
+test('部位多值推断：一个动作可命中多个部位，顺序跟随规则表', () => {
+    // 部位是多值维度：跨关节动作同时属于多个部位，单值入口只会看见第一个。
+    assert.deepEqual(inferBodyParts('股四头肌与臀肌激活'), ['膝', '髋']);
+    assert.deepEqual(inferBodyParts('髌骨稳定与踝泵'), ['膝', '踝']);
+    assert.deepEqual(inferBodyParts('核心稳定 + 肩胛控制'), ['腰背', '肩']);
+    // 命中顺序按 BODY_PART_RULES，与文本里出现的先后无关。
+    assert.deepEqual(inferBodyParts('踝泵后做髌骨滑动'), ['膝', '踝']);
+    assert.deepEqual(inferBodyParts('靠墙蹲'), ['膝'], '单部位动作只返回一个键');
+    assert.deepEqual(inferBodyParts('呼吸训练'), [], '未命中返回空数组');
+    assert.deepEqual(inferBodyParts(''), []);
+    assert.deepEqual(inferBodyParts(/** @type {any} */ (null)), []);
+    assert.deepEqual(inferBodyParts(), []);
+});
+
+test('多值与单值入口自洽：单值恒等于多值的第一项', () => {
+    ['股四头肌与臀肌激活', '髌骨稳定与踝泵', '靠墙蹲', '呼吸训练', ''].forEach((text) => {
+        assert.equal(inferBodyPart(text), inferBodyParts(text)[0] || '', `text=${text || '<empty>'}`);
+    });
+});
+
+test('部位多值归一化：字符串拆分、数组入参、去重与稳定排序', () => {
+    assert.deepEqual(normalizeBodyParts('膝'), ['膝']);
+    assert.deepEqual(normalizeBodyParts('膝、踝'), ['膝', '踝']);
+    assert.deepEqual(normalizeBodyParts('髋/膝'), ['膝', '髋'], '排序跟随 BODY_PARTS，不跟随输入顺序');
+    assert.deepEqual(normalizeBodyParts('踝 膝'), ['膝', '踝']);
+    assert.deepEqual(normalizeBodyParts('膝盖，肩膀'), ['膝', '肩'], '自由文本别名逐项推断');
+    assert.deepEqual(normalizeBodyParts('左膝内侧'), ['膝']);
+    assert.deepEqual(normalizeBodyParts(['踝', '膝', '膝', '', '  ']), ['膝', '踝'], '数组入参去重剔空');
+    assert.deepEqual(normalizeBodyParts(['膝盖', '髋关节']), ['膝', '髋']);
+    assert.deepEqual(normalizeBodyParts('low back'), ['腰背'], '含空格的关键词不能被拆分切断');
+    assert.deepEqual(normalizeBodyParts('全身'), [], '识别不了返回空数组');
+    assert.deepEqual(normalizeBodyParts(''), []);
+    assert.deepEqual(normalizeBodyParts([]), []);
+    // 历史数据可能带 null / 非数组值，归一化必须容忍而不是抛错。
+    assert.deepEqual(normalizeBodyParts(/** @type {any} */ (null)), []);
+    assert.deepEqual(normalizeBodyParts(/** @type {any} */ (undefined)), []);
+    assert.deepEqual(normalizeBodyParts(/** @type {any} */ ({ bodyPart: '膝' })), []);
+    assert.deepEqual(normalizeBodyParts(), []);
+});
+
+test('部位多值归一化幂等：再归一化一次结果完全一致（sync 不会乒乓）', () => {
+    const inputs = [
+        '膝、踝', '髋/膝', '膝盖，肩膀', '左膝内侧', 'low back', '全身', '',
+        ['踝', '膝'], ['膝盖', '髋关节'], [], /** @type {any} */ (null)
+    ];
+    inputs.forEach((input) => {
+        const once = normalizeBodyParts(input);
+        assert.deepEqual(normalizeBodyParts(once), once, `input=${JSON.stringify(input)}`);
+        assert.deepEqual(normalizeBodyParts(normalizeBodyParts(once)), once);
+    });
+    // 归一化结果一定落在枚举内，且能被自身原样接受。
+    BODY_PARTS.forEach((part) => assert.deepEqual(normalizeBodyParts(part), [part]));
+    assert.deepEqual(normalizeBodyParts(BODY_PARTS), BODY_PARTS);
+});
+
+test('多值化不改变单值入口的既有语义', () => {
+    // 既有消费方仍按「首个命中」读 bodyPart，多值化不得改变任何一个既有返回值。
+    assert.equal(normalizeBodyPart('膝盖'), '膝');
+    assert.equal(normalizeBodyPart('左膝内侧'), '膝');
+    assert.equal(normalizeBodyPart('low back'), '腰背');
+    assert.equal(normalizeBodyPart('全身'), '');
+    assert.equal(inferBodyPart('股四头肌与臀肌激活'), '膝', '多命中时单值仍取规则表里靠前的那个');
 });
 
 test('性质 → 运动记录种类：只有力量和拉伸有专属表单', () => {

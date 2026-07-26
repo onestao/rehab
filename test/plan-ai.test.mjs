@@ -230,6 +230,24 @@ test('plan action search matches enum body part against free-text bodyPart', () 
   assert.equal(hits[0].source, 'prescription');
 });
 
+test('plan action search indexes every body part, not just the primary one', () => {
+  const api = loadPlanAi();
+  const ctx = createContext(api);
+  // 部位是多值的：这条动作同时属于膝和踝，搜任意一个部位键都该命中。
+  ctx.db.health.prescriptionActions = [{
+    id: 'pa-multi',
+    displayName: '直腿弹力带下压',
+    aliases: ['直腿弹力带下压'],
+    bodyPart: '髌骨稳定与踝泵'
+  }];
+
+  ['膝', '踝'].forEach((part) => {
+    const hits = api.searchPlanActionChoices.call(ctx, part, 4);
+    assert.equal(hits.length, 1, `搜索「${part}」应命中跨部位动作`);
+    assert.equal(hits[0].name, '直腿弹力带下压');
+  });
+});
+
 test('plan AI parser adapter injects runtime action matching and hides debug meta', () => {
   const api = loadPlanAi();
   const ctx = createContext(api);
