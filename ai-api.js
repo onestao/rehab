@@ -26,12 +26,11 @@ Object.assign(ai, {
         });
     },
 
-    // Client wall-clock budgets. Reasoning / Responses models often spend tens of
-    // seconds before the first token; a hard 30s abort looks like "model broken"
-    // even when the same model works fine in other apps with longer waits.
+    // Client inactivity budgets. Reasoning / Responses models often spend minutes
+    // before the first token, and active streams refresh the timer on every chunk.
     MIN_AI_TIMEOUT_MS: 1000,
-    MAX_AI_TIMEOUT_MS: 300000,
-    DEFAULT_AI_TIMEOUT_MS: 90000,
+    MAX_AI_TIMEOUT_MS: 900000,
+    DEFAULT_AI_TIMEOUT_MS: 300000,
 
     _resolveTimeoutMs(opts = {}, maxTokens = 2000) {
         const minMs = Number(this.MIN_AI_TIMEOUT_MS) || 1000;
@@ -40,16 +39,21 @@ Object.assign(ai, {
         if (Number.isFinite(explicit) && explicit > 0) {
             return Math.max(minMs, Math.min(maxMs, Math.floor(explicit)));
         }
+        const configured = Number(this.cfg?.requestTimeoutMs);
+        if (Number.isFinite(configured) && configured > 0) {
+            return Math.max(minMs, Math.min(maxMs, Math.floor(configured)));
+        }
         const tokens = Math.max(1, Number(maxTokens) || 2000);
-        if (tokens >= 6000) return Math.min(maxMs, 240000);
-        if (tokens >= 3500) return Math.min(maxMs, 180000);
-        if (tokens >= 2000) return Math.min(maxMs, 120000);
-        return Math.min(maxMs, Number(this.DEFAULT_AI_TIMEOUT_MS) || 90000);
+        if (tokens >= 6000) return Math.min(maxMs, 420000);
+        if (tokens >= 3500) return Math.min(maxMs, 360000);
+        return Math.min(maxMs, Number(this.DEFAULT_AI_TIMEOUT_MS) || 300000);
     },
 
-    _timeoutErrorMessage(wasTimeout) {
+    _timeoutErrorMessage(wasTimeout, timeoutMs = 0) {
+        const seconds = Math.max(1, Math.round((Number(timeoutMs) || 0) / 1000));
+        const duration = seconds >= 120 && seconds % 60 === 0 ? `${seconds / 60} 分钟` : `${seconds} 秒`;
         return wasTimeout
-            ? 'AI 请求超时：客户端等待时间已用尽（深度推理模型通常更慢，可换更快模型或稍后重试）'
+            ? `AI 请求超时：客户端连续等待 ${duration} 后已停止。可在“我的 > AI 设置”延长最长等待时间，或换用更快模型后重试。`
             : 'AI 请求已取消';
     },
 
@@ -404,7 +408,7 @@ Object.assign(ai, {
         } catch (e) {
             if (e?.name === 'AbortError') {
                 const wasTimeout = timeout.wasTimeout();
-                throw this._makeAiError(this._timeoutErrorMessage(wasTimeout), {
+                throw this._makeAiError(this._timeoutErrorMessage(wasTimeout, timeout.timeoutMs), {
                     code: wasTimeout ? 'AI_TIMEOUT' : 'AI_CANCELLED',
                     cause: e
                 });
@@ -513,9 +517,10 @@ Object.assign(ai, {
         });
     },
 
-    _makeTimeoutSignal(externalSignal, timeoutMs = 90000) {
+    _makeTimeoutSignal(externalSignal, timeoutMs = 300000) {
         const controller = new AbortController();
         let timedOut = false;
+        let timer = null;
         const abortFromExternal = () => {
             try { controller.abort(externalSignal?.reason); } catch {}
         };
@@ -523,14 +528,22 @@ Object.assign(ai, {
         else externalSignal?.addEventListener?.('abort', abortFromExternal, { once: true });
         const resolved = this._resolveTimeoutMs
             ? this._resolveTimeoutMs({ timeoutMs }, 0)
-            : Math.max(1000, Number(timeoutMs) || 90000);
-        const timer = setTimeout(() => {
-            timedOut = true;
-            try { controller.abort(); } catch {}
-        }, resolved);
+            : Math.max(1000, Number(timeoutMs) || 300000);
+        const arm = () => {
+            clearTimeout(timer);
+            timer = setTimeout(() => {
+                timedOut = true;
+                try { controller.abort(); } catch {}
+            }, resolved);
+        };
+        arm();
         return {
             signal: controller.signal,
+            timeoutMs: resolved,
             wasTimeout: () => timedOut,
+            refresh: () => {
+                if (!timedOut && !controller.signal.aborted) arm();
+            },
             cleanup: () => {
                 clearTimeout(timer);
                 externalSignal?.removeEventListener?.('abort', abortFromExternal);
@@ -721,7 +734,7 @@ Object.assign(ai, {
         } catch (e) {
             if (e?.name === 'AbortError') {
                 const wasTimeout = timeout.wasTimeout();
-                throw this._makeAiError(this._timeoutErrorMessage(wasTimeout), { code: wasTimeout ? 'AI_TIMEOUT' : 'AI_CANCELLED', cause: e });
+                throw this._makeAiError(this._timeoutErrorMessage(wasTimeout, timeout.timeoutMs), { code: wasTimeout ? 'AI_TIMEOUT' : 'AI_CANCELLED', cause: e });
             }
             if (e instanceof TypeError) throw this._makeAiError(e.message || 'NETWORK_ERROR', { code: 'NETWORK_ERROR', cause: e });
             throw e;
@@ -754,16 +767,20 @@ Object.assign(ai, {
         if (!key) throw new Error('请先在当前 AI 配置中填写 API Key');
         const provider = effective.provider || 'openai';
         const timeout = this._makeTimeoutSignal(opts.signal, this._resolveTimeoutMs(opts, maxTokens));
+        const onStreamToken = (...args) => {
+            timeout.refresh?.();
+            return onToken(...args);
+        };
         try {
             timeout.signal.throwIfAborted?.();
-            if (provider === 'claude')           return await this._callClaude(messages, maxTokens, key, true, onToken, effective, timeout.signal, opts);
-            if (provider === 'openai-responses') return await this._callOpenAIResponses(messages, maxTokens, key, true, onToken, effective, timeout.signal, opts);
-            if (provider === 'gemini')           return await this._callGemini(messages, maxTokens, key, true, onToken, effective, timeout.signal, opts);
-            return await this._callOpenAIChat(messages, maxTokens, key, true, onToken, effective, timeout.signal, opts);
+            if (provider === 'claude')           return await this._callClaude(messages, maxTokens, key, true, onStreamToken, effective, timeout.signal, opts);
+            if (provider === 'openai-responses') return await this._callOpenAIResponses(messages, maxTokens, key, true, onStreamToken, effective, timeout.signal, opts);
+            if (provider === 'gemini')           return await this._callGemini(messages, maxTokens, key, true, onStreamToken, effective, timeout.signal, opts);
+            return await this._callOpenAIChat(messages, maxTokens, key, true, onStreamToken, effective, timeout.signal, opts);
         } catch (e) {
             if (e?.name === 'AbortError' || timeout.signal?.aborted || opts.signal?.aborted) {
                 const wasTimeout = timeout.wasTimeout();
-                throw this._makeAiError(this._timeoutErrorMessage(wasTimeout), {
+                throw this._makeAiError(this._timeoutErrorMessage(wasTimeout, timeout.timeoutMs), {
                     code: wasTimeout ? 'AI_TIMEOUT' : 'AI_CANCELLED',
                     cause: e
                 });

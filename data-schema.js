@@ -102,6 +102,7 @@
             this.db.onboarded = true;
             this.db.aiProfiles = this.db.aiProfiles || [];
             this.db.aiActiveId = this.db.aiActiveId || '';
+            this.db.aiRequestTimeoutMs = Math.max(30000, Math.min(900000, Number(this.db.aiRequestTimeoutMs) || 300000));
             this.db.aiModels = this.db.aiModels || [];
             this.db.aiTaskRoutes = this.db.aiTaskRoutes && typeof this.db.aiTaskRoutes === 'object' ? this.db.aiTaskRoutes : {};
             this.db.libraryView = ['actions', 'prescriptionActions', 'routines'].includes(this.db.libraryView) ? this.db.libraryView : 'actions';

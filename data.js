@@ -12,6 +12,7 @@ const data = {
         health: { weights: [], foodLogs: [], exerciseLogs: [], reports: [], rehabWeekly: [], prescriptionActions: [], goalType: 'loss', bodyPlan: null, weightPlan: null, dietGoal: null, aiAdviceChat: [], weeklyGoalSessions: 5 },
         aiProfiles: [],
         aiActiveId: '',
+        aiRequestTimeoutMs: 300000,
         aiModels: [],
         aiTaskRoutes: {},
         aiTemplates: [],

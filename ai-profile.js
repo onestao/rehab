@@ -21,6 +21,18 @@ Object.assign(ai, {
     },
     apiKeyFor(id) { return id ? (this.keyMap[id] || '') : ''; },
 
+    normalizeRequestTimeoutMs(value) {
+        return Math.max(30000, Math.min(900000, Math.round(Number(value) || 300000)));
+    },
+
+    async setRequestTimeoutSeconds(value) {
+        this.cfg.requestTimeoutMs = this.normalizeRequestTimeoutMs(Number(value) * 1000);
+        await this.persist();
+        this.persistDataDb(false);
+        this.syncUI();
+        window.toast?.show?.(`AI 最长等待时间已设为 ${Math.round(this.cfg.requestTimeoutMs / 1000)} 秒`, 'success');
+    },
+
     async persistKeyMap() {
         await this.idbSet(this.KEYS_KEY, JSON.stringify(this.keyMap));
         try { localStorage.setItem(this.KEYS_KEY, JSON.stringify(this.keyMap)); } catch {}
@@ -125,6 +137,7 @@ Object.assign(ai, {
             model: this.cfg.model,
             baseUrl: this.cfg.baseUrl,
             extraVisionKeywords: this.cfg.extraVisionKeywords || '',
+            requestTimeoutMs: this.normalizeRequestTimeoutMs(this.cfg.requestTimeoutMs),
             taskRoutes: this.cfg.taskRoutes || {},
             enabled: this.cfg.enabled
         });
@@ -143,6 +156,7 @@ Object.assign(ai, {
         if (typeof data === 'undefined' || !data.db) return;
         data.db.aiProfiles = this.cfg.profiles || [];
         data.db.aiActiveId = this.cfg.activeProfileId || '';
+        data.db.aiRequestTimeoutMs = this.normalizeRequestTimeoutMs(this.cfg.requestTimeoutMs);
         // Model discovery is derived, endpoint-scoped local cache. Do not sync it through the main database.
         data.db.aiModels = [];
         data.db.aiTaskRoutes = this.cfg.taskRoutes || {};
@@ -160,6 +174,7 @@ Object.assign(ai, {
         const extraVisionKeywords = document.getElementById('aiExtraVisionKeywords');
         const k = document.getElementById('aiApiKey');
         const n = document.getElementById('aiProfileName');
+        const requestTimeoutSeconds = document.getElementById('aiRequestTimeoutSeconds');
         const select = document.getElementById('aiProfileSelect');
         const current = this.cfg.profiles.find(x => x.id === this.cfg.activeProfileId);
         if (p) p.value = this.cfg.provider || 'openai';
@@ -168,6 +183,7 @@ Object.assign(ai, {
         if (extraVisionKeywords) extraVisionKeywords.value = this.cfg.extraVisionKeywords || current?.extraVisionKeywords || '';
         if (k) k.value = this.apiKeyFor(this.cfg.activeProfileId) || '';
         if (n) n.value = current?.name || '';
+        if (requestTimeoutSeconds) requestTimeoutSeconds.value = String(Math.round(this.normalizeRequestTimeoutMs(this.cfg.requestTimeoutMs) / 1000));
         if (select) {
             const esc = window.renderSafe?.escapeHtml || (v => String(v ?? ''));
             const options = this.cfg.profiles.length
@@ -220,7 +236,8 @@ Object.assign(ai, {
             models: this.models || [],
             modelCandidates: this.modelCandidates || {},
             taskRoutes: this.cfg.taskRoutes || {},
-            supplierSchemaVersion: 1
+            requestTimeoutMs: this.normalizeRequestTimeoutMs(this.cfg.requestTimeoutMs),
+            supplierSchemaVersion: 2
         });
         try {
             const cipher = await this.encryptData(payload, password);
@@ -272,6 +289,7 @@ Object.assign(ai, {
             this.models = cfg.models || this.models;
             this.modelCandidates = cfg.modelCandidates || cfg.discoverySnapshots || this.modelCandidates || {};
             this.cfg.taskRoutes = cfg.taskRoutes && typeof cfg.taskRoutes === 'object' ? cfg.taskRoutes : (this.cfg.taskRoutes || {});
+            this.cfg.requestTimeoutMs = this.normalizeRequestTimeoutMs(cfg.requestTimeoutMs || this.cfg.requestTimeoutMs);
             await this.idbSet(this.MODELS_KEY, JSON.stringify(this.models));
             try { localStorage.setItem(this.MODELS_KEY, JSON.stringify(this.models)); } catch {}
             await this.persistModelCandidates?.();

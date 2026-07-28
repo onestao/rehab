@@ -14,6 +14,7 @@ const ai = {
         model: '',
         baseUrl: '',
         extraVisionKeywords: '',
+        requestTimeoutMs: 300000,
         taskRoutes: {},
         enabled: false
     },
@@ -32,6 +33,7 @@ const ai = {
             model: '',
             baseUrl: '',
             extraVisionKeywords: '',
+            requestTimeoutMs: 0,
             taskRoutes: {},
             enabled: false
         };
@@ -94,6 +96,9 @@ const ai = {
         if ((!this.cfg.taskRoutes || !Object.keys(this.cfg.taskRoutes).length) && typeof data !== 'undefined' && data.db?.aiTaskRoutes) {
             this.cfg.taskRoutes = data.db.aiTaskRoutes;
         }
+        if (typeof data !== 'undefined' && Number(data.db?.aiRequestTimeoutMs) > 0 && Number(this.cfg.requestTimeoutMs) <= 0) {
+            this.cfg.requestTimeoutMs = Number(data.db.aiRequestTimeoutMs);
+        }
 
         // 4) 兼容旧 per-profile localStorage key
         (this.cfg.profiles || []).forEach(p => {
@@ -106,6 +111,7 @@ const ai = {
         this.modelCandidates = this.modelCandidates && typeof this.modelCandidates === 'object' ? this.modelCandidates : {};
         this.keyMap = this.keyMap && typeof this.keyMap === 'object' ? this.keyMap : {};
         this.cfg.taskRoutes = this.cfg.taskRoutes && typeof this.cfg.taskRoutes === 'object' ? this.cfg.taskRoutes : {};
+        this.cfg.requestTimeoutMs = Math.max(30000, Math.min(900000, Number(this.cfg.requestTimeoutMs) || 300000));
         if (typeof this.migrateLegacyModelCache === 'function') await this.migrateLegacyModelCache();
         if (!this.cfg.activeProfileId && this.cfg.profiles.length) {
             this.cfg.activeProfileId = this.cfg.profiles[0].id;

@@ -791,10 +791,43 @@ test('text call() honors timeoutMs and maps AbortError to AI_TIMEOUT', async () 
 
 test('AI timeout budget scales with output size and clamps explicit overrides', () => {
     const { ai } = loadProductionAiApi();
-    assert.equal(ai._resolveTimeoutMs({}, 1000), 90000);
-    assert.equal(ai._resolveTimeoutMs({}, 2000), 120000);
-    assert.equal(ai._resolveTimeoutMs({}, 4000), 180000);
-    assert.equal(ai._resolveTimeoutMs({}, 8192), 240000);
+    assert.equal(ai._resolveTimeoutMs({}, 1000), 300000);
+    assert.equal(ai._resolveTimeoutMs({}, 2000), 300000);
+    assert.equal(ai._resolveTimeoutMs({}, 4000), 360000);
+    assert.equal(ai._resolveTimeoutMs({}, 8192), 420000);
     assert.equal(ai._resolveTimeoutMs({ timeoutMs: 500 }, 8192), 1000);
-    assert.equal(ai._resolveTimeoutMs({ timeoutMs: 600000 }, 1000), 300000);
+    assert.equal(ai._resolveTimeoutMs({ timeoutMs: 1000000 }, 1000), 900000);
+    ai.cfg.requestTimeoutMs = 600000;
+    assert.equal(ai._resolveTimeoutMs({}, 1000), 600000);
+    assert.equal(ai._resolveTimeoutMs({ timeoutMs: 45000 }, 8192), 45000);
+});
+
+test('streaming activity refreshes the client inactivity timeout', async () => {
+    const { ai } = loadProductionAiApi();
+    ai._effectiveConfigForRequest = () => ({
+        enabled: true,
+        apiKey: 'k',
+        provider: 'openai',
+        model: 'm',
+        baseUrl: 'https://example.test',
+    });
+    let refreshes = 0;
+    let observed = '';
+    ai._makeTimeoutSignal = () => ({
+        signal: { aborted: false, throwIfAborted() {} },
+        timeoutMs: 300000,
+        wasTimeout: () => false,
+        refresh: () => { refreshes += 1; },
+        cleanup() {},
+    });
+    ai._callOpenAIChat = async (_messages, _maxTokens, _key, _stream, onToken) => {
+        onToken('partial', 'partial', {});
+        return 'complete';
+    };
+
+    const result = await ai.callStream([{ role: 'user', content: 'hi' }], 100, delta => { observed += delta; });
+
+    assert.equal(result, 'complete');
+    assert.equal(observed, 'partial');
+    assert.equal(refreshes, 1);
 });

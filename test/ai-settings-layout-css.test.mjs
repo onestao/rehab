@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import test from 'node:test';
 
 const css = readFileSync(join(process.cwd(), 'css-src/20-settings-ai.css'), 'utf8');
+const html = readFileSync(join(process.cwd(), 'index.html'), 'utf8');
 
 test('supplier summary uses an existing surface token for its background', () => {
     assert.match(css, /\.ai-provider-summary\s*\{[^}]*background:\s*var\(--md-sys-surface-container-low\)/s);
@@ -21,4 +22,10 @@ test('model picker has one immediate touch scroll surface', () => {
     assert.match(css, /\.ai-task-quick-body\s*\{[^}]*min-height:\s*0/s);
     assert.match(css, /\.ai-task-quick-body\s*\{[^}]*touch-action:\s*pan-y/s);
     assert.match(css, /\.ai-task-quick-body\s*\{[^}]*-webkit-overflow-scrolling:\s*touch/s);
+});
+
+test('AI settings expose a bounded configurable inactivity timeout', () => {
+    assert.match(html, /id="aiRequestTimeoutSeconds"/);
+    assert.match(html, /id="aiRequestTimeoutSeconds"[^>]*min="30"[^>]*max="900"[^>]*value="300"/);
+    assert.match(html, /onchange="ai\.setRequestTimeoutSeconds\(this\.value\)"/);
 });
