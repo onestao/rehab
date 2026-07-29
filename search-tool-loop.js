@@ -4,11 +4,32 @@
         type: 'function', function: {
             name: 'search_web', description: '检索公开网页的标题、URL 与摘要。仅用于获取来源，不能读取网页全文。',
             parameters: { type: 'object', additionalProperties: false, properties: {
-                query: { type: 'string', description: '不超过 240 个字符的检索关键词' }, providerId: { type: 'string', description: '已配置搜索供应商 ID（可选）' }
+                query: { type: 'string', description: '不超过 240 个字符的检索关键词' }
             }, required: ['query'] }
         }
     });
     function error(code, message) { return Object.assign(new Error(message), { code }); }
+    function budgetState(value) {
+        if (!value || typeof value !== 'object') return null;
+        if (!Number.isFinite(Number(value.limit))) value.limit = 2;
+        if (!Number.isFinite(Number(value.remaining))) value.remaining = Number(value.limit);
+        if (!Array.isArray(value.attempts)) value.attempts = [];
+        return value;
+    }
+    function consumeBudget(value, kind, providerId = '') {
+        const budget = budgetState(value);
+        if (!budget) return null;
+        if (Number(budget.remaining) <= 0) throw error('SEARCH_TOOL_LIMIT', '联网检索次数已达上限');
+        budget.remaining = Math.max(0, Number(budget.remaining) - 1);
+        const attempt = { kind: String(kind || 'external'), providerId: String(providerId || ''), status: 'started' };
+        budget.attempts.push(attempt);
+        return attempt;
+    }
+    function finishAttempt(attempt, status, code = '') {
+        if (!attempt) return;
+        attempt.status = String(status || 'failed');
+        if (code) attempt.code = String(code);
+    }
     function argsOf(value) {
         if (value && typeof value === 'object' && !Array.isArray(value)) return value;
         try { const parsed = JSON.parse(String(value || '{}')); return parsed && typeof parsed === 'object' ? parsed : {}; } catch { return {}; }
@@ -84,22 +105,32 @@
         async search(args = {}, policy = {}, budget = null) {
             const query = root.searchPolicyPure?.safeSearchQuery?.(args.query) || '';
             if (!query) throw error('SEARCH_QUERY_INVALID', '搜索关键词无效');
-            if (budget && Number(budget.remaining) <= 0) throw error('SEARCH_TOOL_LIMIT', '联网检索次数已达上限');
-            if (budget) budget.remaining = Math.max(0, Number(budget.remaining) - 1);
-            const providers = root.searchRegistry?.select?.(policy) || [];
-            const requested = String(args.providerId || '');
-            const preferred = requested ? providers.filter(item => item.id === requested) : [];
-            const remainder = requested ? providers.filter(item => item.id !== requested) : providers;
-            const candidates = preferred.length || remainder.length ? [...preferred, ...remainder] : providers;
+            const candidates = root.searchRegistry?.select?.(policy) || [];
             if (!candidates.length) throw error('SEARCH_DISABLED', '未配置可用的联网检索服务');
-            let lastError;
+            const strictEmpty = policy.mode === 'required' || policy.sourcePolicy === 'official-only';
+            let lastError = null;
+            let sawEmpty = false;
             for (const provider of candidates) {
+                let attempt = null;
                 try {
+                    attempt = consumeBudget(budget, 'external', provider.id);
                     const evidence = await root.searchAdapters.search(provider, query, { policy });
-                    return evidence;
-                } catch (cause) { lastError = cause; }
+                    if (Array.isArray(evidence) && evidence.length) {
+                        finishAttempt(attempt, 'success');
+                        return evidence;
+                    }
+                    sawEmpty = true;
+                    finishAttempt(attempt, 'empty', 'SEARCH_NO_RESULTS');
+                    if (!strictEmpty) return [];
+                } catch (cause) {
+                    if (String(cause?.code || '') === 'SEARCH_TOOL_LIMIT') throw cause;
+                    lastError = cause;
+                    finishAttempt(attempt, 'failed', String(cause?.code || 'SEARCH_NETWORK_ERROR'));
+                }
             }
-            throw lastError || error('SEARCH_NETWORK_ERROR', '联网检索失败');
+            if (lastError) throw lastError;
+            if (sawEmpty && strictEmpty) throw error('SEARCH_NO_RESULTS', '未找到符合来源策略的检索结果');
+            return [];
         },
         async executeTask({ effective = {}, messages = [], maxTokens = 2000, requestOpts = {}, disableNetworkSearch = false, hasImage = false, direct, requestModel, getEvidence } = {}) {
             if (typeof direct !== 'function') throw error('SEARCH_MODEL_REQUIRED', '模型调用器不可用');
@@ -125,12 +156,19 @@
             const runDirect = async () => {
                 requestOpts.disableNetworkSearch = disableNetworkSearch === true;
                 const budget = requestOpts.searchBudget;
+                let nativeAttempt = null;
                 if (nativeSupported && !requestOpts.disableNativeSearch && !disableNetworkSearch && budget) {
-                    if (Number(budget.remaining) <= 0) throw error('SEARCH_TOOL_LIMIT', '联网检索次数已达上限');
-                    budget.remaining = Math.max(0, Number(budget.remaining) - 1);
+                    nativeAttempt = consumeBudget(budget, 'native', effective.provider || '');
                     requestOpts.nativeSearchMaxUses = 1;
                 }
-                const text = await direct();
+                let text;
+                try {
+                    text = await direct();
+                    finishAttempt(nativeAttempt, 'success');
+                } catch (cause) {
+                    finishAttempt(nativeAttempt, 'failed', String(cause?.code || 'AI_REQUEST_FAILED'));
+                    throw cause;
+                }
                 const evidence = typeof getEvidence === 'function' ? getEvidence() : [];
                 return { text, evidence, external: false };
             };

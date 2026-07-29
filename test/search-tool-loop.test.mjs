@@ -30,6 +30,7 @@ test('provider request builders adapt function tools and tool results for each d
   assert.equal(loop.requestOptions('openai-responses', { externalTools: [schema] }).tools[0].name, 'search_web');
   assert.equal(loop.requestOptions('claude', { externalTools: [schema] }).tools[0].input_schema.type, 'object');
   assert.equal(loop.requestOptions('gemini', { externalTools: [schema] }).tools[0].functionDeclarations[0].name, 'search_web');
+  assert.equal(Object.hasOwn(schema.function.parameters.properties, 'providerId'), false);
 
   const messages = [
     { role: 'assistant', toolCalls: [{ id: 'call_1', name: 'search_web', arguments: { query: 'nutrition' } }] },
@@ -70,7 +71,7 @@ test('empty providerIds never selects arbitrary external providers', async () =>
   }), error => error?.code === 'SEARCH_REQUIRED_UNSATISFIED');
 });
 
-test('external search advances through ordered providers and shares an action budget', async () => {
+test('external search ignores model providerId and charges each ordered provider request', async () => {
   const attempted = [];
   const { loop } = harness({
     providerIds: ['search_one', 'search_two'],
@@ -80,12 +81,30 @@ test('external search advances through ordered providers and shares an action bu
       return [{ id: 'ev_2', title: 'Fallback', url: 'https://example.com', domain: 'example.com', snippet: 'facts', sourceType: 'other', official: false }];
     }
   });
-  const budget = { remaining: 1 };
-  const evidence = await loop.search({ query: 'facts' }, { providerIds: ['search_one', 'search_two'] }, budget);
+  const budget = { limit: 2, remaining: 2, attempts: [] };
+  const evidence = await loop.search({ query: 'facts', providerId: 'search_two' }, { mode: 'required', providerIds: ['search_one', 'search_two'] }, budget);
   assert.deepEqual(attempted, ['search_one', 'search_two']);
   assert.equal(evidence.length, 1);
   assert.equal(budget.remaining, 0);
-  await assert.rejects(() => loop.search({ query: 'again' }, { providerIds: ['search_two'] }, budget), error => error?.code === 'SEARCH_TOOL_LIMIT');
+  assert.deepEqual(budget.attempts.map(item => [item.providerId, item.status]), [['search_one', 'failed'], ['search_two', 'success']]);
+});
+
+test('one remaining search attempt never reaches a second provider', async () => {
+  const attempted = [];
+  const { loop } = harness({
+    providerIds: ['search_one', 'search_two'],
+    adapter: async provider => {
+      attempted.push(provider.id);
+      throw Object.assign(new Error('down'), { code: 'SEARCH_NETWORK_ERROR' });
+    }
+  });
+  const budget = { limit: 2, remaining: 1, attempts: [] };
+  await assert.rejects(
+    () => loop.search({ query: 'facts' }, { mode: 'required', providerIds: ['search_one', 'search_two'] }, budget),
+    error => error?.code === 'SEARCH_TOOL_LIMIT'
+  );
+  assert.deepEqual(attempted, ['search_one']);
+  assert.equal(budget.remaining, 0);
 });
 
 test('ai.run routes required external-only tasks through the shared tool loop', async () => {
