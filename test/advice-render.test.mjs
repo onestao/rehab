@@ -6,6 +6,7 @@ import path from 'node:path';
 
 function loadAdvicePanel() {
     const code = readFileSync(path.join(process.cwd(), 'advice-render.js'), 'utf8');
+    const evidenceUi = readFileSync(path.join(process.cwd(), 'search-evidence-ui.js'), 'utf8');
     const context = {
         advicePanel: {
             escapeHtml(value) {
@@ -28,6 +29,7 @@ function loadAdvicePanel() {
     };
     context.globalThis = context;
     vm.createContext(context);
+    vm.runInContext(evidenceUi, context);
     vm.runInContext(`${code}\nthis.__advicePanel = advicePanel;`, context);
     return context.__advicePanel;
 }
@@ -173,4 +175,16 @@ test('renderAdviceMessage renders escaped safe failure details', () => {
     assert.match(html, /advice-error-details/);
     assert.match(html, /&lt;script&gt;secret&lt;\/script&gt;/);
     assert.doesNotMatch(html, /<script>secret<\/script>/);
+});
+
+test('renderAdviceMessage renders a persistent safe citation trail', () => {
+    const panel = loadAdvicePanel();
+    const html = panel.renderAdviceMessage({
+        id: 'source-1', role: 'assistant', content: '建议', at: '2026-05-30T00:00:00.000Z',
+        searchEvidence: [{ title: '<官方指南>', url: 'https://example.com/guide', domain: 'example.com' }, { title: '不安全', url: 'http://example.com' }]
+    }, true, '');
+    assert.match(html, /联网来源 · 1/);
+    assert.match(html, /https:\/\/example\.com\/guide/);
+    assert.match(html, /&lt;官方指南&gt;/);
+    assert.doesNotMatch(html, /http:\/\/example\.com/);
 });

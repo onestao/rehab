@@ -193,6 +193,7 @@ test('food.vision carries the same in-memory image and routeOverride to ai.run',
 
     const data = {
         ...sandbox.window.dataHealthDiet,
+        _aiFoodEvidence: [{ id: 'stale-text-evidence' }],
         ensureAiRuntime: async () => sandbox.ai,
         getDietPhotoSupportInfo: () => ({ supported: true }),
         setDietPhotoStatus() {},
@@ -209,6 +210,7 @@ test('food.vision carries the same in-memory image and routeOverride to ai.run',
     assert.equal(runCalls[0].imageFile, imageFile);
     assert.equal(runCalls[0].returnMeta, true);
     assert.deepEqual(clearedFailures, [['backup-provider', 'backup-vision']]);
+    assert.deepEqual(data._aiFoodEvidence, [null]);
     assert.equal(setTaskRouteCalls, 0);
 });
 

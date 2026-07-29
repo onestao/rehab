@@ -2409,6 +2409,25 @@ button.is-action-busy,
 .exercise-grid { margin: 0; }
 .manual-ex-list { display: grid; gap: 4px; }
 
+.food-evidence-status,
+.food-evidence-action {
+    margin: 8px 10px 0;
+}
+.food-evidence-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 9px;
+    border: 1px solid var(--glass-border, var(--md-sys-outline-variant));
+    border-radius: var(--md-sys-shape-full);
+    background: var(--glass-bg, var(--md-sys-surface-container-low));
+    color: var(--md-sys-on-surface-variant);
+    font-size: 11px;
+    font-weight: 700;
+}
+.food-evidence-status .material-symbols-rounded { font-size: 15px; }
+.food-evidence-action { min-height: 36px; font-size: 12px; }
+
 }
 @layer components {
 /* --- Weight Loss Plan --- */
@@ -2906,6 +2925,44 @@ button.is-action-busy,
 .ai-template-actions .material-symbols-rounded {
     font-size: 18px;
 }
+
+.ai-network-trigger {
+    min-width: 44px;
+    min-height: 44px;
+    border: 1px solid var(--glass-border, var(--md-sys-outline-variant));
+    border-radius: var(--md-sys-shape-full);
+    background: var(--glass-bg, var(--md-sys-surface-container-low));
+    color: var(--md-sys-on-surface-variant);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+.ai-network-trigger.is-auto { background: var(--md-sys-primary-container); color: var(--md-sys-on-primary-container); }
+.ai-network-trigger.is-required { background: var(--md-sys-tertiary-container); color: var(--md-sys-on-tertiary-container); }
+.ai-network-trigger .material-symbols-rounded { font-size: 18px; }
+.search-provider-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--md-sys-outline-variant); }
+.search-provider-meta { display: grid; gap: 3px; min-width: 0; }
+.search-provider-meta strong { color: var(--md-sys-on-surface); }
+.search-provider-meta small, .search-settings-empty { color: var(--md-sys-on-surface-variant); font-size: 12px; line-height: 1.5; }
+.search-provider-form { display: grid; gap: 14px; }
+.search-provider-actions { flex-wrap: wrap; gap: 8px; }
+
+.ai-task-network-settings {
+    display: grid;
+    gap: 10px;
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid var(--md-sys-outline-variant);
+}
+.ai-task-network-settings h3 { margin: 0; font-size: 14px; }
+.ai-task-network-settings > small,
+.ai-task-network-providers small { color: var(--md-sys-on-surface-variant); font-size: 11px; line-height: 1.45; }
+.ai-task-network-advanced { display: grid; gap: 10px; }
+.ai-task-network-advanced summary { cursor: pointer; color: var(--md-sys-primary); font-size: 13px; font-weight: 700; }
+.ai-task-network-providers { display: grid; gap: 7px; }
+.ai-task-network-provider { display: flex; align-items: center; gap: 8px; min-height: 36px; font-size: 13px; }
+.ai-task-network-domains { width: 100%; resize: vertical; box-sizing: border-box; border: 1px solid var(--md-sys-outline); border-radius: var(--md-sys-shape-md); background: var(--md-sys-surface-container-lowest); color: var(--md-sys-on-surface); padding: 9px; font: inherit; }
 
 .ai-settings-section {
     display: grid;
@@ -8218,6 +8275,17 @@ body.is-training .fab-pip.active {
 }
 .advice-quick-prompts > button:active { transform: scale(.92) rotate(-1deg); }
 
+.advice-source-trail {
+    margin-top: 10px;
+    padding: 8px 10px;
+    border: 1px solid var(--glass-border);
+    border-radius: 14px;
+    background: var(--glass-bg);
+}
+.advice-source-trail summary { cursor: pointer; font-size: 12px; font-weight: 700; }
+.advice-source-trail ul { margin: 7px 0 0; padding-left: 18px; }
+.advice-source-trail a { color: var(--md-sys-primary); overflow-wrap: anywhere; }
+
 }
 @layer components {
 /* --- View Transitions --- */
@@ -11556,6 +11624,7 @@ body.is-paused .fab-play-aura {
 .advice-attach-btn:active, .advice-attach-btn.is-long-press { transform: scale(0.92); }
 .advice-attach-btn:active::after, .advice-attach-btn.is-long-press::after { opacity: var(--md-state-press); }
 .advice-attach-btn .material-symbols-rounded { font-size: 20px; }
+.advice-image-icon { width: 20px; height: 20px; fill: currentColor; flex: none; }
 
 @media (prefers-color-scheme: dark) {
     :root:not([data-theme-mode="light"]) .ai-input :is(.advice-model-openai, .advice-model-grok, .advice-model-kimi, .advice-model-mimo, .advice-model-generic) .advice-model-icon { filter: invert(1); }
@@ -11567,7 +11636,8 @@ body.is-paused .fab-play-aura {
 .advice-attachment-chip.processing { opacity: 0.82; }
 .advice-attachment-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
 .advice-attachment-chip small, .advice-message-attachment small { color: currentColor; opacity: 0.72; white-space: nowrap; }
-.advice-attachment-chip > .material-symbols-rounded, .advice-message-attachment > .material-symbols-rounded { width: 22px; height: 22px; border-radius: 50%; background: color-mix(in srgb, currentColor 10%, transparent); display: inline-flex; align-items: center; justify-content: center; font-size: 14px; flex: none; }
+.advice-attachment-chip > .material-symbols-rounded, .advice-message-attachment > .material-symbols-rounded, .advice-attachment-chip > .advice-image-icon { width: 22px; height: 22px; border-radius: 50%; background: color-mix(in srgb, currentColor 10%, transparent); display: inline-flex; align-items: center; justify-content: center; font-size: 14px; flex: none; }
+.advice-attachment-chip > .advice-image-icon { padding: 4px; }
 .advice-attachment-thumb { width: 42px; height: 42px; border: 1px solid color-mix(in srgb, var(--md-sys-outline-variant) 65%, transparent); border-radius: 14px; padding: 0; overflow: hidden; background: var(--glass-bg); box-shadow: var(--md-sys-elevation-1); flex: none; cursor: pointer; }
 .advice-attachment-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .advice-attachment-chip.has-thumb, .advice-message-attachment.has-thumb { padding: 4px 8px 4px 4px; border-radius: 18px; max-width: min(100%, 320px); }

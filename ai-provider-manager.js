@@ -3,7 +3,7 @@
     'use strict';
 
     const text = value => String(value == null ? '' : value);
-    const KNOWN_MANUAL_CAPABILITIES = new Set(['text', 'vision', 'streaming', 'json', 'reasoning']);
+    const KNOWN_MANUAL_CAPABILITIES = new Set(['text', 'vision', 'streaming', 'json', 'reasoning', 'websearch', 'nativewebsearchchat']);
     const normalizeManualCapabilities = value => {
         const known = {};
         const custom = [];
@@ -12,7 +12,9 @@
             const capability = text(item).trim().toLowerCase();
             if (!capability || seen.has(capability)) return;
             seen.add(capability);
-            if (KNOWN_MANUAL_CAPABILITIES.has(capability)) known[capability] = true;
+            if (capability === 'websearch' || capability === 'web_search') known.webSearch = true;
+            else if (capability === 'nativewebsearchchat' || capability === 'native_web_search_chat') known.nativeWebSearchChat = true;
+            else if (KNOWN_MANUAL_CAPABILITIES.has(capability)) known[capability] = true;
             else custom.push(capability);
         });
         return { known, custom };
@@ -540,7 +542,7 @@
             if (!id) return;
             const displayName = text(prompt('显示名称（可留空）', id)).trim() || id;
             const family = text(prompt('模型分组（可留空）', '')).trim();
-            const capabilityInput = text(prompt('能力标签（可留空，逗号分隔，如 vision,reasoning,json）', '')).trim();
+            const capabilityInput = text(prompt('能力标签（可留空，逗号分隔，如 vision,reasoning,json,webSearch）', '')).trim();
             const { known, custom } = normalizeManualCapabilities(capabilityInput);
             await this.addCandidates(profileId, [{
                 id, displayName, family, capabilities: known, manualUnknownCapabilities: custom, source: 'manual'

@@ -39,7 +39,6 @@
         return window.actionTaxonomy?.inferBodyPart?.(value) || '';
     }
 
-    // 部位集合：优先用记录上已归一化的 bodyParts，没有再从自由文本 bodyPart 推断。也接受裸字符串。
     function bodyPartSet(value) {
         const record = value && typeof value === 'object' ? value : { bodyPart: value };
         const source = Array.isArray(record.bodyParts) && record.bodyParts.length
@@ -164,7 +163,6 @@
                         if (prevId === id) continue;
                         const nameMatch = rehabActionNameMatch(action.name, prevAction.name);
                         if (nameMatch === 'none') continue;
-                        // 传整条记录：优先吃已归一化的 bodyParts，缺失时才回落到 bodyPart 自由文本。
                         const sameBodyPart = sameBodyPartLoose(action, prevAction);
                         if (!sameBodyPart) continue;
                         if (nameMatch === 'exact') { bestMatch = prevAction; bestConfidence = 'high'; break; }
@@ -296,6 +294,7 @@
             const actions = latest?.actions || [];
             const reviewCount = actions.filter(a => a.needsReview || Number(a.confidence || 100) < 80 || Number(a.painLevel || 0) >= 4).length;
             const newCount = actions.filter(a => normalizeRehabStatus(a.status) === 'new').length;
+            const sourceTrail = week => window.searchEvidenceUi?.sourceTrail?.(week?.searchEvidence, value => esc(this, value)) || '';
             const actionPreview = actions.slice(0, 4).map(action => `
                 <div class="rehab-week-action-mini">
                     <span class="rehab-status ${this.rehabStatusClass(action.status)}">${this.rehabStatusLabel(action.status)}</span>
@@ -311,6 +310,7 @@
                         <small>${weekActions.length} 个动作｜${esc(this, weekPreview)}</small>
                     </div>
                     <button class="md-btn md-btn-tonal profile-edit-btn" onclick="data.openRehabWeeklySheet('${esc(this, week.weekStart || '')}')" type="button"><span class="material-symbols-rounded">edit</span> 编辑</button>
+                    ${sourceTrail(week)}
                 </div>`;
             }).join('');
             const retroactiveBanner = this.renderRetroactiveLinkBanner?.() || '';
@@ -336,6 +336,7 @@
                     </div>
                 </div>
                 ${latest ? `<div class="rehab-week-action-list">${actionPreview || '<div class="profile-condition-note">本周处方暂无动作明细</div>'}</div>` : `<div class="profile-condition-note">适合每周从康复中心回来后录入新动作、暂停动作和疼痛反馈。</div>`}
+                ${sourceTrail(latest)}
                 ${weeks.length > 1 ? `<details class="rehab-week-history"><summary><span class="material-symbols-rounded">history</span> 查看/编辑旧处方（共 ${weeks.length} 周）</summary><div class="rehab-week-history-list">${historyRows}</div></details>` : ''}
             </div>`;
         },
@@ -926,6 +927,7 @@
                     progressesFrom: action.progressesFrom !== undefined && action.progressesFrom !== null ? String(action.progressesFrom) : undefined
                 };
             }).filter(Boolean);
+            const searchEvidence = window.searchEvidenceUi?.normalizeSources?.(payload.searchEvidence || fallback.searchEvidence) || [];
             return {
                 weekStart: String(payload.weekStart || fallback.weekStart || this.rehabWeekStart?.() || this.logicalDateKey?.() || '').slice(0, 10),
                 visitDate: String(payload.visitDate || fallback.visitDate || this.logicalDateKey?.() || '').slice(0, 10),
@@ -934,7 +936,8 @@
                 legacyContinueAllowed: !!payload.legacyContinueAllowed || hasLegacyContinueIntent(fallback.rawText || payload.homework || payload.therapistAssessment || ''),
                 therapistAssessment: String(payload.therapistAssessment || '').slice(0, 500),
                 homework: String(payload.homework || '').slice(0, 500),
-                actions
+                actions,
+                searchEvidence
             };
         },
 
@@ -961,10 +964,11 @@
                     { role: 'system', content: '你是康复训练处方结构化助手，只返回严格 JSON。' },
                     { role: 'user', content }
                 ];
-                const parsed = await aiClient.runJson({
+                const result = await aiClient.runJson({
                     taskId: 'rehab.weekly',
                     messages,
                     maxTokens: 4000,
+                    returnMeta: true,
                     parseOptions: REHAB_WEEKLY_PARSE_OPTIONS,
                     onRetry: () => {
                         this.setRehabParseStatus(
@@ -973,10 +977,10 @@
                         );
                     }
                 });
+                const parsed = result?.value;
                 if (!parsed) throw new Error('AI 返回不是有效 JSON');
                 const draft = this.normalizeRehabWeeklyPayload(parsed, { weekStart, visitDate, rawText });
-                // Auto-mark previously active actions as dropped if not mentioned this week,
-                // unless the therapist explicitly allowed previous actions to continue.
+                draft.searchEvidence = window.searchEvidenceUi?.normalizeSources?.(result?.meta?.searchEvidence) || [];
                 const prevWeek = this.latestRehabWeekly?.(1)?.[0];
                 const legacyContinueAllowed = !!draft.legacyContinueAllowed || hasLegacyContinueIntent(rawText);
                 if (prevWeek?.actions?.length && !legacyContinueAllowed) {

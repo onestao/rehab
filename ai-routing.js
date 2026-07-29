@@ -5,6 +5,7 @@
         { id: 'advice.vision', label: 'AI 图片问答', group: '建议', defaultReasoningDepth: 'medium', requiredCapabilities: ['vision'], localPicker: true },
         { id: 'food.text', label: '文字食物解析', group: '饮食', defaultReasoningDepth: 'off', requiredCapabilities: ['text', 'json'] },
         { id: 'food.vision', label: '食物照片识别', group: '饮食', defaultReasoningDepth: 'low', requiredCapabilities: ['vision', 'json'], localPicker: true },
+        { id: 'food.verify', label: '食物营养核实', group: '饮食', defaultReasoningDepth: 'off', requiredCapabilities: ['text', 'json'] },
         { id: 'rehab.weekly', label: '康复周处方解析', group: '康复', defaultReasoningDepth: 'off', requiredCapabilities: ['text', 'json'], localPicker: true },
         { id: 'plan.today', label: '今日训练计划', group: '训练计划', defaultReasoningDepth: 'medium', requiredCapabilities: ['text', 'json'], localPicker: true },
         { id: 'plan.week', label: '一周训练计划', group: '训练计划', defaultReasoningDepth: 'high', requiredCapabilities: ['text', 'json'], localPicker: true },
@@ -80,6 +81,11 @@
             const normalized = helper?.normalizeTaskRoute
                 ? helper.normalizeTaskRoute(route, { reasoningDepth: definition.defaultReasoningDepth })
                 : route;
+            // Network is a separate, security-sensitive contract. Keep the legacy
+            // route normalizer stable and let the dedicated policy module discard
+            // unknown or unsafe fields.
+            const network = window.searchPolicyPure?.normalizeNetworkPolicy?.(route?.network, this.cfg?.networkDefaults || {});
+            if (network) normalized.network = network;
             this.cfg.taskRoutes = { ...(this.cfg.taskRoutes || {}), [taskId]: normalized };
             await this.persist?.();
             this.persistDataDb?.(false);
@@ -166,6 +172,7 @@
             const profile = profileForId(target?.profileId);
             const modelId = target?.modelId || profile?.model || this.cfg.model || '';
             const model = modelForTarget(profile?.id, modelId);
+            const network = this.getTaskNetworkPolicy?.(taskId, route);
             return {
                 taskId,
                 route,
@@ -177,9 +184,24 @@
                 extraVisionKeywords: profile?.extraVisionKeywords || this.cfg.extraVisionKeywords || '',
                 reasoningDepth: route.reasoningDepth || 'auto',
                 capabilities: model?.capabilities || {},
+                network,
                 enabled: !!(profile && profile.enabled !== false && profile.archived !== true && profile.baseUrl && modelId && model),
                 apiKey: profile?.id ? this.apiKeyFor(profile.id) : ''
             };
+        },
+
+        getTaskNetworkPolicy(taskId = '', route = null) {
+            const policy = window.searchPolicyPure;
+            if (!policy?.normalizeNetworkPolicy) return { mode: 'off', execution: 'native-first', providerIds: [], sourcePolicy: 'official-preferred', fallback: 'local-estimate', allowedDomains: [] };
+            // food.verify is an internal second step. It inherits the source task's
+            // policy unless an advanced user has explicitly stored an override.
+            const sourceId = taskId === 'food.verify' ? 'food.text' : taskId;
+            const stored = route?.network ? route : (this.cfg.taskRoutes || {})[taskId] || (this.cfg.taskRoutes || {})[sourceId] || {};
+            return policy.resolveNetworkPolicy?.(stored || {}, {
+                searchProviders: this.cfg?.searchProviders || [],
+                networkDefaults: this.cfg?.networkDefaults || {}
+            }) || policy.normalizeNetworkPolicy(stored?.network, this.cfg?.networkDefaults || {});
+            // food.verify is now a registered internal task; user overrides in taskRoutes['food.verify'] are respected.
         },
 
         getTaskRequestSequence(taskId = '', override = null) {

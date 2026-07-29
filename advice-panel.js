@@ -2401,6 +2401,17 @@ const advicePanel = {
                 attachmentCount: attachments.length
             });
             let full = '';
+            const searchBudget = { remaining: 2 };
+            let searchEvidence = [];
+            const unpack = result => {
+                const found = result?.meta?.searchEvidence;
+                if (Array.isArray(found)) {
+                    const byUrl = new Map(searchEvidence.map(item => [item.url, item]));
+                    found.forEach(item => { if (item?.url) byUrl.set(item.url, item); });
+                    searchEvidence = [...byUrl.values()].slice(0, 20);
+                }
+                return typeof result === 'string' ? result : String(result?.text || '');
+            };
             let _lastRender = 0;
             let _pendingFrame = 0;
             /** @type {{ in: number, out: number }|null} */
@@ -2476,7 +2487,7 @@ const advicePanel = {
                     if (!this._adviceUserScrollPaused) this.scheduleAdviceStreamScroll();
             };
             const onToken = createOnToken();
-            full = hasImageAttachment
+            full = unpack(hasImageAttachment
                 ? (typeof ai.run === 'function' ? await ai.run({
                     taskId: 'advice.vision',
                     messages,
@@ -2484,6 +2495,8 @@ const advicePanel = {
                     maxTokens: outputTokenBudget,
                     signal: controller.signal,
                     routeOverride,
+                    returnMeta: true,
+                    searchBudget,
                     onProgress: ({ stage, message }) => {
                         const idx = this.db.health.aiAdviceChat.findIndex(msg => msg.id === pendingId);
                         if (idx < 0) return;
@@ -2494,10 +2507,10 @@ const advicePanel = {
                     }
                 }) : await ai.callAdviceWithAttachments(messages, attachments, outputTokenBudget, { signal: controller.signal, routeOverride }))
                 : (typeof ai.runStream === 'function'
-                    ? await ai.runStream('advice.chat', messages, outputTokenBudget, onToken, { signal: controller.signal, routeOverride })
+                    ? await ai.runStream('advice.chat', messages, outputTokenBudget, onToken, { signal: controller.signal, routeOverride, returnMeta: true, searchBudget })
                     : (typeof ai.run === 'function'
-                        ? await ai.run({ taskId: 'advice.chat', messages, maxTokens: outputTokenBudget, stream: true, onToken, signal: controller.signal, routeOverride })
-                        : await ai.callStream(messages, outputTokenBudget, onToken, { signal: controller.signal, routeOverride })));
+                        ? await ai.run({ taskId: 'advice.chat', messages, maxTokens: outputTokenBudget, stream: true, onToken, signal: controller.signal, routeOverride, returnMeta: true, searchBudget })
+                        : await ai.callStream(messages, outputTokenBudget, onToken, { signal: controller.signal, routeOverride }))));
             finishRequestUsage();
             const autoContinueLimit = Math.max(0, Number(this.ADVICE_AUTO_CONTINUE_LIMIT || advicePanel.ADVICE_AUTO_CONTINUE_LIMIT) || 0);
             let autoContinueCount = 0;
@@ -2516,9 +2529,9 @@ const advicePanel = {
                         { role: 'assistant', content: continuedFrom },
                         { role: 'user', content: '继续上一条回复：从断点处直接续写剩余内容，不要重复前文，不要重新开头，优先把结尾补完整。' }
                     ];
-                    const continued = typeof ai.run === 'function'
-                        ? await ai.run({ taskId: adviceTaskId, messages: continuationMessages, maxTokens: outputTokenBudget, stream: true, onToken: createOnToken(continuedFrom), signal: controller.signal, routeOverride })
-                        : await ai.callStream(continuationMessages, outputTokenBudget, createOnToken(continuedFrom), { signal: controller.signal, routeOverride });
+                    const continued = unpack(typeof ai.run === 'function'
+                        ? await ai.run({ taskId: adviceTaskId, messages: continuationMessages, maxTokens: outputTokenBudget, stream: true, onToken: createOnToken(continuedFrom), signal: controller.signal, routeOverride, returnMeta: true, searchBudget })
+                        : await ai.callStream(continuationMessages, outputTokenBudget, createOnToken(continuedFrom), { signal: controller.signal, routeOverride }));
                     finishRequestUsage();
                     full = continuedFrom + String(continued || '');
                 } catch (continueError) {
@@ -2560,7 +2573,8 @@ const advicePanel = {
                 temporaryModel: isOverride,
                 pending: false,
                 deleted: false,
-                updatedAt: Date.now()
+                updatedAt: Date.now(),
+                ...(searchEvidence.length ? { searchEvidence } : {})
             };
             window.errorBus?.event?.('advice.request', 'success', {
                 provider,

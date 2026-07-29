@@ -22,11 +22,13 @@ test('model switch success relies on the refreshed icon instead of a blocking to
     assert.match(markup, /refreshAdviceModelChip\?\.\(\)/);
 });
 
-test('attachment controls use familiar local Material Symbols', () => {
-    assert.match(attachments, /<span class="material-symbols-rounded">picture_in_picture_alt<\/span>/);
-    assert.match(attachments, /att\.kind === 'image' \? 'picture_in_picture_alt'/);
+test('attachment controls use the local image-add icon instead of a window icon', () => {
+    assert.match(attachments, /const IMAGE_ICON_MARKUP = '<svg class="advice-image-icon"/);
+    assert.match(attachments, /<path d="M19 3H5/);
+    assert.doesNotMatch(attachments, /material-symbols-rounded">picture_in_picture_alt/);
     assert.doesNotMatch(attachments, /material-symbols-rounded">visibility/);
-    for (const icon of ['picture_in_picture_alt', 'clinical_notes', 'upload_file']) {
+    assert.match(v6Css, /\.advice-image-icon \{[^}]*fill: currentColor;/s);
+    for (const icon of ['clinical_notes', 'upload_file']) {
         assert.ok(cachedIcons.has(icon), `${icon} must exist in the local icon cache`);
     }
 });

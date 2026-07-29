@@ -107,6 +107,8 @@ test('normalizes discovered metadata and binds it to the endpoint fingerprint', 
         vision: true,
         streaming: true,
         json: true,
+        webSearch: undefined,
+        nativeWebSearchChat: undefined,
         reasoning: undefined
     });
     assert.equal(model.sizeTier, 'small');
@@ -114,6 +116,15 @@ test('normalizes discovered metadata and binds it to the endpoint fingerprint', 
     assert.equal(model.lastSeenAt, fetchedAt);
     assert.equal(model.endpointFingerprint, endpointFingerprint('https://api.example.test/v1'));
     assert.notEqual(model.endpointFingerprint, endpointFingerprint('https://other.example.test/v1'));
+});
+
+test('catalog normalization preserves native web search capability flags', () => {
+    const model = normalizeCatalogModel({
+        id: 'search-model',
+        capabilities: { web_search: true, nativeWebSearchChat: true }
+    }, { profileId: 'p1', provider: 'openai' });
+    assert.equal(model.capabilities.webSearch, true);
+    assert.equal(model.capabilities.nativeWebSearchChat, true);
 });
 
 test('runtime cache methods replace and clear the active profile catalog', async () => {

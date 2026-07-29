@@ -39,10 +39,11 @@ module.exports = [
     limit: '3.5 KB'
   },
   { name: 'food-database', path: 'fooddb.js', limit: '2 KB' },
+  { name: 'search-bundle', path: ['search-*.js', 'search-*.mjs'], limit: '30 KB' },
   { name: 'profile-credentials', path: 'credential-fields.js', limit: '1.2 KB' },
   { name: 'generated-css', path: 'build/generated.css', limit: '80 KB' },
   { name: 'workout-bundle', path: ['workout-*.js', 'strength-form.js', 'swipe-actions.js', 'weekly-plan.js'], limit: '50 KB' },
-  { name: 'ai-bundle', path: ['ai-*.js', 'ai-*.mjs', 'advice-*.js', 'coach-context.js', 'lib/virtual-core.umd.js', 'lib/flexsearch.light.js'], limit: '140 KB' },
+  { name: 'ai-bundle', path: ['ai-*.js', 'ai-*.mjs', 'advice-*.js', 'coach-context.js', 'lib/virtual-core.umd.js', 'lib/flexsearch.light.js'], limit: '144 KB' },
   { name: 'rehab-policy', path: 'rehab-policy.js', limit: '12 KB' },
   { name: 'rehab-progression-pure', path: 'rehab-progression-pure.js', limit: '4 KB' },
   // Plan is intentionally tight; keep UI growth lazy and move parser/spec logic into exported pure modules.
@@ -53,6 +54,8 @@ module.exports = [
     path: [
       'health-*.js',
       'food-ai-normalizer-pure.js',
+      'food-evidence-pure.mjs',
+      'food-evidence.js',
       'food-log.js',
       'history-view.js',
       'today-view-core.js',
@@ -63,7 +66,8 @@ module.exports = [
       'volume-heatmap.js',
       'action-history.js'
     ],
-    limit: '90 KB'
+    // Food evidence now includes the required post-photo verification adapter.
+    limit: '94.1 KB'
   },
   {
     name: 'today-view-core',

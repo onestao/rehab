@@ -139,6 +139,9 @@ Object.assign(ai, {
             extraVisionKeywords: this.cfg.extraVisionKeywords || '',
             requestTimeoutMs: this.normalizeRequestTimeoutMs(this.cfg.requestTimeoutMs),
             taskRoutes: this.cfg.taskRoutes || {},
+            searchSchemaVersion: 1,
+            searchProviders: this.cfg.searchProviders || [],
+            networkDefaults: this.cfg.networkDefaults || {},
             enabled: this.cfg.enabled
         });
         await this.idbSet(this.KEY, payload);
@@ -160,6 +163,11 @@ Object.assign(ai, {
         // Model discovery is derived, endpoint-scoped local cache. Do not sync it through the main database.
         data.db.aiModels = [];
         data.db.aiTaskRoutes = this.cfg.taskRoutes || {};
+        data.db.aiSearchConfig = {
+            searchSchemaVersion: 1,
+            searchProviders: this.cfg.searchProviders || [],
+            networkDefaults: this.cfg.networkDefaults || {}
+        };
     },
 
     checkEncrypted() {
@@ -230,6 +238,7 @@ Object.assign(ai, {
         const password = document.getElementById('aiEncryptPass')?.value;
         if (!password || password.length < 4) return alert('请输入至少4位的加密密码');
         const profiles = this.cfg.profiles.map(p => ({ ...p, apiKey: this.apiKeyFor(p.id) }));
+        await window.searchStore?.init?.();
         const payload = JSON.stringify({
             activeProfileId: this.cfg.activeProfileId,
             profiles,
@@ -237,6 +246,9 @@ Object.assign(ai, {
             modelCandidates: this.modelCandidates || {},
             taskRoutes: this.cfg.taskRoutes || {},
             requestTimeoutMs: this.normalizeRequestTimeoutMs(this.cfg.requestTimeoutMs),
+            search: window.searchStore?.exportEncryptedPayload?.() || {
+                config: { searchSchemaVersion: 1, searchProviders: this.cfg.searchProviders || [], networkDefaults: this.cfg.networkDefaults || {} }, keyMap: {}
+            },
             supplierSchemaVersion: 2
         });
         try {
@@ -290,6 +302,7 @@ Object.assign(ai, {
             this.modelCandidates = cfg.modelCandidates || cfg.discoverySnapshots || this.modelCandidates || {};
             this.cfg.taskRoutes = cfg.taskRoutes && typeof cfg.taskRoutes === 'object' ? cfg.taskRoutes : (this.cfg.taskRoutes || {});
             this.cfg.requestTimeoutMs = this.normalizeRequestTimeoutMs(cfg.requestTimeoutMs || this.cfg.requestTimeoutMs);
+            if (cfg.search) await window.searchStore?.importEncryptedPayload?.(cfg.search);
             await this.idbSet(this.MODELS_KEY, JSON.stringify(this.models));
             try { localStorage.setItem(this.MODELS_KEY, JSON.stringify(this.models)); } catch {}
             await this.persistModelCandidates?.();

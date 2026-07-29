@@ -166,6 +166,44 @@
     font-size: 18px;
 }
 
+.ai-network-trigger {
+    min-width: 44px;
+    min-height: 44px;
+    border: 1px solid var(--glass-border, var(--md-sys-outline-variant));
+    border-radius: var(--md-sys-shape-full);
+    background: var(--glass-bg, var(--md-sys-surface-container-low));
+    color: var(--md-sys-on-surface-variant);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+.ai-network-trigger.is-auto { background: var(--md-sys-primary-container); color: var(--md-sys-on-primary-container); }
+.ai-network-trigger.is-required { background: var(--md-sys-tertiary-container); color: var(--md-sys-on-tertiary-container); }
+.ai-network-trigger .material-symbols-rounded { font-size: 18px; }
+.search-provider-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--md-sys-outline-variant); }
+.search-provider-meta { display: grid; gap: 3px; min-width: 0; }
+.search-provider-meta strong { color: var(--md-sys-on-surface); }
+.search-provider-meta small, .search-settings-empty { color: var(--md-sys-on-surface-variant); font-size: 12px; line-height: 1.5; }
+.search-provider-form { display: grid; gap: 14px; }
+.search-provider-actions { flex-wrap: wrap; gap: 8px; }
+
+.ai-task-network-settings {
+    display: grid;
+    gap: 10px;
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid var(--md-sys-outline-variant);
+}
+.ai-task-network-settings h3 { margin: 0; font-size: 14px; }
+.ai-task-network-settings > small,
+.ai-task-network-providers small { color: var(--md-sys-on-surface-variant); font-size: 11px; line-height: 1.45; }
+.ai-task-network-advanced { display: grid; gap: 10px; }
+.ai-task-network-advanced summary { cursor: pointer; color: var(--md-sys-primary); font-size: 13px; font-weight: 700; }
+.ai-task-network-providers { display: grid; gap: 7px; }
+.ai-task-network-provider { display: flex; align-items: center; gap: 8px; min-height: 36px; font-size: 13px; }
+.ai-task-network-domains { width: 100%; resize: vertical; box-sizing: border-box; border: 1px solid var(--md-sys-outline); border-radius: var(--md-sys-shape-md); background: var(--md-sys-surface-container-lowest); color: var(--md-sys-on-surface); padding: 9px; font: inherit; }
+
 .ai-settings-section {
     display: grid;
     gap: 12px;

@@ -28,6 +28,7 @@ const foodLog = {
             updateFoodComputedPreview: this.updateFoodComputedPreview,
             foodSourceTag: this.foodSourceTag,
             aiParseFood: this.aiParseFood,
+            verifyAiFood: this.verifyAiFood,
             updateAiFoodDraft: this.updateAiFoodDraft,
             renderAiFoodEditor: this.renderAiFoodEditor,
             renderAiFoodResults: this.renderAiFoodResults,
@@ -585,6 +586,13 @@ const foodLog = {
             this._aiFoodResults = items;
             this._aiFoodAdded = new Set();
             this._aiFoodDrafts = items.map(item => this.formatAiDraft(item));
+            this._aiFoodEvidence = items.map(() => null);
+            const verifyIndexes = window.foodEvidence?.verificationIndexes?.(items, text, 'food.text', 2) || [];
+            if (verifyIndexes.length) {
+                if (statusEl) statusEl.textContent = '正在查询官方营养信息…';
+                const searchBudget = { remaining: 2 };
+                await Promise.all(verifyIndexes.map(index => this.verifyAiFood(index, { input: text, silent: true, searchBudget })));
+            }
             this.renderAiFoodResults();
             if (statusEl) statusEl.textContent = incompleteCount
                 ? `AI 已识别 ${items.length} 项，其中 ${incompleteCount} 项有空字段，请检查后添加`
@@ -618,10 +626,46 @@ const foodLog = {
         }
     },
 
+    foodEvidenceBlocksSave(evidence, sourceTask = 'food.text') {
+        if (['unavailable', 'needs-confirmation'].includes(evidence?.status)) return true;
+        const policy = window.ai?.getTaskNetworkPolicy?.(sourceTask) || window.foodEvidence?.policyFor?.(sourceTask);
+        if (policy?.mode === 'required' && !evidence) return true;
+        return false;
+    },
+
     updateAiFoodDraft(idx, field, value) {
         const drafts = this._aiFoodDrafts || [];
         if (!drafts[idx]) return;
         drafts[idx][field] = value;
+        if (this._aiFoodEvidence?.[idx]) {
+            const policy = window.ai?.getTaskNetworkPolicy?.(this._aiFoodSourceTask || 'food.text');
+            this._aiFoodEvidence[idx] = policy?.mode === 'required'
+                ? (window.foodEvidencePure?.normalizeFoodEvidence?.({
+                    status: 'needs-confirmation',
+                    confidenceTier: 'vision-estimate',
+                    base: { name: drafts[idx].name, grams: drafts[idx].grams, nutrients: drafts[idx] },
+                    requiredUserInput: ['内容已修改，请重新联网核实后再保存']
+                }, { required: true }) || { status: 'needs-confirmation' })
+                : null;
+            this.renderAiFoodResults();
+        }
+    },
+
+    async verifyAiFood(idx, options = {}) {
+        const item = this._aiFoodDrafts?.[idx] || this._aiFoodResults?.[idx];
+        if (!item || !window.foodEvidence?.verify) return;
+        this._aiFoodEvidence = this._aiFoodEvidence || [];
+        const statusEl = document.getElementById('foodAiStatus');
+        if (!options.silent && statusEl) statusEl.textContent = '正在查询官方营养信息…';
+        const evidence = await window.foodEvidence.verify(item, { input: options.input || document.getElementById('foodAiText')?.value || item.name, sourceTask: options.sourceTask === 'food.vision' ? 'food.vision' : 'food.text', searchBudget: options.searchBudget || { remaining: 2 } });
+        this._aiFoodEvidence[idx] = evidence;
+        if (evidence?.status !== 'unavailable' && evidence?.total?.nutrients && this._aiFoodDrafts?.[idx]) {
+            const nutrients = evidence.total.nutrients;
+            this._aiFoodDrafts[idx] = { ...this._aiFoodDrafts[idx], cal: Number(nutrients.cal || 0), pro: Number(nutrients.pro || 0), carb: Number(nutrients.carb || 0), fat: Number(nutrients.fat || 0) };
+        }
+        this.renderAiFoodResults();
+        if (!options.silent && statusEl) statusEl.textContent = window.searchEvidenceUi?.foodMeta?.(evidence)?.label || '核实完成';
+        return evidence;
     },
 
     renderAiFoodEditor(idx) {
@@ -651,6 +695,10 @@ const foodLog = {
                 const draft = drafts[idx];
                 const gramsText = draft.grams ? ' ' + this.escapeHtml(String(draft.grams)) + 'g' : '';
                 const summary = `${this.escapeHtml(String(draft.cal || 0))} kcal${draft.pro ? ' · 蛋白' + this.escapeHtml(String(draft.pro)) + 'g' : ''}`;
+                const evidence = this._aiFoodEvidence?.[idx];
+                const evidenceHtml = evidence
+                    ? (window.searchEvidenceUi?.foodDetails?.(evidence, idx, value => this.escapeHtml(String(value ?? ''))) || '')
+                    : `<button class="md-btn md-btn-tonal food-evidence-action" type="button" onclick="data.verifyAiFood(${idx})"><span class="material-symbols-rounded">manage_search</span>联网核实</button>`;
                 return `<div class="food-ai-result-card ${added ? 'food-added' : ''}">
                     <div class="food-result-item food-ai-result">
                         <span>${this.escapeHtml(draft.name || item.name)}${gramsText}</span>
@@ -659,6 +707,7 @@ const foodLog = {
                             ? '<span class="food-added-badge">已添加</span>'
                             : `<button class="food-add-btn" onclick="data.addSingleAiFood(${idx})"><span class="material-symbols-rounded">add</span></button>`}
                     </div>
+                    ${evidenceHtml}
                     ${!added ? this.renderAiFoodEditor(idx) : ''}
                 </div>`;
             }).join('')}`;
@@ -666,6 +715,7 @@ const foodLog = {
 
     addSingleAiFood(idx) {
         const item = this.foodEntry(this._aiFoodDrafts?.[idx] || this._aiFoodResults?.[idx] || {});
+        if (this.foodEvidenceBlocksSave(this._aiFoodEvidence?.[idx], this._aiFoodSourceTask || 'food.text')) return alert('仍有规格、份量或改动项待确认，请补充或重新核实后再保存');
         if (!item.name) return alert('请输入食物名称');
         if (!this._aiFoodAdded) this._aiFoodAdded = new Set();
         if (this._aiFoodAdded.has(idx)) return;
@@ -687,6 +737,7 @@ const foodLog = {
         const addedLogs = [];
         items.forEach((item, idx) => {
             if (this._aiFoodAdded.has(idx)) return;
+            if (this.foodEvidenceBlocksSave(this._aiFoodEvidence?.[idx], this._aiFoodSourceTask || 'food.text')) return;
             const entry = this.foodEntry(item);
             if (!entry.name) return;
             addedNow.push(idx);
@@ -710,6 +761,8 @@ const foodLog = {
         const pro = Number(item.pro || 0);
         const carb = Number(item.carb || 0);
         const fat = Number(item.fat || 0);
+        const foodEvidence = this._aiFoodEvidence?.[idx] || null;
+        const evidenceSummary = window.foodEvidencePure?.summarizeFoodEvidence?.(foodEvidence) || null;
         return {
             id: this.generateRecordId(`ai-food-${idx}`),
             date: this.logicalDateKey(),
@@ -734,6 +787,7 @@ const foodLog = {
             sourceLabel: 'AI 识别结果',
             confidence: item.confidence || '',
             note: item.note || '',
+            foodEvidence: evidenceSummary,
             createdAt: new Date().toISOString(),
             updatedAt: Date.now(),
             deleted: false
@@ -744,6 +798,7 @@ const foodLog = {
         this._aiFoodResults = [];
         this._aiFoodDrafts = [];
         this._aiFoodAdded = null;
+        this._aiFoodEvidence = [];
         const el = document.getElementById('foodAiResults');
         if (el) el.innerHTML = '';
         const statusEl = document.getElementById('foodAiStatus');

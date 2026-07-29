@@ -5,6 +5,7 @@
     const MAX_TOTAL_TEXT_CHARS = 90000;
     const IMAGE_ACCEPT = 'image/jpeg,image/png,image/webp,image/gif,image/heic,image/heif';
     const FILE_ACCEPT = '.txt,.md,.markdown,.csv,.tsv,.json,.jsonl,.html,.htm,.xml,.log,.ini,.cfg,.conf,.yaml,.yml,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,text/*,application/json,application/pdf';
+    const IMAGE_ICON_MARKUP = '<svg class="advice-image-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M19 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2Zm0 16H5V5h14v14ZM10 6H8v2H6v2h2v2h2v-2h2V8h-2V6Zm-3 11h10l-3.5-4.5-2.5 3.01-1.5-1.81L7 17Z"/></svg>';
     const IMAGE_RE = /\.(jpe?g|png|webp|gif|heic|heif)$/i;
     const TEXT_RE = /\.(txt|md|markdown|csv|tsv|json|jsonl|html?|xml|log|ini|cfg|conf|ya?ml)$/i;
     const DOC_RE = /\.(pdf|docx?|xlsx?|pptx?)$/i;
@@ -113,7 +114,7 @@
 
         renderAdviceAttachmentControls() {
             return `<div class="advice-attach-actions" aria-label="添加附件">
-                <button id="adviceAttachButton" class="advice-attach-btn" type="button" title="点按添加图片，长按添加文件" aria-label="点按添加图片，长按添加文件"><span class="material-symbols-rounded">picture_in_picture_alt</span></button>
+                <button id="adviceAttachButton" class="advice-attach-btn" type="button" title="点按添加图片，长按添加文件" aria-label="点按添加图片，长按添加文件">${IMAGE_ICON_MARKUP}</button>
             </div>`;
         },
 
@@ -122,10 +123,12 @@
             if (!list.length) return '';
             return `<div id="adviceAttachmentChips" class="advice-attachment-chips">
                 ${list.map(att => {
-                    const icon = att.kind === 'image' ? 'picture_in_picture_alt' : att.kind === 'text' ? 'clinical_notes' : 'upload_file';
+                    const icon = att.kind === 'text' ? 'clinical_notes' : 'upload_file';
                     const state = att.status === 'failed' ? ' failed' : att.status === 'processing' ? ' processing' : '';
                     const title = this.escapeHtml(att.error || att.reason || `${att.name || '附件'}｜${att.label || att.kind || '文件'}｜${att.mime || att.ext || 'unknown'}｜${fmt(att.size || 0)}`);
-                    const preview = att.kind === 'image' && att.thumb ? `<button class="advice-attachment-thumb" type="button" onclick="data.previewAdviceAttachment('${this.escapeHtml(att.id)}')" aria-label="预览图片"><img src="${this.escapeHtml(att.thumb)}" alt=""></button>` : `<span class="material-symbols-rounded">${icon}</span>`;
+                    const preview = att.kind === 'image'
+                        ? (att.thumb ? `<button class="advice-attachment-thumb" type="button" onclick="data.previewAdviceAttachment('${this.escapeHtml(att.id)}')" aria-label="预览图片"><img src="${this.escapeHtml(att.thumb)}" alt=""></button>` : IMAGE_ICON_MARKUP)
+                        : `<span class="material-symbols-rounded">${icon}</span>`;
                     return `<div class="advice-attachment-chip${state} ${att.kind === 'image' ? 'has-thumb' : ''}" title="${title}">
                         ${preview}
                         <span class="advice-attachment-name">${this.escapeHtml(att.name || '附件')}</span>

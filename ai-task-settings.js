@@ -460,7 +460,41 @@
                 closeQuickSheet();
                 render();
             });
-            body.append(fallback, automatic, reset);
+            body.append(fallback, automatic);
+            const currentNetwork = () => root.ai?.getTaskNetworkPolicy?.(definition.id, current) || { mode: 'off', execution: 'native-first', sourcePolicy: 'official-preferred', fallback: 'local-estimate', providerIds: [], allowedDomains: [] };
+            const network = currentNetwork();
+            const section = el('section', 'ai-task-network-settings');
+            section.append(el('h3', '', '联网检索'), el('small', '', '仅发送任务必需的餐品、品牌、地区和规格信息。'));
+            const saveNetwork = patch => save({ ...current, network: { ...currentNetwork(), ...patch } });
+            const selectField = (label, choices, value, change) => {
+                const wrap = el('label', 'ai-task-control');
+                const select = el('select', 'ai-task-select');
+                choices.forEach(([id, name]) => { const option = document.createElement('option'); option.value = id; option.textContent = name; select.append(option); });
+                select.value = value; select.addEventListener('change', () => change(select.value));
+                wrap.append(el('span', 'ai-task-control-label', label), select); return wrap;
+            };
+            section.append(
+                selectField('联网模式', [['off', '不联网'], ['auto', '需要时联网'], ['required', '本次必须先核实']], network.mode, mode => saveNetwork({ mode })),
+                selectField('执行顺序', [['native-first', '原生优先'], ['native-only', '仅模型原生'], ['external-first', '外部服务优先'], ['external-only', '仅外部服务']], network.execution, execution => saveNetwork({ execution })),
+                selectField('来源策略', [['official-preferred', '官方优先'], ['official-only', '仅官方来源'], ['any', '允许所有来源']], network.sourcePolicy, sourcePolicy => saveNetwork({ sourcePolicy })),
+                selectField('不可用时', [['local-estimate', '保留本地估算'], ['ask-user', '要求补充信息'], ['fail', '停止并提示失败']], network.fallback, fallbackMode => saveNetwork({ fallback: fallbackMode }))
+            );
+            const advanced = document.createElement('details'); advanced.className = 'ai-task-network-advanced'; advanced.append(el('summary', '', '高级选项'));
+            const providerBox = el('div', 'ai-task-network-providers'); providerBox.append(el('strong', '', '外部服务顺序'));
+            const providers = root.searchStore?.getProviders?.() || [];
+            if (!providers.length) providerBox.append(el('small', '', '尚未配置外部搜索服务'));
+            const selectedProviders = Array.isArray(network.providerIds) ? network.providerIds : [];
+            providers.forEach(provider => {
+                const line = el('label', 'ai-task-network-provider'); const check = document.createElement('input');
+                check.type = 'checkbox'; check.checked = selectedProviders.includes(provider.id); check.disabled = provider.archived || provider.enabled === false;
+                check.addEventListener('change', () => saveNetwork({ providerIds: check.checked ? [...selectedProviders, provider.id] : selectedProviders.filter(id => id !== provider.id) }));
+                line.append(check, el('span', '', provider.name)); providerBox.append(line);
+            });
+            const domains = el('textarea', 'ai-task-network-domains'); domains.rows = 3; domains.placeholder = 'example.com，一行一个；最多 20 项'; domains.value = (network.allowedDomains || []).join('\n');
+            domains.addEventListener('change', () => saveNetwork({ allowedDomains: domains.value.split(/[\n,，\s]+/).filter(Boolean) }));
+            const domainField = el('label', 'ai-task-control'); domainField.append(el('span', 'ai-task-control-label', '任务域名白名单（只会收紧全局规则）'), domains);
+            advanced.append(providerBox, domainField); section.append(advanced);
+            body.append(section, reset);
         });
     }
 
@@ -501,6 +535,29 @@
         return button;
     }
 
+    function networkMeta(policy) {
+        const mode = text(policy?.mode).toLowerCase();
+        if (mode === 'required') return { mode, icon: 'manage_search', label: '\u672c\u6b21\u5148\u6838\u5b9e' };
+        if (mode === 'auto') return { mode, icon: 'auto_awesome', label: '\u9700\u8981\u65f6\u8054\u7f51' };
+        return { mode: 'off', icon: 'cloud_off', label: '\u4e0d\u8054\u7f51' };
+    }
+
+    function createNetworkControl(taskId, route, save) {
+        const current = root.ai?.getTaskNetworkPolicy?.(taskId, route) || { mode: 'off' };
+        const meta = networkMeta(current);
+        const button = el('button', `ai-network-trigger is-${meta.mode}`);
+        button.type = 'button';
+        button.append(icon(meta.icon));
+        button.setAttribute('aria-label', `\u8054\u7f51\u68c0\u7d22\uff1a${meta.label}`);
+        button.title = `\u8054\u7f51\u68c0\u7d22\uff1a${meta.label}`;
+        button.addEventListener('click', () => {
+            const modes = ['off', 'auto', 'required'];
+            const nextMode = modes[(modes.indexOf(meta.mode) + 1) % modes.length];
+            save({ ...route, network: { ...current, mode: nextMode } });
+        });
+        return button;
+    }
+
     async function saveRoute(taskId, nextRoute, row) {
         row.classList.add('is-saving');
         try {
@@ -529,6 +586,7 @@
         const quick = el('div', 'ai-task-quick-controls');
         quick.append(createCompactModelControl(definition.id, models, route, save));
         quick.append(createReasoningControl(route, models, save));
+        if (definition.id.startsWith('food.') || route?.network) quick.append(createNetworkControl(definition.id, route, save));
         if (definition.allowFallbacks !== false) {
             const more = el('button', `ai-task-route-more ${routeFallback(route) ? 'has-fallback' : ''}`);
             more.type = 'button';

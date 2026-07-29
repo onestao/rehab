@@ -363,6 +363,14 @@ test('probe accepts generated.css md-btn rules', () => {
     assert.equal(harness.stylesheetAppliesAppRules(), true);
 });
 
+test('probe accepts browser-rounded generated.css button height', () => {
+    const harness = runLoader({
+        // Chromium may expose a 44px rule as 43.9946px at non-default page zoom.
+        defaultProbe: { display: 'inline-flex', height: '43.9946px', borderRadius: '9999px' }
+    });
+    assert.equal(harness.stylesheetAppliesAppRules(), true);
+});
+
 test('probe rejects browser-default button styling', () => {
     const harness = runLoader({
         defaultProbe: { display: 'inline-block', height: 'auto', borderRadius: '0px' }

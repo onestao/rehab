@@ -42,6 +42,13 @@ function loadRuntime({ withCapabilityHelper = true } = {}) {
   return ai;
 }
 
+test('food.verify is independently routable from advanced task settings', async () => {
+  const ai = loadRuntime();
+  assert.equal(ai.getTaskDefinition('food.verify')?.label, '食物营养核实');
+  await ai.setTaskRoute('food.verify', { primary: { profileId: 'p1', modelId: 'shared-model' }, reasoningDepth: 'off' });
+  assert.equal(ai.getTaskRoute('food.verify').primary.modelId, 'shared-model');
+});
+
 test('task routes keep identical model ids isolated by profile', async () => {
   const ai = loadRuntime();
   await ai.setTaskRoute('advice.chat', {

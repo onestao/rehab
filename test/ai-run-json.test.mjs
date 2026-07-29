@@ -118,6 +118,15 @@ function loadApiWithRun(texts) {
     return { ai: sandbox.ai, calls };
 }
 
+test('runJson keeps native search available unless the caller disables networking', async () => {
+    const online = loadApiWithRun(['{"ok":true}']);
+    await online.ai.runJson({ taskId: 'rehab.weekly', messages: [], parseOptions: { expected: 'object' } });
+    assert.equal(online.calls[0].opts.disableNativeSearch, false);
+    const offline = loadApiWithRun(['{"ok":true}']);
+    await offline.ai.runJson({ taskId: 'rehab.weekly', messages: [], disableNetworkSearch: true, parseOptions: { expected: 'object' } });
+    assert.equal(offline.calls[0].opts.disableNetworkSearch, true);
+});
+
 const goodObject = JSON.stringify({ actions: [{ name: '台阶下放', status: 'continued' }] });
 
 test('runJson accepts strict JSON once', async () => {

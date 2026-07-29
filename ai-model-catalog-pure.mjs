@@ -80,6 +80,12 @@ export function normalizeCatalogModel(model = {}, context = {}) {
     const visionCapability = vision
         ? true
         : (upstreamCapabilities.vision === false || model.vision === false ? false : undefined);
+    const webSearchCapability = upstreamCapabilities.webSearch === true || upstreamCapabilities.web_search === true || model.webSearch === true || model.web_search === true
+        ? true
+        : (upstreamCapabilities.webSearch === false || upstreamCapabilities.web_search === false || model.webSearch === false || model.web_search === false ? false : undefined);
+    const nativeWebSearchChat = upstreamCapabilities.nativeWebSearchChat === true || model.nativeWebSearchChat === true
+        ? true
+        : (upstreamCapabilities.nativeWebSearchChat === false || model.nativeWebSearchChat === false ? false : undefined);
     return {
         ...model,
         id,
@@ -96,6 +102,8 @@ export function normalizeCatalogModel(model = {}, context = {}) {
             vision: visionCapability,
             streaming: upstreamCapabilities.streaming === true || model.streaming === true,
             json: upstreamCapabilities.json === true || upstreamCapabilities.json_mode === true || model.json === true,
+            webSearch: webSearchCapability,
+            nativeWebSearchChat,
             reasoning: upstreamCapabilities.reasoning === false || model.reasoning === false
                 ? false
                 : (upstreamCapabilities.reasoning === true || model.reasoning === true || inferReasoning(id, provider) ? true : undefined)

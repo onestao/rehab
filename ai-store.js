@@ -16,6 +16,9 @@ const ai = {
         extraVisionKeywords: '',
         requestTimeoutMs: 300000,
         taskRoutes: {},
+        searchSchemaVersion: 1,
+        searchProviders: [],
+        networkDefaults: {},
         enabled: false
     },
     models: [],
@@ -35,6 +38,9 @@ const ai = {
             extraVisionKeywords: '',
             requestTimeoutMs: 0,
             taskRoutes: {},
+            searchSchemaVersion: 1,
+            searchProviders: [],
+            networkDefaults: {},
             enabled: false
         };
         this.models = [];
@@ -96,6 +102,11 @@ const ai = {
         if ((!this.cfg.taskRoutes || !Object.keys(this.cfg.taskRoutes).length) && typeof data !== 'undefined' && data.db?.aiTaskRoutes) {
             this.cfg.taskRoutes = data.db.aiTaskRoutes;
         }
+        if ((!this.cfg.searchProviders || !this.cfg.searchProviders.length) && typeof data !== 'undefined' && data.db?.aiSearchConfig) {
+            this.cfg.searchSchemaVersion = data.db.aiSearchConfig.searchSchemaVersion || 1;
+            this.cfg.searchProviders = data.db.aiSearchConfig.searchProviders || [];
+            this.cfg.networkDefaults = data.db.aiSearchConfig.networkDefaults || {};
+        }
         if (typeof data !== 'undefined' && Number(data.db?.aiRequestTimeoutMs) > 0 && Number(this.cfg.requestTimeoutMs) <= 0) {
             this.cfg.requestTimeoutMs = Number(data.db.aiRequestTimeoutMs);
         }
@@ -111,6 +122,8 @@ const ai = {
         this.modelCandidates = this.modelCandidates && typeof this.modelCandidates === 'object' ? this.modelCandidates : {};
         this.keyMap = this.keyMap && typeof this.keyMap === 'object' ? this.keyMap : {};
         this.cfg.taskRoutes = this.cfg.taskRoutes && typeof this.cfg.taskRoutes === 'object' ? this.cfg.taskRoutes : {};
+        this.cfg.searchProviders = Array.isArray(this.cfg.searchProviders) ? this.cfg.searchProviders : [];
+        this.cfg.networkDefaults = this.cfg.networkDefaults && typeof this.cfg.networkDefaults === 'object' ? this.cfg.networkDefaults : {};
         this.cfg.requestTimeoutMs = Math.max(30000, Math.min(900000, Number(this.cfg.requestTimeoutMs) || 300000));
         if (typeof this.migrateLegacyModelCache === 'function') await this.migrateLegacyModelCache();
         if (!this.cfg.activeProfileId && this.cfg.profiles.length) {

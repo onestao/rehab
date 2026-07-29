@@ -437,6 +437,7 @@ Object.assign(advicePanel, {
         const errorRecovery = msg.error ? (this.renderAdviceErrorRecovery?.(msg) || '') : '';
         const limitNotice = limitedByTokens ? '<div class="advice-limit-notice"><span class="material-symbols-rounded">data_thresholding</span>回复达到模型输出上限，结尾可能不完整。可点击重试，或直接输入“继续”。</div>' : '';
         const stoppedNotice = msg.stopped ? '<div class="advice-stopped-notice"><span class="material-symbols-rounded">stop</span>已停止生成，已保留上方部分回复。</div>' : '';
+        const sourceTrail = window.searchEvidenceUi?.sourceTrail?.(msg.searchEvidence, escapeHtml) || '';
         const actions = msg.role === 'assistant'
             ? `<div class="advice-bubble-actions" aria-label="AI 回答操作">
                 <button class="advice-action-btn" onclick="data.copyAdviceMessage(${msg.idx}, this.closest('.advice-bubble')?.dataset.adviceId || '')" type="button" aria-label="复制" title="复制"><span class="material-symbols-rounded">content_copy</span></button>
@@ -465,6 +466,7 @@ Object.assign(advicePanel, {
             ${limitNotice}
             ${stoppedNotice}
             ${errorRecovery}
+            ${sourceTrail}
             ${longMessageToggle}
             ${routineActions}
             ${actions}

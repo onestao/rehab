@@ -242,6 +242,7 @@
 .advice-attach-btn:active, .advice-attach-btn.is-long-press { transform: scale(0.92); }
 .advice-attach-btn:active::after, .advice-attach-btn.is-long-press::after { opacity: var(--md-state-press); }
 .advice-attach-btn .material-symbols-rounded { font-size: 20px; }
+.advice-image-icon { width: 20px; height: 20px; fill: currentColor; flex: none; }
 
 @media (prefers-color-scheme: dark) {
     :root:not([data-theme-mode="light"]) .ai-input :is(.advice-model-openai, .advice-model-grok, .advice-model-kimi, .advice-model-mimo, .advice-model-generic) .advice-model-icon { filter: invert(1); }
@@ -253,7 +254,8 @@
 .advice-attachment-chip.processing { opacity: 0.82; }
 .advice-attachment-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
 .advice-attachment-chip small, .advice-message-attachment small { color: currentColor; opacity: 0.72; white-space: nowrap; }
-.advice-attachment-chip > .material-symbols-rounded, .advice-message-attachment > .material-symbols-rounded { width: 22px; height: 22px; border-radius: 50%; background: color-mix(in srgb, currentColor 10%, transparent); display: inline-flex; align-items: center; justify-content: center; font-size: 14px; flex: none; }
+.advice-attachment-chip > .material-symbols-rounded, .advice-message-attachment > .material-symbols-rounded, .advice-attachment-chip > .advice-image-icon { width: 22px; height: 22px; border-radius: 50%; background: color-mix(in srgb, currentColor 10%, transparent); display: inline-flex; align-items: center; justify-content: center; font-size: 14px; flex: none; }
+.advice-attachment-chip > .advice-image-icon { padding: 4px; }
 .advice-attachment-thumb { width: 42px; height: 42px; border: 1px solid color-mix(in srgb, var(--md-sys-outline-variant) 65%, transparent); border-radius: 14px; padding: 0; overflow: hidden; background: var(--glass-bg); box-shadow: var(--md-sys-elevation-1); flex: none; cursor: pointer; }
 .advice-attachment-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .advice-attachment-chip.has-thumb, .advice-message-attachment.has-thumb { padding: 4px 8px 4px 4px; border-radius: 18px; max-width: min(100%, 320px); }

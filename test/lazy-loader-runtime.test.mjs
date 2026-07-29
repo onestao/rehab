@@ -243,18 +243,23 @@ function createLoaderHarnessWithRealPrerequisites() {
     };
 }
 
-test('food-log waits for fooddb and food-ai-normalizer-pure before executing', async () => {
+test('food-log waits for database, normalizer, and evidence UI before executing', async () => {
     const harness = createLoaderHarnessWithRealPrerequisites();
     const load = harness.api.loadScript('food-log');
     await flushMicrotasks();
 
     assert.deepEqual(new Set(harness.srcNames()), new Set([
         'food-ai-normalizer-pure.js',
-        'fooddb.js'
+        'fooddb.js',
+        'search-evidence-ui.js'
     ]));
     assert.equal(harness.nodesFor('food-log').length, 0);
 
     harness.complete('food-ai-normalizer-pure');
+    await flushMicrotasks();
+    assert.equal(harness.nodesFor('food-log').length, 0);
+
+    harness.complete('search-evidence-ui');
     await flushMicrotasks();
     assert.equal(harness.nodesFor('food-log').length, 0);
 
@@ -277,10 +282,12 @@ test('food-log concurrent loads request fooddb only once', async () => {
 
     assert.equal(harness.nodesFor('fooddb').length, 1);
     assert.equal(harness.nodesFor('food-ai-normalizer-pure').length, 1);
+    assert.equal(harness.nodesFor('search-evidence-ui').length, 1);
     assert.equal(harness.nodesFor('food-log').length, 0);
 
     harness.complete('fooddb');
     harness.complete('food-ai-normalizer-pure');
+    harness.complete('search-evidence-ui');
     await flushMicrotasks();
     assert.equal(harness.nodesFor('food-log').length, 1);
 
@@ -295,6 +302,7 @@ test('fooddb failure keeps food-log unloadable and retryable', async () => {
     const first = harness.api.loadScript('food-log');
     await flushMicrotasks();
     harness.complete('food-ai-normalizer-pure');
+    harness.complete('search-evidence-ui');
     harness.fail('fooddb');
     await assert.rejects(first, /Failed to load script: fooddb/);
     await flushMicrotasks();

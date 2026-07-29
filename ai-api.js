@@ -26,6 +26,60 @@ Object.assign(ai, {
         });
     },
 
+    _nativeSearchTool(effective = {}, requestOpts = {}) {
+        const policy = effective.network || {};
+        const capabilities = effective.capabilities || {};
+        const supported = capabilities.webSearch === true || capabilities.web_search === true || capabilities.tools?.webSearch === true;
+        if (requestOpts.disableNativeSearch || !requestOpts.allowNativeSearch || requestOpts.disableNetworkSearch || policy.mode === 'off' || !supported) return null;
+        const domains = Array.isArray(policy.allowedDomains) ? policy.allowedDomains.slice(0, 20) : [];
+        const provider = String(effective.provider || '').toLowerCase();
+        if (provider === 'openai-responses') {
+            return { type: 'web_search_preview', ...(domains.length ? { filters: { allowed_domains: domains } } : {}) };
+        }
+        if (provider === 'openai' || provider === 'openai-chat') {
+            if (capabilities.nativeWebSearchChat !== true) return null;
+            return { type: 'web_search_preview', ...(domains.length ? { filters: { allowed_domains: domains } } : {}) };
+        }
+        if (provider === 'claude') {
+            return { type: 'web_search_20250305', name: 'web_search', max_uses: Math.min(2, Number(requestOpts.nativeSearchMaxUses || policy.maxToolCalls) || 2), ...(domains.length ? { allowed_domains: domains } : {}) };
+        }
+        if (provider === 'gemini') {
+            // Gemini Google Search has no portable allow-list field. A task/global
+            // allow-list is therefore a hard compatibility requirement.
+            if (domains.length) return null;
+            return { google_search: {} };
+        }
+        return null;
+    },
+
+    _emitNativeSearchEvidence(payload, effective, requestOpts = {}, cited = []) {
+        if (typeof requestOpts.onSearchEvidence !== 'function') return;
+        const existing = Array.isArray(requestOpts._nativeSearchEvidence) ? requestOpts._nativeSearchEvidence : [];
+        const seen = new Set(existing.map(item => String(item?.url || item?.id || '')));
+        const evidence = [...existing];
+        const append = citation => {
+            const source = window.searchPolicyPure?.classifySearchSource?.(citation?.url || citation?.uri || '') || { sourceType: 'other', official: false };
+            const normalized = window.searchPolicyPure?.normalizeSearchEvidence?.({
+                id: `native_${evidence.length}`, title: citation?.title || citation?.name || '', url: citation?.url || citation?.uri || '', snippet: citation?.snippet || '', providerId: 'native', retrievedAt: Date.now(), ...source
+            }, { allowedDomains: effective.network?.allowedDomains || [] });
+            if (!normalized) return;
+            if (effective.network?.sourcePolicy === 'official-only' && !normalized.official) return;
+            const key = String(normalized.url || normalized.id || '');
+            if (key && seen.has(key)) return;
+            if (key) seen.add(key);
+            evidence.push(normalized);
+        };
+        for (const citation of cited) append(citation);
+        for (const item of (payload?.output || [])) for (const content of (item?.content || [])) {
+            for (const annotation of (content?.annotations || [])) {
+                const citation = annotation?.url_citation || annotation;
+                append(citation);
+            }
+        }
+        requestOpts._nativeSearchEvidence = evidence;
+        if (evidence.length) requestOpts.onSearchEvidence(evidence);
+    },
+
     // Client inactivity budgets. Reasoning / Responses models often spend minutes
     // before the first token, and active streams refresh the timer on every chunk.
     MIN_AI_TIMEOUT_MS: 1000,
@@ -63,7 +117,7 @@ Object.assign(ai, {
             ? this.getTaskRequestSequence(taskId, options.routeOverride || null)
             : [this._effectiveConfigForRequest({ taskId, routeOverride: options.routeOverride })];
         let lastError = null;
-        const withMeta = (text, effective, index) => {
+        const withMeta = (text, effective, index, evidence = []) => {
             if (index > 0) window.toast?.show?.(`\u4e3b\u6a21\u578b\u4e0d\u53ef\u7528\uff0c\u5df2\u4f7f\u7528\u5907\u7528\u6a21\u578b ${effective.modelId || effective.model || ''}`, 'warning');
             return options.returnMeta ? {
                 text,
@@ -73,38 +127,57 @@ Object.assign(ai, {
                     provider: effective.provider || '',
                     modelId: effective.modelId || effective.model || '',
                     reasoningDepth: effective.reasoningDepth || 'auto',
+                    ...(evidence.length ? { searchEvidence: evidence } : {}),
                     fallback: { used: index > 0, index, mode: effective.route?.fallbackMode || 'manual' }
                 }
             } : text;
         };
         for (let index = 0; index < sequence.length; index++) {
-            const effective = sequence[index];
+            const resolved = sequence[index];
+            const networkOverride = options.networkPolicy && typeof options.networkPolicy === 'object'
+                ? window.searchPolicyPure?.normalizeNetworkPolicy?.(options.networkPolicy, this.cfg?.networkDefaults || {})
+                : null;
+            const effective = networkOverride ? { ...resolved, network: networkOverride } : resolved;
             let emitted = false;
+            let searchEvidence = [];
             const originalOnToken = options.onToken || (() => {});
             const requestOpts = {
                 ...options,
                 taskId,
                 effective,
+                allowNativeSearch: !options.disableNativeSearch
+                    && options.disableNetworkSearch !== true
+                    && effective.network?.mode !== 'off',
+                disableNetworkSearch: options.disableNetworkSearch === true,
                 onToken: (delta, accumulated, meta) => {
                     if (delta || accumulated) emitted = true;
                     return originalOnToken(delta, accumulated, meta);
-                }
+                },
+                onSearchEvidence: evidence => { searchEvidence = Array.isArray(evidence) ? evidence : []; }
             };
             try {
-                if (options.imageFile) {
-                    const text = await this.callVisionTextImage(options.promptText || '', options.imageFile, options.maxTokens || 2000, options.systemText || '', requestOpts);
-                    return withMeta(text, effective, index);
-                }
-                if (Array.isArray(options.attachments) && options.attachments.some(item => item?.kind === 'image' && item.file)) {
-                    const text = await this.callAdviceWithAttachments(options.messages || [], options.attachments, options.maxTokens || 2400, requestOpts);
-                    return withMeta(text, effective, index);
-                }
-                if (options.stream) {
-                    const text = await this.callStream(options.messages || [], options.maxTokens || 2000, requestOpts.onToken, requestOpts);
-                    return withMeta(text, effective, index);
-                }
-                const text = await this.call(options.messages || [], options.maxTokens || 2000, requestOpts);
-                return withMeta(text, effective, index);
+                const messages = options.messages || [];
+                const maxTokens = options.maxTokens || 2000;
+                const hasImage = !!options.imageFile || (Array.isArray(options.attachments) && options.attachments.some(item => item?.kind === 'image' && item.file));
+                const direct = async () => {
+                    if (options.imageFile) return this.callVisionTextImage(options.promptText || '', options.imageFile, maxTokens, options.systemText || '', requestOpts);
+                    if (hasImage) return this.callAdviceWithAttachments(messages, options.attachments, options.maxTokens || 2400, requestOpts);
+                    if (options.stream) return this.callStream(messages, maxTokens, requestOpts.onToken, requestOpts);
+                    return this.call(messages, maxTokens, requestOpts);
+                };
+                const result = window.searchToolLoop?.executeTask
+                    ? await window.searchToolLoop.executeTask({
+                        effective, messages, maxTokens, requestOpts, hasImage,
+                        disableNetworkSearch: options.disableNetworkSearch === true,
+                        direct,
+                        getEvidence: () => searchEvidence,
+                        requestModel: (current, toolOptions) => this.call(current, maxTokens, {
+                            ...requestOpts, ...toolOptions, allowNativeSearch: false, disableNativeSearch: true, returnToolEnvelope: true, stream: false
+                        })
+                    })
+                    : { text: await direct(), evidence: searchEvidence, external: false };
+                if (options.stream && result.external && result.text) requestOpts.onToken(result.text, result.text, { done: true });
+                return withMeta(result.text, effective, index, result.evidence || []);
             } catch (error) {
                 let exposedError = error;
                 try {
@@ -239,6 +312,9 @@ Object.assign(ai, {
         const maxTokens = Math.max(1, Number(options.maxTokens) || 2000);
         const parseOptions = options.parseOptions || {};
         const returnMeta = !!options.returnMeta;
+        const searchBudget = options.searchBudget && typeof options.searchBudget === 'object'
+            ? options.searchBudget
+            : { remaining: 2 };
         let firstAttemptCode = '';
         let attemptMeta = null;
         let firstResult = null;
@@ -321,6 +397,9 @@ Object.assign(ai, {
                 onProgress: options.onProgress,
                 returnMeta: true,
                 requireCompleteOutput: true,
+                disableNativeSearch: options.disableNativeSearch === true,
+                disableNetworkSearch: options.disableNetworkSearch === true,
+                searchBudget,
                 stream: false
             });
             attemptMeta = firstResult.meta || null;
@@ -381,6 +460,9 @@ Object.assign(ai, {
                 onProgress: options.onProgress,
                 returnMeta: true,
                 requireCompleteOutput: true,
+                disableNativeSearch: options.disableNativeSearch === true,
+                disableNetworkSearch: options.disableNetworkSearch === true,
+                searchBudget,
                 stream: false
             });
             attemptMeta = retryResult.meta || attemptMeta;
@@ -389,6 +471,10 @@ Object.assign(ai, {
         } catch (error) {
             failAfterRetry(error);
         }
+    },
+
+    async verifyFoodEvidence(options = {}) {
+        return window.foodEvidence?.verifyWithAi?.(options) || null;
     },
 
     // --- API Calls (统一入口，按 provider 分发) ---
@@ -807,6 +893,8 @@ Object.assign(ai, {
         const reasoning = this._reasoningRequestOptions(effective, maxTokens);
         const body = { model: effective.model, messages, max_tokens: reasoning.maxOutputTokens, ...reasoning.params };
         if (!reasoning.omitTemperature) body.temperature = 0.3;
+        const nativeSearch = this._nativeSearchTool(effective, requestOpts);
+        if (nativeSearch) body.tools = [nativeSearch];
         const res = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
@@ -843,6 +931,8 @@ Object.assign(ai, {
         };
         if (!reasoning.omitTemperature) body.temperature = 0.3;
         if (systemText) body.instructions = systemText;
+        const nativeSearch = this._nativeSearchTool(effective, requestOpts);
+        if (nativeSearch) body.tools = [nativeSearch];
         const res = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
@@ -867,6 +957,7 @@ Object.assign(ai, {
             }
         }
         this._assertCompleteAiResponse('openai-responses', d, { requireCompleteOutput: requestOpts?.requireCompleteOutput, text: txt });
+        this._emitNativeSearchEvidence(d, effective, requestOpts);
         return txt;
     },
 
@@ -887,6 +978,8 @@ Object.assign(ai, {
         };
         if (!reasoning.omitTemperature) body.temperature = 0.3;
         if (systemText) body.system = systemText;
+        const nativeSearch = this._nativeSearchTool(effective, requestOpts);
+        if (nativeSearch) body.tools = [nativeSearch];
         const res = await fetch(url, {
             method: 'POST',
             headers: {
@@ -908,6 +1001,7 @@ Object.assign(ai, {
         try { d = JSON.parse(raw); } catch (e) { throw this._makeAiError('AI 返回格式异常', { code: 'AI_JSON_PARSE_FAILED', outputLength: String(raw || '').length }); }
         const text = (d.content || []).filter(c => c.type === 'text').map(c => c.text).join('');
         this._assertCompleteAiResponse('claude', d, { requireCompleteOutput: requestOpts?.requireCompleteOutput, text });
+        this._emitNativeSearchEvidence(d, effective, requestOpts, (d.content || []).flatMap(item => item?.citations || []));
         return text;
     },
 
@@ -931,6 +1025,8 @@ Object.assign(ai, {
             },
             ...(systemText ? { systemInstruction: { parts: [{ text: systemText }] } } : {})
         };
+        const nativeSearch = this._nativeSearchTool(effective, requestOpts);
+        if (nativeSearch) body.tools = [nativeSearch];
         const res = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -947,6 +1043,7 @@ Object.assign(ai, {
         try { d = JSON.parse(raw); } catch (e) { throw this._makeAiError('AI 返回格式异常', { code: 'AI_JSON_PARSE_FAILED', outputLength: String(raw || '').length }); }
         const text = d.candidates?.[0]?.content?.parts?.map(p => p.text).join('') || '';
         this._assertCompleteAiResponse('gemini', d, { requireCompleteOutput: requestOpts?.requireCompleteOutput, text });
+        this._emitNativeSearchEvidence(d, effective, requestOpts, (d.candidates || []).flatMap(item => item?.groundingMetadata?.groundingChunks || []).map(chunk => chunk?.web || {}).filter(Boolean));
         return text;
     },
 
@@ -954,8 +1051,12 @@ Object.assign(ai, {
     async _callOpenAIChat(messages, maxTokens, key, stream, onChunk, effective = this.getEffectiveConfig?.() || this.cfg, signal = null, requestOpts = {}) {
         const url = `${effective.baseUrl}/chat/completions`;
         const reasoning = this._reasoningRequestOptions(effective, maxTokens);
-        const body = { model: effective.model, messages, max_tokens: reasoning.maxOutputTokens, ...reasoning.params };
+        const mappedMessages = window.searchToolLoop?.mapMessages?.('openai-chat', messages) || messages;
+        const body = { model: effective.model, messages: mappedMessages, max_tokens: reasoning.maxOutputTokens, ...reasoning.params };
         if (!reasoning.omitTemperature) body.temperature = 0.3;
+        const nativeSearch = this._nativeSearchTool(effective, requestOpts);
+        if (nativeSearch) body.tools = [nativeSearch];
+        Object.assign(body, window.searchToolLoop?.requestOptions?.('openai-chat', requestOpts) || {});
         if (stream) body.stream = true;
         const res = await fetch(url, {
             method: 'POST',
@@ -973,6 +1074,8 @@ Object.assign(ai, {
                 const d = JSON.parse(raw);
                 const text = d.choices?.[0]?.message?.content || '';
                 this._assertCompleteAiResponse('openai', d, { requireCompleteOutput: requestOpts?.requireCompleteOutput, text });
+                this._emitNativeSearchEvidence(d, effective, requestOpts, d.choices?.[0]?.message?.annotations || []);
+                if (requestOpts.returnToolEnvelope) return window.searchToolLoop?.responseEnvelope?.('openai-chat', d, text) || { text, toolCalls: [] };
                 return text;
             } catch (e) {
                 if (e?.code === 'AI_OUTPUT_TRUNCATED' || e?.code === 'AI_OUTPUT_BLOCKED') throw e;
@@ -992,7 +1095,12 @@ Object.assign(ai, {
             }
         }
          return this._readSSE(res, onChunk,
-              (json) => json.choices?.[0]?.delta?.content ?? json.choices?.[0]?.message?.content ?? '',
+              (json) => {
+                  const choice = json.choices?.[0] || {};
+                  const cited = choice.delta?.annotations || choice.message?.annotations || [];
+                  if (cited.length) this._emitNativeSearchEvidence(json, effective, requestOpts, cited);
+                  return choice.delta?.content ?? choice.message?.content ?? '';
+              },
               (json) => {
                   const usage = json.usage ? { in: Number(json.usage.prompt_tokens || 0), out: Number(json.usage.completion_tokens || 0) } : null;
                   const finishReason = json.choices?.[0]?.finish_reason || '';
@@ -1006,9 +1114,9 @@ Object.assign(ai, {
     async _callOpenAIResponses(messages, maxTokens, key, stream, onChunk, effective = this.getEffectiveConfig?.() || this.cfg, signal = null, requestOpts = {}) {
         const url = `${effective.baseUrl}/responses`;
         const sys = messages.filter(m => m.role === 'system').map(m => m.content).join('\n');
-        const input = messages.filter(m => m.role !== 'system').map(m => ({
-            role: m.role,
-            content: [{ type: m.role === 'assistant' ? 'output_text' : 'input_text', text: m.content }]
+        const sourceInput = messages.filter(m => m.role !== 'system');
+        const input = window.searchToolLoop?.mapMessages?.('openai-responses', sourceInput) || sourceInput.map(m => ({
+            role: m.role, content: [{ type: m.role === 'assistant' ? 'output_text' : 'input_text', text: m.content }]
         }));
         const reasoning = this._reasoningRequestOptions(effective, maxTokens);
         const body = {
@@ -1019,6 +1127,9 @@ Object.assign(ai, {
         };
         if (!reasoning.omitTemperature) body.temperature = 0.3;
         if (sys) body.instructions = sys;
+        const nativeSearch = this._nativeSearchTool(effective, requestOpts);
+        if (nativeSearch) body.tools = [nativeSearch];
+        Object.assign(body, window.searchToolLoop?.requestOptions?.('openai-responses', requestOpts) || {});
         if (stream) body.stream = true;
 
         const res = await fetch(url, {
@@ -1043,6 +1154,8 @@ Object.assign(ai, {
                 }
             }
             this._assertCompleteAiResponse('openai-responses', d, { requireCompleteOutput: requestOpts?.requireCompleteOutput, text: txt });
+            this._emitNativeSearchEvidence(d, effective, requestOpts);
+            if (requestOpts.returnToolEnvelope) return window.searchToolLoop?.responseEnvelope?.('openai-responses', d, txt) || { text: txt, toolCalls: [] };
             return txt;
         }
           return this._readSSE(res, onChunk, (json) => {
@@ -1051,9 +1164,12 @@ Object.assign(ai, {
           }, (json) => {
              const response = json.response || null;
              const finishReason = response?.incomplete_details?.reason || (response?.status && response.status !== 'completed' ? response.status : '') || '';
-             if (json.type === 'response.completed' && response?.usage) {
-                 const u = response.usage;
-                 return { usage: { in: Number(u.input_tokens || 0), out: Number(u.output_tokens || 0) }, finishReason };
+             if (json.type === 'response.completed') {
+                 this._emitNativeSearchEvidence(response || json, effective, requestOpts);
+                 if (response?.usage) {
+                     const u = response.usage;
+                     return { usage: { in: Number(u.input_tokens || 0), out: Number(u.output_tokens || 0) }, finishReason };
+                 }
              }
              if (finishReason) return { finishReason };
               return null;
@@ -1064,10 +1180,8 @@ Object.assign(ai, {
     async _callClaude(messages, maxTokens, key, stream, onChunk, effective = this.getEffectiveConfig?.() || this.cfg, signal = null, requestOpts = {}) {
         const url = `${effective.baseUrl}/messages`;
         const sys = messages.filter(m => m.role === 'system').map(m => m.content).join('\n');
-        const msgs = messages.filter(m => m.role !== 'system').map(m => ({
-            role: m.role === 'assistant' ? 'assistant' : 'user',
-            content: m.content
-        }));
+        const sourceMessages = messages.filter(m => m.role !== 'system');
+        const msgs = window.searchToolLoop?.mapMessages?.('claude', sourceMessages) || sourceMessages.map(m => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: m.content }));
         const reasoning = this._reasoningRequestOptions(effective, maxTokens);
         const body = {
             model: effective.model,
@@ -1077,6 +1191,9 @@ Object.assign(ai, {
         };
         if (!reasoning.omitTemperature) body.temperature = 0.3;
         if (sys) body.system = sys;
+        const nativeSearch = this._nativeSearchTool(effective, requestOpts);
+        if (nativeSearch) body.tools = [nativeSearch];
+        Object.assign(body, window.searchToolLoop?.requestOptions?.('claude', requestOpts) || {});
         if (stream) body.stream = true;
 
         const res = await fetch(url, {
@@ -1098,10 +1215,19 @@ Object.assign(ai, {
             const d = await res.json();
             const text = (d.content || []).filter(c => c.type === 'text').map(c => c.text).join('');
             this._assertCompleteAiResponse('claude', d, { requireCompleteOutput: requestOpts?.requireCompleteOutput, text });
+            this._emitNativeSearchEvidence(d, effective, requestOpts, (d.content || []).flatMap(item => item?.citations || []));
+            if (requestOpts.returnToolEnvelope) return window.searchToolLoop?.responseEnvelope?.('claude', d, text) || { text, toolCalls: [] };
             return text;
         }
           return this._readSSE(res, onChunk, (json) => {
+              if (json.type === 'content_block_start' && json.content_block?.type === 'text' && Array.isArray(json.content_block?.citations)) {
+                  this._emitNativeSearchEvidence(null, effective, requestOpts, json.content_block.citations);
+              }
+              if (json.type === 'content_block_delta' && json.delta?.type === 'citations_delta' && json.delta?.citation) {
+                  this._emitNativeSearchEvidence(null, effective, requestOpts, [json.delta.citation]);
+              }
               if (json.type === 'content_block_delta' && json.delta?.type === 'text_delta') {
+                  if (Array.isArray(json.delta?.citations)) this._emitNativeSearchEvidence(null, effective, requestOpts, json.delta.citations);
                   return json.delta.text || '';
               }
              return '';
@@ -1118,10 +1244,8 @@ Object.assign(ai, {
     // ---------- Gemini ----------
     async _callGemini(messages, maxTokens, key, stream, onChunk, effective = this.getEffectiveConfig?.() || this.cfg, signal = null, requestOpts = {}) {
         const sys = messages.filter(m => m.role === 'system').map(m => m.content).join('\n');
-        const contents = messages.filter(m => m.role !== 'system').map(m => ({
-            role: m.role === 'assistant' ? 'model' : 'user',
-            parts: [{ text: m.content }]
-        }));
+        const sourceContents = messages.filter(m => m.role !== 'system');
+        const contents = window.searchToolLoop?.mapMessages?.('gemini', sourceContents) || sourceContents.map(m => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] }));
         const action = stream ? `streamGenerateContent?alt=sse&key=${key}` : `generateContent?key=${key}`;
         const url = `${effective.baseUrl}/models/${effective.model}:${action}`;
         const reasoning = this._reasoningRequestOptions(effective, maxTokens);
@@ -1134,6 +1258,9 @@ Object.assign(ai, {
             },
             ...(sys ? { systemInstruction: { parts: [{ text: sys }] } } : {})
         };
+        const nativeSearch = this._nativeSearchTool(effective, requestOpts);
+        if (nativeSearch) body.tools = [nativeSearch];
+        Object.assign(body, window.searchToolLoop?.requestOptions?.('gemini', requestOpts) || {});
         const res = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -1148,10 +1275,16 @@ Object.assign(ai, {
             const d = await res.json();
             const text = d.candidates?.[0]?.content?.parts?.map(p => p.text).join('') || '';
             this._assertCompleteAiResponse('gemini', d, { requireCompleteOutput: requestOpts?.requireCompleteOutput, text });
+            this._emitNativeSearchEvidence(d, effective, requestOpts, (d.candidates || []).flatMap(item => item?.groundingMetadata?.groundingChunks || []).map(chunk => chunk?.web || {}).filter(Boolean));
+            if (requestOpts.returnToolEnvelope) return window.searchToolLoop?.responseEnvelope?.('gemini', d, text) || { text, toolCalls: [] };
             return text;
         }
           return this._readSSE(res, onChunk,
-              (json) => json.candidates?.[0]?.content?.parts?.map(p => p.text).join('') || '',
+              (json) => {
+                  const cited = (json.candidates || []).flatMap(item => item?.groundingMetadata?.groundingChunks || []).map(chunk => chunk?.web || {}).filter(Boolean);
+                  if (cited.length) this._emitNativeSearchEvidence(json, effective, requestOpts, cited);
+                  return json.candidates?.[0]?.content?.parts?.map(p => p.text).join('') || '';
+              },
               (json) => {
                  const meta = json.usageMetadata || null;
                  const finishReason = json.candidates?.[0]?.finishReason || '';
@@ -1255,6 +1388,7 @@ Object.assign(ai, {
                 taskId: 'food.text',
                 messages,
                 maxTokens: 2000,
+                disableNetworkSearch: true,
                 routeOverride: opts?.routeOverride || null,
                 parseOptions: {
                     expected: 'array',
@@ -1267,6 +1401,7 @@ Object.assign(ai, {
             taskId: 'food.text',
             messages,
             maxTokens: 2000,
+            disableNetworkSearch: true,
             routeOverride: opts?.routeOverride || null
         }) : await this.call(messages, 2000);
         return this._parseAiJsonPayload(raw, {
@@ -1331,6 +1466,7 @@ Object.assign(ai, {
                 systemText: sysMsg,
                 imageFile: file,
                 maxTokens: 2000,
+                disableNetworkSearch: true,
                 routeOverride: opts?.routeOverride || null,
                 signal: opts?.signal || null,
                 timeoutMs: opts?.timeoutMs,
@@ -1351,7 +1487,7 @@ Object.assign(ai, {
             return result?.value;
         }
         const result = this.resolveTaskConfig
-            ? await this.run({ ...opts, taskId: 'food.vision', promptText: prompt, imageFile: file, systemText: sysMsg, maxTokens: 2000, returnMeta: true })
+            ? await this.run({ ...opts, taskId: 'food.vision', promptText: prompt, imageFile: file, systemText: sysMsg, maxTokens: 2000, disableNetworkSearch: true, returnMeta: true })
             : await this.callVisionTextImage(prompt, file, 2000, sysMsg, opts);
         const raw = result && typeof result === 'object' && typeof result.text === 'string' ? result.text : result;
         if (result?.meta) opts.onResolvedMeta?.(result.meta);

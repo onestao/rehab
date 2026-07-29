@@ -328,6 +328,7 @@
                 return;
             }
             _aiPhotoBusy = true;
+            this._aiFoodEvidence = [];
             const cfg = window.ai?.resolveTaskConfig?.('food.vision', options?.routeOverride || null)
                 || window.ai?.getEffectiveConfig?.()
                 || {};
@@ -361,6 +362,15 @@
                 this._aiFoodAdded = new Set();
                 const format = typeof this.formatAiDraft === 'function' ? this.formatAiDraft.bind(this) : (v => v);
                 this._aiFoodDrafts = items.map(item => format(item));
+                this._aiFoodSourceTask = 'food.vision';
+                this._aiFoodEvidence = items.map(() => null);
+                const descriptions = items.map(item => [item.name, item.source, item.note, ...(item.ingredients || [])].filter(Boolean).join(' '));
+                const verifyIndexes = window.foodEvidence?.verificationIndexes?.(items, descriptions, 'food.vision', 2) || [];
+                if (verifyIndexes.length) {
+                    this.setDietPhotoStatus('request', '正在查询官方营养信息…', () => controller.abort());
+                    const searchBudget = { remaining: 2 };
+                    await Promise.all(verifyIndexes.map(index => this.verifyAiFood?.(index, { input: descriptions[index], sourceTask: 'food.vision', silent: true, searchBudget })));
+                }
                 this.renderAiFoodResults?.();
                 this.setDietPhotoStatus('done', `AI 已识别 ${items.length} 项，点击逐个添加或批量添加`);
                 window.ai?.clearVisionFailure?.(requestMeta?.provider || cfg.provider, requestMeta?.modelId || cfg.model);
@@ -527,6 +537,7 @@
         renderDietLogItem(f) {
             const name = this.escapeHtml(f.name || '未命名食物');
             const grams = f.grams ? ` ${this.escapeHtml(f.grams)}g` : '';
+            const evidenceHtml = window.searchEvidenceUi?.savedFood?.(f.foodEvidence, value => this.escapeHtml(String(value ?? ''))) || '';
             return `<div class="diet-log-item">
             <div class="diet-log-main">
                 <span class="diet-log-name">${name}${grams}</span>
@@ -539,6 +550,7 @@
                     <button class="delete-btn" onclick="data.deleteFoodLog('${f.id}')"><span class="material-symbols-rounded">delete</span></button>
                 </div>
             </div>
+            ${evidenceHtml}
         </div>`;
         },
 
