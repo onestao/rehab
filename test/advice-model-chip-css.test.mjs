@@ -27,7 +27,7 @@ test('attachment controls use the local image-add icon instead of a window icon'
     assert.match(attachments, /<path d="M19 3H5/);
     assert.doesNotMatch(attachments, /material-symbols-rounded">picture_in_picture_alt/);
     assert.doesNotMatch(attachments, /material-symbols-rounded">visibility/);
-    assert.match(v6Css, /\.advice-image-icon \{[^}]*fill: currentColor;/s);
+    assert.match(baseCss, /\.advice-image-icon \{[^}]*fill: currentColor;/s);
     for (const icon of ['clinical_notes', 'upload_file']) {
         assert.ok(cachedIcons.has(icon), `${icon} must exist in the local icon cache`);
     }

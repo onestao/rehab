@@ -1,4 +1,20 @@
 /* --- Advice / AI Coach --- */
+.advice-image-icon {
+    width: 20px;
+    height: 20px;
+    fill: currentColor;
+    flex: none;
+}
+.advice-attachment-chip > .advice-image-icon {
+    width: 22px;
+    height: 22px;
+    padding: 4px;
+    border-radius: 50%;
+    background: color-mix(in srgb, currentColor 10%, transparent);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
 #ai-coach.page {
     padding: 0 14px 0;
     height: 100%;

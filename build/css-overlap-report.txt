@@ -1335,7 +1335,7 @@ mark.ai-hit
   files: 54-v6-ai.css
     filter: invert(1) (54-v6-ai.css / 54-v6-ai.css)
 
-## COMPLEMENTS (same selector, disjoint properties): 127
+## COMPLEMENTS (same selector, disjoint properties): 126
 .bar-leading
   files: 04-layout-appbar.css, 50-v6-ui.css
 
@@ -1679,9 +1679,6 @@ body.is-paused .fab-play
   files: 54-v6-ai.css
 
 .advice-v6-page .advice-bubble-details
-  files: 54-v6-ai.css
-
-.advice-attachment-chip > .advice-image-icon
   files: 54-v6-ai.css
 
 .setting-row .ico
