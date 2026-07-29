@@ -166,6 +166,7 @@ export function normalizeSearchEvidence(value = {}, options = {}) {
     providerId: text(own(raw, 'providerId'), 128),
     retrievedAt: Math.max(0, Number(own(raw, 'retrievedAt')) || Date.now()),
     sourceType, official,
+    matchTrusted: options.matchTrusted === true,
     match: freeze({
       brand: text(own(own(raw, 'match'), 'brand'), 120), product: text(own(own(raw, 'match'), 'product'), 160),
       market: text(own(own(raw, 'match'), 'market'), 32), serving: text(own(own(raw, 'match'), 'serving'), 120)

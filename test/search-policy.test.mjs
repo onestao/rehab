@@ -8,7 +8,16 @@ import {
   resolveNetworkPolicy,
   safeSearchQuery
 } from '../search-policy-pure.mjs';
-import { calculateFoodTotal, normalizeFoodEvidence, shouldVerifyFoodEvidence } from '../food-evidence-pure.mjs';
+import {
+  calculateFoodTotal,
+  deriveFoodEvidenceTier,
+  foodVerificationSaveDecision,
+  invalidateFoodVerification,
+  normalizeFoodEvidence,
+  shouldVerifyFoodEvidence,
+  validateEvidenceLinks,
+  verificationStateFromEvidence
+} from '../food-evidence-pure.mjs';
 
 test('network policy is offline by default and drops malformed values', () => {
   assert.deepEqual(normalizeNetworkPolicy({}), {
@@ -43,6 +52,8 @@ test('evidence requires HTTPS and cannot self-promote official status', () => {
   assert.equal(normalizeSearchEvidence({ url: 'http://example.com' }), null);
   const item = normalizeSearchEvidence({ url: 'https://example.com/a', official: true, sourceType: 'other' });
   assert.equal(item?.official, false);
+  assert.equal(normalizeSearchEvidence({ url: 'https://mcdonalds.com/a', matchTrusted: true })?.matchTrusted, false);
+  assert.equal(normalizeSearchEvidence({ url: 'https://mcdonalds.com/a' }, { matchTrusted: true })?.matchTrusted, true);
   assert.equal(normalizeSearchEvidence({ url: 'https://other.example.com/a' }, { allowedDomains: ['example.com'] })?.domain, 'other.example.com');
   assert.equal(normalizeSearchEvidence({ url: 'https://example.org/a' }, { allowedDomains: ['example.com'] }), null);
   assert.equal(safeSearchQuery(`a${String.fromCharCode(0)} b`).includes(String.fromCharCode(0)), false);
@@ -67,7 +78,7 @@ test('food evidence calculates DIY removal and does not verify without official 
   assert.equal(total.cal, 450);
   assert.equal(total.pro, 22);
   const evidence = normalizeFoodEvidence({ status: 'verified', confidenceTier: 'official-exact', base: { nutrients: { cal: 100 } }, evidence: [] });
-  assert.equal(evidence.status, 'needs-confirmation');
+  assert.notEqual(evidence.status, 'verified');
 });
 
 test('food evidence calculates replacement and portion changes without inventing a range', () => {
@@ -88,4 +99,73 @@ test('food evidence calculates replacement and portion changes without inventing
   });
   assert.deepEqual(evidence.total.range.cal, []);
   assert.equal(normalizeFoodEvidence({ status: 'estimated', base: {}, requiredUserInput: ['请确认地区'] }).status, 'needs-confirmation');
+});
+
+
+test('food evidence tier is derived from linked trusted evidence instead of model claims', () => {
+  const official = {
+    id: 'official-base', official: true, sourceType: 'official-nutrition', matchTrusted: true,
+    match: { brand: '麦当劳', product: '巨无霸', market: 'CN', serving: '1份' }
+  };
+  const exact = normalizeFoodEvidence({
+    status: 'estimated', confidenceTier: 'vision-estimate',
+    base: { name: '麦当劳巨无霸', market: 'CN', servingLabel: '1份', nutrients: { cal: 500 }, evidenceIds: ['official-base'] },
+    evidence: [official]
+  });
+  assert.equal(exact.confidenceTier, 'official-exact');
+  assert.equal(exact.status, 'verified');
+
+  const unrelated = normalizeFoodEvidence({
+    status: 'verified', confidenceTier: 'official-exact',
+    base: { name: '其他汉堡', nutrients: { cal: 400 } },
+    evidence: [official]
+  });
+  assert.equal(unrelated.confidenceTier, 'vision-estimate');
+  assert.notEqual(unrelated.status, 'verified');
+});
+
+test('official composed requires valid evidence links for every modification', () => {
+  const evidence = [
+    { id: 'base', official: true, sourceType: 'official-nutrition' },
+    { id: 'cheese', official: true, sourceType: 'official-nutrition' }
+  ];
+  const complete = {
+    base: { name: '汉堡', nutrients: { cal: 500 }, evidenceIds: ['base'] },
+    modifications: [{ kind: 'add', label: '芝士', nutrients: { cal: 80 }, evidenceIds: ['cheese'] }],
+    evidence
+  };
+  assert.equal(deriveFoodEvidenceTier(complete), 'official-composed');
+  const missing = normalizeFoodEvidence({
+    status: 'verified', confidenceTier: 'official-composed',
+    ...complete,
+    modifications: [{ kind: 'add', label: '芝士', nutrients: { cal: 80 }, evidenceIds: ['missing'] }]
+  });
+  assert.notEqual(missing.confidenceTier, 'official-composed');
+  assert.equal(missing.status, 'needs-confirmation');
+  assert.deepEqual(validateEvidenceLinks(missing).missingIds, ['missing']);
+});
+
+test('trusted brand market and serving conflicts require confirmation', () => {
+  const result = normalizeFoodEvidence({
+    status: 'verified', confidenceTier: 'official-exact',
+    base: { name: '麦当劳巨无霸', market: 'CN', servingLabel: '1份', nutrients: { cal: 500 }, evidenceIds: ['official'] },
+    evidence: [{
+      id: 'official', official: true, sourceType: 'official-nutrition', matchTrusted: true,
+      match: { brand: '麦当劳', product: '巨无霸', market: 'US', serving: '2份' }
+    }]
+  });
+  assert.equal(result.status, 'needs-confirmation');
+  assert.match(result.requiredUserInput.join(' '), /品牌、地区或规格/);
+});
+
+test('food verification state invalidation cannot be saved until reverified', () => {
+  const pending = verificationStateFromEvidence(null, { required: true });
+  assert.equal(foodVerificationSaveDecision(pending, { fallback: 'fail' }).allowed, false);
+  const verified = verificationStateFromEvidence({ status: 'verified' }, { required: true });
+  assert.equal(foodVerificationSaveDecision(verified, { fallback: 'fail' }).allowed, true);
+  const invalidated = invalidateFoodVerification(verified);
+  assert.deepEqual(invalidated, { required: true, state: 'invalidated', evidence: null });
+  assert.equal(foodVerificationSaveDecision(invalidated, { fallback: 'fail' }).allowed, false);
+  const reverified = verificationStateFromEvidence({ status: 'verified' }, { required: true });
+  assert.equal(foodVerificationSaveDecision(reverified, { fallback: 'fail' }).allowed, true);
 });

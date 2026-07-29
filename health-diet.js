@@ -366,9 +366,15 @@
                 this._aiFoodEvidence = items.map(() => null);
                 const descriptions = items.map(item => [item.name, item.source, item.note, ...(item.ingredients || [])].filter(Boolean).join(' '));
                 const verifyIndexes = window.foodEvidence?.verificationIndexes?.(items, descriptions, 'food.vision', 2) || [];
+                const verifySet = new Set(verifyIndexes);
+                const networkPolicy = window.ai?.getTaskNetworkPolicy?.('food.vision') || {};
+                this._aiFoodVerification = items.map((_, index) => window.foodEvidencePure?.verificationStateFromEvidence?.(null, {
+                    required: networkPolicy.mode === 'required' || verifySet.has(index),
+                    pending: networkPolicy.mode === 'required' || verifySet.has(index)
+                }) || { required: networkPolicy.mode === 'required' || verifySet.has(index), state: networkPolicy.mode === 'required' || verifySet.has(index) ? 'pending' : 'not-required', evidence: null });
                 if (verifyIndexes.length) {
                     this.setDietPhotoStatus('request', '正在查询官方营养信息…', () => controller.abort());
-                    const searchBudget = { remaining: 2 };
+                    const searchBudget = { limit: 2, remaining: 2, attempts: [] };
                     await Promise.all(verifyIndexes.map(index => this.verifyAiFood?.(index, { input: descriptions[index], sourceTask: 'food.vision', silent: true, searchBudget })));
                 }
                 this.renderAiFoodResults?.();

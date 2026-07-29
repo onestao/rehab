@@ -29,6 +29,8 @@ const foodLog = {
             foodSourceTag: this.foodSourceTag,
             aiParseFood: this.aiParseFood,
             verifyAiFood: this.verifyAiFood,
+            aiFoodVerificationState: this.aiFoodVerificationState,
+            aiFoodSaveDecision: this.aiFoodSaveDecision,
             updateAiFoodDraft: this.updateAiFoodDraft,
             renderAiFoodEditor: this.renderAiFoodEditor,
             renderAiFoodResults: this.renderAiFoodResults,
@@ -586,11 +588,18 @@ const foodLog = {
             this._aiFoodResults = items;
             this._aiFoodAdded = new Set();
             this._aiFoodDrafts = items.map(item => this.formatAiDraft(item));
+            this._aiFoodSourceTask = 'food.text';
             this._aiFoodEvidence = items.map(() => null);
             const verifyIndexes = window.foodEvidence?.verificationIndexes?.(items, text, 'food.text', 2) || [];
+            const verifySet = new Set(verifyIndexes);
+            const networkPolicy = aiClient?.getTaskNetworkPolicy?.('food.text') || window.foodEvidence?.policyFor?.('food.text') || {};
+            this._aiFoodVerification = items.map((_, index) => window.foodEvidencePure?.verificationStateFromEvidence?.(null, {
+                required: networkPolicy.mode === 'required' || verifySet.has(index),
+                pending: networkPolicy.mode === 'required' || verifySet.has(index)
+            }) || { required: networkPolicy.mode === 'required' || verifySet.has(index), state: networkPolicy.mode === 'required' || verifySet.has(index) ? 'pending' : 'not-required', evidence: null });
             if (verifyIndexes.length) {
                 if (statusEl) statusEl.textContent = '正在查询官方营养信息…';
-                const searchBudget = { remaining: 2 };
+                const searchBudget = { limit: 2, remaining: 2, attempts: [] };
                 await Promise.all(verifyIndexes.map(index => this.verifyAiFood(index, { input: text, silent: true, searchBudget })));
             }
             this.renderAiFoodResults();
@@ -626,27 +635,39 @@ const foodLog = {
         }
     },
 
-    foodEvidenceBlocksSave(evidence, sourceTask = 'food.text') {
+    aiFoodVerificationState(idx, sourceTask = 'food.text') {
+        const stored = this._aiFoodVerification?.[idx];
+        if (stored) return stored;
+        const policy = window.ai?.getTaskNetworkPolicy?.(sourceTask) || window.foodEvidence?.policyFor?.(sourceTask) || {};
+        return window.foodEvidencePure?.verificationStateFromEvidence?.(this._aiFoodEvidence?.[idx] || null, { required: policy.mode === 'required' })
+            || { required: policy.mode === 'required', state: policy.mode === 'required' ? 'pending' : 'not-required', evidence: this._aiFoodEvidence?.[idx] || null };
+    },
+
+    aiFoodSaveDecision(idx, sourceTask = 'food.text') {
+        const policy = window.ai?.getTaskNetworkPolicy?.(sourceTask) || window.foodEvidence?.policyFor?.(sourceTask) || {};
+        return window.foodEvidencePure?.foodVerificationSaveDecision?.(this.aiFoodVerificationState(idx, sourceTask), policy)
+            || { allowed: policy.mode !== 'required' && !['unavailable', 'needs-confirmation'].includes(this._aiFoodEvidence?.[idx]?.status), reason: '需要先完成联网核实' };
+    },
+
+    foodEvidenceBlocksSave(evidence, sourceTask = 'food.text', idx = -1) {
+        if (idx >= 0) return !this.aiFoodSaveDecision(idx, sourceTask).allowed;
         if (['unavailable', 'needs-confirmation'].includes(evidence?.status)) return true;
         const policy = window.ai?.getTaskNetworkPolicy?.(sourceTask) || window.foodEvidence?.policyFor?.(sourceTask);
-        if (policy?.mode === 'required' && !evidence) return true;
-        return false;
+        return policy?.mode === 'required' && !evidence;
     },
 
     updateAiFoodDraft(idx, field, value) {
         const drafts = this._aiFoodDrafts || [];
         if (!drafts[idx]) return;
         drafts[idx][field] = value;
-        if (this._aiFoodEvidence?.[idx]) {
-            const policy = window.ai?.getTaskNetworkPolicy?.(this._aiFoodSourceTask || 'food.text');
-            this._aiFoodEvidence[idx] = policy?.mode === 'required'
-                ? (window.foodEvidencePure?.normalizeFoodEvidence?.({
-                    status: 'needs-confirmation',
-                    confidenceTier: 'vision-estimate',
-                    base: { name: drafts[idx].name, grams: drafts[idx].grams, nutrients: drafts[idx] },
-                    requiredUserInput: ['内容已修改，请重新联网核实后再保存']
-                }, { required: true }) || { status: 'needs-confirmation' })
-                : null;
+        const sourceTask = this._aiFoodSourceTask || 'food.text';
+        const current = this.aiFoodVerificationState(idx, sourceTask);
+        if (current.required || current.state !== 'not-required' || this._aiFoodEvidence?.[idx]) {
+            this._aiFoodEvidence = this._aiFoodEvidence || [];
+            this._aiFoodEvidence[idx] = null;
+            this._aiFoodVerification = this._aiFoodVerification || [];
+            this._aiFoodVerification[idx] = window.foodEvidencePure?.invalidateFoodVerification?.(current)
+                || { required: true, state: 'invalidated', evidence: null };
             this.renderAiFoodResults();
         }
     },
@@ -657,8 +678,13 @@ const foodLog = {
         this._aiFoodEvidence = this._aiFoodEvidence || [];
         const statusEl = document.getElementById('foodAiStatus');
         if (!options.silent && statusEl) statusEl.textContent = '正在查询官方营养信息…';
-        const evidence = await window.foodEvidence.verify(item, { input: options.input || document.getElementById('foodAiText')?.value || item.name, sourceTask: options.sourceTask === 'food.vision' ? 'food.vision' : 'food.text', searchBudget: options.searchBudget || { remaining: 2 } });
+        const sourceTask = options.sourceTask === 'food.vision' ? 'food.vision' : (this._aiFoodSourceTask || 'food.text');
+        const evidence = await window.foodEvidence.verify(item, { input: options.input || document.getElementById('foodAiText')?.value || item.name, sourceTask, searchBudget: options.searchBudget || { limit: 2, remaining: 2, attempts: [] } });
         this._aiFoodEvidence[idx] = evidence;
+        this._aiFoodVerification = this._aiFoodVerification || [];
+        const previous = this.aiFoodVerificationState(idx, sourceTask);
+        this._aiFoodVerification[idx] = window.foodEvidencePure?.verificationStateFromEvidence?.(evidence, { required: previous.required || true })
+            || { required: true, state: evidence?.status || 'unavailable', evidence: evidence || null };
         if (evidence?.status !== 'unavailable' && evidence?.total?.nutrients && this._aiFoodDrafts?.[idx]) {
             const nutrients = evidence.total.nutrients;
             this._aiFoodDrafts[idx] = { ...this._aiFoodDrafts[idx], cal: Number(nutrients.cal || 0), pro: Number(nutrients.pro || 0), carb: Number(nutrients.carb || 0), fat: Number(nutrients.fat || 0) };
@@ -696,9 +722,10 @@ const foodLog = {
                 const gramsText = draft.grams ? ' ' + this.escapeHtml(String(draft.grams)) + 'g' : '';
                 const summary = `${this.escapeHtml(String(draft.cal || 0))} kcal${draft.pro ? ' · 蛋白' + this.escapeHtml(String(draft.pro)) + 'g' : ''}`;
                 const evidence = this._aiFoodEvidence?.[idx];
+                const verification = this.aiFoodVerificationState(idx, this._aiFoodSourceTask || 'food.text');
                 const evidenceHtml = evidence
                     ? (window.searchEvidenceUi?.foodDetails?.(evidence, idx, value => this.escapeHtml(String(value ?? ''))) || '')
-                    : `<button class="md-btn md-btn-tonal food-evidence-action" type="button" onclick="data.verifyAiFood(${idx})"><span class="material-symbols-rounded">manage_search</span>联网核实</button>`;
+                    : `<button class="md-btn md-btn-tonal food-evidence-action" type="button" onclick="data.verifyAiFood(${idx})"><span class="material-symbols-rounded">manage_search</span>${verification.state === 'invalidated' ? '已编辑，需重新核实' : '联网核实'}</button>`;
                 return `<div class="food-ai-result-card ${added ? 'food-added' : ''}">
                     <div class="food-result-item food-ai-result">
                         <span>${this.escapeHtml(draft.name || item.name)}${gramsText}</span>
@@ -715,7 +742,8 @@ const foodLog = {
 
     addSingleAiFood(idx) {
         const item = this.foodEntry(this._aiFoodDrafts?.[idx] || this._aiFoodResults?.[idx] || {});
-        if (this.foodEvidenceBlocksSave(this._aiFoodEvidence?.[idx], this._aiFoodSourceTask || 'food.text')) return alert('仍有规格、份量或改动项待确认，请补充或重新核实后再保存');
+        const saveDecision = this.aiFoodSaveDecision(idx, this._aiFoodSourceTask || 'food.text');
+        if (!saveDecision.allowed) return alert(saveDecision.reason);
         if (!item.name) return alert('请输入食物名称');
         if (!this._aiFoodAdded) this._aiFoodAdded = new Set();
         if (this._aiFoodAdded.has(idx)) return;
@@ -735,9 +763,11 @@ const foodLog = {
         const meal = this._dietMeal || this.defaultDietMealForTime?.() || 'lunch';
         const addedNow = [];
         const addedLogs = [];
+        const skippedReasons = [];
         items.forEach((item, idx) => {
             if (this._aiFoodAdded.has(idx)) return;
-            if (this.foodEvidenceBlocksSave(this._aiFoodEvidence?.[idx], this._aiFoodSourceTask || 'food.text')) return;
+            const saveDecision = this.aiFoodSaveDecision(idx, this._aiFoodSourceTask || 'food.text');
+            if (!saveDecision.allowed) { skippedReasons.push(saveDecision.reason); return; }
             const entry = this.foodEntry(item);
             if (!entry.name) return;
             addedNow.push(idx);
@@ -750,7 +780,9 @@ const foodLog = {
         });
         this.renderAiFoodResults();
         const statusEl = document.getElementById('foodAiStatus');
-        if (statusEl) statusEl.textContent = addedNow.length ? `已添加 ${addedNow.length} 项 AI 食物` : '这些 AI 食物已全部添加';
+        if (statusEl) statusEl.textContent = skippedReasons.length
+            ? `已添加 ${addedNow.length} 项，跳过 ${skippedReasons.length} 项：${[...new Set(skippedReasons)].join('；')}`
+            : addedNow.length ? `已添加 ${addedNow.length} 项 AI 食物` : '这些 AI 食物已全部添加';
         this.rememberRecentAiFoodAdd(addedLogs);
         this.saveAndBackup();
     },
@@ -799,6 +831,7 @@ const foodLog = {
         this._aiFoodDrafts = [];
         this._aiFoodAdded = null;
         this._aiFoodEvidence = [];
+        this._aiFoodVerification = [];
         const el = document.getElementById('foodAiResults');
         if (el) el.innerHTML = '';
         const statusEl = document.getElementById('foodAiStatus');
