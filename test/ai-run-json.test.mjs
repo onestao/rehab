@@ -69,6 +69,7 @@ function loadApiWithRun(texts) {
         });
         if (!queue.length) throw new Error('unexpected extra model call');
         const next = queue.shift();
+        if (next && typeof next === 'object' && typeof next.before === 'function') await next.before(opts);
         if (next && typeof next === 'object' && next.throw) {
             const err = new Error(next.throw.message || 'fail');
             Object.assign(err, next.throw);
@@ -180,6 +181,47 @@ test('runJson unwraps wrapperKeys once', async () => {
     });
     assert.equal(value.actions[0].name, '台阶下放');
     assert.equal(calls.length, 1);
+});
+
+test('runJson reuses one search budget and disables networking after it is exhausted', async () => {
+    const budget = { limit: 2, remaining: 2, attempts: [] };
+    const policy = { mode: 'auto', execution: 'external-first', fallback: 'local-estimate' };
+    const { ai, calls } = loadApiWithRun([
+        { text: '{"actions":[', before: opts => { opts.searchBudget.remaining = 0; } },
+        goodObject
+    ]);
+    const value = await ai.runJson({
+        taskId: 'rehab.weekly',
+        messages: [{ role: 'user', content: 'x' }],
+        searchBudget: budget,
+        networkPolicy: policy,
+        parseOptions: { expected: 'object', shapeKeys: ['actions'] }
+    });
+    assert.equal(value.actions[0].name, '台阶下放');
+    assert.equal(calls.length, 2);
+    assert.equal(calls[0].opts.searchBudget, budget);
+    assert.equal(calls[1].opts.searchBudget, budget);
+    assert.equal(calls[0].opts.networkPolicy, policy);
+    assert.equal(calls[1].opts.networkPolicy, policy);
+    assert.equal(calls[1].opts.disableNetworkSearch, true);
+    assert.equal(calls[1].opts.disableNativeSearch, true);
+});
+
+test('required runJson does not grant a fresh search budget to JSON retry', async () => {
+    const budget = { limit: 2, remaining: 1, attempts: [] };
+    const { ai, calls } = loadApiWithRun([
+        { text: '{"actions":[', before: opts => { opts.searchBudget.remaining = 0; } },
+        goodObject
+    ]);
+    await assert.rejects(() => ai.runJson({
+        taskId: 'rehab.weekly',
+        messages: [{ role: 'user', content: 'x' }],
+        searchBudget: budget,
+        networkPolicy: { mode: 'required', execution: 'external-only', fallback: 'fail' },
+        parseOptions: { expected: 'object', shapeKeys: ['actions'] }
+    }), error => error?.code === 'SEARCH_TOOL_LIMIT');
+    assert.equal(calls.length, 1);
+    assert.equal(budget.remaining, 0);
 });
 
 test('runJson retries truncated JSON and succeeds with same model and reasoning off', async () => {

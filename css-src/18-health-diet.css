@@ -436,11 +436,20 @@
 .exercise-grid { margin: 0; }
 .manual-ex-list { display: grid; gap: 4px; }
 
-.food-evidence-status,
-.food-evidence-action {
-    margin: 8px 10px 0;
+.food-evidence-panel {
+    display: grid;
+    gap: 10px;
+    margin: 10px;
+    padding: 12px;
+    border: 1px solid var(--glass-border, var(--md-sys-outline-variant));
+    border-radius: 18px;
+    background: var(--glass-bg-strong, var(--md-sys-surface-container-low));
+    box-shadow: var(--glass-shadow-inset), var(--md-sys-elevation-1);
+    backdrop-filter: var(--glass-blur-sm);
+    -webkit-backdrop-filter: var(--glass-blur-sm);
 }
 .food-evidence-status {
+    width: fit-content;
     display: inline-flex;
     align-items: center;
     gap: 5px;
@@ -453,4 +462,69 @@
     font-weight: 700;
 }
 .food-evidence-status .material-symbols-rounded { font-size: 15px; }
-.food-evidence-action { min-height: 36px; font-size: 12px; }
+.food-evidence-line,
+.food-evidence-block {
+    display: grid;
+    gap: 5px;
+    min-width: 0;
+}
+.food-evidence-line {
+    grid-template-columns: minmax(72px, auto) minmax(0, 1fr);
+    align-items: start;
+}
+.food-evidence-line > strong,
+.food-evidence-block > strong {
+    color: var(--md-sys-on-surface);
+    font-size: 12px;
+}
+.food-evidence-line > span,
+.food-evidence-block :is(li, small, em) {
+    color: var(--md-sys-on-surface-variant);
+    font-size: 12px;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+}
+.food-evidence-list {
+    display: grid;
+    gap: 7px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+.food-evidence-list li {
+    display: grid;
+    gap: 2px;
+    padding: 8px 10px;
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--md-sys-surface-container-high) 72%, transparent);
+}
+.food-evidence-list li > span { color: var(--md-sys-on-surface); font-weight: 700; }
+.food-evidence-list li > em { font-style: normal; }
+.food-evidence-sources summary {
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    color: var(--md-sys-primary);
+    font-size: 12px;
+    font-weight: 700;
+}
+.food-evidence-sources ul { margin: 0; padding-inline-start: 20px; }
+.food-evidence-sources a { color: var(--md-sys-primary); overflow-wrap: anywhere; }
+.food-evidence-action {
+    min-height: 44px;
+    justify-self: start;
+    font-size: 12px;
+}
+.food-evidence-saved { margin: 8px 0 0; }
+.food-evidence-saved > summary {
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    font-weight: 700;
+}
+@media (prefers-reduced-motion: reduce) {
+    .food-evidence-panel,
+    .food-evidence-action { transition: none; }
+}

@@ -2401,7 +2401,7 @@ const advicePanel = {
                 attachmentCount: attachments.length
             });
             let full = '';
-            const searchBudget = { remaining: 2 };
+            const searchBudget = { limit: 2, remaining: 2, attempts: [] };
             let searchEvidence = [];
             const unpack = result => {
                 const found = result?.meta?.searchEvidence;

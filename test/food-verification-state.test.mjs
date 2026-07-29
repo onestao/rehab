@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import vm from 'node:vm';
 import * as foodEvidencePure from '../food-evidence-pure.mjs';
+import * as searchPolicyPure from '../search-policy-pure.mjs';
 
 const source = readFileSync(new URL('../food-log.js', import.meta.url), 'utf8');
 
@@ -21,6 +22,7 @@ function load({ policy = { mode: 'required', fallback: 'fail' }, verifyResult = 
   const window = {
     data,
     foodEvidencePure,
+    searchPolicyPure,
     ai: { getTaskNetworkPolicy: () => policy },
     foodEvidence: {
       policyFor: () => policy,
@@ -46,7 +48,7 @@ function seed(data, verification, evidence = null) {
 
 test('required failure stays blocked after an ordinary edit', () => {
   const { data, alerts } = load();
-  seed(data, foodEvidencePure.verificationStateFromEvidence({ status: 'unavailable' }, { required: true }), { status: 'unavailable' });
+  seed(data, searchPolicyPure.verificationStateFromEvidence({ status: 'unavailable' }, { required: true }), { status: 'unavailable' });
   data.updateAiFoodDraft(0, 'grams', '180');
   assert.equal(data._aiFoodEvidence[0], null);
   assert.equal(data._aiFoodVerification[0].state, 'invalidated');
@@ -58,7 +60,7 @@ test('required failure stays blocked after an ordinary edit', () => {
 test('editing verified food invalidates its evidence and save permission', () => {
   const { data } = load();
   const evidence = { status: 'verified', total: { nutrients: { cal: 500, pro: 20 } } };
-  seed(data, foodEvidencePure.verificationStateFromEvidence(evidence, { required: true }), evidence);
+  seed(data, searchPolicyPure.verificationStateFromEvidence(evidence, { required: true }), evidence);
   assert.equal(data.aiFoodSaveDecision(0, 'food.text').allowed, true);
   data.updateAiFoodDraft(0, 'cal', '450');
   assert.equal(data._aiFoodVerification[0].state, 'invalidated');

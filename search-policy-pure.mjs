@@ -174,4 +174,125 @@ export function normalizeSearchEvidence(value = {}, options = {}) {
   });
 }
 
-if (typeof window !== 'undefined') window.searchPolicyPure = { NETWORK_MODES, NETWORK_EXECUTIONS, SOURCE_POLICIES, NETWORK_FALLBACKS, SEARCH_PROVIDER_TYPES, SEARCH_LIMITS, normalizeDomain, normalizeNetworkDefaults, normalizeNetworkPolicy, normalizeSearchProvider, normalizeSearchConfig, normalizeSearchEvidence, resolveNetworkPolicy, safeSearchQuery, classifySearchSource };
+
+const FOOD_VERIFY_TRIGGER = /(?:\b(?:kfc|mcdonald'?s|starbucks|subway|burger\s*king)\b|麦当劳|肯德基|星巴克|瑞幸|喜茶|奈雪|包装|条码|菜单|订单|套餐|去掉|不要|加|换|双倍|半份|核实|来源|最新)/i;
+
+export function shouldVerifyFoodEvidence(input, item = {}, policy = {}) {
+  if (policy?.mode === 'required') return true;
+  if (policy?.mode !== 'auto') return false;
+  const confidence = Number(item?.confidence);
+  const ratio = confidence > 1 ? confidence / 100 : confidence;
+  return FOOD_VERIFY_TRIGGER.test(String(input || '')) || (ratio > 0 && ratio < 0.65);
+}
+
+export function summarizeFoodEvidence(value) {
+  if (!value) return null;
+  const { evidence = [], ...summary } = value;
+  return { ...summary, sources: evidence.map(({ snippet, match, matchTrusted, providerId, retrievedAt, ...source }) => source).slice(0, 20) };
+}
+
+export const FOOD_VERIFICATION_STATES = freeze(['not-required', 'pending', 'verified', 'estimated', 'needs-confirmation', 'unavailable', 'invalidated']);
+
+export function validateFoodEvidenceLinks(value = {}) {
+  const base = value?.base && typeof value.base === 'object' ? value.base : {};
+  const modifications = Array.isArray(value?.modifications) ? value.modifications.slice(0, 20) : [];
+  const evidence = Array.isArray(value?.evidence) ? value.evidence.filter(item => item && typeof item === 'object' && text(item.id, 128)).slice(0, 20) : [];
+  const index = new Map(evidence.map(item => [text(item.id, 128), item]));
+  const resolve = ids => (Array.isArray(ids) ? ids : []).map(id => index.get(text(id, 128))).filter(Boolean);
+  const baseIds = Array.isArray(base.evidenceIds) ? base.evidenceIds : [];
+  const baseMissingIds = baseIds.filter(id => !index.has(text(id, 128)));
+  const modificationLinks = modifications.map((item, itemIndex) => {
+    const ids = Array.isArray(item?.evidenceIds) ? item.evidenceIds : [];
+    const missingIds = ids.filter(id => !index.has(text(id, 128)));
+    return freeze({ index: itemIndex, ids, missingIds: freeze(missingIds), evidence: freeze(resolve(ids)) });
+  });
+  const missingIds = freeze([...new Set([...baseMissingIds, ...modificationLinks.flatMap(item => item.missingIds)])]);
+  return freeze({
+    valid: missingIds.length === 0,
+    completeBase: baseIds.length > 0 && baseMissingIds.length === 0,
+    completeModifications: modifications.every((_, indexValue) => modificationLinks[indexValue].ids.length > 0 && modificationLinks[indexValue].missingIds.length === 0),
+    missingIds,
+    baseEvidence: freeze(resolve(baseIds)),
+    modificationLinks: freeze(modificationLinks),
+    base,
+    modifications,
+    evidence
+  });
+}
+
+function normalizedFoodText(value) { return text(value, 300).toLocaleLowerCase(); }
+function containsFoodIdentity(leftValue, rightValue) {
+  const left = normalizedFoodText(leftValue), right = normalizedFoodText(rightValue);
+  return !!left && !!right && (left.includes(right) || right.includes(left));
+}
+
+export function foodEvidenceMatchConflict(base = {}, item = {}) {
+  if (item?.matchTrusted !== true) return false;
+  const match = item?.match && typeof item.match === 'object' ? item.match : {};
+  if (match.brand && base.name && !containsFoodIdentity(base.name, match.brand)) return true;
+  if (match.product && base.name && !containsFoodIdentity(base.name, match.product)) return true;
+  if (match.market && base.market && normalizedFoodText(match.market) !== normalizedFoodText(base.market)) return true;
+  if (match.serving && base.servingLabel && normalizedFoodText(match.serving) !== normalizedFoodText(base.servingLabel)) return true;
+  const servingGrams = match.serving && /^\s*\d+(?:\.\d+)?\s*g?\s*$/i.test(String(match.serving))
+    ? Number(String(match.serving).match(/\d+(?:\.\d+)?/)?.[0] || 0) : 0;
+  return !!(servingGrams && base.grams && Math.abs(servingGrams - Number(base.grams)) > 0.01);
+}
+
+export function deriveFoodEvidenceTier(value = {}) {
+  const links = validateFoodEvidenceLinks(value);
+  const baseOfficial = links.completeBase && links.baseEvidence.every(item => item.official === true);
+  const modificationsOfficial = links.completeModifications && links.modificationLinks.every(group => group.evidence.every(item => item.official === true));
+  const exact = !links.modifications.length && baseOfficial && links.baseEvidence.some(item => {
+    const match = item?.match && typeof item.match === 'object' ? item.match : {};
+    return item?.matchTrusted === true && !!(match.brand || match.product) && !!(match.serving || links.base.servingLabel || links.base.grams)
+      && !foodEvidenceMatchConflict(links.base, item);
+  });
+  if (exact) return 'official-exact';
+  if (links.modifications.length && baseOfficial && modificationsOfficial) return 'official-composed';
+  const linked = [...links.baseEvidence, ...links.modificationLinks.flatMap(item => item.evidence)];
+  const structured = links.modifications.length > 0 && links.valid
+    && links.modifications.every(item => item.label && (item.kind !== 'portion' || item.portionFactor));
+  return linked.some(item => item.sourceType === 'database') || structured ? 'database-estimate' : 'vision-estimate';
+}
+
+export function verificationStateFromEvidence(evidence, options = {}) {
+  const required = options.required === true;
+  if (options.invalidated === true) return freeze({ required: true, state: 'invalidated', evidence: null });
+  if (options.pending === true) return freeze({ required, state: 'pending', evidence: null });
+  if (!evidence) return freeze({ required, state: required ? 'pending' : 'not-required', evidence: null });
+  const state = ['verified', 'estimated', 'needs-confirmation', 'unavailable'].includes(String(evidence.status))
+    ? String(evidence.status) : (required ? 'needs-confirmation' : 'estimated');
+  return freeze({ required, state, evidence });
+}
+
+export function createFoodVerificationStates(count, verifyIndexes = [], policy = {}) {
+  const requiredIndexes = new Set(Array.isArray(verifyIndexes) ? verifyIndexes.map(Number) : []);
+  return freeze(Array.from({ length: Math.max(0, Number(count) || 0) }, (_, index) => {
+    const required = policy?.mode === 'required' || requiredIndexes.has(index);
+    return verificationStateFromEvidence(null, { required, pending: required });
+  }));
+}
+
+export function invalidateFoodVerification(value = {}) {
+  const required = value?.required === true || String(value?.state || '') !== 'not-required' || !!value?.evidence;
+  return freeze(required
+    ? { required: true, state: 'invalidated', evidence: null }
+    : { required: false, state: 'not-required', evidence: null });
+}
+
+export function foodVerificationSaveDecision(value = {}, policy = {}) {
+  const state = FOOD_VERIFICATION_STATES.includes(String(value?.state || '')) ? String(value.state) : (value?.required ? 'pending' : 'not-required');
+  if (state === 'not-required' || state === 'verified' || (state === 'estimated' && policy?.fallback === 'local-estimate')) {
+    return freeze({ allowed: true, state, reason: '' });
+  }
+  const reason = {
+    pending: '仍在等待联网核实',
+    'needs-confirmation': '仍有规格、份量或改动项待确认',
+    unavailable: '联网核实不可用',
+    invalidated: '内容已编辑，需重新联网核实',
+    estimated: '当前策略不允许保存未核实估算'
+  }[state] || '需要先完成联网核实';
+  return freeze({ allowed: false, state, reason });
+}
+
+if (typeof window !== 'undefined') window.searchPolicyPure = { NETWORK_MODES, NETWORK_EXECUTIONS, SOURCE_POLICIES, NETWORK_FALLBACKS, SEARCH_PROVIDER_TYPES, SEARCH_LIMITS, FOOD_VERIFICATION_STATES, normalizeDomain, normalizeNetworkDefaults, normalizeNetworkPolicy, normalizeSearchProvider, normalizeSearchConfig, normalizeSearchEvidence, resolveNetworkPolicy, safeSearchQuery, classifySearchSource, shouldVerifyFoodEvidence, summarizeFoodEvidence, validateFoodEvidenceLinks, foodEvidenceMatchConflict, deriveFoodEvidenceTier, verificationStateFromEvidence, createFoodVerificationStates, invalidateFoodVerification, foodVerificationSaveDecision };

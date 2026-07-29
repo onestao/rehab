@@ -1,5 +1,6 @@
 // @ts-nocheck
 import * as aiJsonPure from '../ai-json-pure.mjs';
+import * as searchPolicyPure from '../search-policy-pure.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
@@ -33,6 +34,7 @@ function createSandbox(elements = {}) {
             haptics: { error() {}, light() {}, success() {} },
             toast: { sanitize: (error) => String(error?.message || error || ''), show() {} },
             aiJsonPure: aiJsonPure.default || aiJsonPure,
+            searchPolicyPure,
         },
     };
     sandbox.globalThis = sandbox;

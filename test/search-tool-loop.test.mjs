@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import vm from 'node:vm';
+import * as aiJsonPure from '../ai-json-pure.mjs';
 
 const loopSource = readFileSync(new URL('../search-tool-loop.js', import.meta.url), 'utf8');
 const apiSource = readFileSync(new URL('../ai-api.js', import.meta.url), 'utf8');
@@ -13,6 +14,7 @@ function harness({ providerIds = ['search_one'], adapter } = {}) {
     { id: 'search_two', enabled: true, archived: false, sortOrder: 1 }
   ];
   const root = {
+    aiJsonPure,
     searchPolicyPure: { safeSearchQuery: value => String(value || '').trim() },
     searchStore: { config: { networkDefaults: { maxToolCalls: 2, maxResultChars: 12000 } } },
     searchRegistry: { select: policy => providers.filter(provider => providerIds.includes(provider.id) && policy.providerIds?.includes(provider.id)), nativeUsable: effective => effective.capabilities?.webSearch === true },
@@ -131,6 +133,76 @@ test('ai.run routes required external-only tasks through the shared tool loop', 
   assert.equal(result.text, 'verified');
   assert.equal(result.meta.searchEvidence.length, 1);
   assert.equal(requestCount, 2);
+});
+
+test('advice.vision external-only uses hidden vision context before the text search loop', async () => {
+  const { root, context } = harness();
+  const ai = {
+    cfg: {},
+    getTaskRequestSequence() {
+      return [{ enabled: true, provider: 'openai', model: 'vision-model', modelId: 'vision-model', profileId: 'p1', capabilities: {}, network: { mode: 'required', execution: 'external-only', providerIds: ['search_one'], fallback: 'fail' } }];
+    }
+  };
+  context.ai = ai; root.ai = ai; root.aiRoutingPure = { isRetryableAiError: () => false };
+  vm.runInNewContext(apiSource, context);
+  let visionCalls = 0;
+  ai.callAdviceWithAttachments = async (messages, attachments, _maxTokens, options) => {
+    visionCalls += 1;
+    assert.equal(options.disableNetworkSearch, true);
+    assert.equal(attachments.length, 1);
+    assert.equal(messages.some(message => String(message.content || '').includes('old history')), false);
+    return JSON.stringify({ query: 'shoulder sprain cold compress guidance', imageContext: 'Visible shoulder support; no open wound', uncertainties: ['pain severity unknown'] });
+  };
+  let modelCalls = 0;
+  ai.call = async (messages, _maxTokens, options) => {
+    modelCalls += 1;
+    assert.equal(options.disableNativeSearch, true);
+    if (modelCalls === 1) {
+      const payload = JSON.parse(messages.find(message => message.role === 'user').content);
+      assert.equal(payload.query, 'shoulder sprain cold compress guidance');
+      assert.match(payload.imageContext, /shoulder support/);
+      return { text: '', toolCalls: [{ id: 'vision-search', name: 'search_web', arguments: { query: payload.query } }] };
+    }
+    assert.equal(messages.some(message => message.role === 'tool'), true);
+    return { text: '基于来源的非诊断性建议', toolCalls: [] };
+  };
+  const result = await ai.run({
+    taskId: 'advice.vision',
+    messages: [
+      { role: 'user', content: 'old history' },
+      { role: 'assistant', content: 'old answer' },
+      { role: 'user', content: '这张图应该怎么处理？' }
+    ],
+    attachments: [{ kind: 'image', file: {} }],
+    searchBudget: { limit: 2, remaining: 2, attempts: [] },
+    returnMeta: true
+  });
+  assert.equal(visionCalls, 1);
+  assert.equal(modelCalls, 2);
+  assert.equal(result.text, '基于来源的非诊断性建议');
+  assert.equal(result.meta.searchEvidence.length, 1);
+});
+
+test('advice.vision required external search does not disguise context extraction failure as offline advice', async () => {
+  const { root, context } = harness();
+  const ai = {
+    cfg: {},
+    getTaskRequestSequence() {
+      return [{ enabled: true, provider: 'openai', model: 'vision-model', modelId: 'vision-model', profileId: 'p1', capabilities: {}, network: { mode: 'required', execution: 'external-only', providerIds: ['search_one'], fallback: 'fail' } }];
+    }
+  };
+  context.ai = ai; root.ai = ai; root.aiRoutingPure = { isRetryableAiError: () => false };
+  vm.runInNewContext(apiSource, context);
+  let visionCalls = 0;
+  ai.callAdviceWithAttachments = async () => { visionCalls += 1; return 'not json'; };
+  ai.call = async () => { throw new Error('text search must not start'); };
+  await assert.rejects(() => ai.run({
+    taskId: 'advice.vision',
+    messages: [{ role: 'user', content: '看图给建议' }],
+    attachments: [{ kind: 'image', file: {} }],
+    searchBudget: { limit: 2, remaining: 2, attempts: [] }
+  }), error => error?.code === 'SEARCH_IMAGE_CONTEXT_FAILED');
+  assert.equal(visionCalls, 1);
 });
 
 test('ai.run falls back from unsupported native-first to external search', async () => {

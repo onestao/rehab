@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import vm from 'node:vm';
-import { normalizeFoodEvidence, shouldVerifyFoodEvidence } from '../food-evidence-pure.mjs';
+import { normalizeFoodEvidence } from '../food-evidence-pure.mjs';
+import { shouldVerifyFoodEvidence } from '../search-policy-pure.mjs';
 
 const source = readFileSync(new URL('../food-evidence.js', import.meta.url), 'utf8');
 
@@ -27,7 +28,8 @@ function load({ policy, evidence = [] } = {}) {
   const window = {
     ai,
     aiRoutingPure: { manualFallbackTarget: value => value },
-    foodEvidencePure: { normalizeFoodEvidence, shouldVerifyFoodEvidence }
+    searchPolicyPure: { shouldVerifyFoodEvidence },
+    foodEvidencePure: { normalizeFoodEvidence }
   };
   vm.runInNewContext(source, { window, console, JSON, String, Number, Object, Array });
   return { api: window.foodEvidence, ai, calls };

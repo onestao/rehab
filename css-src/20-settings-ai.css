@@ -201,7 +201,22 @@
 .ai-task-network-advanced { display: grid; gap: 10px; }
 .ai-task-network-advanced summary { cursor: pointer; color: var(--md-sys-primary); font-size: 13px; font-weight: 700; }
 .ai-task-network-providers { display: grid; gap: 7px; }
-.ai-task-network-provider { display: flex; align-items: center; gap: 8px; min-height: 36px; font-size: 13px; }
+.ai-task-network-provider { display: flex; align-items: center; gap: 8px; min-height: 44px; font-size: 13px; }
+.ai-task-network-provider > span:not(.ai-task-network-provider-order) { min-width: 0; flex: 1; overflow-wrap: anywhere; }
+.ai-task-network-provider-order { display: inline-flex; gap: 4px; margin-inline-start: auto; }
+.ai-task-network-provider-order .md-icon-btn { width: 44px; height: 44px; }
+.ai-task-network-capability {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 8px;
+    padding: 10px;
+    border: 1px solid var(--glass-border);
+    border-radius: var(--md-sys-shape-md);
+    background: var(--glass-bg);
+}
+.ai-task-network-capability > .material-symbols-rounded { color: var(--md-sys-primary); }
+.ai-task-network-capability > .md-btn { grid-column: 1 / -1; min-height: 44px; justify-self: start; }
 .ai-task-network-domains { width: 100%; resize: vertical; box-sizing: border-box; border: 1px solid var(--md-sys-outline); border-radius: var(--md-sys-shape-md); background: var(--md-sys-surface-container-lowest); color: var(--md-sys-on-surface); padding: 9px; font: inherit; }
 
 .ai-settings-section {

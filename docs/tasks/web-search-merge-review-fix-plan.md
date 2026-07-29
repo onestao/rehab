@@ -1,24 +1,21 @@
 # AI 联网检索合并复审修复计划
 
 > 日期：2026-07-29  
-> 状态：待实施，完成前不建议合并  
+> 状态：非 Playwright 修复已实施；浏览器复审待安装 Playwright msedge
 > 实施分支：`perfrom`  
-> 固定审阅基线：`perfrom`（当前实现仍位于未提交工作区）  
+> 固定审阅基线：`perfrom`
 > 原始规格：`docs/tasks/web-search-integration-design.md`  
-> 当前版本：v388  
-> 当前门禁：`npm run ci`、940 项测试、CSS/HTML safety/size-limit、版本检查和 `git diff --check` 均通过  
+> 当前版本：v391
+> 当前门禁：lint、typecheck、939 项非 Playwright 测试、CSS/HTML safety/size-limit、版本检查和 `git diff --check` 均通过；浏览器测试因本机未安装 Playwright msedge 未执行
 > 目标：关闭合并复审剩余的 5 个 P1 与 4 个 P2 规格缺口，并补齐能证明行为闭环的回归测试。
 
 ## 1. 当前结论
 
-工程门禁已经恢复，但功能仍不能进入合并。剩余问题集中在四类边界：
+本轮已关闭合并复审列出的 5 个 P1 与 4 个 P2 非浏览器缺口，并恢复 lint、typecheck、Node 测试、CSS、HTML safety、size-limit、版本和 diff 门禁。
 
-1. 食物 required 核实状态可以通过编辑被隐式清除，且“官方数据”等级仍可由模型间接自报。
-2. 搜索预算只在部分调用链共享，JSON 重试和供应商故障转移仍可能突破每次用户动作最多 2 次的限制。
-3. 外部供应商的有序后备可以被模型传入的 `providerId` 绕过，任务级供应商选择和排序 UI 也没有形成可靠状态。
-4. 图片健康建议的外部搜索路径、官方优先排序、DIY 数值证据链及首次联网/能力恢复 UI 尚未完成。
+当前仍不宣告最终合并完成：本机未安装 Playwright 的 `msedge` 分发，浏览器导航、焦点、窄屏和真实交互复审尚未执行。该环境缺失不会被伪装为代码通过，也不影响本轮“修复非 Playwright 测试问题”的完成判断。
 
-以下 9 项均属于本计划范围：
+以下 9 项为本轮关闭范围：
 
 | 编号 | 优先级 | 问题 | 主要文件 |
 |---|---|---|---|
@@ -31,6 +28,20 @@
 | F7 | P2 | 任务级多供应商选择与排序错误 | `ai-task-settings.js`、`search-registry.js` |
 | F8 | P2 | 食物 DIY 证据卡缺少数值变化 | `search-evidence-ui.js`、`18-health-diet.css` |
 | F9 | P2 | 首次联网说明及能力恢复路径缺失 | `ai-task-settings.js`、`search-registry.js` |
+
+## 1.1 本轮实施结果（v391）
+
+- [x] F1：新增独立食物核实状态，required 失败或已核实条目编辑后进入 `invalidated`，单项与批量保存共用同一判定。
+- [x] F2：官方等级改由有效证据 ID、官方性和可信匹配关系确定，模型自报等级不再提升结果。
+- [x] F3：模型 `providerId` 不再参与候选选择，外部供应商严格按任务顺序逐请求扣减预算。
+- [x] F4：`run()` fallback 与 `runJson()` JSON 重试共享同一搜索预算；预算耗尽后 required 路径返回 `SEARCH_TOOL_LIMIT`。
+- [x] F5：`advice.vision` external-only 接入隐藏的图片上下文提取 → 文本搜索工具循环两阶段路径，并保留统一来源。
+- [x] F6：`official-preferred` 使用稳定分组排序，官方结果优先且组内顺序不变。
+- [x] F7：任务级供应商可连续选择、上移/下移，并显示禁用、归档和已删除引用。
+- [x] F8：食物证据卡统一展示基础值、add/remove/replace/portion 数值变化、合计、假设和安全来源。
+- [x] F9：首次启用说明仅保存在本地偏好；不同任务显示准确隐私文案，并提供原生能力原因与恢复操作。
+
+本轮验证聚焦非 Playwright 门禁。浏览器测试仍需在安装 `msedge` 后单独执行，未将其缺失视为代码失败，也未据此标记整份合并复审完全结束。
 
 ## 2. 实施边界
 

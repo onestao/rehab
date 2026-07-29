@@ -6,7 +6,7 @@
             ? root.ai.getTaskNetworkPolicy?.('food.verify', explicit)
             : root.ai?.getTaskNetworkPolicy?.(sourceTask);
     }
-    function shouldVerify(input, item, policy) { return root.foodEvidencePure?.shouldVerifyFoodEvidence?.(input, item, policy) === true; }
+    function shouldVerify(input, item, policy) { return root.searchPolicyPure?.shouldVerifyFoodEvidence?.(input, item, policy) === true; }
     function verificationIndexes(items = [], input = '', sourceTask = 'food.text', limit = 2) {
         const values = Array.isArray(input) ? input : items.map(() => input);
         const policy = policyFor(sourceTask);

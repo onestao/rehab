@@ -62,7 +62,10 @@
             }, { allowedDomains: domains })).filter(Boolean);
             let filtered = sourcePolicy === 'official-only' ? normalized.filter(item => item.official) : normalized;
             if (sourcePolicy === 'official-preferred') {
-                filtered = [...filtered].sort((a, b) => Number(b.official === true) - Number(a.official === true));
+                filtered = [
+                    ...filtered.filter(item => item.official === true),
+                    ...filtered.filter(item => item.official !== true)
+                ];
             }
             root.searchRegistry?.mark?.(provider.id, true);
             return filtered;

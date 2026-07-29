@@ -1335,7 +1335,7 @@ mark.ai-hit
   files: 54-v6-ai.css
     filter: invert(1) (54-v6-ai.css / 54-v6-ai.css)
 
-## COMPLEMENTS (same selector, disjoint properties): 126
+## COMPLEMENTS (same selector, disjoint properties): 127
 .bar-leading
   files: 04-layout-appbar.css, 50-v6-ui.css
 
@@ -1375,7 +1375,10 @@ mark.ai-hit
 .food-edit-actions .md-btn-filled
   files: 18-health-diet.css
 
-.food-evidence-status
+.food-evidence-panel
+  files: 18-health-diet.css
+
+.food-evidence-line
   files: 18-health-diet.css
 
 .food-evidence-action

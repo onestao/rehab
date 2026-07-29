@@ -132,7 +132,7 @@
             if (sawEmpty && strictEmpty) throw error('SEARCH_NO_RESULTS', '未找到符合来源策略的检索结果');
             return [];
         },
-        async executeTask({ effective = {}, messages = [], maxTokens = 2000, requestOpts = {}, disableNetworkSearch = false, hasImage = false, direct, requestModel, getEvidence } = {}) {
+        async executeTask({ effective = {}, messages = [], maxTokens = 2000, requestOpts = {}, disableNetworkSearch = false, hasImage = false, direct, requestModel, getEvidence, prepareExternalMessages } = {}) {
             if (typeof direct !== 'function') throw error('SEARCH_MODEL_REQUIRED', '模型调用器不可用');
             const policy = effective.network || { mode: 'off', execution: 'native-first', fallback: 'local-estimate' };
             const nativeSupported = root.searchRegistry?.nativeUsable?.(effective) === true;
@@ -142,7 +142,12 @@
             const requiresEvidence = !disableNetworkSearch && policy.mode !== 'off' && strict;
             const external = async () => {
                 if (!externalAllowed || typeof requestModel !== 'function') throw error('SEARCH_DISABLED', '外部联网检索不可用');
-                const result = await this.run({ messages, policy, requestModel, budget: requestOpts.searchBudget });
+                let toolMessages = messages;
+                if (typeof prepareExternalMessages === 'function') {
+                    try { toolMessages = await prepareExternalMessages(); }
+                    catch (cause) { throw error('SEARCH_IMAGE_CONTEXT_FAILED', '无法从图片提取安全的检索上下文'); }
+                }
+                const result = await this.run({ messages: toolMessages, policy, requestModel, budget: requestOpts.searchBudget });
                 return { text: result.text, evidence: result.evidence || [], external: true };
             };
             const tryExternal = async () => {

@@ -8,16 +8,15 @@ import {
   resolveNetworkPolicy,
   safeSearchQuery
 } from '../search-policy-pure.mjs';
+import { calculateFoodTotal, normalizeFoodEvidence } from '../food-evidence-pure.mjs';
 import {
-  calculateFoodTotal,
   deriveFoodEvidenceTier,
   foodVerificationSaveDecision,
   invalidateFoodVerification,
-  normalizeFoodEvidence,
-  shouldVerifyFoodEvidence,
-  validateEvidenceLinks,
-  verificationStateFromEvidence
-} from '../food-evidence-pure.mjs';
+  validateFoodEvidenceLinks,
+  verificationStateFromEvidence,
+  shouldVerifyFoodEvidence
+} from '../search-policy-pure.mjs';
 
 test('network policy is offline by default and drops malformed values', () => {
   assert.deepEqual(normalizeNetworkPolicy({}), {
@@ -142,7 +141,7 @@ test('official composed requires valid evidence links for every modification', (
   });
   assert.notEqual(missing.confidenceTier, 'official-composed');
   assert.equal(missing.status, 'needs-confirmation');
-  assert.deepEqual(validateEvidenceLinks(missing).missingIds, ['missing']);
+  assert.deepEqual(validateFoodEvidenceLinks(missing).missingIds, ['missing']);
 });
 
 test('trusted brand market and serving conflicts require confirmation', () => {
