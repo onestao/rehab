@@ -169,7 +169,7 @@
                     });
                     const parsed = result?.value || null;
                     if (!parsed || typeof parsed !== 'object') {
-                        const err = new Error('AI 返回的 JSON 缺少当前功能所需字段，请切换模型后重试。');
+                        const err = new Error('AI 返回不完整，请切换后重试。');
                         err.code = 'AI_JSON_SHAPE_MISMATCH';
                         throw err;
                     }
@@ -184,7 +184,7 @@
                         suggestions: Array.isArray(parsed.suggestions) ? parsed.suggestions.map(String).filter(Boolean).slice(0, 3) : []
                     };
                     if (!ai.summary) {
-                        const err = new Error('AI 返回的 JSON 缺少当前功能所需字段，请切换模型后重试。');
+                        const err = new Error('AI 返回不完整，请切换后重试。');
                         err.code = 'AI_JSON_SHAPE_MISMATCH';
                         throw err;
                     }
@@ -192,6 +192,7 @@
                     ai.profileId = resultMeta.profileId || '';
                     ai.reasoningEffort = resultMeta.reasoningEffort || '';
                     ai.fallback = resultMeta.fallback || null;
+                    ai.searchEvidence = resultMeta.searchEvidence;
                     ai.prompt_id = kind === 'monthly' ? 'monthly_report' : 'weekly_report';
                 } catch (err) {
                     const message = String(err?.message || err || 'AI 复盘失败');
@@ -309,6 +310,7 @@
                 <section class="weight-report-ai"><h4>总结</h4><p>${esc(ai.summary || '暂无总结')}</p></section>
                 ${highlights.length ? `<section class="weight-report-ai"><h4>亮点</h4>${highlights.slice(0, 3).map(x => `<p>${esc(x)}</p>`).join('')}</section>` : ''}
                 ${suggestions.length ? `<section class="weight-report-ai"><h4>建议</h4>${suggestions.slice(0, 3).map(x => `<p>${esc(x)}</p>`).join('')}</section>` : ''}
+                ${window.searchEvidenceUi.trail(version.searchEvidence, esc)}
                 <div data-ai-task-picker="${report.kind === 'monthly' ? 'report.weight.monthly' : 'report.weight.weekly'}"></div>
                 <div class="weight-report-actions">
                     <button class="md-btn md-btn-tonal" onclick="data.generateReport('${esc(report.kind)}', '${esc(report.periodStart)}', { useAi: true })" type="button">用当前模型重新生成</button>

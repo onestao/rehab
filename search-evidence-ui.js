@@ -11,11 +11,15 @@
         }[evidence?.confidenceTier]?.reduce((result, value, index) => ({ ...result, [index ? 'label' : 'icon']: value }), {}) || { icon: 'data_thresholding', label: '估算，建议确认' };
     };
     const sourcesOf = value => (Array.isArray(value) ? value : value?.evidence || value?.sources || []).filter(item => String(item?.url || '').startsWith('https://'));
-    const normalizeSources = value => sourcesOf(value).slice(0, 20).map(item => ({ title: String(item.title || '').slice(0, 300), url: String(item.url).slice(0, 2048), domain: String(item.domain || '').slice(0, 253), official: item.official === true, sourceType: String(item.sourceType || 'other') }));
+    const normalizeSources = value => sourcesOf(value).slice(0, 20).map(item => ({ title: String(item.title || '').slice(0, 300), url: String(item.url).slice(0, 2048), domain: String(item.domain || '').slice(0, 253), official: item.official === true, sourceType: String(item.sourceType || 'other'), readStatus: item.readStatus === 'deep-read' ? 'deep-read' : 'summary' }));
     const sourceTrail = (value, esc, className = 'advice-source-trail') => {
         const sources = sourcesOf(value);
-        return sources.length ? `<details class="${className}"><summary>联网来源 · ${sources.length}</summary><ul>${sources.map(item => `<li><a href="${esc(item.url)}" target="_blank" rel="noopener noreferrer">${esc(item.title || item.domain || '来源')}</a></li>`).join('')}</ul></details>` : '';
+        return sources.length ? `<details class="${className}"><summary>联网来源 · ${sources.length}</summary><ul>${sources.map(item => `<li><a href="${esc(item.url)}" target="_blank" rel="noopener noreferrer">${esc(item.title || item.domain || '来源')}</a><small class="search-source-read-status">${item.readStatus === 'deep-read' ? '已深读' : '仅摘要'}</small></li>`).join('')}</ul></details>` : '';
     };
+    const trail = (value, esc) => sourceTrail(value, esc);
+    const summary = (value, taskId = '') => Array.from(root.searchPolicyPure?.summarizeSearchEvidence?.(value, { taskId }) || []);
+    const attach = (target, value, taskId) => (target.searchEvidence = summary(value, taskId), target);
+    const version = payload => root.searchPolicyPure.searchEvidenceVersion(payload);
     const numeric = value => Number.isFinite(Number(value)) ? Number(value) : 0;
     const plainNumber = value => Number(numeric(value).toFixed(2)).toString();
     const signed = value => `${numeric(value) < 0 ? '−' : '+'}${plainNumber(Math.abs(numeric(value)))}`;
@@ -71,5 +75,5 @@
             <button class="md-btn md-btn-tonal food-evidence-action" type="button" onclick="data.verifyAiFood(${safeIndex})"><span class="material-symbols-rounded">refresh</span>重新核实</button></div>`;
     };
     const savedFood = (evidence, esc) => evidence ? `<details class="food-evidence-panel food-evidence-saved"><summary>${esc(foodMeta(evidence).label)}</summary>${sharedFoodBody(evidence, esc)}</details>` : '';
-    root.searchEvidenceUi = { foodMeta, foodDetails, savedFood, sourceTrail, normalizeSources, modificationText, nutrientSummary };
+    root.searchEvidenceUi = { foodMeta, foodDetails, savedFood, sourceTrail, trail, summary, attach, version, normalizeSources, modificationText, nutrientSummary };
 })(window);

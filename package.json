@@ -16,6 +16,7 @@
     "test": "node --test test/*.test.mjs",
     "test:unit": "node --test --test-force-exit test/*.test.mjs",
     "test:browser:lazyload": "node --test --test-force-exit test/plan-feature-gate.browser.test.mjs test/deep-link-nav.browser.test.mjs test/ensure-deps-side-effects.browser.test.mjs test/modal-a11y.browser.test.mjs test/today-ai-picker-readiness.browser.test.mjs",
+    "test:browser:web-search": "node --test --test-force-exit test/web-search-capabilities.browser.test.mjs",
     "test:evidence:lazyload": "node scripts/verify-lazyload-repair-evidence.mjs",
     "test:deps": "node --test --test-force-exit test/deps-closure.test.mjs test/entry-loaded-seed.test.mjs test/method-owner-registry.test.mjs test/data-ready-barrier.test.mjs test/offline-essential-closure.test.mjs",
     "test:browser:lifecycle": "node --test --test-force-exit test/route-lifecycle-leak.browser.test.mjs",

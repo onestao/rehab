@@ -503,31 +503,26 @@
         const selected = reasoningMeta(current);
         const button = el('button', `ai-reasoning-trigger is-${current}`);
         button.type = 'button';
+        button.dataset.label = selected.title === '\u5173\u95ed' ? '\u4e0d\u63a8\u7406' : `\u63a8\u7406${selected.title}`;
         button.append(icon(selected.icon));
         button.setAttribute('aria-label', `\u63a8\u7406\u5f3a\u5ea6\uff1a${selected.label}`);
-        button.title = `\u63a8\u7406\u5f3a\u5ea6\uff1a${selected.label}`;
         button.addEventListener('click', () => openReasoningMenu(route, models, save));
         return button;
     }
 
-    function networkMeta(policy) {
-        const mode = text(policy?.mode).toLowerCase();
-        if (mode === 'required') return { mode, icon: 'manage_search', label: '\u672c\u6b21\u5148\u6838\u5b9e' };
-        if (mode === 'auto') return { mode, icon: 'auto_awesome', label: '\u9700\u8981\u65f6\u8054\u7f51' };
-        return { mode: 'off', icon: 'cloud_off', label: '\u4e0d\u8054\u7f51' };
-    }
-
     function createNetworkControl(taskId, route, save) {
         const current = root.ai?.getTaskNetworkPolicy?.(taskId, route) || { mode: 'off' };
-        const meta = networkMeta(current);
-        const button = el('button', `ai-network-trigger is-${meta.mode}`);
+        const modes = ['off', 'auto', 'required'];
+        const rawMode = text(current.mode).toLowerCase();
+        const mode = modes.includes(rawMode) ? rawMode : 'off';
+        const [glyph, label] = mode === 'required' ? ['verified', '\u5148\u6838\u5b9e'] : mode === 'auto' ? ['search', '\u6309\u9700\u641c'] : ['cloud_off', '\u4e0d\u8054\u7f51'];
+        const button = el('button', `ai-network-trigger is-${mode}`);
         button.type = 'button';
-        button.append(icon(meta.icon));
-        button.setAttribute('aria-label', `\u8054\u7f51\u68c0\u7d22\uff1a${meta.label}`);
-        button.title = `\u8054\u7f51\u68c0\u7d22\uff1a${meta.label}`;
+        button.dataset.label = label;
+        button.append(icon(glyph));
+        button.setAttribute('aria-label', `\u8054\u7f51\u68c0\u7d22\uff1a${label}`);
         button.addEventListener('click', () => {
-            const modes = ['off', 'auto', 'required'];
-            const nextMode = modes[(modes.indexOf(meta.mode) + 1) % modes.length];
+            const nextMode = modes[(modes.indexOf(mode) + 1) % modes.length];
             save({ ...route, network: { ...current, mode: nextMode } });
         });
         return button;
@@ -560,16 +555,19 @@
         const save = nextRoute => saveRoute(definition.id, nextRoute, row);
         const quick = el('div', 'ai-task-quick-controls');
         quick.append(createCompactModelControl(definition.id, models, route, save));
-        quick.append(createReasoningControl(route, models, save));
-        if (definition.id.startsWith('food.') || route?.network) quick.append(createNetworkControl(definition.id, route, save));
+        const utility = el('div', 'ai-task-utility-controls');
+        utility.append(createReasoningControl(route, models, save));
+        if (definition.id.startsWith('food.') || route?.network) utility.append(createNetworkControl(definition.id, route, save));
         if (definition.allowFallbacks !== false) {
             const more = el('button', `ai-task-route-more ${routeFallback(route) ? 'has-fallback' : ''}`);
             more.type = 'button';
-            more.setAttribute('aria-label', '\u5b8c\u6574\u6a21\u578b\u8bbe\u7f6e');
-            more.append(icon('compare_arrows'));
+            more.dataset.label = '\u8bbe\u7f6e';
+            more.setAttribute('aria-label', '\u6a21\u578b\u8bbe\u7f6e');
+            more.append(icon('tune'));
             more.addEventListener('click', () => openTaskSettingsSheet(definition, route, models));
-            quick.append(more);
+            utility.append(more);
         }
+        quick.append(utility);
         controls.append(quick);
         row.append(meta, controls);
         return row;

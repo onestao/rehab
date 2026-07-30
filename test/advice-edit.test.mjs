@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
+import { summarizeSearchEvidence } from '../search-policy-pure.mjs';
 
 function loadAdvicePanelHarness() {
     const context = {
@@ -1253,6 +1254,26 @@ test('sendAiAdvice uses larger output budget and auto-continues length replies o
     assert.equal(reply.tokenUsage.in, 16);
     assert.equal(reply.tokenUsage.out, 8202);
     assert.equal(reply.pending, false);
+});
+
+test('sendAiAdvice persists citation summaries without deep-read body content', async () => {
+    const data = loadAdvicePanelHarness();
+    data.db.health.aiAdviceChat = [];
+    data.__context.window.searchPolicyPure = { summarizeSearchEvidence };
+    data.__context.ai.runStream = async () => ({
+        text: 'grounded answer',
+        meta: { searchEvidence: [{
+            id: 'ev', title: 'Guide', url: 'https://example.com/guide',
+            contentExcerpt: 'full page body must remain transient', contentType: 'text/markdown', readStatus: 'deep-read'
+        }] }
+    });
+
+    await data.sendAiAdvice('use the guide');
+
+    const source = data.db.health.aiAdviceChat.find(msg => msg.role === 'assistant').searchEvidence[0];
+    assert.equal(source.readStatus, 'deep-read');
+    assert.equal(Object.hasOwn(source, 'contentExcerpt'), false);
+    assert.equal(Object.hasOwn(source, 'contentType'), false);
 });
 
 test('sendAiAdvice keeps length finish reason when auto-continue also reaches limit', async () => {

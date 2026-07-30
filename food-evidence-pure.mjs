@@ -12,6 +12,8 @@ const NUTRIENTS = Object.freeze(['cal', 'pro', 'carb', 'fat', 'fiber', 'sugar', 
 const own = (value, key) => { try { return value && typeof value === 'object' && !Array.isArray(value) && Object.getOwnPropertyDescriptor(value, key)?.value; } catch { return undefined; } };
 const text = (value, max = 300) => typeof value === 'string' ? value.trim().slice(0, max) : '';
 const number = value => Number.isFinite(Number(value)) ? Math.max(0, Math.min(100000, Number(Number(value).toFixed(2)))) : 0;
+import { stripSearchEvidenceBody as stripEvidence } from './search-policy-pure.mjs';
+
 const freeze = Object.freeze;
 
 export function normalizeNutrients(value = {}) {
@@ -65,7 +67,8 @@ export function calculateFoodTotal(base, modifications = []) {
 
 export function normalizeFoodEvidence(value = {}, options = {}) {
   const raw = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
-  const evidence = freeze((Array.isArray(own(raw, 'evidence')) ? own(raw, 'evidence') : []).filter(item => item && typeof item === 'object' && text(item.id, 128)).slice(0, 20));
+  const evidence = freeze((Array.isArray(own(raw, 'evidence')) ? own(raw, 'evidence') : [])
+    .filter(item => item && typeof item === 'object' && text(item.id, 128)).map(stripEvidence).slice(0, 20));
   const base = normalizeBase(own(raw, 'base'));
   const modifications = freeze((Array.isArray(own(raw, 'modifications')) ? own(raw, 'modifications') : []).map(normalizeModification).slice(0, 20));
   const links = validateFoodEvidenceLinks({ base, modifications, evidence });

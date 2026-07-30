@@ -1,6 +1,4 @@
 // @ts-nocheck
-// Read-only V6 first paint for Today. Must not populate the plan UI module bag,
-// mutate dailyPlans, or pull the full plan interaction / rehab-policy chain.
 (function () {
     'use strict';
 
@@ -154,8 +152,7 @@
         },
 
         renderPlanTodaySection(summary) {
-            // Read-only: never create or bootstrap plans on first paint.
-            const todayPlans = this.getTodayDailyPlans?.() || readTodayPlans(this);
+                const todayPlans = this.getTodayDailyPlans?.() || readTodayPlans(this);
             const aggregate = this.aggregateCompletionRate?.(todayPlans) || aggregateCompletionRate(todayPlans);
             const plan = selectedPlan(this, todayPlans);
             const percent = Math.round((aggregate.rate || 0) * 100);
@@ -208,6 +205,7 @@
                 return `<span class="seg ${cls}" style="width:${100 / totalItems}%"></span>`;
             }).join('')}</div>
                 ${current ? `<div class="plan-meta"><span>${taskSpecText(current)}${current.currentLevel ? ` · Lv${current.currentLevel}` : ''}</span>${pending ? `<span>${pending} 项待完成</span>` : ''}</div>` : ''}
+                ${window.searchEvidenceUi?.trail(plan.searchEvidence, esc) || ''}
                 <div class="plan-actions">
                     ${current ? `<button class="md-btn md-btn-filled" type="button" onclick="data.handlePlanTaskTap('${plan.id}','${current.id}')"><span class="material-symbols-rounded">play_arrow</span>继续训练</button>` : `<button class="md-btn md-btn-tonal" type="button" onclick="data.openPlanTaskDrawer('${plan.id}')"><span class="material-symbols-rounded">checklist</span>查看完成</button>`}
                     <button class="md-btn md-btn-tonal" type="button" onclick="data.openPlanTaskDrawer('${plan.id}')">查看动作</button></div></div>`;
@@ -253,8 +251,6 @@
             }
         },
 
-        // Fallback only: without plan-ui there is nothing deferred to enhance.
-        // plan-ui replaces this with a local AI/timeline enhance after it loads.
         enhanceTodayPage() {
             this.updateTodayV6Greet?.();
         }

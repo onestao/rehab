@@ -111,7 +111,8 @@ async function launchBrowser() {
             browser: await chromium.launch({ channel: preferred, headless: true }),
             channel: preferred
         };
-    } catch {
+    } catch (error) {
+        if (process.env.AUDIT_CHANNEL || !String(error?.message || '').includes("distribution 'msedge' is not found")) throw error;
         return {
             browser: await chromium.launch({ headless: true }),
             channel: 'chromium'

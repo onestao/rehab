@@ -424,7 +424,8 @@
                 };
                 record = window.reportVersionPure.appendVersion(record, {
                     content,
-                    ai: { summary: content, model: meta.model || 'ai', profileId: meta.profileId || '', reasoningEffort: meta.reasoningEffort || '', fallback: meta.fallback || null, prompt_id: `summary_${kind}_${resultType}` }
+                    ai: { summary: content, model: meta.model || 'ai', profileId: meta.profileId || '', reasoningEffort: meta.reasoningEffort || '', fallback: meta.fallback || null, prompt_id: `summary_${kind}_${resultType}` },
+                    searchEvidence: meta.searchEvidence
                 }, now);
                 record.content = content;
                 if (existing) Object.assign(existing, record);
@@ -450,6 +451,7 @@
             return `<div class="summary-ai-response" data-summary-result="${safe(resultType)}">
                 <div class="summary-version-head"><b>${resultType === 'deload' ? '降载判断' : '总结'}</b><small>${safe(ai.model || 'AI')}${ai.reasoningEffort ? ` · ${safe(ai.reasoningEffort)}` : ''}</small></div>
                 <div class="summary-ai-result">${renderMd(version.content || ai.summary || '')}</div>
+                ${window.searchEvidenceUi.trail(version.searchEvidence, safe)}
                 <div class="advice-version-switcher" aria-label="总结版本">
                     <button class="advice-version-btn" ${index <= 0 ? 'disabled' : ''} onclick="data.cycleSummaryVersion('${safe(report.id)}', -1)" type="button" aria-label="上一个版本"><span class="material-symbols-rounded">chevron_left</span></button>
                     <span>${index + 1}/${report.versions.length}</span>

@@ -26,8 +26,10 @@
                 const conditions = profile.conditions || [];
                 const examResults = profile.examResults || [];
                 const allergies = profile.allergies || [];
-                const plan = await ai.bodyGoalPlan({ goalType, currentWeight, targetWeight, activityLevel, dailyTrainMin, height, weeklyFreq, intensity, sportType, experience, gender: profile.gender, age: profile.age, conditions, examResults, allergies }, { routeOverride });
+                const result = await ai.bodyGoalPlan({ goalType, currentWeight, targetWeight, activityLevel, dailyTrainMin, height, weeklyFreq, intensity, sportType, experience, gender: profile.gender, age: profile.age, conditions, examResults, allergies }, { routeOverride, returnMeta: true });
+                const plan = result?.value || result;
                 const normalized = this.normalizeBodyPlan(plan, { currentWeight, targetWeight }, goalType);
+                normalized.searchEvidence = window.searchEvidenceUi?.summary?.(result?.meta?.searchEvidence || plan?.searchEvidence, 'goal.body') || [];
                 this.db.health.bodyPlan = normalized;
                 this.db.health.weightPlan = normalized;
                 this.save();
@@ -232,10 +234,11 @@
                     <div class="md-field"><select id="planSportType"><option value="strength" ${isGain ? 'selected' : ''}>力量训练</option><option value="cardio">有氧运动</option><option value="mixed" ${!isGain ? 'selected' : ''}>力量+有氧混合</option><option value="flexibility">拉伸/瑜伽</option></select><label>主要运动项目</label></div>
                     ${isGain ? `<div class="md-field span-full"><select id="planExperience"><option value="beginner">新手</option><option value="intermediate">中级</option><option value="advanced">高级</option></select><label>训练经验</label></div>` : ''}
                 </div>
-                <div id="planProfileHint" class="food-ai-status">性别 / 年龄已从健康档案自动读取：${profile.gender === 'female' ? '女' : '男'} · ${profile.age || '未填写'} 岁${profile.age ? '' : '，建议先到「健康」页补充年龄以提升方案准确度'}</div>
+                <div id="planProfileHint" class="food-ai-status">档案：${profile.gender === 'female' ? '女' : '男'} · ${profile.age || '未填写'} 岁${profile.age ? '' : '，建议补充年龄'}</div>
                 <div data-ai-task-picker="goal.body"></div>
                 <button class="md-btn md-btn-filled" onclick="data.requestWeightLossPlan()"><span class="material-symbols-rounded">psychology</span> AI 生成${isGain ? '增肌' : '减重'}方案</button>
                 <div id="planStatus" class="food-ai-status"></div>
+                ${window.searchEvidenceUi?.trail(plan?.searchEvidence, this.escapeHtml.bind(this)) || ''}
             </div>
             <details class="goal-guide">
                 <summary><span class="material-symbols-rounded">help</span> 如何选择活动水平、强度和经验</summary>

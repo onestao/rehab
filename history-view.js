@@ -573,7 +573,6 @@
         contextAiDescription(context) { return { today: '结合今日饮食、训练和体重记录生成建议', diet: '检查热量、蛋白质和饮食结构是否贴合目标', exercise: '根据训练频率、强度和恢复情况给出调整', weight: '结合趋势判断目标推进是否稳定', calendar: '按选中日期或本月记录总结关键变化' }[context] || '结合你的记录生成可执行建议'; },
 
         resolveGoalTypeForAiPrompts() {
-            // Keep semantics close to health-diet.currentGoalType without requiring that lazy module.
             if (typeof this.currentGoalType === 'function') {
                 try {
                     const typed = this.currentGoalType();
@@ -585,7 +584,6 @@
             if (fromDietGoal === 'gain' || fromDietGoal === 'loss') return fromDietGoal;
             const fromHealth = health.goalType;
             if (fromHealth === 'gain' || fromHealth === 'loss') return fromHealth;
-            // Unknown/missing goal data: do not force "loss" for prompt branching.
             return null;
         },
 

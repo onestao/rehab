@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import vm from 'node:vm';
 import { normalizeFoodEvidence } from '../food-evidence-pure.mjs';
-import { shouldVerifyFoodEvidence } from '../search-policy-pure.mjs';
+import { safeFetchUrl, shouldVerifyFoodEvidence } from '../search-policy-pure.mjs';
 
 const source = readFileSync(new URL('../food-evidence.js', import.meta.url), 'utf8');
 
@@ -29,6 +29,12 @@ function load({ policy, evidence = [] } = {}) {
     ai,
     aiRoutingPure: { manualFallbackTarget: value => value },
     searchPolicyPure: { shouldVerifyFoodEvidence },
+    searchToolLoop: {
+      urlsFromText(value) {
+        const urls = (String(value || '').match(/https:\/\/[^\s<>"']+/g) || []).map(value => safeFetchUrl(value)).filter(Boolean);
+        return Object.freeze([...new Set(urls)]);
+      }
+    },
     foodEvidencePure: { normalizeFoodEvidence }
   };
   vm.runInNewContext(source, { window, console, JSON, String, Number, Object, Array });
@@ -52,4 +58,26 @@ test('required food verification remains unavailable when lookup yields no evide
   assert.equal(result.status, 'unavailable');
   assert.equal(calls[0][1].networkPolicy.taskId, 'food.vision');
   assert.equal(calls.some(([name]) => name === 'runJson'), false);
+});
+
+
+test('food verification authorizes only URLs in the current raw input and reuses the proof', async () => {
+  const evidence = [{ id: 'ev', url: 'https://mcdonalds.com/menu', official: true, sourceType: 'official-nutrition' }];
+  const { api, calls } = load({ policy: { mode: 'required', execution: 'external-only', fallback: 'fail' }, evidence });
+  await api.verify({ name: '汉堡', grams: 200 }, { input: '按官方菜单 https://mcdonalds.com/menu 核实', sourceTask: 'food.text' });
+  const lookup = calls.find(([name]) => name === 'run')?.[1];
+  const jsonCall = calls.find(([name]) => name === 'runJson')?.[1];
+  assert.deepEqual(Array.from(lookup.userProvidedUrls), ['https://mcdonalds.com/menu']);
+  assert.equal(Object.isFrozen(lookup.userProvidedUrls), true);
+  assert.equal(jsonCall.userProvidedUrls, lookup.userProvidedUrls);
+  assert.equal(jsonCall.searchBudget, lookup.searchBudget);
+});
+
+test('food verification never authorizes URLs found only in candidate or imported context', async () => {
+  const { api, calls } = load({ policy: { mode: 'required', execution: 'external-only', fallback: 'fail' }, evidence: [] });
+  await api.verify({ name: '包装食品', ingredients: ['导入来源 https://history.example/imported'] }, { input: '核实这个包装食品', sourceTask: 'food.text' });
+  const lookup = calls.find(([name]) => name === 'run')?.[1];
+  assert.deepEqual(Array.from(lookup.userProvidedUrls), []);
+  assert.match(lookup.messages[1].content, /history\.example\/imported/);
+  assert.doesNotMatch(JSON.stringify(lookup.userProvidedUrls), /history\.example/);
 });

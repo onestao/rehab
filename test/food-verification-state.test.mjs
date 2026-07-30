@@ -8,9 +8,10 @@ import * as searchPolicyPure from '../search-policy-pure.mjs';
 
 const source = readFileSync(new URL('../food-log.js', import.meta.url), 'utf8');
 
-function load({ policy = { mode: 'required', fallback: 'fail' }, verifyResult = null } = {}) {
+function load({ policy = { mode: 'required', fallback: 'fail' }, verifyResult = null, elements = {} } = {}) {
   const alerts = [];
   let saved = 0;
+  const verifyCalls = [];
   const data = {
     db: { health: { foodLogs: [] } },
     escapeHtml: value => String(value ?? ''),
@@ -26,15 +27,15 @@ function load({ policy = { mode: 'required', fallback: 'fail' }, verifyResult = 
     ai: { getTaskNetworkPolicy: () => policy },
     foodEvidence: {
       policyFor: () => policy,
-      async verify() { return verifyResult; }
+      async verify(item, options) { verifyCalls.push({ item, options }); return verifyResult; }
     }
   };
-  const document = { getElementById: () => null };
+  const document = { getElementById: id => elements[id] || null };
   vm.runInNewContext(source, {
     window, document, console, JSON, String, Number, Object, Array, Set, Date,
     alert: message => alerts.push(String(message))
   });
-  return { data, alerts, saved: () => saved };
+  return { data, alerts, verifyCalls, saved: () => saved };
 }
 
 function seed(data, verification, evidence = null) {
@@ -94,4 +95,35 @@ test('bulk save reports skipped verification reasons', () => {
   assert.equal(data.db.health.foodLogs.length, 1);
   assert.equal(data._aiFoodAdded.has(0), true);
   assert.equal(data._aiFoodAdded.has(1), false);
+});
+
+
+test('verifyAiFood never promotes candidate URLs when explicit input is empty', async () => {
+  const { data, verifyCalls } = load({
+    verifyResult: { status: 'unavailable' },
+    elements: { foodAiText: { value: 'https://stale.example/textarea' } }
+  });
+  seed(data, { required: true, state: 'invalidated', evidence: null });
+  data._aiFoodDrafts[0] = {
+    name: '候选 https://candidate.example/name',
+    ingredients: ['导入 https://candidate.example/ingredient']
+  };
+  await data.verifyAiFood(0, { input: '', sourceTask: 'food.text', silent: true });
+  assert.equal(verifyCalls.length, 1);
+  assert.equal(verifyCalls[0].options.queryContext, '');
+  assert.equal(verifyCalls[0].options.authorizationInput, '');
+  assert.doesNotMatch(JSON.stringify(verifyCalls[0].options), /candidate\.example|stale\.example/);
+});
+
+test('verifyAiFood uses no candidate URL when input and textarea are both absent', async () => {
+  const { data, verifyCalls } = load({ verifyResult: { status: 'unavailable' } });
+  seed(data, { required: true, state: 'invalidated', evidence: null });
+  data._aiFoodDrafts[0] = {
+    name: '候选 https://candidate.example/name',
+    ingredients: ['导入 https://candidate.example/ingredient']
+  };
+  await data.verifyAiFood(0, { sourceTask: 'food.text', silent: true });
+  assert.equal(verifyCalls.length, 1);
+  assert.equal(verifyCalls[0].options.queryContext, '');
+  assert.equal(verifyCalls[0].options.authorizationInput, '');
 });

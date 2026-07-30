@@ -4,7 +4,14 @@ import {
   normalizeNetworkPolicy,
   normalizeSearchConfig,
   normalizeSearchEvidence,
+  normalizeSearchProvider,
   classifySearchSource,
+  domainProfileForTask,
+  searchSourcePriority,
+  safeFetchUrl,
+  summarizeSearchEvidence,
+  summarizeFoodEvidence,
+  sortSearchEvidence,
   resolveNetworkPolicy,
   safeSearchQuery
 } from '../search-policy-pure.mjs';
@@ -59,8 +66,25 @@ test('evidence requires HTTPS and cannot self-promote official status', () => {
 });
 
 test('official source classification is pure and limited to explicit domains', () => {
-  assert.deepEqual(classifySearchSource('https://menu.mcdonalds.com/item'), { sourceType: 'official-nutrition', official: true });
+  assert.deepEqual(classifySearchSource('https://menu.mcdonalds.com/item', { taskId: 'food.text' }), { sourceType: 'official-nutrition', official: true });
+  assert.deepEqual(classifySearchSource('https://menu.mcdonalds.com/item', { taskId: 'rehab.weekly' }), { sourceType: 'official-nutrition', official: false });
+  assert.deepEqual(classifySearchSource('https://www.who.int/news-room/fact-sheets', { taskId: 'rehab.weekly' }), { sourceType: 'public-health', official: true });
+  assert.deepEqual(classifySearchSource('https://pubmed.ncbi.nlm.nih.gov/123', { taskId: 'rehab.weekly' }), { sourceType: 'academic', official: false });
   assert.deepEqual(classifySearchSource('https://mcdonalds.example/item'), { sourceType: 'other', official: false });
+  assert.equal(domainProfileForTask('plan.today'), 'training-health');
+  assert.deepEqual(Array.from(sortSearchEvidence([
+    { title: 'Hospital', url: 'https://www.mayoclinic.org/example', sourceType: 'other', official: false },
+    { title: 'Academic', url: 'https://pubmed.ncbi.nlm.nih.gov/123', sourceType: 'other', official: false },
+    { title: 'WHO', url: 'https://www.who.int/example', sourceType: 'other', official: false }
+  ], { taskId: 'rehab.weekly' }), item => item.title), ['WHO', 'Academic', 'Hospital']);
+});
+
+test('evidence official status is derived from URL and task domain', () => {
+  const health = normalizeSearchEvidence({ url: 'https://www.cdc.gov/example', official: false, sourceType: 'other' }, { taskId: 'advice.chat' });
+  assert.equal(health?.sourceType, 'public-health');
+  assert.equal(health?.official, true);
+  const foodInHealth = normalizeSearchEvidence({ url: 'https://mcdonalds.com/menu', official: true, sourceType: 'official-nutrition' }, { taskId: 'rehab.weekly' });
+  assert.equal(foodInHealth?.official, false);
 });
 
 test('food verification trigger handles brand, required mode, and both confidence scales', () => {
@@ -167,4 +191,56 @@ test('food verification state invalidation cannot be saved until reverified', ()
   assert.equal(foodVerificationSaveDecision(invalidated, { fallback: 'fail' }).allowed, false);
   const reverified = verificationStateFromEvidence({ status: 'verified' }, { required: true });
   assert.equal(foodVerificationSaveDecision(reverified, { fallback: 'fail' }).allowed, true);
+});
+
+test('unknown domains cannot self-report academic source type or priority', () => {
+  const evidence = normalizeSearchEvidence({
+    url: 'https://example.com/untrusted', title: 'Untrusted', sourceType: 'academic', official: true
+  }, { taskId: 'rehab.weekly' });
+  assert.ok(evidence);
+  assert.equal(evidence.sourceType, 'other');
+  assert.equal(evidence.official, false);
+  assert.equal(searchSourcePriority(evidence, { taskId: 'rehab.weekly' }), 0);
+});
+
+test('provider normalization accepts sprint 2 providers and marks duckduckgo experimental', () => {
+  for (const type of ['exa', 'jina', 'serper']) {
+    assert.equal(normalizeSearchProvider({ id: type, type, options: {} })?.type, type);
+  }
+  assert.equal(normalizeSearchProvider({ id: 'ddg', type: 'duckduckgo', options: {} })?.options.experimental, true);
+});
+
+test('safeFetchUrl accepts public HTTPS and rejects local private or credentialed targets', () => {
+  assert.equal(safeFetchUrl('https://example.com/a#part'), 'https://example.com/a');
+  for (const value of [
+    'http://example.com/a', 'https://localhost/a', 'https://127.0.0.1/a',
+    'https://192.168.1.1/a', 'https://service.internal/a',
+    'https://user:pass@example.com/a', 'https://example.com:8443/a'
+  ]) assert.equal(safeFetchUrl(value), '');
+});
+
+test('summarizeSearchEvidence keeps only safe citation metadata', () => {
+  const sources = summarizeSearchEvidence([
+    { id: 'a', title: 'Guide', url: 'https://example.com/guide', contentExcerpt: 'full body', readStatus: 'deep-read' },
+    { id: 'b', title: 'Unsafe', url: 'http://localhost/private', sourceType: 'academic' }
+  ]);
+  assert.equal(sources.length, 1);
+  assert.equal(sources[0].readStatus, 'deep-read');
+  assert.equal(Object.hasOwn(sources[0], 'contentExcerpt'), false);
+});
+
+test('food evidence normalization and persistence summaries remove deep-read body fields', () => {
+  const normalized = normalizeFoodEvidence({
+    status: 'estimated', base: { nutrients: { cal: 100 } },
+    evidence: [{
+      id: 'ev', title: 'Guide', url: 'https://example.com/food', domain: 'example.com',
+      contentExcerpt: 'full body must stay transient', contentType: 'text/markdown', readStatus: 'deep-read'
+    }]
+  });
+  assert.equal(Object.hasOwn(normalized.evidence[0], 'contentExcerpt'), false);
+  assert.equal(Object.hasOwn(normalized.evidence[0], 'contentType'), false);
+  const stored = summarizeFoodEvidence(normalized);
+  assert.equal(stored.sources.length, 1);
+  assert.equal(Object.hasOwn(stored.sources[0], 'contentExcerpt'), false);
+  assert.equal(Object.hasOwn(stored.sources[0], 'contentType'), false);
 });

@@ -1,4 +1,4 @@
-﻿// @ts-nocheck
+// @ts-nocheck
 Object.assign(ai, {
     FOOD_WRAPPER_KEYS: Object.freeze([
         'items', 'foods', 'foodItems', 'food_items', 'foodList', 'food_list',
@@ -44,8 +44,6 @@ Object.assign(ai, {
             return { type: 'web_search_20250305', name: 'web_search', max_uses: Math.min(2, Number(requestOpts.nativeSearchMaxUses || policy.maxToolCalls) || 2), ...(domains.length ? { allowed_domains: domains } : {}) };
         }
         if (provider === 'gemini') {
-            // Gemini Google Search has no portable allow-list field. A task/global
-            // allow-list is therefore a hard compatibility requirement.
             if (domains.length) return null;
             return { google_search: {} };
         }
@@ -53,35 +51,9 @@ Object.assign(ai, {
     },
 
     _emitNativeSearchEvidence(payload, effective, requestOpts = {}, cited = []) {
-        if (typeof requestOpts.onSearchEvidence !== 'function') return;
-        const existing = Array.isArray(requestOpts._nativeSearchEvidence) ? requestOpts._nativeSearchEvidence : [];
-        const seen = new Set(existing.map(item => String(item?.url || item?.id || '')));
-        const evidence = [...existing];
-        const append = citation => {
-            const source = window.searchPolicyPure?.classifySearchSource?.(citation?.url || citation?.uri || '') || { sourceType: 'other', official: false };
-            const normalized = window.searchPolicyPure?.normalizeSearchEvidence?.({
-                id: `native_${evidence.length}`, title: citation?.title || citation?.name || '', url: citation?.url || citation?.uri || '', snippet: citation?.snippet || '', providerId: 'native', retrievedAt: Date.now(), ...source
-            }, { allowedDomains: effective.network?.allowedDomains || [] });
-            if (!normalized) return;
-            if (effective.network?.sourcePolicy === 'official-only' && !normalized.official) return;
-            const key = String(normalized.url || normalized.id || '');
-            if (key && seen.has(key)) return;
-            if (key) seen.add(key);
-            evidence.push(normalized);
-        };
-        for (const citation of cited) append(citation);
-        for (const item of (payload?.output || [])) for (const content of (item?.content || [])) {
-            for (const annotation of (content?.annotations || [])) {
-                const citation = annotation?.url_citation || annotation;
-                append(citation);
-            }
-        }
-        requestOpts._nativeSearchEvidence = evidence;
-        if (evidence.length) requestOpts.onSearchEvidence(evidence);
+        window.searchToolLoop?.emitNativeEvidence?.(payload, effective, requestOpts, cited);
     },
 
-    // Client inactivity budgets. Reasoning / Responses models often spend minutes
-    // before the first token, and active streams refresh the timer on every chunk.
     MIN_AI_TIMEOUT_MS: 1000,
     MAX_AI_TIMEOUT_MS: 900000,
     DEFAULT_AI_TIMEOUT_MS: 300000,
@@ -113,6 +85,7 @@ Object.assign(ai, {
 
     async run(options = {}) {
         const taskId = options.taskId || 'advice.chat';
+        const urls = window.searchToolLoop?.normalizeUserProvidedUrls?.(options.userProvidedUrls) || [];
         const actionSearchBudget = options.searchBudget && typeof options.searchBudget === 'object'
             ? options.searchBudget
             : { limit: 2, remaining: 2, attempts: [] };
@@ -152,6 +125,7 @@ Object.assign(ai, {
                 taskId,
                 effective,
                 searchBudget: actionSearchBudget,
+                userProvidedUrls: urls,
                 allowNativeSearch: !options.disableNativeSearch
                     && options.disableNetworkSearch !== true
                     && effective.network?.mode !== 'off',
@@ -160,7 +134,8 @@ Object.assign(ai, {
                     if (delta || accumulated) emitted = true;
                     return originalOnToken(delta, accumulated, meta);
                 },
-                onSearchEvidence: evidence => { searchEvidence = Array.isArray(evidence) ? evidence : []; }
+                onSearchEvidence: evidence => { searchEvidence = Array.isArray(evidence) ? evidence : []; },
+                nativeUrlContextUrls: urls
             };
             try {
                 const messages = options.messages || [];
@@ -424,6 +399,7 @@ Object.assign(ai, {
                 disableNetworkSearch: options.disableNetworkSearch === true,
                 networkPolicy,
                 searchBudget,
+                userProvidedUrls: options.userProvidedUrls,
                 stream: false
             });
             attemptMeta = firstResult.meta || null;
@@ -514,6 +490,7 @@ Object.assign(ai, {
                 disableNetworkSearch: retryDisableNetworkSearch,
                 networkPolicy,
                 searchBudget,
+                userProvidedUrls: options.userProvidedUrls,
                 stream: false
             });
             attemptMeta = retryResult.meta || attemptMeta;
@@ -577,7 +554,6 @@ Object.assign(ai, {
         return window.foodEvidence?.verifyWithAi?.(options) || null;
     },
 
-    // --- API Calls (统一入口，按 provider 分发) ---
     async call(messages, maxTokens = 2000, opts = {}) {
         const effective = this._effectiveConfigForRequest(opts);
         if (!effective.enabled) throw new Error('请先在设置中配置 AI 接口');
@@ -606,7 +582,6 @@ Object.assign(ai, {
         }
     },
 
-    // --- Vision Helpers ---
     async _blobToDataUrl(blob) {
         return await new Promise((resolve, reject) => {
             try {
@@ -695,7 +670,6 @@ Object.assign(ai, {
     _makeHttpAiError(status, body = '') {
         const statusNum = Number(status) || 0;
         const bodyLength = String(body ?? '').length;
-        // Never attach raw provider response bodies (may contain secrets or health data).
         return this._makeAiError(`AI 请求失败: HTTP ${statusNum}`, {
             code: 'AI_HTTP_ERROR',
             status: statusNum,
@@ -995,6 +969,7 @@ Object.assign(ai, {
         if (!reasoning.omitTemperature) body.temperature = 0.3;
         const nativeSearch = this._nativeSearchTool(effective, requestOpts);
         if (nativeSearch) body.tools = [nativeSearch];
+        window.searchToolLoop?.applyOpenRouterPlugin?.(body, effective, requestOpts);
         const res = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
@@ -1011,6 +986,7 @@ Object.assign(ai, {
         try { d = JSON.parse(raw); } catch (e) { throw this._makeAiError('AI 返回格式异常', { code: 'AI_JSON_PARSE_FAILED', outputLength: String(raw || '').length }); }
         const text = d.choices?.[0]?.message?.content || '';
         this._assertCompleteAiResponse('openai', d, { requireCompleteOutput: requestOpts?.requireCompleteOutput, text });
+        this._emitNativeSearchEvidence(d, effective, requestOpts, d.choices?.[0]?.message?.annotations);
         return text;
     },
 
@@ -1125,12 +1101,12 @@ Object.assign(ai, {
             },
             ...(systemText ? { systemInstruction: { parts: [{ text: systemText }] } } : {})
         };
-        const nativeSearch = this._nativeSearchTool(effective, requestOpts);
-        if (nativeSearch) body.tools = [nativeSearch];
+        const prepared = window.searchToolLoop?.prepareGeminiRequest?.(body, this._nativeSearchTool(effective, requestOpts), effective, requestOpts)
+            || { body, json: JSON.stringify(body) };
         const res = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body),
+            body: prepared.json,
             signal
         });
         this._debugDietPhoto({ stage: 'response', url: url.replace(/key=[^&]+/i, 'key=***'), status: res.status });
@@ -1147,7 +1123,6 @@ Object.assign(ai, {
         return text;
     },
 
-    // ---------- OpenAI Chat Completions ----------
     async _callOpenAIChat(messages, maxTokens, key, stream, onChunk, effective = this.getEffectiveConfig?.() || this.cfg, signal = null, requestOpts = {}) {
         const url = `${effective.baseUrl}/chat/completions`;
         const reasoning = this._reasoningRequestOptions(effective, maxTokens);
@@ -1156,6 +1131,7 @@ Object.assign(ai, {
         if (!reasoning.omitTemperature) body.temperature = 0.3;
         const nativeSearch = this._nativeSearchTool(effective, requestOpts);
         if (nativeSearch) body.tools = [nativeSearch];
+        window.searchToolLoop?.applyOpenRouterPlugin?.(body, effective, requestOpts);
         Object.assign(body, window.searchToolLoop?.requestOptions?.('openai-chat', requestOpts) || {});
         if (stream) body.stream = true;
         const res = await fetch(url, {
@@ -1210,7 +1186,6 @@ Object.assign(ai, {
           );
     },
 
-    // ---------- OpenAI Responses API（最新 /v1/responses） ----------
     async _callOpenAIResponses(messages, maxTokens, key, stream, onChunk, effective = this.getEffectiveConfig?.() || this.cfg, signal = null, requestOpts = {}) {
         const url = `${effective.baseUrl}/responses`;
         const sys = messages.filter(m => m.role === 'system').map(m => m.content).join('\n');
@@ -1276,7 +1251,6 @@ Object.assign(ai, {
           }, signal);
     },
 
-    // ---------- Anthropic Claude Messages API ----------
     async _callClaude(messages, maxTokens, key, stream, onChunk, effective = this.getEffectiveConfig?.() || this.cfg, signal = null, requestOpts = {}) {
         const url = `${effective.baseUrl}/messages`;
         const sys = messages.filter(m => m.role === 'system').map(m => m.content).join('\n');
@@ -1341,7 +1315,6 @@ Object.assign(ai, {
           }, signal);
     },
 
-    // ---------- Gemini ----------
     async _callGemini(messages, maxTokens, key, stream, onChunk, effective = this.getEffectiveConfig?.() || this.cfg, signal = null, requestOpts = {}) {
         const sys = messages.filter(m => m.role === 'system').map(m => m.content).join('\n');
         const sourceContents = messages.filter(m => m.role !== 'system');
@@ -1358,13 +1331,13 @@ Object.assign(ai, {
             },
             ...(sys ? { systemInstruction: { parts: [{ text: sys }] } } : {})
         };
-        const nativeSearch = this._nativeSearchTool(effective, requestOpts);
-        if (nativeSearch) body.tools = [nativeSearch];
         Object.assign(body, window.searchToolLoop?.requestOptions?.('gemini', requestOpts) || {});
+        const prepared = window.searchToolLoop?.prepareGeminiRequest?.(body, this._nativeSearchTool(effective, requestOpts), effective, requestOpts)
+            || { body, json: JSON.stringify(body) };
         const res = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body),
+            body: prepared.json,
             signal
         });
         if (!res.ok) {
@@ -1398,7 +1371,6 @@ Object.assign(ai, {
           );
     },
 
-    // ---------- 通用 SSE 读取 ----------
     async _readSSE(res, onChunk, extract, extractUsage = null, signal = null) {
         if (!res.body) {
             signal?.throwIfAborted?.();
@@ -1677,7 +1649,8 @@ Object.assign(ai, {
                     messages,
                     maxTokens: 2600,
                     routeOverride,
-                    parseOptions
+                    parseOptions,
+                    returnMeta: options.returnMeta === true
                 });
             }
             const raw = this.resolveTaskConfig ? await this.run({

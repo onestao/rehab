@@ -110,10 +110,13 @@ async function withBrowser(fn) {
     const pw = loadPlaywright();
     const chromium = pw.chromium || pw.default?.chromium;
     if (!chromium?.launch) throw new Error('playwright.chromium.launch unavailable');
-    const browser = await chromium.launch({
-        channel: process.env.AUDIT_CHANNEL || 'msedge',
-        headless: true
-    });
+    let browser;
+    try {
+        browser = await chromium.launch({ channel: process.env.AUDIT_CHANNEL || 'msedge', headless: true });
+    } catch (error) {
+        if (process.env.AUDIT_CHANNEL || !String(error?.message || '').includes("distribution 'msedge' is not found")) throw error;
+        browser = await chromium.launch({ headless: true });
+    }
     try {
         return await fn(browser);
     } finally {

@@ -8,6 +8,19 @@ import { manualFallbackTarget } from '../ai-routing-pure.mjs';
 const reportSource = readFileSync(new URL('../report-panel.js', import.meta.url), 'utf8');
 const summarySource = readFileSync(new URL('../weekly-summary.js', import.meta.url), 'utf8');
 const versionSource = readFileSync(new URL('../report-version-pure.js', import.meta.url), 'utf8');
+const searchEvidenceUi = {
+    summary: value => Array.isArray(value) ? value.map(({ contentExcerpt: _body, ...item }) => item) : [],
+    version(payload = {}) {
+        const ai = { ...(payload.ai || {}) };
+        const searchEvidence = this.summary(payload.searchEvidence || ai.searchEvidence);
+        delete ai.searchEvidence;
+        return { ai, searchEvidence };
+    }
+};
+const searchPolicyPure = {
+    summarizeSearchEvidence: searchEvidenceUi.summary,
+    searchEvidenceVersion: searchEvidenceUi.version.bind(searchEvidenceUi)
+};
 
 test('weight report fallback retries with routeOverride and never saves it as the task route', async () => {
     const runCalls = [];
@@ -31,6 +44,7 @@ test('weight report fallback retries with routeOverride and never saves it as th
         window: {
             ai,
             aiRoutingPure: { manualFallbackTarget },
+            searchEvidenceUi, searchPolicyPure,
             reportMetricsPure: {
                 buildWeeklyMetrics: (_db, anchor) => ({ periodStart: anchor, periodEnd: '2026-07-12', metrics: { weight: 78 } }),
                 buildMonthlyMetrics: (_db, anchor) => ({ periodStart: anchor, periodEnd: '2026-07-31', metrics: { weight: 78 } }),
@@ -90,6 +104,7 @@ test('weekly summary fallback retries with routeOverride and preserves the promp
         window: {
             ai,
             aiRoutingPure: { manualFallbackTarget },
+            searchEvidenceUi, searchPolicyPure,
             reportVersionPure: {},
             toast: { show: (...args) => toastCalls.push(args) }
         }
@@ -135,6 +150,7 @@ test('weight report ignores malformed fallback targets without exposing an actio
         window: {
             ai,
             aiRoutingPure: { manualFallbackTarget },
+            searchEvidenceUi, searchPolicyPure,
             reportMetricsPure: {
                 buildWeeklyMetrics: () => ({ periodStart: '2026-07-06', periodEnd: '2026-07-12', metrics: { weight: 78 } }),
                 buildMonthlyMetrics: () => ({ periodStart: '2026-07-01', periodEnd: '2026-07-31', metrics: { weight: 78 } }),
@@ -185,6 +201,7 @@ test('weight report fallback action is single-use and appends only one active ve
         window: {
             ai,
             aiRoutingPure: { manualFallbackTarget },
+            searchEvidenceUi, searchPolicyPure,
             reportMetricsPure: {
                 buildWeeklyMetrics: (_db, anchor) => ({ periodStart: anchor, periodEnd: '2026-07-12', metrics: { weight: 78 } }),
                 buildMonthlyMetrics: (_db, anchor) => ({ periodStart: anchor, periodEnd: '2026-07-31', metrics: { weight: 78 } }),
@@ -243,6 +260,7 @@ test('weekly summary ignores malformed fallback targets without exposing an acti
         window: {
             ai,
             aiRoutingPure: { manualFallbackTarget },
+            searchEvidenceUi, searchPolicyPure,
             reportVersionPure: {},
             toast: { show: (...args) => toastCalls.push(args) }
         }
@@ -293,6 +311,7 @@ test('weekly summary fallback action is single-use and appends only one active v
         window: {
             ai,
             aiRoutingPure: { manualFallbackTarget },
+            searchEvidenceUi, searchPolicyPure,
             toast: { show: (...args) => toastCalls.push(args) }
         }
     };
@@ -363,6 +382,7 @@ test('weight report runJson retry succeeds and stores AI model metadata', async 
         window: {
             ai,
             aiRoutingPure: { manualFallbackTarget },
+            searchEvidenceUi, searchPolicyPure,
             reportMetricsPure: {
                 buildWeeklyMetrics: (_db, anchor) => ({ periodStart: anchor, periodEnd: '2026-07-12', metrics: { weight: 78 } }),
                 buildMonthlyMetrics: (_db, anchor) => ({ periodStart: anchor, periodEnd: '2026-07-31', metrics: { weight: 78 } }),
@@ -413,6 +433,7 @@ test('weight report final AI failure keeps empty reports and does not save offli
         window: {
             ai,
             aiRoutingPure: { manualFallbackTarget },
+            searchEvidenceUi, searchPolicyPure,
             reportMetricsPure: {
                 buildWeeklyMetrics: (_db, anchor) => ({ periodStart: anchor, periodEnd: '2026-07-12', metrics: { weight: 78 } }),
                 buildMonthlyMetrics: (_db, anchor) => ({ periodStart: anchor, periodEnd: '2026-07-31', metrics: { weight: 78 } }),
@@ -449,6 +470,7 @@ test('weight report without runJson reports unavailable and does not save', asyn
         window: {
             ai,
             aiRoutingPure: { manualFallbackTarget },
+            searchEvidenceUi, searchPolicyPure,
             reportMetricsPure: {
                 buildWeeklyMetrics: (_db, anchor) => ({ periodStart: anchor, periodEnd: '2026-07-12', metrics: { weight: 78 } }),
                 buildMonthlyMetrics: (_db, anchor) => ({ periodStart: anchor, periodEnd: '2026-07-31', metrics: { weight: 78 } }),
@@ -483,6 +505,7 @@ test('weight report offline path still saves when useAi is false', async () => {
         window: {
             ai,
             aiRoutingPure: { manualFallbackTarget },
+            searchEvidenceUi, searchPolicyPure,
             reportMetricsPure: {
                 buildWeeklyMetrics: (_db, anchor) => ({ periodStart: anchor, periodEnd: '2026-07-12', metrics: { weight: 78 } }),
                 buildMonthlyMetrics: (_db, anchor) => ({ periodStart: anchor, periodEnd: '2026-07-31', metrics: { weight: 78 } }),

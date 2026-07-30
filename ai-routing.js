@@ -160,6 +160,7 @@
         },
 
         resolveTaskConfig(taskId = '', override = null) {
+            const definition = this.getTaskDefinition(taskId);
             const helper = pure();
             const route = helper?.resolveTaskRoute
                 ? helper.resolveTaskRoute({

@@ -9,6 +9,12 @@
         const caps = effective.capabilities || {};
         const declared = caps.webSearch ?? caps.web_search ?? caps.tools?.webSearch;
         const provider = String(effective.provider || '').toLowerCase();
+        let host = '';
+        try { host = new URL(String(effective.baseUrl || '')).hostname.toLowerCase(); } catch {}
+        const identity = `${effective.profileName || ''} ${effective.providerName || ''}`.toLowerCase();
+        if (host === 'openrouter.ai' || host.endsWith('.openrouter.ai') || identity.includes('openrouter')) {
+            return { usable: true, code: 'openrouter-web-plugin', reason: '当前 OpenRouter 连接可使用统一 Web Search 插件', actions: [] };
+        }
         if (declared !== true) {
             return declared === false
                 ? { usable: false, code: 'capability-unsupported', reason: '当前模型声明不支持原生联网检索', actions: ['选择支持联网的模型', '配置外部搜索服务'] }
@@ -25,7 +31,7 @@
         if (provider === 'gemini') {
             return (effective.network?.allowedDomains || []).length
                 ? { usable: false, code: 'gemini-domain-filter-incompatible', reason: 'Gemini 原生检索无法应用当前任务的域名白名单', actions: ['移除不兼容的域名限制', '改用外部服务优先'] }
-                : { usable: true, code: 'available', reason: '当前 Gemini 模型可使用原生联网检索', actions: [] };
+                : { usable: true, code: 'available', reason: '当前 Gemini 模型可使用 Google Search；提示中包含 URL 时可同时使用 URL Context 深读', actions: [] };
         }
         return { usable: false, code: 'provider-unsupported', reason: '当前供应商没有已验证的原生联网适配', actions: ['配置外部搜索服务', '选择支持的供应商'] };
     }

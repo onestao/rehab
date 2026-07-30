@@ -1,19 +1,19 @@
 # AI 联网检索合并复审修复计划
 
 > 日期：2026-07-29  
-> 状态：非 Playwright 修复已实施；浏览器复审待安装 Playwright msedge
+> 状态：Sprint 1 历史修复记录；Sprint 2–4 与后续复审修复见 `web-search-next-capability-plan.md`
 > 实施分支：`perfrom`  
 > 固定审阅基线：`perfrom`
 > 原始规格：`docs/tasks/web-search-integration-design.md`  
-> 当前版本：v391
-> 当前门禁：lint、typecheck、939 项非 Playwright 测试、CSS/HTML safety/size-limit、版本检查和 `git diff --check` 均通过；浏览器测试因本机未安装 Playwright msedge 未执行
+> 历史基线：v398；本文件保留为 Sprint 1 历史修复记录
+> 浏览器门禁：通过 `AUDIT_CHANNEL` 明确选择宿主可用通道；本次自动化完整门禁实际使用 Chromium。Edge 仅在执行宿主可解析 `msedge` 分发时运行，不再把通道缺失写成代码失败或安装状态结论
 > 目标：关闭合并复审剩余的 5 个 P1 与 4 个 P2 规格缺口，并补齐能证明行为闭环的回归测试。
 
 ## 1. 当前结论
 
 本轮已关闭合并复审列出的 5 个 P1 与 4 个 P2 非浏览器缺口，并恢复 lint、typecheck、Node 测试、CSS、HTML safety、size-limit、版本和 diff 门禁。
 
-当前仍不宣告最终合并完成：本机未安装 Playwright 的 `msedge` 分发，浏览器导航、焦点、窄屏和真实交互复审尚未执行。该环境缺失不会被伪装为代码通过，也不影响本轮“修复非 Playwright 测试问题”的完成判断。
+本节仅记录 Sprint 1 当时的非浏览器修复范围。当前环境已可运行 Edge/Chromium 浏览器测试，最终是否可合并应以后续 Sprint 2–4 复审记录与当次干净 CI 为准。
 
 以下 9 项为本轮关闭范围：
 
@@ -41,7 +41,7 @@
 - [x] F8：食物证据卡统一展示基础值、add/remove/replace/portion 数值变化、合计、假设和安全来源。
 - [x] F9：首次启用说明仅保存在本地偏好；不同任务显示准确隐私文案，并提供原生能力原因与恢复操作。
 
-本轮验证聚焦非 Playwright 门禁。浏览器测试仍需在安装 `msedge` 后单独执行，未将其缺失视为代码失败，也未据此标记整份合并复审完全结束。
+本轮历史验证当时聚焦非 Playwright 门禁；浏览器专项与完整门禁的现状以 `web-search-next-capability-plan.md` 为准。
 
 ## 2. 实施边界
 

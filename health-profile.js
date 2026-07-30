@@ -34,7 +34,6 @@
         };
     }
 
-    // 部位词典已收编进 action-taxonomy-pure.js（boot 常驻）；保留函数壳以维持闭包内调用点不变。
     function inferBodyPart(value = '') {
         return window.actionTaxonomy?.inferBodyPart?.(value) || '';
     }
@@ -47,9 +46,6 @@
         return new Set(window.actionTaxonomy?.normalizeBodyParts?.(source) || []);
     }
 
-    // 同部位判断（集合语义）：部位是多值的，两边集合有交集就算同部位
-    //（「弓步蹲」的髋+膝 与单部位「膝」能关联；「膝盖」vs「膝」同样命中）。
-    // 任一边认不出任何部位（空集）时维持原有的宽松放行，不因多值化而收紧自动关联。
     function sameBodyPartLoose(a = '', b = '') {
         const left = bodyPartSet(a);
         const right = bodyPartSet(b);
@@ -947,6 +943,7 @@
                 this.setRehabParseStatus('先输入康复师原话或动作描述。', 'error');
                 return;
             }
+            const userProvidedUrls = window.searchToolLoop?.urlsFromText?.(rawText) || Object.freeze([]);
             const weekStart = document.getElementById('rehabWeekStart')?.value || this.rehabWeekStart?.() || '';
             const visitDate = document.getElementById('rehabVisitDate')?.value || this.logicalDateKey?.() || '';
             this.setRehabParsePending(true);
@@ -969,6 +966,7 @@
                     messages,
                     maxTokens: 4000,
                     returnMeta: true,
+                    userProvidedUrls,
                     parseOptions: REHAB_WEEKLY_PARSE_OPTIONS,
                     onRetry: () => {
                         this.setRehabParseStatus(

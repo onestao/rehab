@@ -1,16 +1,16 @@
 // @ts-nocheck
 // Search policy and evidence are deliberately kept independent from browser APIs.
+import './search-evidence-schema-pure.js';
+const evidencePure = globalThis.searchEvidenceSchemaPure;
+if (!evidencePure) throw new Error('search evidence schema unavailable');
 export const NETWORK_MODES = Object.freeze(['off', 'auto', 'required']);
 export const NETWORK_EXECUTIONS = Object.freeze(['native-first', 'native-only', 'external-first', 'external-only']);
 export const SOURCE_POLICIES = Object.freeze(['official-preferred', 'official-only', 'any']);
 export const NETWORK_FALLBACKS = Object.freeze(['local-estimate', 'ask-user', 'fail']);
-export const SEARCH_PROVIDER_TYPES = Object.freeze(['tavily', 'brave', 'searxng']);
-export const SEARCH_LIMITS = Object.freeze({ maxProviders: 12, maxProviderIds: 12, maxDomains: 20, maxDomainLength: 253, maxToolCalls: 2, maxResultChars: 12000, maxResults: 10, timeoutMs: 8000, queryChars: 240, snippetChars: 2000 });
-const OFFICIAL_DOMAIN_RULES = Object.freeze({
-  'mcdonalds.com': 'official-nutrition', 'kfc.com': 'official-nutrition',
-  'starbucks.com': 'official-nutrition', 'subway.com': 'official-nutrition',
-  'burgerking.com': 'official-nutrition', 'coca-cola.com': 'official-nutrition'
-});
+export const SEARCH_PROVIDER_TYPES = Object.freeze(['tavily', 'brave', 'searxng', 'exa', 'jina', 'serper', 'duckduckgo']);
+export const SEARCH_LIMITS = evidencePure.SEARCH_LIMITS;
+export const SEARCH_DOMAIN_PROFILES = evidencePure.SEARCH_DOMAIN_PROFILES;
+export const SEARCH_SOURCE_TYPES = evidencePure.SEARCH_SOURCE_TYPES;
 
 const freeze = Object.freeze;
 const own = (value, key) => {
@@ -20,11 +20,7 @@ const text = (value, limit = 0) => typeof value === 'string' ? value.trim().slic
 const oneOf = (value, values, fallback) => values.includes(String(value || '').trim()) ? String(value).trim() : fallback;
 const positive = (value, fallback, max) => Number.isFinite(Number(value)) ? Math.max(1, Math.min(max, Math.floor(Number(value)))) : fallback;
 
-export function normalizeDomain(value) {
-  let domain = text(value, SEARCH_LIMITS.maxDomainLength).toLowerCase().replace(/^https?:\/\//, '').replace(/\/$/, '');
-  if (!domain || /[\s/@?#\\]/.test(domain) || domain === 'localhost' || /^\d{1,3}(?:\.\d{1,3}){3}$/.test(domain)) return '';
-  return /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/.test(domain) ? domain : '';
-}
+export const normalizeDomain = evidencePure.normalizeDomain;
 
 function uniqueStrings(value, limit, mapper = value => text(value)) {
   const result = [];
@@ -89,7 +85,8 @@ export function normalizeSearchProvider(value = {}, index = 0) {
     options: freeze({
       maxResults: positive(own(safeOptions, 'maxResults'), 5, SEARCH_LIMITS.maxResults),
       timeoutMs: positive(own(safeOptions, 'timeoutMs'), SEARCH_LIMITS.timeoutMs, 30000),
-      ...(type === 'searxng' && baseUrl ? { baseUrl } : {})
+      ...(type === 'searxng' && baseUrl ? { baseUrl } : {}),
+      ...(type === 'duckduckgo' ? { experimental: true } : {})
     })
   });
 }
@@ -135,44 +132,15 @@ export function safeSearchQuery(value) {
   }).join('').replace(/\s+/g, ' ').trim();
 }
 
-export function classifySearchSource(value) {
-  let domain = '';
-  try { domain = normalizeDomain(new URL(String(value || '')).hostname); } catch {}
-  const match = Object.entries(OFFICIAL_DOMAIN_RULES)
-    .find(([allowed]) => domain === allowed || domain.endsWith(`.${allowed}`));
-  return freeze(match
-    ? { sourceType: match[1], official: true }
-    : { sourceType: 'other', official: false });
-}
-
-export function normalizeSearchEvidence(value = {}, options = {}) {
-  const raw = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
-  let url = text(own(raw, 'url'), 2048);
-  try {
-    const parsed = new URL(url);
-    if (parsed.protocol !== 'https:' || parsed.username || parsed.password || !normalizeDomain(parsed.hostname)) url = '';
-    else url = parsed.href;
-  } catch { url = ''; }
-  if (!url) return null;
-  const domain = normalizeDomain(new URL(url).hostname);
-  const allowed = uniqueStrings(options.allowedDomains, SEARCH_LIMITS.maxDomains, normalizeDomain);
-  if (allowed.length && !allowed.some(item => domain === item || domain.endsWith(`.${item}`))) return null;
-  const sourceType = oneOf(own(raw, 'sourceType'), ['official-nutrition', 'official-menu', 'database', 'other'], 'other');
-  const official = own(raw, 'official') === true && ['official-nutrition', 'official-menu'].includes(sourceType);
-  return freeze({
-    id: text(own(raw, 'id'), 128) || `ev_${Math.random().toString(36).slice(2, 12)}`,
-    title: text(own(raw, 'title'), 300), url, domain,
-    snippet: text(own(raw, 'snippet'), SEARCH_LIMITS.snippetChars),
-    providerId: text(own(raw, 'providerId'), 128),
-    retrievedAt: Math.max(0, Number(own(raw, 'retrievedAt')) || Date.now()),
-    sourceType, official,
-    matchTrusted: options.matchTrusted === true,
-    match: freeze({
-      brand: text(own(own(raw, 'match'), 'brand'), 120), product: text(own(own(raw, 'match'), 'product'), 160),
-      market: text(own(own(raw, 'match'), 'market'), 32), serving: text(own(own(raw, 'match'), 'serving'), 120)
-    })
-  });
-}
+export const safeFetchUrl = evidencePure.safeFetchUrl;
+export const domainProfileForTask = evidencePure.domainProfileForTask;
+export const classifySearchSource = evidencePure.classifySearchSource;
+export const searchSourcePriority = evidencePure.searchSourcePriority;
+export const sortSearchEvidence = evidencePure.sortSearchEvidence;
+export const normalizeSearchEvidence = evidencePure.normalizeSearchEvidence;
+export const summarizeSearchEvidence = evidencePure.summarizeSearchEvidence;
+export const stripSearchEvidenceBody = evidencePure.stripSearchEvidenceBody;
+export const searchEvidenceVersion = evidencePure.searchEvidenceVersion;
 
 
 const FOOD_VERIFY_TRIGGER = /(?:\b(?:kfc|mcdonald'?s|starbucks|subway|burger\s*king)\b|麦当劳|肯德基|星巴克|瑞幸|喜茶|奈雪|包装|条码|菜单|订单|套餐|去掉|不要|加|换|双倍|半份|核实|来源|最新)/i;
@@ -188,7 +156,7 @@ export function shouldVerifyFoodEvidence(input, item = {}, policy = {}) {
 export function summarizeFoodEvidence(value) {
   if (!value) return null;
   const { evidence = [], ...summary } = value;
-  return { ...summary, sources: evidence.map(({ snippet, match, matchTrusted, providerId, retrievedAt, ...source }) => source).slice(0, 20) };
+  return { ...summary, sources: summarizeSearchEvidence(evidence, { domainProfile: 'food' }) };
 }
 
 export const FOOD_VERIFICATION_STATES = freeze(['not-required', 'pending', 'verified', 'estimated', 'needs-confirmation', 'unavailable', 'invalidated']);
@@ -295,4 +263,4 @@ export function foodVerificationSaveDecision(value = {}, policy = {}) {
   return freeze({ allowed: false, state, reason });
 }
 
-if (typeof window !== 'undefined') window.searchPolicyPure = { NETWORK_MODES, NETWORK_EXECUTIONS, SOURCE_POLICIES, NETWORK_FALLBACKS, SEARCH_PROVIDER_TYPES, SEARCH_LIMITS, FOOD_VERIFICATION_STATES, normalizeDomain, normalizeNetworkDefaults, normalizeNetworkPolicy, normalizeSearchProvider, normalizeSearchConfig, normalizeSearchEvidence, resolveNetworkPolicy, safeSearchQuery, classifySearchSource, shouldVerifyFoodEvidence, summarizeFoodEvidence, validateFoodEvidenceLinks, foodEvidenceMatchConflict, deriveFoodEvidenceTier, verificationStateFromEvidence, createFoodVerificationStates, invalidateFoodVerification, foodVerificationSaveDecision };
+if (typeof window !== 'undefined') window.searchPolicyPure = { NETWORK_MODES, NETWORK_EXECUTIONS, SOURCE_POLICIES, NETWORK_FALLBACKS, SEARCH_PROVIDER_TYPES, SEARCH_LIMITS, SEARCH_DOMAIN_PROFILES, SEARCH_SOURCE_TYPES, FOOD_VERIFICATION_STATES, normalizeDomain, normalizeNetworkDefaults, normalizeNetworkPolicy, normalizeSearchProvider, normalizeSearchConfig, normalizeSearchEvidence, summarizeSearchEvidence, stripSearchEvidenceBody, searchEvidenceVersion, resolveNetworkPolicy, safeSearchQuery, safeFetchUrl, domainProfileForTask, classifySearchSource, searchSourcePriority, sortSearchEvidence, shouldVerifyFoodEvidence, summarizeFoodEvidence, validateFoodEvidenceLinks, foodEvidenceMatchConflict, deriveFoodEvidenceTier, verificationStateFromEvidence, createFoodVerificationStates, invalidateFoodVerification, foodVerificationSaveDecision };

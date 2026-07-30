@@ -113,6 +113,10 @@ function loadAdviceHarness() {
     context.window = {
         ai,
         aiRoutingPure: { manualFallbackTarget },
+        searchToolLoop: {
+            urlsFromText: value => Object.freeze(String(value || '').match(/https:\/\/[^\s]+/g) || []),
+            normalizeUserProvidedUrls: value => Object.freeze(Array.isArray(value) ? [...new Set(value)] : [])
+        },
         toast: {
             show(...args) { state.toastCalls.push(args); },
             sanitize: context.toast.sanitize
@@ -248,9 +252,10 @@ test('zero-output chat fallback retries the safe target without duplicating the 
         return 'recovered answer';
     };
 
-    await data.sendAiAdvice('keep one question', { routeOverride: { profileId: 'first-profile', modelId: 'first-model' } });
+    await data.sendAiAdvice('keep one https://example.com/guide', { routeOverride: { profileId: 'first-profile', modelId: 'first-model' } });
     const failed = data.db.health.aiAdviceChat.find(message => message.role === 'assistant');
     const failedIndex = data.db.health.aiAdviceChat.indexOf(failed);
+    const proof = Object.getOwnPropertyDescriptor(failed, '_userProvidedUrls');
     await data.retryAdviceFrom(failedIndex, failed.id);
 
     const userMessages = data.db.health.aiAdviceChat.filter(message => message.role === 'user' && !message.deleted);
@@ -260,6 +265,10 @@ test('zero-output chat fallback retries the safe target without duplicating the 
     assert.equal(userMessages.length, 1);
     assert.deepEqual(json(failed.aiFallback?.target), target);
     assert.deepEqual(json(retriedCall.routeOverride), target);
+    assert.equal(proof.enumerable, false);
+    assert.equal(Object.isFrozen(proof.value), true);
+    assert.equal(retriedCall.userProvidedUrls, proof.value);
+    assert.equal(JSON.stringify(failed).includes('_userProvidedUrls'), false);
     assert.equal(retriedAnswer.replyToId, failed.id);
     assert.equal(retriedAnswer.versionIdx, 1);
     assert.equal(retriedAnswer.versionActive, true);
@@ -299,6 +308,7 @@ test('chat fallback persists only a safe target and refresh retry keeps the orig
     assert.deepEqual(json(restored.__state.calls[0].messages), [
         { role: 'user', content: 'persist this question' }
     ]);
+    assert.deepEqual(json(restored.__state.calls[0].userProvidedUrls), []);
     assert.equal(restored.db.health.aiAdviceChat.filter(message => message.role === 'user' && !message.deleted).length, 1);
 });
 

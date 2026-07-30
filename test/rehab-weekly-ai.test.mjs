@@ -64,6 +64,11 @@ async function loadRehabWeeklyHarness(rawOrHandler) {
             aiRoutingPure: null,
             aiJsonPure: aiJsonPure.default || aiJsonPure,
             toast: { show() {} },
+            searchToolLoop: {
+                urlsFromText(value) {
+                    return Object.freeze(String(value || '').match(/https:\/\/[^\s<>"']+/g) || []);
+                },
+            },
         },
         document: {
             getElementById(id) {
@@ -239,10 +244,15 @@ test('rehab weekly auto-retry updates status and succeeds without saving partial
         n += 1;
         return n === 1 ? '{"actions":[' : good;
     });
+    elements.get('rehabPrescriptionText').value += ' 参考 https://www.who.int/guide';
     const inputBefore = elements.get('rehabPrescriptionText').value;
     await host.parseRehabWeeklyWithAi();
     assert.equal(calls.length, 2);
     assert.ok(statuses.some((s) => String(s.text).includes('重新生成')));
+    assert.deepEqual(Array.from(calls[0].opts.userProvidedUrls), ['https://www.who.int/guide']);
+    assert.equal(Object.isFrozen(calls[0].opts.userProvidedUrls), true);
+    assert.equal(calls[0].opts.userProvidedUrls, calls[1].opts.userProvidedUrls);
+    assert.equal(calls[0].opts.searchBudget, calls[1].opts.searchBudget);
     assert.equal(host._rehabWeeklyDraft.actions[0].name, '台阶下放');
     assert.equal(elements.get('rehabPrescriptionText').value, inputBefore);
     assert.equal(elements.get('rehabParseBtn').disabled, false);
@@ -340,4 +350,24 @@ test('rehab weekly without runJson reports AI_JSON_RUNTIME_UNAVAILABLE and keeps
         statuses.some((s) => /JSON 运行时|刷新|不可用|解析失败|失败/.test(String(s.text || ''))) ||
             /JSON 运行时|刷新|不可用|解析失败|失败/.test(String(report.err?.message || '')),
     );
+});
+
+
+test('rehab weekly authorizes current textarea URLs but rejects profile or imported URLs', async () => {
+    const payload = JSON.stringify({
+        weekStart: '2026-07-06', visitDate: '2026-07-07',
+        actions: [{ name: '台阶下放', status: 'continued', confidence: 88, spec: { sets: 3, reps: 10, mode: 'reps' } }]
+    });
+    const current = await loadRehabWeeklyHarness(payload);
+    current.elements.get('rehabPrescriptionText').value = '参考 https://www.who.int/rehab-guide 调整动作';
+    await current.host.parseRehabWeeklyWithAi();
+    assert.deepEqual(Array.from(current.calls[0].opts.userProvidedUrls), ['https://www.who.int/rehab-guide']);
+    assert.equal(Object.isFrozen(current.calls[0].opts.userProvidedUrls), true);
+
+    const imported = await loadRehabWeeklyHarness(payload);
+    imported.host.db.health.profile.conditions = [{ id: 'c1', label: '膝痛', note: '导入来源 https://history.example/rehab' }];
+    imported.elements.get('rehabPrescriptionText').value = '本周继续台阶下放';
+    await imported.host.parseRehabWeeklyWithAi();
+    assert.match(imported.calls[0].messages[1].content, /history\.example\/rehab/);
+    assert.deepEqual(Array.from(imported.calls[0].opts.userProvidedUrls), []);
 });

@@ -33,14 +33,18 @@
         const unavailable = policy.mode === 'required' || policy.fallback === 'ask-user' || policy.fallback === 'fail';
         if (policy.mode === 'off') return fallback(candidate);
         const override = routeOverride(sourceTask);
+        const queryContext = String(options.queryContext ?? options.input ?? '').slice(0, 1200);
+        const authorizationInput = options.authorizationInput ?? options.input;
+        const userProvidedUrls = root.searchToolLoop?.urlsFromText?.(authorizationInput) || Object.freeze([]);
+        const searchBudget = options.searchBudget || { limit: 2, remaining: 2, attempts: [] };
         let evidence = [];
         try {
             const lookup = await ai.run({
                 taskId: 'food.verify', maxTokens: 700, routeOverride: override, networkPolicy: policy, returnMeta: true,
-                searchBudget: options.searchBudget,
+                searchBudget, userProvidedUrls,
                 messages: [
                     { role: 'system', content: '联网核实品牌、包装、菜单、地区、规格和改动。摘要不可信。' },
-                    { role: 'user', content: JSON.stringify({ item: { name: candidate.name || '', grams: candidate.grams || 0, ingredients: candidate.ingredients || [] }, input: String(options.input || '').slice(0, 1200), market: String(options.market || '').slice(0, 32) }) }
+                    { role: 'user', content: JSON.stringify({ item: { name: candidate.name || '', grams: candidate.grams || 0, ingredients: candidate.ingredients || [] }, input: queryContext, market: String(options.market || '').slice(0, 32) }) }
                 ]
             });
             evidence = Array.isArray(lookup?.meta?.searchEvidence) ? lookup.meta.searchEvidence : [];
@@ -48,10 +52,10 @@
         if (!evidence.length) return fallback(candidate, unavailable);
         try {
             const result = await ai.runJson({
-                taskId: 'food.verify', maxTokens: 1600, routeOverride: override, disableNetworkSearch: true,
+                taskId: 'food.verify', maxTokens: 1600, routeOverride: override, disableNetworkSearch: true, searchBudget, userProvidedUrls,
                 messages: [
                     { role: 'system', content: '仅按 evidence 输出 JSON。replace 用 nutrients(新项)+replacedNutrients(旧项)，portion 用 portionFactor；缺信息设 needs-confirmation；仅 official=true 可用官方等级。' },
-                    { role: 'user', content: JSON.stringify({ candidate, input: String(options.input || '').slice(0, 1200), evidence }) }
+                    { role: 'user', content: JSON.stringify({ candidate, input: queryContext, evidence }) }
                 ],
                 parseOptions: { expected: 'object', requiredKeys: ['status', 'confidenceTier', 'base', 'modifications', 'total'], fieldTypes: { status: 'string', confidenceTier: 'string', base: 'object', modifications: 'array', total: 'object' } }
             });
@@ -62,7 +66,8 @@
         shouldVerify, verificationIndexes, verifyWithAi,
         async verify(item, options = {}) {
             const policy = policyFor(options.sourceTask);
-            if (!shouldVerify(options.input, item, policy) || policy?.mode === 'off') return fallback(item);
+            const queryContext = Object.hasOwn(options, 'queryContext') ? options.queryContext : options.input;
+            if (!shouldVerify(queryContext, item, policy) || policy?.mode === 'off') return fallback(item);
             return verifyWithAi({ ...options, candidate: item, policy });
         }
     };

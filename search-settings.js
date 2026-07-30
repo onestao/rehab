@@ -13,6 +13,13 @@
         if (id.startsWith('plan.')) return '仅发送生成当前计划所需的目标、限制和用户明确提供的上下文。';
         return '仅发送完成当前任务所需的信息，不会自动附带无关健康记录。';
     }
+    function sourcePolicyChoices(taskId) {
+        const profile = root.searchPolicyPure?.domainProfileForTask?.(taskId) || 'any';
+        if (profile === 'food') return [['official-preferred', '品牌官方优先'], ['official-only', '仅品牌官方来源'], ['any', '允许所有来源']];
+        if (profile === 'health') return [['official-preferred', '指南与公共卫生优先'], ['official-only', '仅指南与公共卫生来源'], ['any', '允许所有来源']];
+        if (profile === 'training-health') return [['official-preferred', '训练健康来源优先'], ['official-only', '仅指南与公共卫生来源'], ['any', '允许所有来源']];
+        return [['official-preferred', '官方优先'], ['official-only', '仅官方来源'], ['any', '允许所有来源']];
+    }
     function updateProviderSelection(providerIds, providerId, checked) {
         const current = [...new Set((Array.isArray(providerIds) ? providerIds : []).map(value => text(value).trim()).filter(Boolean))];
         const id = text(providerId).trim();
@@ -64,7 +71,7 @@
         section.append(
             selectField('联网模式', [['off', '不联网'], ['auto', '需要时联网'], ['required', '本次必须先核实']], network.mode, mode => saveNetwork({ mode })),
             selectField('执行顺序', [['native-first', '原生优先'], ['native-only', '仅模型原生'], ['external-first', '外部服务优先'], ['external-only', '仅外部服务']], network.execution, execution => saveNetwork({ execution })),
-            selectField('来源策略', [['official-preferred', '官方优先'], ['official-only', '仅官方来源'], ['any', '允许所有来源']], network.sourcePolicy, sourcePolicy => saveNetwork({ sourcePolicy })),
+            selectField('来源策略', sourcePolicyChoices(taskId), network.sourcePolicy, sourcePolicy => saveNetwork({ sourcePolicy })),
             selectField('不可用时', [['local-estimate', '保留本地估算'], ['ask-user', '要求补充信息'], ['fail', '停止并提示失败']], network.fallback, fallback => saveNetwork({ fallback }))
         );
         const capability = root.searchRegistry?.nativeCapabilityState?.({ ...(root.ai?.resolveTaskConfig?.(taskId) || {}), network })
@@ -101,7 +108,7 @@
             if (selected) {
                 const controls = el('span', 'ai-task-network-provider-order');
                 for (const [symbol, title, delta] of [['arrow_upward', '上移', -1], ['arrow_downward', '下移', 1]]) {
-                    const move = el('button', 'md-icon-btn'); move.type = 'button'; move.title = title; move.append(icon(symbol));
+                    const move = el('button', 'md-icon-btn ai-task-network-order-btn'); move.type = 'button'; move.title = title; move.setAttribute('aria-label', title); move.append(icon(symbol), el('span', 'ai-task-order-caption', title));
                     move.disabled = delta < 0 ? selectedIndex === 0 : selectedIndex === selectedProviders.length - 1;
                     move.addEventListener('click', () => saveNetwork({ providerIds: moveProviderSelection(currentNetwork().providerIds || [], providerId, delta) }));
                     controls.append(move);
@@ -138,7 +145,7 @@
             const meta = el('div', 'search-provider-meta'); meta.append(el('strong', '', provider.name), el('small', '', `${provider.type} · ${provider.archived ? '已归档' : provider.enabled ? '已启用' : '已停用'}`));
             const actions = el('div', 'search-provider-actions');
             for (const [symbol, label, delta] of [['arrow_upward', '上移', -1], ['arrow_downward', '下移', 1]]) {
-                const move = el('button', 'md-icon-btn'); move.type = 'button'; move.title = label; move.append(icon(symbol)); move.addEventListener('click', async () => { await root.searchStore.moveProvider(provider.id, delta); this.render(); }); actions.append(move);
+                const move = el('button', 'md-icon-btn search-provider-order-btn'); move.type = 'button'; move.title = label; move.setAttribute('aria-label', label); move.append(icon(symbol), el('span', 'ai-task-order-caption', label)); move.addEventListener('click', async () => { await root.searchStore.moveProvider(provider.id, delta); this.render(); }); actions.append(move);
             }
             const edit = el('button', 'md-btn md-btn-tonal'); edit.type = 'button'; edit.append(icon('tune'), document.createTextNode('管理')); edit.addEventListener('click', () => this.edit(provider));
             actions.append(edit); row.append(meta, actions); return row;
@@ -150,7 +157,11 @@
             const field = (label, value, type = 'text') => { const wrap = el('label', 'md-field'); const input = document.createElement('input'); input.type = type; input.value = value || ''; input.placeholder = ' '; input.name = label; wrap.append(input, el('span', '', label)); return { wrap, input }; };
             const name = field('名称', provider.name); const key = field('API Key（留空则保持不变）', '', 'password');
             const typeWrap = el('label', 'md-field'); const type = document.createElement('select'); type.name = '类型';
-            [['tavily', 'Tavily'], ['brave', 'Brave Search'], ['searxng', 'SearXNG（自托管）']].forEach(([value, label]) => { const option = document.createElement('option'); option.value = value; option.textContent = label; option.selected = provider.type === value; type.append(option); });
+            [
+                ['tavily', 'Tavily'], ['brave', 'Brave Search'], ['exa', 'Exa'],
+                ['jina', 'Jina Search / Reader'], ['serper', 'Serper'],
+                ['searxng', 'SearXNG（自托管）'], ['duckduckgo', 'DuckDuckGo Instant Answers（实验）']
+            ].forEach(([value, label]) => { const option = document.createElement('option'); option.value = value; option.textContent = label; option.selected = provider.type === value; type.append(option); });
             typeWrap.append(type, el('span', '', '类型'));
             const endpoint = field('SearXNG HTTPS 地址', provider.options?.baseUrl || '', 'url');
             const enabled = document.createElement('input'); enabled.type = 'checkbox'; enabled.checked = provider.enabled !== false;
@@ -163,6 +174,11 @@
             const remove = el('button', 'md-btn md-btn-tonal', '删除'); remove.type = 'button'; remove.addEventListener('click', async () => { if (!root.confirm?.('删除此搜索服务及其本机密钥？')) return; await root.searchStore.removeProvider(provider.id); this.render(); });
             actions.append(cancel, archive, remove, test, save); form.append(name.wrap, typeWrap, endpoint.wrap, key.wrap, enabledWrap, actions);
             const value = () => ({ ...provider, name: name.input.value, type: type.value, enabled: enabled.checked, options: { ...provider.options, baseUrl: endpoint.input.value } });
+            const refreshFields = () => {
+                endpoint.wrap.hidden = type.value !== 'searxng';
+                key.wrap.hidden = ['searxng', 'duckduckgo'].includes(type.value);
+            };
+            type.addEventListener('change', refreshFields); refreshFields();
             test.addEventListener('click', async () => { test.disabled = true; try { await root.searchAdapters?.test?.(value(), key.input.value || root.searchStore?.apiKeyFor?.(provider.id)); root.toast?.show?.('搜索服务连接正常', 'success'); } catch (error) { root.toast?.show?.(root.searchAdapters?.errorMessage?.(error?.code) || '测试失败', 'error'); } finally { test.disabled = false; } });
             form.addEventListener('submit', async event => { event.preventDefault(); await root.searchStore.saveProvider(value(), key.input.value); this.render(); });
             body.append(form);

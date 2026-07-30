@@ -34,6 +34,10 @@ function createHarness(options = {}) {
             actionIdentity: {},
             aiRoutingPure,
             planAiPure,
+            searchToolLoop: {
+                urlsFromText: value => Object.freeze(String(value || '').match(/https:\/\/[^\s]+/g) || []),
+                normalizeUserProvidedUrls: value => Array.isArray(value) ? [...new Set(value)] : []
+            },
             planPolicy: { isProtectedPlanTask: () => false },
             toast: { show: (...args) => toastCalls.push(args), sanitize: (error) => String(error?.message || error || '') }
         }
@@ -92,6 +96,7 @@ test('plan fallback action retries once with safe target and preserves sheet sta
             return { text: '{}', meta: { taskId: 'plan.today', profileId: target.profileId, modelId: target.modelId } };
         }
     });
+    harness.promptInput.value = '参考 https://example.com/fallback 制定计划';
     const originalPreview = harness.data._pendingPlanAiPlans;
     const originalTypes = [...harness.data._planAiTypes];
     const originalConditions = [...harness.data._planAiConditionIds];
@@ -101,7 +106,7 @@ test('plan fallback action retries once with safe target and preserves sheet sta
 
     assert.equal(harness.data.previewCalls || 0, 0);
     assert.equal(harness.data._pendingPlanAiPlans, originalPreview);
-    assert.equal(harness.promptInput.value, '保留疼痛反馈，安排轻量训练');
+    assert.equal(harness.promptInput.value, '参考 https://example.com/fallback 制定计划');
     assert.deepEqual(harness.data._planAiTypes, originalTypes);
     assert.deepEqual(harness.data._planAiConditionIds, originalConditions);
     assert.deepEqual(harness.data._planAiTemporaryConditions, originalTemporaryConditions);
@@ -117,15 +122,56 @@ test('plan fallback action retries once with safe target and preserves sheet sta
 
     assert.equal(harness.routeCalls.length, 2);
     assert.deepEqual(harness.routeCalls[1][4]?.routeOverride, target);
+    assert.equal(harness.routeCalls[0][4]?.userProvidedUrls, harness.routeCalls[1][4]?.userProvidedUrls);
+    assert.equal(Object.isFrozen(harness.routeCalls[1][4]?.userProvidedUrls), true);
     assert.equal(harness.data.previewCalls, 1);
     assert.deepEqual(JSON.parse(JSON.stringify(harness.data._lastPlanAiMeta)), {
         taskId: 'plan.today',
         profileId: target.profileId,
-        modelId: target.modelId
+        modelId: target.modelId,
+        searchEvidence: []
     });
-    assert.equal(harness.promptInput.value, '保留疼痛反馈，安排轻量训练');
+    assert.equal(harness.promptInput.value, '参考 https://example.com/fallback 制定计划');
     assert.deepEqual(harness.data._planAiTypes, originalTypes);
     assert.deepEqual(harness.data._planAiConditionIds, originalConditions);
     assert.deepEqual(harness.data._planAiTemporaryConditions, originalTemporaryConditions);
     assert.equal(harness.setTaskRouteCalls(), 0);
+});
+
+test('plan JSON repair reuses runtime budget and the original explicit URL authorization', async () => {
+    const budgets = [];
+    const urlSets = [];
+    let modelCalls = 0;
+    const harness = createHarness({
+        runStream: async (_taskId, _messages, _tokens, _onToken, options) => {
+            modelCalls += 1;
+            budgets.push(options.searchBudget);
+            urlSets.push(options.userProvidedUrls);
+            if (modelCalls === 1) {
+                options.searchBudget.remaining -= 2;
+                options.searchBudget.attempts.push(
+                    { kind: 'external', providerId: 'provider-a', status: 'failed' },
+                    { kind: 'external', providerId: 'provider-b', status: 'success' }
+                );
+                return { text: '{"plans":', meta: { taskId: 'plan.today', profileId: 'p1', modelId: 'm1', searchEvidence: [{ url: 'https://example.com/source' }] } };
+            }
+            assert.equal(options.searchBudget.remaining, 0);
+            return { text: '{}', meta: { taskId: 'plan.today', profileId: 'p1', modelId: 'm1' } };
+        }
+    });
+    harness.promptInput.value = '请参考 https://example.com/guide 后安排计划';
+    let validations = 0;
+    harness.data.validatePlanAiPayload = () => (++validations === 1
+        ? { ok: false, errors: ['invalid json'] }
+        : { ok: true, errors: [] });
+
+    await harness.data.submitPlanAi('today');
+
+    assert.equal(modelCalls, 2);
+    assert.equal(budgets[0], budgets[1]);
+    assert.equal(urlSets[0], urlSets[1]);
+    assert.equal(Object.isFrozen(urlSets[0]), true);
+    assert.deepEqual(Array.from(urlSets[0]), ['https://example.com/guide']);
+    assert.equal(budgets[1].remaining, 0);
+    assert.equal(JSON.stringify(budgets[1].attempts.map(item => item.providerId)), JSON.stringify(['provider-a', 'provider-b']));
 });

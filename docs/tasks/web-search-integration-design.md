@@ -1,12 +1,12 @@
 # AI 联网检索与食物证据核实接入设计
 
 > 日期：2026-07-29
-> 状态：提案，尚未实施
-> 目标：在不引入后端或 bundler 的前提下，为静态、本地优先 PWA 增加按任务可控的联网检索；优先解决品牌食品、包装食品和 D.I.Y. 快餐的营养核实。
+> 状态：主体已实施，复审修复与最终门禁见 `web-search-next-capability-plan.md`
+> 目标：在不引入后端或 bundler 的前提下，为静态、本地优先 PWA 提供按任务可控的原生联网、外部搜索、受控网页深读与可持久化引用。
 
 ## 1. 结论与范围
 
-联网检索应成为 AI 的**受控能力**，而不是全局默认行为或任意 URL `fetch`。系统同时支持两条执行路径：
+联网检索是 AI 的**受控能力**，不是全局默认行为或任意 URL `fetch`。系统支持原生搜索、外部搜索和仅针对本轮证据/用户 URL 的受控 `fetch_url`：
 
 1. **模型原生联网**：在供应商 API 请求中启用该模型支持的 Web Search 工具，由供应商完成检索、网页理解和引用。
 2. **外部搜索服务**：用户配置一个受支持的搜索服务；模型通过受限的 `search_web` 工具请求检索，应用将规范化结果回传给模型。
@@ -28,10 +28,10 @@
 
 项目已有适合复用的基础：
 
-- `ai-routing.js` 注册 14 个任务，已按任务保存主模型、推理深度与备用模型；`food.text` 和 `food.vision` 已是独立任务。
+- `ai-routing.js` 当前注册 15 个任务，已按任务保存主模型、推理深度、备用模型与联网策略；`food.text`、`food.vision`、`food.verify` 已是独立任务。
 - `ai-task-settings.js` 已有“功能模型”矩阵和完整设置 Sheet；不需要新增平行的设置入口。
 - `ai-provider-manager.js` 已有供应商列表、详情、启用/归档、模型发现和测试连接的交互模型。
-- `ai-api.js` 已按 OpenAI Chat、OpenAI Responses、Claude、Gemini 分发请求，但没有发送工具定义、处理 tool call 或保存搜索引用。
+- `ai-api.js` 已按 OpenAI Chat、OpenAI Responses、Claude、Gemini 分发请求，并通过受控工具循环处理搜索、深读与原生引用。
 - 食物识别的 JSON 已包含 `ingredients`、`source`、`confidence`、`note`；但这些字段目前可由模型自行估算，不是可验证证据。
 - `food-log.js` 已允许用户在保存前编辑 AI 识别草稿，是接入“核实后确认”最安全的落点。
 

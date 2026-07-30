@@ -596,7 +596,7 @@ const foodLog = {
             if (verifyIndexes.length) {
                 if (statusEl) statusEl.textContent = '正在查询营养信息…';
                 const searchBudget = { limit: 2, remaining: 2, attempts: [] };
-                await Promise.all(verifyIndexes.map(index => this.verifyAiFood(index, { input: text, silent: true, searchBudget })));
+                await Promise.all(verifyIndexes.map(index => this.verifyAiFood(index, { queryContext: text, authorizationInput: text, silent: true, searchBudget })));
             }
             this.renderAiFoodResults();
             if (statusEl) statusEl.textContent = incompleteCount
@@ -665,7 +665,10 @@ const foodLog = {
         const statusEl = document.getElementById('foodAiStatus');
         if (!options.silent && statusEl) statusEl.textContent = '正在查询营养信息…';
         const sourceTask = options.sourceTask === 'food.vision' ? 'food.vision' : (this._aiFoodSourceTask || 'food.text');
-        const evidence = await window.foodEvidence.verify(item, { input: options.input || document.getElementById('foodAiText')?.value || item.name, sourceTask, searchBudget: options.searchBudget || { limit: 2, remaining: 2, attempts: [] } });
+        const textareaInput = document.getElementById('foodAiText')?.value || '', hasInput = Object.hasOwn(options, 'input'), vision = sourceTask === 'food.vision';
+        const queryContext = options.queryContext ?? (hasInput ? options.input : (vision ? '' : textareaInput));
+        const authorizationInput = options.authorizationInput ?? (vision ? '' : (hasInput ? options.input : textareaInput));
+        const evidence = await window.foodEvidence.verify(item, { queryContext, authorizationInput, sourceTask, searchBudget: options.searchBudget || { limit: 2, remaining: 2, attempts: [] } });
         this._aiFoodEvidence[idx] = evidence;
         this._aiFoodVerification = this._aiFoodVerification || [];
         this._aiFoodVerification[idx] = window.searchPolicyPure.verificationStateFromEvidence(evidence, { required: true });

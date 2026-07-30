@@ -214,7 +214,6 @@ const advicePanel = {
             pinAdviceVersion: this.pinAdviceVersion,
             deleteAdviceVersion: this.deleteAdviceVersion
         });
-        // New callers should use this narrow facade; the flat attach list above stays for legacy compatibility.
         target.adviceApi = this.createAdviceFacade(target);
         Object.assign(target, window.adviceTemplateManager || {});
         Object.assign(target, window.adviceAttachments || {});
@@ -583,9 +582,6 @@ const advicePanel = {
         } else {
             scroller.scrollTop = target;
         }
-        // Some iOS Safari WebViews silently ignore smooth scrolling on a nested
-        // overflow ancestor. Verify after a frame and force the position if
-        // nothing actually moved.
         requestAnimationFrame(() => {
             const now = isDoc
                 ? (window.scrollY || document.documentElement.scrollTop || 0)
@@ -2280,6 +2276,9 @@ const advicePanel = {
             ? attachmentPayload.attachments.slice()
             : ((!promptOverride && !options?.skipUserMessage) ? (this._adviceAttachments || []).filter(att => att && att.status !== 'failed').slice() : []);
         const effectivePrompt = prompt || (attachments.some(att => att.kind === 'image') ? '请结合附件内容进行分析，并给出可执行建议。' : '请分析附件内容，并给出可执行建议。');
+        const urls = Array.isArray(options?.userProvidedUrls)
+            ? (Object.isFrozen(options.userProvidedUrls) ? options.userProvidedUrls : (window.searchToolLoop?.normalizeUserProvidedUrls?.(options.userProvidedUrls) || []))
+            : (!options?.skipUserMessage ? (window.searchToolLoop?.urlsFromText?.(effectivePrompt) || []) : []);
         if (!(this.canSendAdviceWithAttachments?.(prompt, attachments) || prompt)) return;
         if (attachments.some(att => att.status === 'processing')) {
             window.toast?.show?.('附件仍在处理中，请稍后发送', 'info');
@@ -2406,8 +2405,11 @@ const advicePanel = {
             const unpack = result => {
                 const found = result?.meta?.searchEvidence;
                 if (Array.isArray(found)) {
+                    const safe = window.searchPolicyPure?.summarizeSearchEvidence?.(found, {
+                        taskId: hasImageAttachment ? 'advice.vision' : 'advice.chat'
+                    }) || [];
                     const byUrl = new Map(searchEvidence.map(item => [item.url, item]));
-                    found.forEach(item => { if (item?.url) byUrl.set(item.url, item); });
+                    safe.forEach(item => { if (item?.url) byUrl.set(item.url, item); });
                     searchEvidence = [...byUrl.values()].slice(0, 20);
                 }
                 return typeof result === 'string' ? result : String(result?.text || '');
@@ -2478,7 +2480,6 @@ const advicePanel = {
                             contentEl._renderer.seed(displayAccumulated);
                         }
                     } else {
-                        // fallback
                         contentEl.innerHTML = this.renderAdviceMarkdown(displayAccumulated);
                     }
                     bubble.classList.remove('pending');
@@ -2495,6 +2496,7 @@ const advicePanel = {
                     maxTokens: outputTokenBudget,
                     signal: controller.signal,
                     routeOverride,
+                    userProvidedUrls: urls,
                     returnMeta: true,
                     searchBudget,
                     onProgress: ({ stage, message }) => {
@@ -2507,9 +2509,9 @@ const advicePanel = {
                     }
                 }) : await ai.callAdviceWithAttachments(messages, attachments, outputTokenBudget, { signal: controller.signal, routeOverride }))
                 : (typeof ai.runStream === 'function'
-                    ? await ai.runStream('advice.chat', messages, outputTokenBudget, onToken, { signal: controller.signal, routeOverride, returnMeta: true, searchBudget })
+                    ? await ai.runStream('advice.chat', messages, outputTokenBudget, onToken, { signal: controller.signal, routeOverride, returnMeta: true, searchBudget, userProvidedUrls: urls })
                     : (typeof ai.run === 'function'
-                        ? await ai.run({ taskId: 'advice.chat', messages, maxTokens: outputTokenBudget, stream: true, onToken, signal: controller.signal, routeOverride, returnMeta: true, searchBudget })
+                        ? await ai.run({ taskId: 'advice.chat', messages, maxTokens: outputTokenBudget, stream: true, onToken, signal: controller.signal, routeOverride, returnMeta: true, searchBudget, userProvidedUrls: urls })
                         : await ai.callStream(messages, outputTokenBudget, onToken, { signal: controller.signal, routeOverride }))));
             finishRequestUsage();
             const autoContinueLimit = Math.max(0, Number(this.ADVICE_AUTO_CONTINUE_LIMIT || advicePanel.ADVICE_AUTO_CONTINUE_LIMIT) || 0);
@@ -2530,7 +2532,7 @@ const advicePanel = {
                         { role: 'user', content: '继续上一条回复：从断点处直接续写剩余内容，不要重复前文，不要重新开头，优先把结尾补完整。' }
                     ];
                     const continued = unpack(typeof ai.run === 'function'
-                        ? await ai.run({ taskId: adviceTaskId, messages: continuationMessages, maxTokens: outputTokenBudget, stream: true, onToken: createOnToken(continuedFrom), signal: controller.signal, routeOverride, returnMeta: true, searchBudget })
+                        ? await ai.run({ taskId: adviceTaskId, messages: continuationMessages, maxTokens: outputTokenBudget, stream: true, onToken: createOnToken(continuedFrom), signal: controller.signal, routeOverride, returnMeta: true, searchBudget, userProvidedUrls: urls })
                         : await ai.callStream(continuationMessages, outputTokenBudget, createOnToken(continuedFrom), { signal: controller.signal, routeOverride }));
                     finishRequestUsage();
                     full = continuedFrom + String(continued || '');
@@ -2704,6 +2706,7 @@ const advicePanel = {
                 : null;
             preserveAttachmentPayload = !!(hasImageAttachment && fallbackTarget && !attachmentPayloadId);
             const failed = { id: pendingId, role: 'assistant', content: failure.content, at: new Date().toISOString(), model, provider, temporaryModel: isOverride, error: true, errorInfo: { ...(failure.info || {}), ...(this._adviceRequestMeta || {}) }, retryPrompt: effectivePrompt, ...(fallbackTarget ? { aiFallback: { taskId: adviceTaskId, target: fallbackTarget } } : {}), deleted: false, updatedAt: Date.now(), replyToId, versionIdx: baseVersionIdx, versionActive: options?.versionActive !== false, versionPinned: !!options?.versionPinned };
+            if (fallbackTarget && urls.length) Object.defineProperty(failed, '_userProvidedUrls', { value: urls });
             if (idx >= 0) this.db.health.aiAdviceChat[idx] = failed;
             else this.db.health.aiAdviceChat.push(failed);
             window.errorBus?.event?.('advice.request', 'failed', {
@@ -2832,6 +2835,7 @@ const advicePanel = {
 
         await this.sendAiAdvice(nextPrompt, {
             skipUserMessage: true,
+            userProvidedUrls: window.searchToolLoop?.urlsFromText?.(nextPrompt) || [],
             insertAfterId: userId,
             replyToId: rootId,
             versionIdx: nextVersionIdx,
@@ -2928,8 +2932,10 @@ const advicePanel = {
             window.toast?.show?.('原图片仅在当前会话短期保留，请重新附图后再试。', 'info');
             return;
         }
+        const proof = Object.getOwnPropertyDescriptor(msg, '_userProvidedUrls');
+        const userProvidedUrls = proof && !proof.enumerable && Object.isFrozen(proof.value) ? proof.value : [];
         const startRetry = (sendOptions) => {
-            const retry = Promise.resolve(this.sendAiAdvice(prompt, { ...sendOptions, routeOverride, attachmentPayloadId }));
+            const retry = Promise.resolve(this.sendAiAdvice(prompt, { ...sendOptions, routeOverride, attachmentPayloadId, userProvidedUrls }));
             if (!msg.id) return retry;
             this._adviceRetryPromises.set(msg.id, retry);
             retry.finally(() => {
@@ -3281,10 +3287,11 @@ PR:${a.prLift || '无'} 1RM${a.prDistance || '--'} ${a.prWeight || '--'}kg${a.pr
             this.cacheTrainingClassifications?.(parsed.classifications);
             const updatedCtx = parsed.classifications?.length && this.buildPlanAnalytics ? { ...ctx, ...this.buildPlanAnalytics() } : ctx;
             this._lastInsightCtx = { ...updatedCtx };
-            const html = `<div class="ai-llm-label">AI 跨域建议</div>${this.renderAdviceMarkdown(parsed.advice || text)}`;
+            const searchEvidence = window.searchEvidenceUi?.summary?.(result?.meta?.searchEvidence, taskId) || [];
+            const html = `<div class="ai-llm-label">AI 跨域建议</div>${this.renderAdviceMarkdown(parsed.advice || text)}${window.searchEvidenceUi?.trail?.(searchEvidence, this.escapeHtml.bind(this)) || ''}`;
             const actualIdentity = normalizeTarget(result?.meta) || requestedIdentity;
             const actualCacheKey = this.insightCacheKey?.(ctx, today, actualIdentity) || cacheKey;
-            this.setInsightCache?.(actualCacheKey, today, html, { text: parsed.advice || text, classifications: parsed.classifications || [], analysis: updatedCtx.analysis || {} });
+            this.setInsightCache?.(actualCacheKey, today, html, { text: parsed.advice || text, classifications: parsed.classifications || [], analysis: updatedCtx.analysis || {}, searchEvidence });
             this.updateInsightAiBlock(html);
             if (parsed.classifications?.length && this._aiInsightExpanded) {
                 this._cachedInsightHtml = html;

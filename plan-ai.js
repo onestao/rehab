@@ -113,7 +113,6 @@
         return String(value || '').split(/[、,，\n]/).map((item) => item.trim()).filter(Boolean);
     }
 
-    // 部位词典已收编进 action-taxonomy-pure.js（boot 常驻）；保留函数壳以维持闭包内调用点不变。
     function inferBodyPart(value = '') {
         return window.actionTaxonomy?.inferBodyPart?.(value) || '';
     }
@@ -496,9 +495,7 @@
                 enriched.note,
                 Array.isArray(enriched.aliases) ? enriched.aliases.join(' ') : '',
                 Array.isArray(enriched.tags) ? enriched.tags.join(' ') : '',
-                // 归一化部位（如「膝盖」→「膝」），让搜索枚举键能命中自由文本部位。
-                // 部位是多值的：把全部命中部位都写进搜索文本，搜「髋」也能找到弓步蹲这类跨部位动作。
-                (window.actionTaxonomy?.normalizeBodyParts?.(
+                                (window.actionTaxonomy?.normalizeBodyParts?.(
                     Array.isArray(enriched.bodyParts) && enriched.bodyParts.length
                         ? enriched.bodyParts
                         : enriched.bodyPart
@@ -803,7 +800,6 @@
             };
             const rehabWeekly = summarizeRehabWeekly(this, 6);
             const prescriptionCatalog = summarizePrescriptionActionCatalog(this, rehabWeekly);
-            // blocked/dropped 处方动作进不了计划，永远等不到分类；顺带在同一次请求里交给 AI，空列表则整段不输出。
             const unclassifiedBodyParts = window.actionIdentity?.listUnclassifiedBodyPartActions?.(this.db || {})?.actions || [];
             const rehabByCondition = partitionRehabWeeklyByConditions(rehabWeekly, selectedConditionIds, temporaryConditions, profile);
             const bodyPartConstraints = summarizeBodyPartConstraints(profile, rehabWeekly, selectedConditionIds, temporaryConditions);
@@ -884,7 +880,6 @@
             const promptMode = mode === 'week'
                 ? `输出严格 JSON：{"plans":[${planJsonShape}]${catalogShape && `,${catalogShape}`}}`
                 : `请输出严格 JSON，结构为：${planJsonShape}${catalogShape && `；顶层再加一个与 items 平级的字段 ${catalogShape}`}`;
-            // 枚举由 taxonomy 唯一定义，动态拼进提示词；词表改了提示词自动跟上，不留第二份字面量。
             const bodyPartEnum = (window.actionTaxonomy?.BODY_PARTS || []).join('/');
             const specRules = [
                 '只输出 JSON 本体，不要使用 Markdown 代码块、不要前后加自然语言、不要注释。所有数值字段必须是 number 类型，布尔字段必须是 true/false，禁止用字符串如 "3"、"true"。',
@@ -1270,6 +1265,7 @@
             }
             const types = normalizePlanTypes(this._planAiTypes);
             const prompt = bodyValue('planAiPrompt').trim();
+            const urls = Array.isArray(options?.userProvidedUrls) ? options.userProvidedUrls : (window.searchToolLoop?.urlsFromText?.(prompt) || []);
             this._lastPlanAiPrompt = prompt;
             this._planAiAllowUserPlanMerge = hasUserPlanMergeIntent(prompt);
             const targetDates = planAiTargetDates(this, mode);
@@ -1282,27 +1278,29 @@
             ];
             try {
                 this.setPlanAiPending?.(true);
-                this.setPlanAiStatus?.('正在发送训练档案和最近计划摘要…', 'busy');
-                window.toast?.show?.('AI 正在生成训练计划…', 'info', 4200);
-                const MAX_ATTEMPTS = 2;
+                this.setPlanAiStatus?.('正在生成计划…', 'busy');
+                window.toast?.show?.('AI 正在生成计划…', 'info', 4200);
                 let text = '';
                 let parsed = null;
                 let validation = null;
                 let requestMeta = null;
-                for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-                    if (attempt > 0) {
-                        this.setPlanAiStatus?.(`第 ${attempt + 1} 次尝试：AI 正在修正 spec 字段…`, 'busy');
+                const searchBudget = { limit: 2, remaining: 2, attempts: [] };
+                for (let attempt = 0; attempt < 2; attempt++) {
+                    if (attempt) {
+                        this.setPlanAiStatus?.('正在修正格式…', 'busy');
                     }
                     const result = await ai.runStream(taskId, messages, outputTokenBudget, (_delta, accumulated) => {
                         const length = String(accumulated || '').length;
-                        this.setPlanAiStatus?.(length ? `正在接收计划草稿：${length} 字` : 'AI 已响应，正在等待内容…', 'busy');
-                    }, { routeOverride, returnMeta: true });
+                        this.setPlanAiStatus?.(length ? `已接收 ${length} 字` : '等待 AI 内容…', 'busy');
+                    }, { routeOverride, returnMeta: true, searchBudget, userProvidedUrls: urls });
                     text = typeof result === 'string' ? result : String(result?.text || '');
-                    if (result?.meta) requestMeta = { ...result.meta };
-                    this.setPlanAiStatus?.('已收到计划草稿，正在校验 JSON…', 'busy');
+                    if (result?.meta) {
+                        requestMeta = { ...result.meta, searchEvidence: window.searchEvidenceUi?.summary?.([...(requestMeta?.searchEvidence || []), ...(result.meta.searchEvidence || [])], taskId) || [] };
+                    }
+                    this.setPlanAiStatus?.('正在校验 JSON…', 'busy');
                     validation = this.validatePlanAiPayload(text, types, mode === 'week' ? targetDates : []);
                     if (validation.ok) break;
-                    if (validation.errors?.length && attempt < MAX_ATTEMPTS - 1) {
+                    if (validation.errors?.length && attempt < 1) {
                         messages.push({ role: 'assistant', content: text });
                         messages.push({
                             role: 'user',
@@ -1347,7 +1345,7 @@
                     onAction: () => {
                         if (retried) return;
                         retried = true;
-                        return this.submitPlanAi(mode, { routeOverride: fallbackTarget });
+                        return this.submitPlanAi(mode, { routeOverride: fallbackTarget, userProvidedUrls: urls });
                     }
                 } : undefined;
                 window.toast?.show?.(`AI 生成失败：${message}`, 'error', retry);
@@ -1709,6 +1707,7 @@
                     title: plan.title || this.planTypeMeta?.(plan.type)?.label || '训练计划',
                     source: currentUserPlan && allowUserPlanMerge ? (current.source || 'manual') : 'ai',
                     notes: plan.notes,
+                    searchEvidence: this._lastPlanAiMeta?.searchEvidence || [],
                     items: [...preserved, ...aiItems]
                 });
                 const validation = currentUserPlan && (forceUserPlanOverwrite || allowUserPlanMerge || !(current.items || []).some((item) => item && !item.deleted)) ? null : window.planPolicy?.validatePlanChanges?.({

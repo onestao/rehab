@@ -1335,7 +1335,7 @@ mark.ai-hit
   files: 54-v6-ai.css
     filter: invert(1) (54-v6-ai.css / 54-v6-ai.css)
 
-## COMPLEMENTS (same selector, disjoint properties): 127
+## COMPLEMENTS (same selector, disjoint properties): 129
 .bar-leading
   files: 04-layout-appbar.css, 50-v6-ui.css
 
@@ -1401,6 +1401,12 @@ mark.ai-hit
 
 .goal-safety-metrics small
   files: 19-health-weightloss-ai.css
+
+.ai-task-utility-controls > button
+  files: 20-settings-ai.css
+
+.ai-compact-model
+  files: 20-settings-ai.css
 
 #aiModelPickerSheet .md-modal-sheet-card
   files: 20-settings-ai.css

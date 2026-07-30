@@ -371,7 +371,7 @@
                 if (verifyIndexes.length) {
                     this.setDietPhotoStatus('request', '正在查询营养信息…', () => controller.abort());
                     const searchBudget = { limit: 2, remaining: 2, attempts: [] };
-                    await Promise.all(verifyIndexes.map(index => this.verifyAiFood?.(index, { input: descriptions[index], sourceTask: 'food.vision', silent: true, searchBudget })));
+                    await Promise.all(verifyIndexes.map(index => this.verifyAiFood?.(index, { queryContext: descriptions[index], authorizationInput: '', sourceTask: 'food.vision', silent: true, searchBudget })));
                 }
                 this.renderAiFoodResults?.();
                 this.setDietPhotoStatus('done', `AI 已识别 ${items.length} 项，点击逐个添加或批量添加`);
