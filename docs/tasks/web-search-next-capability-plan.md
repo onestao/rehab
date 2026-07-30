@@ -1,9 +1,9 @@
 # 联网检索 Sprint 2–4 实施与验收记录
 
 > 日期：2026-07-30  
-> 状态：第九轮 Gemini 最终序列化快照 P1 已关闭；v410 无参数完整门禁通过  
+> 状态：第十一轮本地 Material Symbols 子集修复已完成；v412 无参数完整门禁通过
 > 分支：`perfrom`  
-> 基线：v398；当前候选版本：v410  
+> 基线：v398；当前候选版本：v412
 > 前置记录：`web-search-integration-design.md`、`web-search-merge-review-fix-plan.md`
 
 ## 1. 本轮结论
@@ -20,11 +20,13 @@ Sprint 2–4 主体已从计划转为实现；能否合并仍以本文件所列�
 8. 来源 schema 只在 `search-evidence-schema-pure.js` 定义；浏览器 ESM 与 CommonJS/VM 报告路径调用同一实现，未知域名自报无法提升等级。声明超限响应会在读取前 cancel body 并 abort。
 9. `food.verify` 与 `rehab.weekly` 都只从当前原始输入生成冻结 `userProvidedUrls`；候选对象、健康档案和导入上下文中的 URL 即使进入 `user` 消息也不授权。`verifyAiFood()` 用自有 `input` 属性区分显式空输入与未传输入，永不回退 `item.name`。图片识别把模型描述仅作为 `queryContext`，并以空 `authorizationInput` 执行自动核实；图片结果手动核实也不会读取无关的 `foodAiText`。
 10. Gemini 在合入全部 request options 与原生搜索工具后只生成一次可发送的纯 JSON 快照；该步骤统一触发自身/继承 `toJSON()` 与 getter。URL provenance、`url_context` 决策、原子预算和最终 fetch 字符串都基于该快照，原始对象不会再次序列化。快照中的字符串值和动态对象键只要出现任一未授权 HTTP(S) URL，就不添加 `url_context`，且不消耗 `native-fetch` 预算。
+11. 用户 URL 授权提取与 Gemini 最终快照扫描共用同一个 URL token 规则：原始裸 `]`、反引号和中文 `】` 均作为 token 结束边界；边界后紧邻的第二个 URL 会继续被扫描，百分号编码的 `%5D`、`%60`、`%E3%80%91` 仍保留为 URL 内容。
+12. 本地 Material Symbols 收集器已覆盖动态状态映射、排序元组和 `icon('...')` 调用，补齐 `account_tree`、`database`、`photo_camera`、`arrow_upward`、`arrow_downward`。`npm run icons:update` 可按收集清单重新生成本地 WOFF2；浏览器门禁会逐个验证全部 160 个 ligature，避免仅凭字体家族加载成功造成假通过。
 
 仍保留的边界：
 
 - DuckDuckGo Instant Answers 不是稳定的通用搜索 API，继续标记为 `experimental`。
-- 第三方公网 CORS 会受供应商、账号、区域和网络环境影响；拦截式浏览器契约通过不等于所有公网环境都可直连。
+- 第三方公网 CORS 会受供应商、账号、区域和网络环境影响；拦截式浏览器契约通过不等于所有公网环境都可直连。真实 Exa / Jina / Serper Key 的 Edge 公网冒烟仍需在可用凭据环境执行。
 - DashScope、Grok、Claude 新工具版本与 Gemini 其他上下文工具按真实需求后续接入，不作为本轮硬门禁。
 
 ## 2. 供应商契约
@@ -150,7 +152,7 @@ UI 明确显示：`仅摘要` 或 `已深读`。
 
 - Gemini 模型支持 URL Context、授权集合非空，且合入全部 request options 和原生工具后生成的纯 JSON 快照中，字符串值与动态对象键的所有 HTTP(S) URL 都能在冻结授权集合中逐一匹配时，`google_search` 与 `url_context` 才可同时进入请求。
 - `urlContextMetadata` 成功项转换为 `readStatus: deep-read` 的统一证据。
-- 自身或继承的 `toJSON()` 注入、状态型 getter、动态对象键、后合入 request options、混合来源请求、未授权 HTTPS URL、HTTP URL 或安全规范化失败的 URL 都会在同一快照上禁用 `url_context`；发送字符串不会再次读取原始 getter/`toJSON()`。
+- 自身或继承的 `toJSON()` 注入、状态型 getter、动态对象键、后合入 request options、混合来源请求、未授权 HTTPS URL、HTTP URL 或安全规范化失败的 URL 都会在同一快照上禁用 `url_context`；发送字符串不会再次读取原始 getter/`toJSON()`。用户授权提取与快照扫描共用 token 边界，裸 `]`、反引号、中文 `】` 不会被吞入 URL。
 - 域名白名单与 Gemini 原生 Search 不兼容时，继续提供外部服务恢复路径。
 
 ### OpenRouter Web Search plugin
@@ -194,4 +196,4 @@ git diff --check
 
 不得通过提高 size-limit 或 CSS 冲突阈值完成验收。
 
-本轮 v410 最终结果：`tests 1025 / pass 1025 / fail 0`；CSS overlap 仍为 219/220，HTML safety 为 32 个文件 / 125 个 sink，全部 size-limit、版本同步与 `git diff --check` 均通过。`ai-bundle` 为 143.86/144 KB，`search-bundle` 为 25.72/30 KB。第九轮新增自身/继承 `toJSON()`、状态型 getter、动态键、后合入 request options，以及快照预算与最终发送一致性回归。
+本轮 v412 最终结果：`tests 1032 / pass 1032 / fail 0`；CSS overlap 仍为 219/220，HTML safety 为 32 个文件 / 125 个 sink，全部 size-limit、版本同步与 `git diff --check` 均通过。`records-bundle` 为 94.02/94.1 KB，`ai-bundle` 为 143.86/144 KB，`search-bundle` 为 25.79/30 KB。第十一轮新增动态图标收集单测、本地字体更新脚本和 160/160 逐 ligature 浏览器回归；Material Symbols 字体由 23,308 字节更新为 17,708 字节。

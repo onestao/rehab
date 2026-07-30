@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 const root = path.resolve(import.meta.dirname, '..');
 const outDir = path.join(root, 'build');
@@ -11,6 +12,8 @@ const SPAN_ICON_RE = />([a-z][a-z0-9_]+)<\/span>/g;
 const TERNARY_ICON_RE = /\$\{[^}]*\?\s*["']([a-z][a-z0-9_]*)["']\s*:\s*["']([a-z][a-z0-9_]*)["'][^}]*\}/g;
 const PROPERTY_ICON_RE = /\bicon\s*:\s*["']([a-z][a-z0-9_]*)["']/g;
 const TUPLE_ICON_RE = /\[\s*["'][^"']+["']\s*,\s*["'][^"']+["']\s*,\s*["']([a-z][a-z0-9_]*)["']\s*\]/g;
+const ORDER_ICON_RE = /\[\s*["']([a-z][a-z0-9_]*)["']\s*,\s*["'][^"']+["']\s*,\s*-?\d+\s*\]/g;
+const ICON_CALL_RE = /\bicon\(\s*["']([a-z][a-z0-9_]*)["']\s*\)/g;
 const STATUS_ICON_RE = /:\s*\[\s*["']([a-z][a-z0-9_]*)["']\s*,/g;
 const ICON_TEXT_ASSIGN_RE = /(?:innerText|textContent)\s*=\s*[^;\n]*(?:\?\s*)?["']([a-z][a-z0-9_]*)["'](?:\s*:\s*["']([a-z][a-z0-9_]*)["'])?/g;
 const SPORT_RETURN_RE = /return\s+["']([a-z][a-z0-9_]*)["']/g;
@@ -45,7 +48,7 @@ function readText(filePath) {
     return readFileSync(filePath, 'utf8');
 }
 
-function extractFromContent(content, icons) {
+export function extractFromContent(content, icons = new Set()) {
     DIRECT_ICON_RE.lastIndex = 0;
     let match;
     while ((match = DIRECT_ICON_RE.exec(content)) !== null) {
@@ -89,12 +92,23 @@ function extractFromContent(content, icons) {
         if (context.includes('material-symbols-rounded') || context.includes('icon')) icons.add(match[1]);
     }
 
+    ORDER_ICON_RE.lastIndex = 0;
+    while ((match = ORDER_ICON_RE.exec(content)) !== null) {
+        const start = Math.max(0, match.index - CONTEXT_RADIUS * 2);
+        const end = Math.min(content.length, match.index + match[0].length + CONTEXT_RADIUS * 2);
+        const context = content.slice(start, end);
+        if (context.includes('material-symbols-rounded') || context.includes('icon(')) icons.add(match[1]);
+    }
+
+    ICON_CALL_RE.lastIndex = 0;
+    while ((match = ICON_CALL_RE.exec(content)) !== null) icons.add(match[1]);
+
     STATUS_ICON_RE.lastIndex = 0;
     while ((match = STATUS_ICON_RE.exec(content)) !== null) {
         const start = Math.max(0, match.index - CONTEXT_RADIUS * 3);
         const end = Math.min(content.length, match.index + match[0].length + CONTEXT_RADIUS * 3);
         const context = content.slice(start, end);
-        if (context.includes('material-symbols-rounded') || context.includes('setStatus')) icons.add(match[1]);
+        if (context.includes('material-symbols-rounded') || context.includes('setStatus') || context.includes('icon')) icons.add(match[1]);
     }
 
     ICON_TEXT_ASSIGN_RE.lastIndex = 0;
@@ -112,6 +126,7 @@ function extractFromContent(content, icons) {
         SPORT_RETURN_RE.lastIndex = 0;
         while ((match = SPORT_RETURN_RE.exec(content)) !== null) icons.add(match[1]);
     }
+    return icons;
 }
 
 function readAllowlist() {
@@ -121,17 +136,23 @@ function readAllowlist() {
         .filter(line => line && !line.startsWith('#'));
 }
 
-const icons = new Set();
-for (const filePath of collectFiles(root)) {
-    extractFromContent(readText(filePath), icons);
-}
-for (const icon of readAllowlist()) {
-    icons.add(icon);
+export function collectMaterialSymbolNames() {
+    const icons = new Set();
+    for (const filePath of collectFiles(root)) {
+        extractFromContent(readText(filePath), icons);
+    }
+    for (const icon of readAllowlist()) icons.add(icon);
+    return [...icons].sort();
 }
 
-const sortedIcons = [...icons].sort();
-mkdirSync(outDir, { recursive: true });
-writeFileSync(path.join(outDir, 'icons.txt'), sortedIcons.join('\n'), 'utf8');
-writeFileSync(path.join(outDir, 'icons.csv'), sortedIcons.join(','), 'utf8');
+export function writeMaterialSymbolLists() {
+    const sortedIcons = collectMaterialSymbolNames();
+    mkdirSync(outDir, { recursive: true });
+    writeFileSync(path.join(outDir, 'icons.txt'), sortedIcons.join('\n'), 'utf8');
+    writeFileSync(path.join(outDir, 'icons.csv'), sortedIcons.join(','), 'utf8');
+    console.log(`Collected ${sortedIcons.length} icons → build/icons.txt, build/icons.csv`);
+    return sortedIcons;
+}
 
-console.log(`Collected ${sortedIcons.length} icons → build/icons.txt, build/icons.csv`);
+const invokedPath = process.argv[1] ? pathToFileURL(path.resolve(process.argv[1])).href : '';
+if (invokedPath === import.meta.url) writeMaterialSymbolLists();

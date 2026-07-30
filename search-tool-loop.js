@@ -58,10 +58,17 @@
         let out = JSON.stringify(value);
         return out.length > limit ? out.slice(0, limit) : out;
     }
+    const URL_TOKEN_PATTERN = /https?:\/\/[^\s<>"'`\]】]+/gi;
+    const URL_TRAILING_PUNCTUATION_PATTERN = /[),.;!?，。；！？]+$/;
+    function urlTokens(value = '') {
+        return (String(value || '').match(URL_TOKEN_PATTERN) || [])
+            .map(token => token.replace(URL_TRAILING_PUNCTUATION_PATTERN, ''))
+            .filter(Boolean);
+    }
     function urlsFromText(value = '') {
         const out = new Set();
-        for (const match of String(value || '').match(/https:\/\/[^\s<>"']+/gi) || []) {
-            const url = root.searchPolicyPure?.safeFetchUrl?.(match.replace(/[),.;!?，。；！？]+$/, '')) || '';
+        for (const match of urlTokens(value)) {
+            const url = root.searchPolicyPure?.safeFetchUrl?.(match) || '';
             if (url) out.add(url);
         }
         return Object.freeze([...out]);
@@ -82,7 +89,7 @@
         while (stack.length) {
             const current = stack.pop();
             if (typeof current === 'string') {
-                out.push(...(current.match(/https?:\/\/[^\s<>"']+/gi) || []));
+                out.push(...urlTokens(current));
             } else if (current && typeof current === 'object' && !seen.has(current)) {
                 seen.add(current);
                 if (Array.isArray(current)) stack.push(...current);
@@ -97,7 +104,7 @@
         const allowed = new Set(normalizeUserProvidedUrls(requestOpts.nativeUrlContextUrls));
         if (!allowed.size) return null;
         const exposed = outbound == null ? [] : outboundUrls(outbound);
-        if (exposed.some(raw => !allowed.has(root.searchPolicyPure?.safeFetchUrl?.(raw.replace(/[),.;!?，。；！？]+$/, '')) || ''))) return null;
+        if (exposed.some(raw => !allowed.has(root.searchPolicyPure?.safeFetchUrl?.(raw) || ''))) return null;
         const caps = effective.capabilities || {};
         const model = String(effective.modelId || effective.model || '').toLowerCase();
         return caps.urlContext === true || caps.url_context === true || /gemini-(?:2\.5|3)/.test(model) ? { url_context: {} } : null;

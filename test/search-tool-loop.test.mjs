@@ -338,6 +338,23 @@ test('native attempts reserve the shared user-action budget', async () => {
   assert.equal(requestOpts.nativeSearchMaxUses, 1);
 });
 
+test('URL token boundaries are shared for bare brackets, backticks, and Chinese brackets', () => {
+  const { loop } = harness();
+  const urls = [
+    'https://one.example/guide',
+    'https://two.example/code',
+    'https://three.example/menu'
+  ];
+  const text = `裸边界 ${urls[0]}] 代码 \`${urls[1]}\` 中文【${urls[2]}】。`;
+  assert.deepEqual(JSON.parse(JSON.stringify(loop.urlsFromText(text))), urls);
+  assert.deepEqual(
+    JSON.parse(JSON.stringify(loop.urlsFromText(`${urls[0]}]https://four.example/next`))),
+    [urls[0], 'https://four.example/next']
+  );
+  const encoded = 'https://encoded.example/a%5Db%60c%E3%80%91';
+  assert.deepEqual(JSON.parse(JSON.stringify(loop.urlsFromText(encoded))), [encoded]);
+});
+
 test('imported or application-generated user context never grants fetch authorization', async () => {
   const { loop } = harness();
   assert.equal(JSON.stringify(loop.urlsFromText('read https://current.example/guide')), JSON.stringify(['https://current.example/guide']));
@@ -363,6 +380,42 @@ test('nested OpenAI and OpenRouter URL citations are unwrapped', () => {
   }]);
   assert.equal(citations[0].url, 'https://example.com/nested');
   assert.equal(loop.nativeEvidence(citations[0]).title, 'Nested');
+});
+
+test('Gemini native budget uses the shared URL token boundaries', () => {
+  const { loop } = harness();
+  const effective = {
+    provider: 'gemini', model: 'gemini-2.5-pro', capabilities: { webSearch: true, urlContext: true },
+    network: { mode: 'auto', execution: 'native-first', fallback: 'local-estimate' }
+  };
+  const authorized = 'https://allowed.example/guide';
+  const unauthorized = 'https://unauthorized.example/private';
+  for (const boundary of [']', '`', '】']) {
+    const requestOpts = {
+      allowNativeSearch: true,
+      nativeUrlContextUrls: [authorized],
+      searchBudget: { limit: 2, remaining: 2, attempts: [] }
+    };
+    const key = `${authorized}${boundary}${unauthorized}`;
+    const prepared = loop.prepareGeminiRequest({
+      contents: [{ role: 'model', parts: [{ functionCall: { name: 'inspect_source', args: { [key]: 'value' } } }] }]
+    }, { google_search: {} }, effective, requestOpts);
+    assert.deepEqual(JSON.parse(JSON.stringify(prepared.body.tools)), [{ google_search: {} }]);
+    assert.equal(requestOpts.searchBudget.remaining, 1);
+    assert.deepEqual(requestOpts.searchBudget.attempts.map(item => item.kind), ['native-search']);
+  }
+
+  const allowedOpts = {
+    allowNativeSearch: true,
+    nativeUrlContextUrls: [authorized],
+    searchBudget: { limit: 2, remaining: 2, attempts: [] }
+  };
+  const prepared = loop.prepareGeminiRequest({
+    contents: [{ role: 'user', parts: [{ text: `裸边界 ${authorized}] 代码 \`${authorized}\` 中文【${authorized}】` }] }]
+  }, { google_search: {} }, effective, allowedOpts);
+  assert.deepEqual(JSON.parse(JSON.stringify(prepared.body.tools)), [{ google_search: {} }, { url_context: {} }]);
+  assert.equal(allowedOpts.searchBudget.remaining, 0);
+  assert.deepEqual(allowedOpts.searchBudget.attempts.map(item => item.kind), ['native-search', 'native-fetch']);
 });
 
 test('mixed Gemini URL provenance disables native URL Context before budget consumption', async () => {

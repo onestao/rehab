@@ -97,6 +97,39 @@ test('Gemini URL Context is combined with Google Search only when a safe URL is 
   assert.deepEqual(gemini.requests[0].body.tools, [{ google_search: {} }, { url_context: {} }]);
 });
 
+test('Gemini URL Context uses shared bare bracket, backtick, and Chinese bracket boundaries', async () => {
+  const gemini = loadApi();
+  const authorized = [
+    'https://one.example/guide',
+    'https://two.example/code',
+    'https://three.example/menu'
+  ];
+  const content = `裸边界 ${authorized[0]}] 代码 \`${authorized[1]}\` 中文【${authorized[2]}】。`;
+  await gemini.ai._callGemini([{ role: 'user', content }], 300, 'key', false, null, {
+    provider: 'gemini', baseUrl: 'https://example.test', model: 'gemini-2.5-pro', capabilities: { webSearch: true, urlContext: true },
+    network: { mode: 'auto', execution: 'native-first', allowedDomains: [] }
+  }, null, { allowNativeSearch: true, nativeUrlContextUrls: authorized });
+  assert.deepEqual(gemini.requests[0].body.tools, [{ google_search: {} }, { url_context: {} }]);
+  assert.equal(gemini.requests[0].body.contents[0].parts[0].text, content);
+});
+
+test('Gemini URL Context detects an unauthorized URL immediately after each shared boundary', async () => {
+  const authorized = 'https://allowed.example/guide';
+  const unauthorized = 'https://unauthorized.example/private';
+  for (const boundary of [']', '`', '】']) {
+    const gemini = loadApi();
+    const dynamicKey = `${authorized}${boundary}${unauthorized}`;
+    await gemini.ai._callGemini([
+      { role: 'assistant', toolCalls: [{ id: 'call_1', name: 'inspect_source', arguments: { [dynamicKey]: 'value' } }] }
+    ], 300, 'key', false, null, {
+      provider: 'gemini', baseUrl: 'https://example.test', model: 'gemini-2.5-pro', capabilities: { webSearch: true, urlContext: true },
+      network: { mode: 'auto', execution: 'native-first', allowedDomains: [] }
+    }, null, { allowNativeSearch: true, nativeUrlContextUrls: [authorized] });
+    assert.deepEqual(gemini.requests[0].body.tools, [{ google_search: {} }]);
+    assert.equal(gemini.requests[0].body.contents[0].parts[0].functionCall.args[dynamicKey], 'value');
+  }
+});
+
 test('Gemini URL Context stays enabled when a JSON message contains only an authorized URL', async () => {
   const gemini = loadApi();
   const authorized = 'https://restaurant.example/official-menu';

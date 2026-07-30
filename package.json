@@ -28,7 +28,8 @@
     "check:html-safety": "node scripts/check-html-safety.mjs",
     "check:size-limit-coverage": "node scripts/check-size-limit-coverage.mjs",
     "check:css": "npm run check:css-markers && npm run check:css-sources && npm run check:99-targets && npm run check:css-overlap",
-    "ci": "npm run lint && npm run typecheck && npm run test && npm run check:css && npm run check:html-safety && npm run check:size-limit-coverage && npx --yes size-limit"
+    "ci": "npm run lint && npm run typecheck && npm run test && npm run check:css && npm run check:html-safety && npm run check:size-limit-coverage && npx --yes size-limit",
+    "icons:update": "node scripts/collect-icons.mjs && node scripts/update-material-symbols.mjs"
   },
   "devDependencies": {
     "@size-limit/file": "^11.0.0",

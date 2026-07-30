@@ -1,8 +1,11 @@
 accessibility_new
+account_tree
 add
 add_circle
 arrow_back
+arrow_downward
 arrow_forward
+arrow_upward
 assignment
 auto_awesome
 backup
@@ -33,6 +36,7 @@ compress
 content_copy
 dark_mode
 data_thresholding
+database
 delete
 delete_forever
 delete_sweep
@@ -90,6 +94,7 @@ palette
 pause
 pedal_bike
 person
+photo_camera
 picture_in_picture_alt
 play_arrow
 play_circle

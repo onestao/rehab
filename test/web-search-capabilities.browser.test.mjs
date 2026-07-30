@@ -1,7 +1,7 @@
 // @ts-nocheck
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
-import { createReadStream, existsSync } from 'node:fs';
+import { createReadStream, existsSync, readFileSync } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import net from 'node:net';
@@ -11,6 +11,7 @@ import test from 'node:test';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const repoRoot = path.resolve(root, '../..');
+const materialIcons = readFileSync(path.join(root, 'build', 'icons.txt'), 'utf8').trim().split(/\r?\n/).filter(Boolean);
 
 function loadPlaywright() {
     const candidates = [
@@ -239,5 +240,38 @@ test('safe citation summary survives reload and renders summary/deep-read labels
         assert.equal(Object.hasOwn(stored.searchEvidence[0], 'contentExcerpt'), false);
         assert.equal(Object.hasOwn(stored.ai, 'searchEvidence'), false);
         assert.equal(await page.locator('.search-source-read-status').textContent(), '已深读');
+    });
+});
+
+test('local Material Symbols subset renders every collected icon as a ligature', async () => {
+    await withPage({ width: 390, height: 844 }, async (page, _context, base) => {
+        await page.setContent(shell(base));
+        const result = await page.evaluate(async icons => {
+            await document.fonts.load('24px "Material Symbols Rounded"');
+            await document.fonts.ready;
+            const host = document.createElement('div');
+            host.style.cssText = 'position:fixed;left:-10000px;top:0;white-space:nowrap';
+            document.body.append(host);
+            const measure = text => {
+                const node = document.createElement('span');
+                node.className = 'material-symbols-rounded';
+                node.style.cssText = 'display:inline-block;width:auto;max-width:none;font-size:24px;line-height:1;white-space:nowrap';
+                node.textContent = text;
+                host.append(node);
+                const value = { text, width: node.getBoundingClientRect().width, fontFamily: getComputedStyle(node).fontFamily };
+                node.remove();
+                return value;
+            };
+            return {
+                loaded: document.fonts.check('24px "Material Symbols Rounded"'),
+                bogus: measure('definitely_not_an_icon'),
+                icons: icons.map(measure)
+            };
+        }, materialIcons);
+        assert.equal(result.loaded, true);
+        assert.ok(result.bogus.width > 30, JSON.stringify(result.bogus));
+        const missing = result.icons.filter(item => item.width > 30 || !/Material Symbols Rounded/i.test(item.fontFamily));
+        assert.deepEqual(missing, []);
+        assert.equal(result.icons.length, materialIcons.length);
     });
 });
