@@ -370,9 +370,9 @@
 
         canSendAdviceWithAttachments(prompt = '', attachments = getAttachmentList(this)) {
             const usable = attachments.filter(att => att.status !== 'failed');
-            if (String(prompt || '').trim()) return true;
-            if (usable.some(att => att.kind === 'image')) return true;
-            if (usable.some(att => att.kind === 'text' && att.text)) return true;
+            if (String(prompt || '').trim()) return;
+            if (usable.some(att => att.kind === 'image')) return;
+            if (usable.some(att => att.kind === 'text' && att.text)) return;
             return false;
         },
 
@@ -399,11 +399,13 @@
             if (caption) caption.textContent = `${att.name || '图片'} · ${fmt(att.size || 0)}`;
             root.classList.remove('hidden');
             root.setAttribute('aria-hidden', 'false');
+            window.navStack?.open?.('modal', 'adviceAttachmentPreview', () => this.closeAdviceAttachmentPreview(true));
         },
 
-        closeAdviceAttachmentPreview() {
+        closeAdviceAttachmentPreview(direct) {
+            if (!direct && window.navStack?.requestClose?.('modal', 'adviceAttachmentPreview')) return;
             const root = document.getElementById('adviceAttachmentPreview');
-            if (!root) return;
+            if (!root) return true;
             root.classList.add('hidden');
             root.setAttribute('aria-hidden', 'true');
         }

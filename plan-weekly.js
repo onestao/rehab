@@ -63,14 +63,14 @@
             this.bindActions(body);
             sheet.classList.remove('hidden');
             sheet.setAttribute('aria-hidden', 'false');
-            window.navStack?.push?.({
-                type: 'modal',
-                id: 'planWeeklySheet',
-                close: () => this.close()
-            });
+            window.navStack?.open?.('modal', 'planWeeklySheet', () => this.closeInternal());
         },
 
         close() {
+            return window.navStack?.requestClose?.('modal', 'planWeeklySheet') || this.closeInternal();
+        },
+
+        closeInternal() {
             const sheet = document.getElementById('planWeeklySheet');
             sheet?.classList.add('hidden');
             sheet?.setAttribute('aria-hidden', 'true');

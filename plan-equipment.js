@@ -133,7 +133,7 @@
         },
 
         openPlanEquipmentSheet() {
-            this.closePlanEquipmentSheet?.();
+            this.closePlanEquipmentSheetInternal?.();
             const modal = document.createElement('div');
             modal.id = 'planEquipmentSheet';
             modal.className = 'md-modal md-modal-sheet';
@@ -177,13 +177,19 @@
             });
             document.body.appendChild(modal);
             this._planEquipmentSheetEl = modal;
+            window.navStack?.open?.('modal', 'planEquipmentSheet', () => this.closePlanEquipmentSheetInternal());
             requestAnimationFrame(() => document.getElementById('planEquipmentNameInput')?.focus?.());
         },
 
         closePlanEquipmentSheet() {
+            return window.navStack?.requestClose?.('modal', 'planEquipmentSheet') || this.closePlanEquipmentSheetInternal();
+        },
+
+        closePlanEquipmentSheetInternal() {
             const el = this._planEquipmentSheetEl || document.getElementById('planEquipmentSheet');
             el?.remove?.();
             this._planEquipmentSheetEl = null;
+            return true;
         },
 
         refreshPlanEquipmentSheet() {

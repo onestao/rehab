@@ -1318,15 +1318,18 @@ const advicePanel = {
         this.bindAdviceModelPickerActions(content);
         modal.classList.remove('hidden');
         modal.setAttribute('aria-hidden', 'false');
+        window.navStack?.open?.('modal', 'aiModelPickerSheet', () => this.closeAdviceModelPicker(true));
     },
 
-    closeAdviceModelPicker() {
+    closeAdviceModelPicker(direct) {
+        if (!direct && window.navStack?.requestClose?.('modal', 'aiModelPickerSheet')) return;
         const modal = document.getElementById('aiModelPickerSheet');
         modal?.classList.add('hidden');
         modal?.classList.remove('advice-model-picker-sheet');
         modal?.setAttribute('aria-hidden', 'true');
         modal?.querySelector('.md-modal-sheet-card')?.classList.remove('advice-model-picker-card');
         document.getElementById('aiModelPickerContent')?.classList.remove('advice-model-picker-content');
+        return true;
     },
 
     setAdviceModelPickerScope(scope = 'current') {
@@ -3108,7 +3111,7 @@ const advicePanel = {
                 const templates = Array.isArray(this.db.aiTemplates) ? this.db.aiTemplates : [];
                 if (!templates.length) return '';
                 const activeId = this.db.aiTemplateActiveId || templates[0]?.id || '';
-                return `<div class="advice-template-row">${templates.map(t => `<button class="advice-pill ${t.id === activeId ? 'active' : ''}" onclick="data.selectAdviceTemplate('${this.escapeHtml(t.id)}')" type="button">${this.escapeHtml(t.name)}</button>`).join('')}</div>`;
+                return `<div class="advice-template-row" role="group" aria-label="提示词模板">${templates.map(t => `<button class="advice-pill ${t.id === activeId ? 'active' : ''}" onclick="data.selectAdviceTemplate('${this.escapeHtml(t.id)}')" type="button" aria-pressed="${t.id === activeId}">${this.escapeHtml(t.name)}</button>`).join('')}</div>`;
             })()}
             ${this.renderAdviceFilterControls()}
         </div>`;
@@ -3127,7 +3130,7 @@ const advicePanel = {
         const modeItems = 'auto,自动,auto_awesome|light,轻量,compress|none,仅提问,short_text'.split('|').map(item => item.split(','));
         return `
             <div class="advice-filter-row">
-                <div class="advice-range-tabs">${[['today','今日'],['week','7天'],['month','30天'],['all','全部']].map(([key, label]) => `<button class="advice-pill ${range === key ? 'active' : ''}" onclick="data.setAdviceRange('${key}')" type="button">${label}</button>`).join('')}</div>
+                <div class="advice-range-tabs" role="group" aria-label="对话时间范围">${[['today','今日'],['week','7天'],['month','30天'],['all','全部']].map(([key, label]) => `<button class="advice-pill ${range === key ? 'active' : ''}" onclick="data.setAdviceRange('${key}')" type="button" aria-pressed="${range === key}">${label}</button>`).join('')}</div>
                 <div class="advice-filter-actions">
                     <button class="advice-search-toggle ${ctxOpen ? 'active' : ''}" onclick="data.toggleAdviceContextPanel()" type="button" aria-label="数据维度" title="数据维度">
                         <span class="material-symbols-rounded">tune</span>
@@ -3139,7 +3142,7 @@ const advicePanel = {
             ${searchOpen ? `<div class="advice-search-panel">
                 <div class="advice-search-row">
                     <span class="material-symbols-rounded">search</span>
-                    <input id="adviceSearchInput" value="${searchQuery}" oninput="data.onAdviceSearchInput(this)" placeholder="搜索聊天记录、日期或模型" autocomplete="off">
+                    <input id="adviceSearchInput" value="${searchQuery}" oninput="data.onAdviceSearchInput(this)" placeholder="搜索聊天记录、日期或模型" autocomplete="off" aria-label="搜索聊天记录">
                     ${rawSearchQuery ? '<button onclick="data.clearAdviceSearch()" type="button" aria-label="清空搜索"><span class="material-symbols-rounded">close</span></button>' : ''}
                 </div>
                 <label class="advice-history-scope">
@@ -3159,7 +3162,7 @@ const advicePanel = {
                 </div>
                 <div class="advice-context-section">
                     <small>数据维度</small>
-                <div class="advice-context-toggles">${[['diet','饮食','restaurant'],['training','训练','fitness_center'],['weight','体重','monitor_weight'],['goal','目标','flag']].map(([key, label, icon]) => `<button class="advice-pill ${contexts[key] ? 'active' : ''}" onclick="data.toggleAdviceContext('${key}')" type="button"><span class="material-symbols-rounded">${icon}</span>${label}</button>`).join('')}</div>
+                <div class="advice-context-toggles">${[['diet','饮食','restaurant'],['training','训练','fitness_center'],['weight','体重','monitor_weight'],['goal','目标','flag']].map(([key, label, icon]) => `<button class="advice-pill ${contexts[key] ? 'active' : ''}" onclick="data.toggleAdviceContext('${key}')" type="button" aria-pressed="${contexts[key]}"><span class="material-symbols-rounded">${icon}</span>${label}</button>`).join('')}</div>
                 </div>
                 <small class="advice-context-hint">自动会按问题重点和模型预算裁剪；维度开关是可使用数据上限。</small>
             </div>` : ''}
@@ -3215,17 +3218,17 @@ const advicePanel = {
             <div class="advice-v6-filter-bar">${this.renderAdviceFilterControls()}</div>
             <div class="sect-head"><span class="t">对话</span><button class="a" onclick="data.clearAdviceChat?.()" type="button">清空</button></div>
             <div class="ai-msg-list advice-v6-chat-list" data-advice-virtual-list="true">${virtualShell}</div>
-            <div class="advice-scroll-rail" aria-label="对话快速跳转">
+            <nav class="advice-scroll-rail" aria-label="对话快速跳转">
                 <button class="advice-rail-btn" onclick="data.scrollAdviceToTop()" type="button" aria-label="跳到最顶端" title="跳到最顶端"><span class="material-symbols-rounded">vertical_align_top</span></button>
-                <button class="advice-rail-btn" onclick="data.scrollAdviceToPrevBubble()" type="button" aria-label="上一段对话" title="上一段对话"><span class="material-symbols-rounded">expand_less</span></button>
-                <button class="advice-rail-btn" onclick="data.scrollAdviceToNextBubble()" type="button" aria-label="下一段对话" title="下一段对话"><span class="material-symbols-rounded">expand_more</span></button>
+                <button class="advice-rail-btn advice-rail-step" onclick="data.scrollAdviceToPrevBubble()" type="button" aria-label="上一段对话" title="上一段对话"><span class="material-symbols-rounded">expand_less</span></button>
+                <button class="advice-rail-btn advice-rail-step" onclick="data.scrollAdviceToNextBubble()" type="button" aria-label="下一段对话" title="下一段对话"><span class="material-symbols-rounded">expand_more</span></button>
                 <button class="advice-rail-btn" onclick="data.scrollAdviceToBottom()" type="button" aria-label="跳到最下端" title="跳到最下端"><span class="material-symbols-rounded">vertical_align_bottom</span></button>
-            </div>
+            </nav>
             <button id="adviceNewMessageBtn" class="advice-new-message-btn hidden" onclick="data.jumpAdviceToLatest()" type="button" aria-hidden="true">↓ 新消息</button>
-            <div class="glass-card advice-v6-suggestions-card">
-                <div class="sect-head" style="padding:0 0 8px;margin:0"><span class="t">快速建议</span></div>
+            <details class="glass-card advice-v6-suggestions-card"${messages.length ? '' : ' open'}>
+                <summary>快速建议</summary>
                 <div class="advice-v6-suggestions">${quicks.map(q => `<button onclick="data.useAdvicePrompt('${this.escapeHtml(q)}')" type="button">${this.escapeHtml(q)}</button>`).join('')}</div>
-            </div>
+            </details>
             <div class="advice-composer-stack">
                 ${this.renderAdviceAttachmentChips?.() || ''}
                 <div class="ai-input">
@@ -3233,7 +3236,7 @@ const advicePanel = {
                     ${this.renderAdviceModelChip()}
                     ${advicePanel.renderAdviceReasoningChip.call(this)}
                     ${this.renderAdviceAttachmentControls?.() || ''}
-                    <textarea id="advicePrompt" class="advice-composer-input" rows="1" placeholder="问 AI 关于训练 / 饮食..." oninput="data.onAdvicePromptInput(this)" onkeydown="data.onAdvicePromptKeydown(event)">${draft}</textarea>
+                    <textarea id="advicePrompt" class="advice-composer-input" rows="1" placeholder="问 AI 关于训练 / 饮食..." aria-label="向 AI 提问" oninput="data.onAdvicePromptInput(this)" onkeydown="data.onAdvicePromptKeydown(event)">${draft}</textarea>
                     <button id="adviceSendBtn" class="ai-send ${isSendingAdvice ? 'is-stopping' : ''}" onclick="${isSendingAdvice ? 'data.cancelAiAdvice()' : 'data.sendAiAdvice()'}" type="button" ${isSendingAdvice || canSend ? '' : 'disabled'} aria-label="${isSendingAdvice ? '停止生成' : '发送问题'}" title="${isSendingAdvice ? '停止生成' : '发送问题'}"><span class="material-symbols-rounded">${isSendingAdvice ? 'stop' : 'send'}</span></button>
                 </div>
             </div>

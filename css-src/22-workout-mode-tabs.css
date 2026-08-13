@@ -62,7 +62,7 @@
 .mode-tab:active::after { opacity: var(--md-state-press); }
 
 @media (max-width: 480px) {
-    .mode-tab { font-size: 12px; gap: 4px; height: 38px; }
+    .mode-tab { font-size: 12px; gap: 4px; height: 44px; }
     .mode-tab .material-symbols-rounded { font-size: 18px; }
 }
 

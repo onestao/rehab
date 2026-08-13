@@ -2,17 +2,16 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>&#35757;&#32451;&#21161;&#25163;</title>
     <link rel="manifest" href="manifest.json">
     <link rel="icon" href="assets/app-icon.svg" type="image/svg+xml">
     <meta name="theme-color" content="#0061a4">
-    <link rel="preload" href="assets/material-symbols-rounded.woff2" as="font" type="font/woff2" crossorigin>
     <style>
         /* Critical first-paint rules: keep the shell usable even if generated.css fails. */
         [hidden] { display: none !important; }
         .hidden { display: none !important; }
-        html, body { margin: 0; background: #fff; color: #1a1a1a; }
+        html, body { margin: 0; background: var(--md-sys-surface, #fff); color: var(--md-sys-on-surface, #1a1a1a); }
         body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
         #appUpdateBanner:not(.hidden) {
             position: sticky;
@@ -20,9 +19,10 @@
             z-index: 300;
             margin: 10px 16px 0;
             padding: 12px 14px;
-            border: 1px solid #c5c6d0;
+            border: 1px solid var(--md-sys-outline-variant, #c5c6d0);
             border-radius: 12px;
-            background: #f8f9ff;
+            background: var(--md-sys-surface-container-lowest, #f8f9ff);
+            color: var(--md-sys-on-surface, #1a1a1a);
             display: flex;
             flex-wrap: wrap;
             gap: 8px;
@@ -34,7 +34,7 @@
         (function installNonBlockingStartup() {
             'use strict';
 
-            const releaseVersion = '412';
+            const releaseVersion = '424';
             let applicationLaunchStarted = false;
 
             function acknowledgeReleasePage() {
@@ -253,6 +253,10 @@
             }
 
             async function loadStylesheet() {
+                const fontPreload = document.querySelector('[data-rehab-font-preload]');
+                if (fontPreload?.dataset?.href && !fontPreload.getAttribute('href')) {
+                    fontPreload.setAttribute('href', resolveAssetUrl(fontPreload.dataset.href));
+                }
                 const declaration = document.querySelector('[data-rehab-stylesheet]');
                 if (!declaration || !declaration.dataset.href) {
                     return Promise.reject(new Error('缺少应用样式声明'));
@@ -397,7 +401,8 @@
         })();
         /* APP_STARTUP_NON_BLOCKING_BOOT_END */
     </script>
-    <link data-rehab-stylesheet="primary" data-href="build/generated.css?v=412">
+    <link rel="preload" data-rehab-font-preload="primary" data-href="assets/material-symbols-rounded.woff2?v=424" as="font" type="font/woff2" crossorigin>
+    <link data-rehab-stylesheet="primary" data-href="build/generated.css?v=424">
 </head>
 <body>
     <div id="appUpdateBanner" class="app-update-banner hidden">
@@ -416,7 +421,8 @@
     <div id="appShell" class="app-shell-v6" hidden>
     <main id="app">
         <!-- Workout -->
-        <section id="workout" class="page">
+        <section id="workout" class="page" aria-labelledby="workoutPageTitle">
+            <h1 id="workoutPageTitle" class="visually-hidden">训练</h1>
             <header class="md-top-app-bar workout-only-bar">
                 <div class="bar-leading"><span class="material-symbols-rounded app-icon">fitness_center</span><span class="app-title">&#35757;&#32451;&#21161;&#25163;</span></div>
             </header>
@@ -426,7 +432,7 @@
                 <button id="wakeLockStatusButton" class="timer-wakelock-btn hidden" onclick="workoutWakeLock?.request?.()" type="button" aria-label="屏幕常亮">
                     <span class="material-symbols-rounded">lock_open</span>
                 </button>
-                <span class="skip-btn" onclick="workout.skip()"><span class="material-symbols-rounded">skip_next</span></span>
+                <button class="skip-btn" onclick="workout.skip()" type="button" aria-label="跳过当前阶段"><span class="material-symbols-rounded">skip_next</span></button>
                 <div id="statusText">READY</div>
                 <div id="mainTime">00</div>
                 <div id="subText">&#20934;&#22791;&#24320;&#22987;</div>
@@ -462,7 +468,7 @@
                 <div class="rate-row">
                     <span class="material-symbols-rounded" style="font-size:18px">speed</span>
                     <span>&#35821;&#36895; <span id="rateLabel">1.1</span>x</span>
-                    <input type="range" id="ttsRate" min="0.5" max="3" step="0.1" value="1.1" oninput="workout.updateRate(this.value)">
+                    <input type="range" id="ttsRate" min="0.5" max="3" step="0.1" value="1.1" oninput="workout.updateRate(this.value)" aria-label="语速">
                 </div>
                 <div class="md-divider compact-divider"></div>
                 <div class="strength-presets">
@@ -474,7 +480,7 @@
                 <div class="md-grid strength-input-grid">
                     <div class="md-field strength-name-field">
                         <input type="text" id="name" placeholder=" " autocomplete="off">
-                        <label>&#21160;&#20316;&#21517;&#31216;</label>
+                        <label for="name">&#21160;&#20316;&#21517;&#31216;</label>
                     </div>
                     <div class="md-field strength-phase-field">
                         <select id="actionPhase">
@@ -482,17 +488,17 @@
                             <option value="main" selected>&#20027;&#35757;&#32451;</option>
                             <option value="cooldown">&#25918;&#26494;</option>
                         </select>
-                        <label>&#35757;&#32451;&#38454;&#27573;</label>
+                        <label for="actionPhase">&#35757;&#32451;&#38454;&#27573;</label>
                     </div>
-                    <div class="md-field"><input type="number" id="sets" placeholder=" "><label>&#32452;&#25968;</label></div>
-                    <div class="md-field"><input type="number" id="reps" placeholder=" "><label>&#27425;&#25968;</label></div>
-                    <div class="md-field"><input type="number" id="work" placeholder=" "><label>&#21160;&#20316;&#26102;&#38271;&#65288;&#31186;&#65289;</label></div>
-                    <div class="md-field"><input type="number" id="repRest" placeholder=" "><label>&#27425;&#38388;&#20241;&#24687;&#65288;&#31186;&#65289;</label></div>
-                    <div class="md-field"><input type="number" id="actionRest" placeholder=" "><label>&#32452;&#38388;&#20241;&#24687;&#65288;&#31186;&#65289;</label></div>
-                    <div class="md-field"><input type="number" id="groupRest" placeholder=" "><label>&#38454;&#27573;&#20241;&#24687;&#65288;&#31186;&#65289;</label></div>
+                    <div class="md-field"><input type="number" id="sets" placeholder=" "><label for="sets">&#32452;&#25968;</label></div>
+                    <div class="md-field"><input type="number" id="reps" placeholder=" "><label for="reps">&#27425;&#25968;</label></div>
+                    <div class="md-field"><input type="number" id="work" placeholder=" "><label for="work">&#21160;&#20316;&#26102;&#38271;&#65288;&#31186;&#65289;</label></div>
+                    <div class="md-field"><input type="number" id="repRest" placeholder=" "><label for="repRest">&#27425;&#38388;&#20241;&#24687;&#65288;&#31186;&#65289;</label></div>
+                    <div class="md-field"><input type="number" id="actionRest" placeholder=" "><label for="actionRest">&#32452;&#38388;&#20241;&#24687;&#65288;&#31186;&#65289;</label></div>
+                    <div class="md-field"><input type="number" id="groupRest" placeholder=" "><label for="groupRest">&#38454;&#27573;&#20241;&#24687;&#65288;&#31186;&#65289;</label></div>
                     <div class="md-switch span-full" role="switch" aria-checked="false">
                         <span><span class="material-symbols-rounded" style="font-size:18px;vertical-align:middle;margin-right:6px">swap_horiz</span>&#21452;&#20391;&#20132;&#26367;&#21160;&#20316;</span>
-                        <label class="switch-track"><input type="checkbox" id="isAlt" onchange="ui.syncSwitchAria(this)"><span class="switch-thumb"></span></label>
+                        <label class="switch-track"><input type="checkbox" id="isAlt" onchange="ui.syncSwitchAria(this)" aria-label="双侧交替动作"><span class="switch-thumb"></span></label>
                     </div>
                 </div>
                 <div class="input-card-actions">
@@ -535,10 +541,10 @@
                             <option value="battle_rope">&#25112;&#32483; 8.0 MET</option>
                             <option value="spin_bike">&#21160;&#24863;&#21333;&#36710; 7.5 MET</option>
                         </select>
-                        <label>&#26377;&#27687;&#39033;&#30446;</label>
+                        <label for="cardioType">&#26377;&#27687;&#39033;&#30446;</label>
                     </div>
-                    <div class="md-field"><input type="number" id="cardioWeight" placeholder=" " value="70" oninput="cardio.updatePlan()"><label>&#20307;&#37325; kg</label></div>
-                    <div class="md-field"><input type="number" id="cardioTarget" placeholder=" " value="30" oninput="cardio.updatePlan()"><label>&#30446;&#26631;&#20998;&#38047;</label></div>
+                    <div class="md-field"><input type="number" id="cardioWeight" placeholder=" " value="70" oninput="cardio.updatePlan()"><label for="cardioWeight">&#20307;&#37325; kg</label></div>
+                    <div class="md-field"><input type="number" id="cardioTarget" placeholder=" " value="30" oninput="cardio.updatePlan()"><label for="cardioTarget">&#30446;&#26631;&#20998;&#38047;</label></div>
                 </div>
             </div>
             <div class="md-card strength-log-card hidden" id="strengthLogCard">
@@ -547,19 +553,19 @@
                         <select id="slLibraryAction" onchange="data.applyStrengthLogLibraryAction(this.value)">
                             <option value="">&#20174;&#21160;&#20316;&#24211;&#36873;&#25321;</option>
                         </select>
-                        <label>&#21160;&#20316;&#24211;&#35843;&#29992;</label>
+                        <label for="slLibraryAction">&#21160;&#20316;&#24211;&#35843;&#29992;</label>
                     </div>
                     <div class="sl-name-row span-full">
                         <div class="md-field">
-                            <input type="text" id="slName" placeholder=" "><label>&#21160;&#20316;&#21517;&#31216;</label>
+                            <input type="text" id="slName" placeholder=" "><label for="slName">&#21160;&#20316;&#21517;&#31216;</label>
                         </div>
                         <button class="md-icon-btn" onclick="actionHistory.openFor(document.getElementById('slName')?.value)" type="button" aria-label="查看动作历史" title="查看动作历史"><span class="material-symbols-rounded">monitoring</span></button>
                     </div>
-                    <div class="md-field"><input type="number" id="slWeight" step="0.5" placeholder=" "><label>&#22806;&#21152;&#36127;&#37325; kg</label></div>
-                    <div class="md-field"><input type="number" id="slSets" placeholder=" "><label>&#32452;&#25968;</label></div>
-                    <div class="md-field"><input type="number" id="slReps" placeholder=" "><label>&#27599;&#32452;&#27425;&#25968;</label></div>
-                    <div class="md-field"><input type="number" id="slMinutes" placeholder=" "><label>&#24635;&#26102;&#38271;&#65288;&#20998;&#38047;&#65292;&#21487;&#31354;&#65289;</label></div>
-                    <div class="md-field span-full"><input type="text" id="slNote" placeholder=" "><label>&#22791;&#27880;</label></div>
+                    <div class="md-field"><input type="number" id="slWeight" step="0.5" placeholder=" "><label for="slWeight">&#22806;&#21152;&#36127;&#37325; kg</label></div>
+                    <div class="md-field"><input type="number" id="slSets" placeholder=" "><label for="slSets">&#32452;&#25968;</label></div>
+                    <div class="md-field"><input type="number" id="slReps" placeholder=" "><label for="slReps">&#27599;&#32452;&#27425;&#25968;</label></div>
+                    <div class="md-field"><input type="number" id="slMinutes" placeholder=" "><label for="slMinutes">&#24635;&#26102;&#38271;&#65288;&#20998;&#38047;&#65292;&#21487;&#31354;&#65289;</label></div>
+                    <div class="md-field span-full"><input type="text" id="slNote" placeholder=" "><label for="slNote">&#22791;&#27880;</label></div>
                     <label class="md-switch span-full"><input type="checkbox" id="slSaveToLibrary"><span>&#35760;&#20303;&#21040;&#21160;&#20316;&#24211;&#24182;&#21487;&#22797;&#29992;</span></label>
                 </div>
                 <button class="md-btn md-btn-filled" onclick="data.addStrengthLog()">
@@ -569,14 +575,15 @@
             <div id="workoutPlanCard"></div>
             <div id="currentActionList"></div>
             <div class="md-card routine-tool">
-                <div class="md-field" style="flex:1"><input type="text" id="newRoutineName" placeholder=" "><label>&#26041;&#26696;&#21517;&#31216;</label></div>
-                <div class="md-field" style="flex:1"><input type="text" id="routineTagsInput" placeholder=" "><label>&#26631;&#31614;&#65288;&#36887;&#21495;&#20998;&#38548;&#65289;</label></div>
+                <div class="md-field" style="flex:1"><input type="text" id="newRoutineName" placeholder=" "><label for="newRoutineName">&#26041;&#26696;&#21517;&#31216;</label></div>
+                <div class="md-field" style="flex:1"><input type="text" id="routineTagsInput" placeholder=" "><label for="routineTagsInput">&#26631;&#31614;&#65288;&#36887;&#21495;&#20998;&#38548;&#65289;</label></div>
                 <button class="md-btn md-btn-tonal" onclick="data.saveRoutine()"><span class="material-symbols-rounded">bookmark_add</span> &#23384;&#20837;&#26041;&#26696;&#24211;</button>
             </div>
         </section>
 
         <!-- Today page -->
-        <section id="today" class="page active">
+        <section id="today" class="page active" aria-labelledby="todayPageTitle">
+            <h1 id="todayPageTitle" class="visually-hidden">今日</h1>
             <header class="md-top-app-bar today-v6-appbar">
                 <div class="bar-leading"><div class="today-v6-greet"><span class="today-v6-greet-line"></span><span class="today-v6-greet-sub"></span></div></div>
                 <div class="bar-trailing"><div id="syncStatus" class="md-chip"><span class="material-symbols-rounded" style="font-size:14px">cloud_off</span> &#26412;&#22320;</div></div>
@@ -590,7 +597,8 @@
         </section>
 
         <!-- Records page -->
-        <section id="records" class="page">
+        <section id="records" class="page" aria-labelledby="recordsPageTitle">
+            <h1 id="recordsPageTitle" class="visually-hidden">记录</h1>
             <header class="md-top-app-bar">
                 <div class="bar-leading"><span class="material-symbols-rounded app-icon">monitoring</span><span class="app-title">&#35760;&#24405;</span></div>
             </header>
@@ -599,7 +607,8 @@
         </section>
 
         <!-- AI coach page -->
-        <section id="ai-coach" class="page ai-coach-page">
+        <section id="ai-coach" class="page ai-coach-page" aria-labelledby="aiCoachPageTitle">
+            <h1 id="aiCoachPageTitle" class="visually-hidden">AI 教练</h1>
             <header class="md-top-app-bar">
                 <div class="bar-leading"><span class="material-symbols-rounded app-icon">psychology</span><span class="app-title">AI &#25945;&#32451;</span></div>
                 <div class="bar-trailing">
@@ -615,7 +624,8 @@
         </section>
 
         <!-- Profile page -->
-        <section id="profile" class="page">
+        <section id="profile" class="page" aria-labelledby="profilePageTitle">
+            <h1 id="profilePageTitle" class="visually-hidden">我的</h1>
             <header class="md-top-app-bar">
                 <div class="bar-leading"><span class="material-symbols-rounded app-icon">person</span><span class="app-title" data-i18n="nav.profile">&#25105;&#30340;</span></div>
                 <button class="theme-trigger"
@@ -759,7 +769,7 @@
         </section>
         <section id="aiProviderManager" class="ai-provider-manager hidden" aria-hidden="true" aria-label="AI &#20379;&#24212;&#21830;&#31649;&#29702;">
             <header class="ai-provider-manager-bar">
-                <button class="ai-icon-btn" type="button" onclick="window.aiProviderManager?.panel !== 'list' ? (window.aiProviderManager.panel='list',window.aiProviderManager.render()) : window.aiProviderManager?.close()" aria-label="&#36820;&#22238;"><span class="material-symbols-rounded">arrow_back</span></button>
+                <button class="ai-icon-btn" type="button" onclick="window.aiProviderManager?.back()" aria-label="&#36820;&#22238;"><span class="material-symbols-rounded">arrow_back</span></button>
                 <strong id="aiProviderManagerTitle">&#20379;&#24212;&#21830;</strong>
                 <button class="ai-icon-btn" type="button" onclick="window.aiProviderManager?.close()" aria-label="&#20851;&#38381;"><span class="material-symbols-rounded">close</span></button>
             </header>
@@ -767,9 +777,9 @@
         </section>
         <section id="searchProviderManager" class="ai-provider-manager hidden" aria-hidden="true" aria-label="联网检索服务管理">
             <header class="ai-provider-manager-bar">
+                <button class="ai-icon-btn" type="button" onclick="window.searchSettings?.back()" aria-label="返回"><span class="material-symbols-rounded">arrow_back</span></button>
+                <strong id="searchProviderManagerTitle">联网检索</strong>
                 <button class="ai-icon-btn" type="button" onclick="window.searchSettings?.close()" aria-label="关闭"><span class="material-symbols-rounded">close</span></button>
-                <strong>联网检索</strong>
-                <span aria-hidden="true"></span>
             </header>
             <div id="searchProviderManagerBody" class="ai-provider-manager-body"></div>
         </section>
@@ -819,7 +829,7 @@
         (function earlyUpgradeOverlay() {
             try {
                 const url = new URL(window.location.href);
-                if (url.searchParams.get('__rehab_upgrade') !== '412') return;
+                if (url.searchParams.get('__rehab_upgrade') !== '424') return;
                 const el = document.createElement('div');
                 el.id = 'rehabUpgradeOverlay';
                 el.setAttribute('role', 'alertdialog');
@@ -839,27 +849,27 @@
         })();
     </script>
 
-    <script data-rehab-entry data-kind="classic" data-src="m3e-ripple.js?v=412"></script>
-    <script data-rehab-entry data-kind="classic" data-src="toast.js?v=412"></script>
-    <script data-rehab-entry data-kind="classic" data-src="error-bus.js?v=412"></script>
-    <script data-rehab-entry data-kind="classic" data-src="i18n.js?v=412"></script>
-    <script data-rehab-entry data-kind="classic" data-src="theme.js?v=412"></script>
-    <script data-rehab-entry data-kind="classic" data-src="render-safe.js?v=412"></script>
-    <script data-rehab-entry data-kind="classic" data-src="nav-stack.js?v=412"></script>
-    <script data-rehab-entry data-kind="classic" data-src="app-route.js?v=412"></script>
-    <script data-rehab-entry data-kind="module" data-src="data-utils-pure.js?v=412"></script>
-    <script data-rehab-entry data-kind="module" data-src="action-taxonomy-pure.js?v=412"></script>
-    <script data-rehab-entry data-kind="module" data-src="action-identity.js?v=412"></script>
-    <script data-rehab-entry data-kind="classic" data-src="data-utils.js?v=412"></script>
-    <script data-rehab-entry data-kind="classic" data-src="storage/idb.js?v=412"></script>
-    <script data-rehab-entry data-kind="classic" data-src="storage/migrate.js?v=412"></script>
-    <script data-rehab-entry data-kind="classic" data-src="data-records.js?v=412"></script>
-    <script data-rehab-entry data-kind="classic" data-src="data-schema.js?v=412"></script>
-    <script data-rehab-entry data-kind="classic" data-src="data-store.js?v=412"></script>
-    <script data-rehab-entry data-kind="classic" data-src="data-ui-core.js?v=412"></script>
-    <script data-rehab-entry data-kind="classic" data-src="data-views.js?v=412"></script>
-    <script data-rehab-entry data-kind="classic" data-src="data.js?v=412"></script>
-    <script data-rehab-entry data-kind="classic" data-src="sync-status.js?v=412"></script>
+    <script data-rehab-entry data-kind="classic" data-src="m3e-ripple.js?v=424"></script>
+    <script data-rehab-entry data-kind="classic" data-src="toast.js?v=424"></script>
+    <script data-rehab-entry data-kind="classic" data-src="error-bus.js?v=424"></script>
+    <script data-rehab-entry data-kind="classic" data-src="i18n.js?v=424"></script>
+    <script data-rehab-entry data-kind="classic" data-src="theme.js?v=424"></script>
+    <script data-rehab-entry data-kind="classic" data-src="render-safe.js?v=424"></script>
+    <script data-rehab-entry data-kind="classic" data-src="nav-stack.js?v=424"></script>
+    <script data-rehab-entry data-kind="classic" data-src="app-route.js?v=424"></script>
+    <script data-rehab-entry data-kind="module" data-src="data-utils-pure.js?v=424"></script>
+    <script data-rehab-entry data-kind="module" data-src="action-taxonomy-pure.js?v=424"></script>
+    <script data-rehab-entry data-kind="module" data-src="action-identity.js?v=424"></script>
+    <script data-rehab-entry data-kind="classic" data-src="data-utils.js?v=424"></script>
+    <script data-rehab-entry data-kind="classic" data-src="storage/idb.js?v=424"></script>
+    <script data-rehab-entry data-kind="classic" data-src="storage/migrate.js?v=424"></script>
+    <script data-rehab-entry data-kind="classic" data-src="data-records.js?v=424"></script>
+    <script data-rehab-entry data-kind="classic" data-src="data-schema.js?v=424"></script>
+    <script data-rehab-entry data-kind="classic" data-src="data-store.js?v=424"></script>
+    <script data-rehab-entry data-kind="classic" data-src="data-ui-core.js?v=424"></script>
+    <script data-rehab-entry data-kind="classic" data-src="data-views.js?v=424"></script>
+    <script data-rehab-entry data-kind="classic" data-src="data.js?v=424"></script>
+    <script data-rehab-entry data-kind="classic" data-src="sync-status.js?v=424"></script>
     <div id="weightModal" class="md-modal md-modal-sheet hidden" aria-hidden="true">
         <div class="md-modal-backdrop" onclick="data.closeWeightModal()"></div>
         <div class="md-modal-card md-modal-sheet-card">
@@ -1263,7 +1273,7 @@
             'plan-weekly': ['plan-store'],
             'plan-equipment': ['plan-store'],
             'plan-ai': ['plan-store','rehab-policy','ai-api','search-settings','ai-task-settings','plan-ai-pure','search-evidence-ui'],
-            'plan-ui': ['plan-store','plan-feedback','plan-cooldown','plan-weekly','plan-equipment'],
+            'plan-ui': ['plan-store','plan-feedback','plan-cooldown','plan-weekly','plan-equipment','routine-plan'],
             'debug-tools': [],
             'debug-ai': [],
             'debug-plan-ai': []
@@ -1376,7 +1386,7 @@
             return true;
         }
         window.claimServiceWorkerReload = claimServiceWorkerReload;
-        const SERVICE_WORKER_CONTROLLER_RELOAD_KEY = 'rehab-sw-controller-reload-v412';
+        const SERVICE_WORKER_CONTROLLER_RELOAD_KEY = 'rehab-sw-controller-reload-v424';
         void SERVICE_WORKER_CONTROLLER_RELOAD_KEY;
         function scheduleServiceWorkerRegistration() {
             if (scheduleServiceWorkerRegistration._scheduled) return;
@@ -1403,7 +1413,7 @@
                     return;
                 }
                 const script = document.createElement('script');
-                script.src = (typeof window.resolveAssetUrl === 'function' ? window.resolveAssetUrl('app-update.js?v=412') : 'app-update.js?v=412');
+                script.src = (typeof window.resolveAssetUrl === 'function' ? window.resolveAssetUrl('app-update.js?v=424') : 'app-update.js?v=424');
                 script.async = true;
                 script.dataset.rehabAppUpdate = '1';
                 script.onload = () => resolve(window.appUpdate);
@@ -1415,11 +1425,11 @@
                 try {
                     // Do not re-register / normalize while an intentional SW navigate is in flight.
                     try {
-                        if (new URL(window.location.href).searchParams.get('__rehab_upgrade') === '412') {
+                        if (new URL(window.location.href).searchParams.get('__rehab_upgrade') === '424') {
                             return;
                         }
                     } catch {}
-                    const registration = await navigator.serviceWorker.register('./sw.js?v=412', { updateViaCache: 'none' });
+                    const registration = await navigator.serviceWorker.register('./sw.js?v=424', { updateViaCache: 'none' });
                     await registration.update?.();
                     // Never auto-activate a waiting worker here. Quiet registration only discovers
                     // updates; activation must wait for explicit user apply (or the post-apply
@@ -1435,7 +1445,7 @@
                                 return null;
                             }
                         })();
-                        const alreadyCurrent = controllerUrl && controllerUrl.searchParams.get('v') === '412';
+                        const alreadyCurrent = controllerUrl && controllerUrl.searchParams.get('v') === '424';
                         // Bare controllers are normal for legacy installs until the user applies.
                         // Only suppress the banner when the controller scriptURL is already versioned.
                         if (!alreadyCurrent) {
@@ -1507,7 +1517,7 @@
             const p = new Promise((res, rej) => {
                 const link = document.createElement('link');
                 link.rel = 'stylesheet';
-                link.href = (typeof window.resolveAssetUrl === 'function' ? window.resolveAssetUrl(`css-src/${name}.css?v=412`) : `css-src/${name}.css?v=412`);
+                link.href = (typeof window.resolveAssetUrl === 'function' ? window.resolveAssetUrl(`css-src/${name}.css?v=424`) : `css-src/${name}.css?v=424`);
                 link.dataset.appCss = name;
                 link.onload = () => {
                     link.dataset.loaded = 'true';
@@ -1590,7 +1600,7 @@
                 };
                 if (MODULE_SCRIPTS.has(name)) s.type = 'module';
                 const ext = MJS_SCRIPTS.has(name) ? '.mjs' : '.js';
-                let href = `${name}${ext}?v=412`;
+                let href = `${name}${ext}?v=424`;
                 if (forceReload) href += `&_rl=${Date.now()}`;
                 s.src = (typeof window.resolveAssetUrl === 'function' ? window.resolveAssetUrl(href) : href);
                 s.onload = () => settle();

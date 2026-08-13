@@ -1028,7 +1028,7 @@
                 </div>`;
             sheet.classList.remove('hidden');
             sheet.setAttribute('aria-hidden', 'false');
-            window.navStack?.push?.({ type: 'modal', id: 'planAiSheet', close: () => this.closePlanAiSheet() });
+            window.navStack?.open?.('modal', 'planAiSheet', () => this.closePlanAiSheetInternal());
             void this.mountPlanAiPickerReady?.();
         },
 
@@ -1095,6 +1095,10 @@
         },
 
         closePlanAiSheet() {
+            return window.navStack?.requestClose?.('modal', 'planAiSheet') || this.closePlanAiSheetInternal();
+        },
+
+        closePlanAiSheetInternal() {
             const sheet = document.getElementById('planAiSheet');
             sheet?.classList.add('hidden');
             sheet?.setAttribute('aria-hidden', 'true');

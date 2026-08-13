@@ -213,7 +213,7 @@
         },
 
         openPlanTaskDrawer(planId) {
-            this.closePlanTaskDrawer?.();
+            this.closePlanTaskDrawerInternal?.();
             const modal = document.createElement('div');
             modal.id = 'planTaskDrawer';
             modal.className = 'md-modal md-modal-sheet';
@@ -231,12 +231,18 @@
             });
             document.body.appendChild(modal);
             this._planTaskDrawerEl = modal;
+            window.navStack?.open?.('drawer', 'planTaskDrawer', () => this.closePlanTaskDrawerInternal());
         },
 
         closePlanTaskDrawer() {
+            return window.navStack?.requestClose?.('drawer', 'planTaskDrawer') || this.closePlanTaskDrawerInternal();
+        },
+
+        closePlanTaskDrawerInternal() {
             const el = this._planTaskDrawerEl || document.getElementById('planTaskDrawer');
             el?.remove?.();
             this._planTaskDrawerEl = null;
+            return true;
         },
 
         cancelDailyPlanConfirm(planId) {

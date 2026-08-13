@@ -151,11 +151,15 @@ test('version gate rejects changed precache, runtime-cache-first, and nested laz
     const script = path.join(fixture, 'scripts', 'bump-version.js');
     fs.mkdirSync(path.join(fixture, 'assets'), { recursive: true });
     fs.mkdirSync(path.join(fixture, 'scripts'), { recursive: true });
+    fs.mkdirSync(path.join(fixture, 'css-src'), { recursive: true });
+    fs.mkdirSync(path.join(fixture, 'build'), { recursive: true });
     fs.mkdirSync(path.join(fixture, 'lib'), { recursive: true });
     fs.copyFileSync(path.join(root, 'scripts', 'bump-version.js'), script);
     fs.writeFileSync(path.join(fixture, 'sw.js'), `const CACHE = 'training-assistant-v326';\nconst CACHE_ASSET_REVISION = '${placeholder}';\nconst ASSETS = ['index.html', 'chunk.js?v=326', 'favicon.ico'];\nconst RUNTIME_CACHE_FIRST_ASSETS = new Set(['assets/heic2any.min.js']);\n`);
     fs.writeFileSync(path.join(fixture, 'index.html'), `<script>const releaseVersion = '326';</script><script src="chunk.js?v=326"></script><script>const key='rehab-sw-controller-reload-v326';navigator.serviceWorker.register('./sw.js?v=326', { updateViaCache: 'none' });const PAGE_DEPS={today:['chunk','lib/virtual-core.umd']};const SCRIPT_PREREQUISITES={};const MJS_SCRIPTS=new Set([]);</script>`);
     fs.writeFileSync(path.join(fixture, 'app-update.js'), `const appUpdate={swUrl:'./sw.js?v=326',version:'326',key:'rehab-sw-controller-reload-v326'};`);
+    fs.writeFileSync(path.join(fixture, 'css-src', '02-base.css'), '@font-face { src: url("../assets/material-symbols-rounded.woff2?v=326") format("woff2"); }\n');
+    fs.writeFileSync(path.join(fixture, 'build', 'generated.css'), '@font-face { src: url("../assets/material-symbols-rounded.woff2?v=326") format("woff2"); }\n');
     fs.writeFileSync(path.join(fixture, 'chunk.js'), 'window.fixtureChunk = 1;\n');
     fs.writeFileSync(path.join(fixture, 'favicon.ico'), 'BASE64-ICON\n');
     fs.writeFileSync(path.join(fixture, 'assets', 'heic2any.min.js'), 'window.heicFixture = 1;\n');

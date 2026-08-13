@@ -13,6 +13,8 @@ const root = process.env.REHAB_VERSION_ROOT
 const swPath = path.join(root, 'sw.js');
 const htmlPath = path.join(root, 'index.html');
 const appUpdatePath = path.join(root, 'app-update.js');
+const materialFontCssPath = path.join(root, 'css-src', '02-base.css');
+const generatedCssPath = path.join(root, 'build', 'generated.css');
 const iconsCsvPath = path.join(root, 'build', 'icons.csv');
 const materialIconsPath = path.join(root, 'assets', 'material-symbols-icons.txt');
 const collectIconsPath = path.join(root, 'scripts', 'collect-icons.mjs');
@@ -181,6 +183,8 @@ function checkVersionSync() {
     const sw = fs.readFileSync(swPath, 'utf8');
     const html = fs.readFileSync(htmlPath, 'utf8');
     const appUpdate = fs.readFileSync(appUpdatePath, 'utf8');
+    const materialFontCss = fs.readFileSync(materialFontCssPath, 'utf8');
+    const generatedCss = fs.readFileSync(generatedCssPath, 'utf8');
     const swVersion = readSwVersion(sw);
 
     const swParamSet = new Set();
@@ -203,6 +207,18 @@ function checkVersionSync() {
     if (appUpdateMismatched.length) {
         console.error(`app-update.js has ?v=${appUpdateMismatched.join(',')} but sw.js CACHE is v${swVersion}`);
         process.exit(1);
+    }
+
+    for (const [label, source] of [
+        ['css-src/02-base.css', materialFontCss],
+        ['build/generated.css', generatedCss]
+    ]) {
+        const materialFontVersions = readHtmlVersions(source);
+        const materialFontMismatched = [...materialFontVersions].filter(v => v !== swVersion);
+        if (!materialFontVersions.size || materialFontMismatched.length) {
+            console.error(`${label} Material Symbols URL is missing or does not match v${swVersion}`);
+            process.exit(1);
+        }
     }
 
     const appUpdateVersion = appUpdate.match(/version:\s*['"](\d+)['"]/);
@@ -300,6 +316,12 @@ function bumpVersion() {
     appUpdate = appUpdate.replace(/version:\s*['"]\d+['"]/, `version: '${next}'`);
     appUpdate = appUpdate.replace(/rehab-sw-controller-reload-v\d+/g, `rehab-sw-controller-reload-v${next}`);
     fs.writeFileSync(appUpdatePath, appUpdate);
+
+    for (const cssPath of [materialFontCssPath, generatedCssPath]) {
+        let materialFontCss = fs.readFileSync(cssPath, 'utf8');
+        materialFontCss = materialFontCss.replace(/material-symbols-rounded\.woff2\?v=\d+/g, `material-symbols-rounded.woff2?v=${next}`);
+        fs.writeFileSync(cssPath, materialFontCss);
+    }
 
     const revision = computeCacheAssetRevision();
     swContent = fs.readFileSync(swPath, 'utf8').replace(CACHE_REVISION_PATTERN, `const CACHE_ASSET_REVISION = '${revision}'`);

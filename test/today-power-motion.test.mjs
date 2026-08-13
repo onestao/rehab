@@ -60,6 +60,10 @@ function readTodayCss() {
   return readFileSync(new URL('../css-src/51-v6-today.css', import.meta.url), 'utf8');
 }
 
+function readGeneratedCss() {
+  return readFileSync(new URL('../build/generated.css', import.meta.url), 'utf8');
+}
+
 function extractKeyframes(css, name) {
   const re = new RegExp(`@keyframes\\s+${name}\\s*\\{([\\s\\S]*?)\\n\\}`);
   const m = css.match(re);
@@ -97,19 +101,25 @@ test('dynamic ring data and train onclick remain intact', () => {
   assert.match(diet, /1500\/2000/);
 });
 
-test('today css stops infinite paint animations on hero and rings', () => {
+test('today css has no persistent animation while preserving static aura styling', () => {
   const css = readTodayCss();
   const heroBlock = css.match(/\.hero\s*\{[\s\S]*?\n\}/)?.[0] || '';
   const ringBlock = css.match(/\.ring\s*\{[\s\S]*?\n\}/)?.[0] || '';
   assert.doesNotMatch(heroBlock, /animation:\s*glass-breathe/);
   assert.doesNotMatch(ringBlock, /animation:\s*ring-breathe/);
-  assert.match(css, /\.hero-motion-aura[\s\S]*animation:\s*hero-aura-breathe\s+6s/);
-  assert.match(css, /\.ring-motion-aura[\s\S]*animation:\s*ring-aura-breathe\s+5\.4s/);
-  assert.match(css, /\.ring-diet\s+\.ring-motion-aura\s*\{\s*animation-delay:\s*0\.6s/);
-  assert.match(css, /\.tl-item\.now\s+\.tl-dot::after[\s\S]*animation:\s*tl-dot-aura-pulse\s+2s/);
-  assert.doesNotMatch(css, /\.tl-item\.now\s+\.tl-dot\s*\{[^}]*animation:\s*pulse/);
+  assert.doesNotMatch(css, /animation\s*:[^;]*\binfinite\b/);
+  assert.match(css, /\.hero-motion-aura[\s\S]*opacity:\s*\.42/);
+  assert.match(css, /\.ring-motion-aura[\s\S]*opacity:\s*\.48/);
+  assert.match(css, /\.tl-item\.now\s+\.tl-dot::after[\s\S]*opacity:\s*\.7/);
+});
 
-  for (const name of ['hero-aura-breathe', 'ring-aura-breathe', 'tl-dot-aura-pulse']) {
-    assertComposable(extractKeyframes(css, name), name);
-  }
+test('generated css ships the same idle-safe today styles', () => {
+  const css = readGeneratedCss();
+  const todayStart = css.indexOf('/* --- V6 Today');
+  const workoutStart = css.indexOf('/* --- V6 Workout', todayStart);
+  assert.ok(todayStart >= 0 && workoutStart > todayStart, 'generated css must include the today section');
+  const today = css.slice(todayStart, workoutStart);
+  assert.doesNotMatch(today, /animation\s*:[^;]*\binfinite\b/);
+  assert.match(today, /\.hero-motion-aura[\s\S]*opacity:\s*\.42/);
+  assert.match(today, /\.ring-motion-aura[\s\S]*opacity:\s*\.48/);
 });

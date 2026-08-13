@@ -138,11 +138,7 @@ const cardio = {
         document.getElementById('cardioEditCal').value = Math.round(calories);
         modal.classList.remove('hidden');
         modal.setAttribute('aria-hidden', 'false');
-        window.navStack?.replaceOrPush?.({
-            type: 'modal',
-            id: 'cardioEditModal',
-            close: () => this.closeEditModalInternal()
-        });
+        window.navStack?.open?.('modal', 'cardioEditModal', () => this.closeEditModalInternal());
         this._editOriginalDuration = duration;
         this._editOriginalCalories = calories;
         this.updateEditCalories();

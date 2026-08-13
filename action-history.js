@@ -165,9 +165,11 @@
         render();
         sheet.classList.remove('hidden');
         sheet.setAttribute('aria-hidden', 'false');
+        window.navStack?.open?.('modal', 'actionHistorySheet', () => close(true));
     }
 
-    function close() {
+    function close(direct) {
+        if (!direct && window.navStack?.requestClose?.('modal', 'actionHistorySheet')) return;
         const sheet = document.getElementById('actionHistorySheet');
         sheet?.classList.add('hidden');
         sheet?.setAttribute('aria-hidden', 'true');

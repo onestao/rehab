@@ -32,9 +32,13 @@ mark.ai-hit {
 }
 
 @media (prefers-color-scheme: dark) {
-    mark.ai-hit {
+    :root:not([data-theme-mode="light"]) mark.ai-hit {
         background: var(--md-sys-color-tertiary, #ffb866);
         color: #1a1200;
     }
+}
+[data-theme-mode="dark"] mark.ai-hit {
+    background: var(--md-sys-color-tertiary, #ffb866);
+    color: #1a1200;
 }
 

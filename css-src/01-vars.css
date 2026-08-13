@@ -10,6 +10,7 @@
 
 /* --- Design Tokens --- */
 :root {
+    color-scheme: light;
     /* Primary — Default Blue */
     --md-sys-primary: #0061a4;
     --md-sys-on-primary: #ffffff;
@@ -54,11 +55,15 @@
     --timer-gradient-mid: #0061a4;
     --timer-gradient-end: #2f7cbd;
     --timer-time-color: #d1e4ff;
+    --timer-foreground: #f7fbff;
+    --timer-foreground-muted: rgba(247, 251, 255, 0.82);
+    --timer-foreground-subtle: rgba(247, 251, 255, 0.70);
     --timer-orb: rgba(209, 228, 255, 0.15);
     --theme-seed: #0061a4;
 
     /* Error */
     --md-sys-error: #ba1a1a;
+    --md-sys-on-error: #ffffff;
     --md-sys-error-container: #ffdad6;
     --md-sys-on-error-container: #410002;
 
@@ -193,4 +198,3 @@
     --c-carb: #8b5cf6;  /* 碳水 carb → 紫 */
     --c-fat: #f59e0b;   /* 脂肪 fat → 黄 */
 }
-

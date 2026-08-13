@@ -232,6 +232,8 @@ test('startup executes before every versioned external business resource declara
     assert.ok(marker > 0);
     const parserRequested = [...html.matchAll(/<(?:script|link)\b[^>]*\s(?:src|href)=["'][^"']+\?v=\d+/gi)];
     assert.equal(parserRequested.length, 0, parserRequested.map((match) => match[0]).join('\n'));
+    assert.match(html, new RegExp(`data-rehab-font-preload[^>]+data-href=["']assets\\/material-symbols-rounded\\.woff2\\?v=${releaseVersion}`));
+    assert.match(html, /fontPreload\.setAttribute\(['"]href['"], resolveAssetUrl\(fontPreload\.dataset\.href\)\)/);
     assert.ok(marker < html.indexOf('data-rehab-stylesheet'));
     assert.match(html, new RegExp(`data-rehab-stylesheet[^>]+data-href=["']build\\/generated\\.css\\?v=${releaseVersion}`));
     assert.match(html, new RegExp(`script[^>]+data-rehab-entry[^>]+data-src=["']m3e-ripple\\.js\\?v=${releaseVersion}`));

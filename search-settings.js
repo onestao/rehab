@@ -125,62 +125,177 @@
     }
     const manager = {
         panel: 'list',
-        open() { document.getElementById('searchProviderManager')?.classList.remove('hidden'); document.getElementById('searchProviderManager')?.setAttribute('aria-hidden', 'false'); this.render(); },
-        close() { document.getElementById('searchProviderManager')?.classList.add('hidden'); document.getElementById('searchProviderManager')?.setAttribute('aria-hidden', 'true'); },
-        async render() {
+        open() {
+            document.getElementById('searchProviderManager')?.classList.remove('hidden');
+            document.getElementById('searchProviderManager')?.setAttribute('aria-hidden', 'false');
+            this.renderList();
+            root.navStack?.open?.('modal', 'searchProviderManager', () => this.close(true));
+        },
+        close(direct = false) {
+            if (!direct && root.navStack?.close?.('modal', 'searchProviderManager', () => this.close(true))) return true;
+            document.getElementById('searchProviderManager')?.classList.add('hidden');
+            document.getElementById('searchProviderManager')?.setAttribute('aria-hidden', 'true');
+            this.panel = 'list';
+            return true;
+        },
+        back() {
+            return this.panel === 'edit' ? this.showList() : this.close();
+        },
+        showList(direct = false) {
+            if (!direct && root.navStack?.requestClose?.('panel', 'searchProviderEditor')) return true;
+            this.renderList();
+            return true;
+        },
+        render() { return this.renderList(); },
+        async renderList() {
+            this.panel = 'list';
+            const title = document.getElementById('searchProviderManagerTitle');
+            if (title) title.textContent = '联网检索';
             const body = document.getElementById('searchProviderManagerBody');
             if (!body) return;
             await root.searchStore?.init?.();
             body.replaceChildren();
             const providers = root.searchStore?.getProviders?.() || [];
             if (!providers.length) body.append(el('p', 'search-settings-empty', '未配置外部搜索服务；食物核实将保持离线或使用模型原生联网。'));
-            for (const provider of providers) body.append(this.providerRow(provider));
-            const add = el('button', 'md-btn md-btn-tonal'); add.type = 'button'; add.append(icon('add'), document.createTextNode('添加搜索服务'));
+            providers.forEach((provider, index) => body.append(this.providerRow(provider, index, providers.length)));
+            const add = el('button', 'md-btn md-btn-tonal search-provider-add');
+            add.type = 'button';
+            add.append(icon('add'), document.createTextNode('添加搜索服务'));
             add.addEventListener('click', () => this.edit({ id: `search_${Date.now().toString(36)}`, name: '搜索服务', type: 'tavily', enabled: true, archived: false, options: { maxResults: 5, timeoutMs: 8000 } }));
             body.append(add);
             this.updateSummary();
         },
-        providerRow(provider) {
+        providerRow(provider, index = 0, total = 1) {
             const row = el('section', 'search-provider-row');
-            const meta = el('div', 'search-provider-meta'); meta.append(el('strong', '', provider.name), el('small', '', `${provider.type} · ${provider.archived ? '已归档' : provider.enabled ? '已启用' : '已停用'}`));
+            const meta = el('div', 'search-provider-meta');
+            meta.append(el('strong', '', provider.name), el('small', '', `${provider.type} · ${provider.archived ? '已归档' : provider.enabled ? '已启用' : '已停用'}`));
+
             const actions = el('div', 'search-provider-actions');
+            const order = el('div', 'search-provider-order');
+            order.setAttribute('aria-label', '调整搜索服务顺序');
             for (const [symbol, label, delta] of [['arrow_upward', '上移', -1], ['arrow_downward', '下移', 1]]) {
-                const move = el('button', 'md-icon-btn search-provider-order-btn'); move.type = 'button'; move.title = label; move.setAttribute('aria-label', label); move.append(icon(symbol), el('span', 'ai-task-order-caption', label)); move.addEventListener('click', async () => { await root.searchStore.moveProvider(provider.id, delta); this.render(); }); actions.append(move);
+                const move = el('button', 'md-icon-btn search-provider-order-btn');
+                move.type = 'button';
+                move.title = label;
+                move.setAttribute('aria-label', label);
+                move.disabled = delta < 0 ? index === 0 : index === total - 1;
+                move.append(icon(symbol));
+                move.addEventListener('click', async () => {
+                    await root.searchStore.moveProvider(provider.id, delta);
+                    this.renderList();
+                });
+                order.append(move);
             }
-            const edit = el('button', 'md-btn md-btn-tonal'); edit.type = 'button'; edit.append(icon('tune'), document.createTextNode('管理')); edit.addEventListener('click', () => this.edit(provider));
-            actions.append(edit); row.append(meta, actions); return row;
+            const edit = el('button', 'md-btn md-btn-tonal search-provider-manage-btn');
+            edit.type = 'button';
+            edit.setAttribute('aria-label', `管理 ${provider.name}`);
+            edit.append(icon('tune'), el('span', 'search-provider-manage-label', '管理'));
+            edit.addEventListener('click', () => this.edit(provider));
+            actions.append(order, edit);
+            row.append(meta, actions);
+            return row;
         },
         edit(provider) {
-            const body = document.getElementById('searchProviderManagerBody'); if (!body) return;
+            this.panel = 'edit';
+            root.navStack?.open?.('panel', 'searchProviderEditor', () => this.showList(true));
+            const title = document.getElementById('searchProviderManagerTitle');
+            if (title) title.textContent = '编辑搜索服务';
+            const body = document.getElementById('searchProviderManagerBody');
+            if (!body) return;
             body.replaceChildren();
-            const form = el('form', 'search-provider-form'); form.noValidate = true;
-            const field = (label, value, type = 'text') => { const wrap = el('label', 'md-field'); const input = document.createElement('input'); input.type = type; input.value = value || ''; input.placeholder = ' '; input.name = label; wrap.append(input, el('span', '', label)); return { wrap, input }; };
-            const name = field('名称', provider.name); const key = field('API Key（留空则保持不变）', '', 'password');
-            const typeWrap = el('label', 'md-field'); const type = document.createElement('select'); type.name = '类型';
+            const form = el('form', 'search-provider-form');
+            form.noValidate = true;
+
+            const field = (label, value, type = 'text', placeholder = '') => {
+                const wrap = el('label', 'search-provider-field');
+                const input = document.createElement('input');
+                input.className = 'search-provider-control';
+                input.type = type;
+                input.value = value || '';
+                input.placeholder = placeholder || label;
+                input.name = label;
+                if (type === 'password') input.autocomplete = 'new-password';
+                wrap.append(el('span', 'search-provider-field-label', label), input);
+                return { wrap, input };
+            };
+
+            const name = field('名称', provider.name, 'text', '例如：Tavily 主服务');
+            const key = field('API Key', '', 'password', '留空则保持现有密钥');
+            key.wrap.classList.add('search-provider-field-wide');
+
+            const typeWrap = el('label', 'search-provider-field');
+            const type = document.createElement('select');
+            type.className = 'search-provider-control';
+            type.name = '类型';
             [
                 ['tavily', 'Tavily'], ['brave', 'Brave Search'], ['exa', 'Exa'],
                 ['jina', 'Jina Search / Reader'], ['serper', 'Serper'],
                 ['searxng', 'SearXNG（自托管）'], ['duckduckgo', 'DuckDuckGo Instant Answers（实验）']
-            ].forEach(([value, label]) => { const option = document.createElement('option'); option.value = value; option.textContent = label; option.selected = provider.type === value; type.append(option); });
-            typeWrap.append(type, el('span', '', '类型'));
-            const endpoint = field('SearXNG HTTPS 地址', provider.options?.baseUrl || '', 'url');
-            const enabled = document.createElement('input'); enabled.type = 'checkbox'; enabled.checked = provider.enabled !== false;
-            const enabledWrap = el('label', 'md-switch'); enabledWrap.append(el('span', '', '启用此服务'), enabled);
-            const actions = el('div', 'md-row search-provider-actions');
-            const cancel = el('button', 'md-btn md-btn-tonal', '返回'); cancel.type = 'button'; cancel.addEventListener('click', () => this.render());
-            const test = el('button', 'md-btn md-btn-tonal', '测试连接'); test.type = 'button';
-            const save = el('button', 'md-btn md-btn-filled', '保存'); save.type = 'submit';
-            const archive = el('button', 'md-btn md-btn-tonal', provider.archived ? '取消归档' : '归档'); archive.type = 'button'; archive.addEventListener('click', async () => { await root.searchStore.archiveProvider(provider.id, !provider.archived); this.render(); });
-            const remove = el('button', 'md-btn md-btn-tonal', '删除'); remove.type = 'button'; remove.addEventListener('click', async () => { if (!root.confirm?.('删除此搜索服务及其本机密钥？')) return; await root.searchStore.removeProvider(provider.id); this.render(); });
-            actions.append(cancel, archive, remove, test, save); form.append(name.wrap, typeWrap, endpoint.wrap, key.wrap, enabledWrap, actions);
+            ].forEach(([value, label]) => {
+                const option = document.createElement('option');
+                option.value = value;
+                option.textContent = label;
+                option.selected = provider.type === value;
+                type.append(option);
+            });
+            typeWrap.append(el('span', 'search-provider-field-label', '类型'), type);
+
+            const endpoint = field('SearXNG 地址', provider.options?.baseUrl || '', 'url', 'https://search.example.com');
+            endpoint.wrap.classList.add('search-provider-field-wide');
+
+            const enabled = document.createElement('input');
+            enabled.type = 'checkbox';
+            enabled.checked = provider.enabled !== false;
+            const enabledWrap = el('label', 'md-switch search-provider-enabled');
+            enabledWrap.append(el('span', '', '启用此服务'), enabled);
+
+            const actions = el('div', 'search-provider-form-actions');
+            const cancel = el('button', 'md-btn md-btn-tonal', '返回');
+            cancel.type = 'button';
+            cancel.addEventListener('click', () => this.showList());
+            const archive = el('button', 'md-btn md-btn-tonal', provider.archived ? '取消归档' : '归档');
+            archive.type = 'button';
+            archive.addEventListener('click', async () => {
+                await root.searchStore.archiveProvider(provider.id, !provider.archived);
+                this.showList();
+            });
+            const remove = el('button', 'md-btn md-btn-tonal', '删除');
+            remove.type = 'button';
+            remove.addEventListener('click', async () => {
+                if (!root.confirm?.('删除此搜索服务及其本机密钥？')) return;
+                await root.searchStore.removeProvider(provider.id);
+                this.showList();
+            });
+            const test = el('button', 'md-btn md-btn-tonal', '测试连接');
+            test.type = 'button';
+            const save = el('button', 'md-btn md-btn-filled search-provider-save', '保存');
+            save.type = 'submit';
+            actions.append(cancel, archive, remove, test, save);
+
+            form.append(name.wrap, typeWrap, endpoint.wrap, key.wrap, enabledWrap, actions);
             const value = () => ({ ...provider, name: name.input.value, type: type.value, enabled: enabled.checked, options: { ...provider.options, baseUrl: endpoint.input.value } });
             const refreshFields = () => {
                 endpoint.wrap.hidden = type.value !== 'searxng';
                 key.wrap.hidden = ['searxng', 'duckduckgo'].includes(type.value);
             };
-            type.addEventListener('change', refreshFields); refreshFields();
-            test.addEventListener('click', async () => { test.disabled = true; try { await root.searchAdapters?.test?.(value(), key.input.value || root.searchStore?.apiKeyFor?.(provider.id)); root.toast?.show?.('搜索服务连接正常', 'success'); } catch (error) { root.toast?.show?.(root.searchAdapters?.errorMessage?.(error?.code) || '测试失败', 'error'); } finally { test.disabled = false; } });
-            form.addEventListener('submit', async event => { event.preventDefault(); await root.searchStore.saveProvider(value(), key.input.value); this.render(); });
+            type.addEventListener('change', refreshFields);
+            refreshFields();
+            test.addEventListener('click', async () => {
+                test.disabled = true;
+                try {
+                    await root.searchAdapters?.test?.(value(), key.input.value || root.searchStore?.apiKeyFor?.(provider.id));
+                    root.toast?.show?.('搜索服务连接正常', 'success');
+                } catch (error) {
+                    root.toast?.show?.(root.searchAdapters?.errorMessage?.(error?.code) || '测试失败', 'error');
+                } finally {
+                    test.disabled = false;
+                }
+            });
+            form.addEventListener('submit', async event => {
+                event.preventDefault();
+                await root.searchStore.saveProvider(value(), key.input.value);
+                this.showList();
+            });
             body.append(form);
         },
         updateSummary() {

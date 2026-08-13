@@ -285,9 +285,11 @@
             </div>`;
         },
 
-        closeSummarySheet() {
+        closeSummarySheet(direct) {
+            const id = window.navStack?.top?.()?.id === 'monthlySummary' ? 'monthlySummary' : 'weeklySummary';
+            if (!direct && window.navStack?.requestClose?.('sheet', id)) return;
             const el = document.getElementById('summarySheetOverlay');
-            if (!el) return;
+            if (!el) return true;
             el.style.animation = 'summarySheetFadeIn .2s ease reverse forwards';
             const sheet = el.querySelector('.summary-sheet');
             if (sheet) sheet.style.animation = 'summarySheetSlideUp .25s var(--md-sys-motion-emphasized) reverse forwards';
@@ -516,7 +518,7 @@
             document.body.appendChild(overlay);
             this._summarySheetEsc = (e) => { if (e.key === 'Escape') this.closeSummarySheet(); };
             document.addEventListener('keydown', this._summarySheetEsc);
-            window.navStack?.push?.({ type: 'sheet', id: 'weeklySummary', close: () => this.closeSummarySheet() });
+            window.navStack?.open?.('sheet', 'weeklySummary', () => this.closeSummarySheet(true));
         },
 
         normalizeSummaryMonthKey(monthKey) {
@@ -626,7 +628,7 @@
             document.body.appendChild(overlay);
             this._summarySheetEsc = (e) => { if (e.key === 'Escape') this.closeSummarySheet(); };
             document.addEventListener('keydown', this._summarySheetEsc);
-            window.navStack?.push?.({ type: 'sheet', id: 'monthlySummary', close: () => this.closeSummarySheet() });
+            window.navStack?.open?.('sheet', 'monthlySummary', () => this.closeSummarySheet(true));
         }
     };
 })();

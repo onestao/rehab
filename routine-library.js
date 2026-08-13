@@ -353,6 +353,7 @@
 
             sheet.classList.remove('hidden');
             sheet.setAttribute('aria-hidden', 'false');
+            window.navStack?.open?.('modal', 'workoutLibrarySheet', () => this.closeWorkoutLibraryInternal());
         },
 
         showWorkoutLibraryPane(view) {
@@ -457,11 +458,16 @@
         },
 
         closeWorkoutLibrary() {
+            return window.navStack?.requestClose?.('modal', 'workoutLibrarySheet') || this.closeWorkoutLibraryInternal();
+        },
+
+        closeWorkoutLibraryInternal() {
             const sheet = document.getElementById('workoutLibrarySheet');
             if (sheet) {
                 sheet.classList.add('hidden');
                 sheet.setAttribute('aria-hidden', 'true');
             }
+            return true;
         },
 
         loadRoutineFromLib(idx) {

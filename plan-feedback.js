@@ -78,11 +78,7 @@
                 </div>`;
             sheet.classList.remove('hidden');
             sheet.setAttribute('aria-hidden', 'false');
-            window.navStack?.push?.({
-                type: 'modal',
-                id: 'planFeedbackSheet',
-                close: () => this.closePlanFeedback()
-            });
+            window.navStack?.open?.('modal', 'planFeedbackSheet', () => this.closePlanFeedbackInternal());
         },
 
         selectPlanFeedback(rpe) {
@@ -96,6 +92,10 @@
         },
 
         closePlanFeedback() {
+            return window.navStack?.requestClose?.('modal', 'planFeedbackSheet') || this.closePlanFeedbackInternal();
+        },
+
+        closePlanFeedbackInternal() {
             const sheet = qs('planFeedbackSheet');
             sheet?.classList.add('hidden');
             sheet?.setAttribute('aria-hidden', 'true');

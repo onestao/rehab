@@ -12,20 +12,13 @@ const TODAY_CSS = 'css-src/51-v6-today.css';
 const WORKOUT_CSS = 'css-src/52-v6-workout.css';
 const UI_KEYFRAMES_CSS = 'css-src/50-v6-ui.css';
 
-const NEW_KEYFRAMES = [
-  'hero-aura-breathe',
-  'ring-aura-breathe',
-  'tl-dot-aura-pulse',
-  'fab-aura-glow'
-];
-
-const CONTINUOUS_BINDINGS = [
-  { file: TODAY_CSS, selector: '.hero-motion-aura', keyframe: 'hero-aura-breathe' },
-  { file: TODAY_CSS, selector: '.ring-motion-aura', keyframe: 'ring-aura-breathe' },
-  { file: TODAY_CSS, selector: '.tl-item.now .tl-dot::after', keyframe: 'tl-dot-aura-pulse' },
-  { file: WORKOUT_CSS, selector: '.fab-play-aura', keyframe: 'fab-aura-glow' },
-  { file: WORKOUT_CSS, selector: '.timer-panel::before', keyframe: 'orb' },
-  { file: WORKOUT_CSS, selector: '.timer-panel::after', keyframe: 'orb' }
+const IDLE_PAGE_SELECTORS = [
+  { file: TODAY_CSS, selector: '.hero-motion-aura' },
+  { file: TODAY_CSS, selector: '.ring-motion-aura' },
+  { file: TODAY_CSS, selector: '.tl-item.now .tl-dot::after' },
+  { file: WORKOUT_CSS, selector: '.fab-play-aura' },
+  { file: WORKOUT_CSS, selector: '.timer-panel::before' },
+  { file: WORKOUT_CSS, selector: '.timer-panel::after' }
 ];
 
 const FORBIDDEN_HOST_ANIMATIONS = [
@@ -214,29 +207,18 @@ function changedFilesSinceBase() {
     .filter(Boolean);
 }
 
-test('T1/T2 replacement keyframes only animate opacity/transform', () => {
+test('Today and Workout page CSS contain no persistent animations', () => {
   const today = readRepo(TODAY_CSS);
   const workout = readRepo(WORKOUT_CSS);
-  for (const name of ['hero-aura-breathe', 'ring-aura-breathe', 'tl-dot-aura-pulse']) {
-    assertComposableKeyframes(extractKeyframes(today, name), name);
-  }
-  assertComposableKeyframes(extractKeyframes(workout, 'fab-aura-glow'), 'fab-aura-glow');
-  // orb remains shared and must stay transform-only for continuous use on timer orbs
-  assertComposableKeyframes(extractKeyframes(readRepo(UI_KEYFRAMES_CSS), 'orb'), 'orb');
+  assert.doesNotMatch(today, /animation\s*:[^;]*\binfinite\b/);
+  assert.doesNotMatch(workout, /animation\s*:[^;]*\binfinite\b/);
 });
 
-test('continuous motion selectors bind composited keyframes only', () => {
-  for (const item of CONTINUOUS_BINDINGS) {
+test('idle visual selectors are detached from continuous motion', () => {
+  for (const item of IDLE_PAGE_SELECTORS) {
     const css = readRepo(item.file);
     const names = continuousAnimationNames(css, item.selector);
-    assert.ok(names.includes(item.keyframe), `${item.selector} must bind ${item.keyframe}, got ${names.join(',') || '(none)'}`);
-    let body;
-    if (item.keyframe === 'orb') {
-      body = extractKeyframes(readRepo(UI_KEYFRAMES_CSS), 'orb');
-    } else {
-      body = extractKeyframes(css, item.keyframe);
-    }
-    assertComposableKeyframes(body, `${item.selector} -> ${item.keyframe}`);
+    assert.deepEqual(names, [], `${item.selector} must not bind continuous motion`);
   }
 });
 

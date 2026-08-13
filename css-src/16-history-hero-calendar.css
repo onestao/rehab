@@ -338,10 +338,14 @@
 }
 
 @media (prefers-color-scheme: dark) {
-    .calendar-event {
+    :root:not([data-theme-mode="light"]) .calendar-event {
         background: color-mix(in srgb, var(--event-color) 18%, var(--md-sys-surface-container-highest));
         color: color-mix(in srgb, var(--event-color) 35%, var(--md-sys-on-surface));
     }
+}
+[data-theme-mode="dark"] .calendar-event {
+    background: color-mix(in srgb, var(--event-color) 18%, var(--md-sys-surface-container-highest));
+    color: color-mix(in srgb, var(--event-color) 35%, var(--md-sys-on-surface));
 }
 .calendar-legend {
     display: flex;

@@ -126,7 +126,7 @@
     margin-bottom: 8px;
 }
 .sect-head .t { font-size: 13px; font-weight: 600; color: var(--md-sys-on-surface); }
-.sect-head .a { font-size: 12px; color: var(--md-sys-primary); cursor: pointer; background: none; border: none; font-weight: 600; }
+.sect-head .a { min-height: 44px; padding: 0 8px; font-size: 12px; color: var(--md-sys-primary); cursor: pointer; background: none; border: none; border-radius: var(--md-sys-shape-full); font-weight: 600; }
 
 /* ======================
    ANIMATIONS — V6 keyframes

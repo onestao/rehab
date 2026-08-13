@@ -16,6 +16,8 @@ function loadNav({ standalone = false } = {}) {
         state: null,
         /** @type {any[]} */
         stack: [],
+        /** @type {number[]} */
+        goCalls: [],
         replaceState(state) { this.state = state; },
         pushState(state) {
             this.state = state;
@@ -23,6 +25,12 @@ function loadNav({ standalone = false } = {}) {
         },
         back() {
             this.stack.pop();
+            this.state = this.stack[this.stack.length - 1] || { navRoot: true, navIndex: 0 };
+        },
+        go(delta) {
+            this.goCalls.push(delta);
+            const count = Math.max(0, -Number(delta || 0));
+            this.stack.splice(Math.max(0, this.stack.length - count), count);
             this.state = this.stack[this.stack.length - 1] || { navRoot: true, navIndex: 0 };
         }
     };
@@ -104,4 +112,44 @@ test('H2 unit: source documents browser vs pwa contract', () => {
     assert.match(src, /mode:\s*'browser'|mode = isStandaloneDisplay/);
     assert.match(src, /pwa/);
     assert.match(src, /isStandaloneDisplay/);
+});
+
+
+test('Android back closes nested settings panel before its manager', () => {
+    const { nav } = loadNav({ standalone: false });
+    const closed = [];
+    nav.open('modal', 'searchProviderManager', () => { closed.push('manager'); return true; });
+    nav.open('panel', 'searchProviderEditor', () => { closed.push('editor'); return true; });
+
+    nav._onPopState({});
+    assert.deepEqual(closed, ['editor']);
+    assert.equal(nav.top().id, 'searchProviderManager');
+
+    nav._onPopState({});
+    assert.deepEqual(closed, ['editor', 'manager']);
+    assert.equal(nav.top().id, 'today');
+});
+
+test('explicit close of a settings manager clears its nested panel in one history jump', () => {
+    const { nav, history } = loadNav({ standalone: false });
+    let managerClosed = 0;
+    let editorClosed = 0;
+    nav.open('modal', 'aiProviderManager', () => { managerClosed += 1; return true; });
+    nav.open('panel', 'aiProviderManagerPanel', () => { editorClosed += 1; return true; });
+
+    assert.equal(nav.close('modal', 'aiProviderManager'), true);
+    assert.equal(managerClosed, 1);
+    assert.equal(editorClosed, 0, 'closing the manager owns cleanup of its internal panel DOM');
+    assert.equal(nav.top().id, 'today');
+    assert.deepEqual(history.goCalls, [-2]);
+});
+
+test('reopening the same layer refreshes its close callback without duplicate frames', () => {
+    const { nav } = loadNav({ standalone: false });
+    const closed = [];
+    nav.open('modal', 'themeSheet', () => { closed.push('old'); return true; });
+    nav.open('modal', 'themeSheet', () => { closed.push('new'); return true; });
+    assert.equal(nav.stack.filter(entry => entry.id === 'themeSheet').length, 1);
+    nav._onPopState({});
+    assert.deepEqual(closed, ['new']);
 });

@@ -1385,9 +1385,14 @@
    ============================================ */
 
 @media (prefers-color-scheme: dark) {
-    .profile-condition-type.type-injury { background: #5d1717; color: #ffd9d9; }
-    .profile-sev.sev-mild { background: #1f3a23; color: #d4edda; }
-    .profile-sev.sev-moderate { background: #4a3e1a; color: #fff3cd; }
-    .profile-sev.sev-severe { background: #4a1f23; color: #f8d7da; }
-    .profile-form-section { box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 8%, transparent); }
+    :root:not([data-theme-mode="light"]) .profile-condition-type.type-injury { background: #5d1717; color: #ffd9d9; }
+    :root:not([data-theme-mode="light"]) .profile-sev.sev-mild { background: #1f3a23; color: #d4edda; }
+    :root:not([data-theme-mode="light"]) .profile-sev.sev-moderate { background: #4a3e1a; color: #fff3cd; }
+    :root:not([data-theme-mode="light"]) .profile-sev.sev-severe { background: #4a1f23; color: #f8d7da; }
+    :root:not([data-theme-mode="light"]) .profile-form-section { box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 8%, transparent); }
 }
+[data-theme-mode="dark"] .profile-condition-type.type-injury { background: #5d1717; color: #ffd9d9; }
+[data-theme-mode="dark"] .profile-sev.sev-mild { background: #1f3a23; color: #d4edda; }
+[data-theme-mode="dark"] .profile-sev.sev-moderate { background: #4a3e1a; color: #fff3cd; }
+[data-theme-mode="dark"] .profile-sev.sev-severe { background: #4a1f23; color: #f8d7da; }
+[data-theme-mode="dark"] .profile-form-section { box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 8%, transparent); }

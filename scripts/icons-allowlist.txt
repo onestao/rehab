@@ -31,6 +31,8 @@ radio_button_unchecked
 warning
 error
 info
+arrow_downward
+arrow_upward
 keyboard_arrow_down
 keyboard_arrow_up
 keyboard_arrow_left

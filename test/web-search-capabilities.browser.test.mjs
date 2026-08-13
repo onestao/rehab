@@ -12,6 +12,9 @@ import test from 'node:test';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const repoRoot = path.resolve(root, '../..');
 const materialIcons = readFileSync(path.join(root, 'build', 'icons.txt'), 'utf8').trim().split(/\r?\n/).filter(Boolean);
+const indexSource = readFileSync(path.join(root, 'index.html'), 'utf8');
+const criticalStyle = indexSource.match(/<style>([\s\S]*?)<\/style>/)?.[1] || '';
+const releaseVersion = indexSource.match(/const releaseVersion = ['"](\d+)['"]/)?.[1] || '';
 
 function loadPlaywright() {
     const candidates = [
@@ -126,6 +129,128 @@ test('provider manager exposes Sprint 2 providers and correct credential fields'
         assert.equal(await page.locator('input[name^="API Key"]').evaluate(node => node.closest('label').hidden), true);
         await page.locator('select[name="类型"]').selectOption('jina');
         assert.equal(await page.locator('input[name^="API Key"]').evaluate(node => node.closest('label').hidden), false);
+    });
+});
+
+for (const width of [360, 390]) {
+    test(`search provider manager stays compact at ${width}px`, async () => {
+        await withPage({ width, height: 844 }, async (page, _context, base) => {
+            await page.setContent(shell(base));
+            await page.waitForFunction(() => [...document.styleSheets].some(sheet => {
+                try { return sheet.href?.includes('/build/generated.css') && sheet.cssRules.length > 0; } catch { return false; }
+            }));
+            await page.evaluate(() => {
+                const providers = [
+                    { id: 'one', name: 'Tavily', type: 'tavily', enabled: true, archived: false, options: {} },
+                    { id: 'two', name: 'Exa Backup', type: 'exa', enabled: true, archived: false, options: {} },
+                ];
+                window.searchStore = {
+                    async init() {}, getProviders: () => providers, apiKeyFor: () => '',
+                    async saveProvider() {}, async archiveProvider() {}, async removeProvider() {}, async moveProvider() {},
+                };
+                window.searchRegistry = { nativeCapabilityState: () => ({ usable: false, reason: 'test', actions: [] }) };
+                window.searchAdapters = { async test() {} };
+                window.ai = {};
+            });
+            await loadModules(page, base, ['search-policy-pure.mjs', 'search-settings.js']);
+            await page.evaluate(() => window.searchSettings.open());
+            await page.waitForSelector('.search-provider-row');
+
+            const listLayout = await page.locator('.search-provider-row').first().evaluate(row => {
+                const rect = row.getBoundingClientRect();
+                const meta = row.querySelector('.search-provider-meta').getBoundingClientRect();
+                const actions = row.querySelector('.search-provider-actions').getBoundingClientRect();
+                const buttons = [...row.querySelectorAll('.search-provider-order-btn')].map(node => node.getBoundingClientRect());
+                return {
+                    overflow: row.scrollWidth - row.clientWidth,
+                    rect: { top: rect.top, bottom: rect.bottom, right: rect.right },
+                    meta: { top: meta.top, bottom: meta.bottom, right: meta.right },
+                    actions: { top: actions.top, bottom: actions.bottom, left: actions.left, right: actions.right },
+                    buttonYs: buttons.map(button => Math.round(button.y)),
+                    hasCaptions: !!row.querySelector('.ai-task-order-caption'),
+                };
+            });
+            assert.ok(listLayout.overflow <= 1, JSON.stringify(listLayout));
+            assert.ok(listLayout.actions.left >= listLayout.meta.right - 1, JSON.stringify(listLayout));
+            assert.ok(listLayout.actions.top >= listLayout.rect.top - 1 && listLayout.actions.bottom <= listLayout.rect.bottom + 1, JSON.stringify(listLayout));
+            assert.equal(new Set(listLayout.buttonYs).size, 1);
+            assert.equal(listLayout.hasCaptions, false);
+            assert.ok(listLayout.actions.right <= width + 1, JSON.stringify(listLayout));
+
+            await page.locator('.search-provider-manage-btn').first().click();
+            await page.waitForSelector('.search-provider-form');
+            const formLayout = await page.locator('.search-provider-form').evaluate(form => {
+                const rect = form.getBoundingClientRect();
+                const visibleFields = [...form.querySelectorAll('.search-provider-field')].filter(field => !field.hidden);
+                const fieldRects = visibleFields.map(field => {
+                    const box = field.getBoundingClientRect();
+                    const label = field.querySelector('.search-provider-field-label')?.getBoundingClientRect();
+                    const control = field.querySelector('.search-provider-control')?.getBoundingClientRect();
+                    return {
+                        box: { x: box.x, y: box.y, right: box.right, bottom: box.bottom },
+                        label: label && { x: label.x, y: label.y, right: label.right, bottom: label.bottom },
+                        control: control && { x: control.x, y: control.y, right: control.right, bottom: control.bottom },
+                    };
+                });
+                const utility = [...form.querySelectorAll('.search-provider-form-actions > .md-btn:not(.search-provider-save)')].map(button => button.getBoundingClientRect());
+                const save = form.querySelector('.search-provider-save').getBoundingClientRect();
+                const key = form.querySelector('input[type="password"]');
+                return {
+                    overflow: form.scrollWidth - form.clientWidth,
+                    rect: { x: rect.x, right: rect.right },
+                    fieldRects,
+                    firstRowYs: fieldRects.slice(0, 2).map(field => Math.round(field.box.y)),
+                    labelsInside: fieldRects.every(field => field.label && field.label.y >= field.box.y && field.label.bottom <= field.box.bottom && field.control.y >= field.box.y && field.control.bottom <= field.box.bottom),
+                    utilityYs: utility.map(button => Math.round(button.y)),
+                    save: { x: save.x, right: save.right, width: save.width },
+                    keyPlaceholder: key?.placeholder || '',
+                    legacyFields: form.querySelectorAll('.md-field').length,
+                };
+            });
+            assert.ok(formLayout.overflow <= 1, JSON.stringify(formLayout));
+            assert.equal(new Set(formLayout.firstRowYs).size, 1, JSON.stringify(formLayout));
+            assert.equal(formLayout.labelsInside, true, JSON.stringify(formLayout));
+            assert.equal(new Set(formLayout.utilityYs).size, 1, JSON.stringify(formLayout));
+            assert.ok(formLayout.save.width >= (formLayout.rect.right - formLayout.rect.x) - 2, JSON.stringify(formLayout));
+            assert.ok(formLayout.keyPlaceholder.length > 0);
+            assert.equal(formLayout.legacyFields, 0);
+        });
+    });
+}
+
+test('Android back unwinds search service editor before closing settings manager', async () => {
+    await withPage({ width: 390, height: 844 }, async (page, _context, base) => {
+        await page.setContent(shell(base));
+        await page.evaluate(() => {
+            const providers = [{ id: 'one', name: 'Tavily', type: 'tavily', enabled: true, archived: false, options: {} }];
+            window.searchStore = {
+                async init() {}, getProviders: () => providers, apiKeyFor: () => '',
+                async saveProvider() {}, async archiveProvider() {}, async removeProvider() {}, async moveProvider() {},
+            };
+            window.searchRegistry = { nativeCapabilityState: () => ({ usable: false, reason: 'test', actions: [] }) };
+            window.searchAdapters = { async test() {} };
+            window.ai = {};
+        });
+        await loadModules(page, base, ['nav-stack.js', 'search-policy-pure.mjs', 'search-settings.js']);
+        await page.evaluate(() => {
+            window.navStack.init();
+            window.searchSettings.open();
+        });
+        await page.waitForSelector('.search-provider-row');
+        await page.locator('.search-provider-manage-btn').click();
+        await page.waitForSelector('.search-provider-form');
+        assert.equal(await page.locator('#searchProviderManager').getAttribute('aria-hidden'), 'false');
+
+        await page.evaluate(() => history.back());
+        await page.waitForSelector('.search-provider-row');
+        assert.equal(await page.locator('.search-provider-form').count(), 0);
+        assert.equal(await page.locator('#searchProviderManager').getAttribute('aria-hidden'), 'false');
+        assert.equal(await page.evaluate(() => window.navStack.top().id), 'searchProviderManager');
+
+        await page.evaluate(() => history.back());
+        await page.waitForFunction(() => document.getElementById('searchProviderManager')?.classList.contains('hidden'));
+        assert.equal(await page.locator('#searchProviderManager').getAttribute('aria-hidden'), 'true');
+        assert.equal(await page.evaluate(() => window.navStack.top().id), 'today');
     });
 });
 
@@ -273,5 +398,136 @@ test('local Material Symbols subset renders every collected icon as a ligature',
         const missing = result.icons.filter(item => item.width > 30 || !/Material Symbols Rounded/i.test(item.fontFamily));
         assert.deepEqual(missing, []);
         assert.equal(result.icons.length, materialIcons.length);
+    });
+});
+
+
+test('manual dark shell keeps inherited prescription text on semantic colors', async () => {
+    await withPage({ width: 390, height: 844 }, async (page, _context, base) => {
+        await page.setContent(`<!doctype html><html data-theme-mode="dark"><head><style>${criticalStyle}</style><link rel="stylesheet" href="${base}/build/generated.css"></head><body>
+            <div class="library-card prescription-action-card">
+                <label class="prescription-merge-check"><input type="checkbox"><span></span></label>
+                <button class="prescription-action-main" type="button"><strong>90/90髋内外旋</strong><small>髋 · continued</small></button>
+            </div>
+        </body></html>`);
+        await page.waitForFunction(() => [...document.styleSheets].some(sheet => {
+            try { return sheet.href?.includes('/build/generated.css') && sheet.cssRules.length > 0; } catch { return false; }
+        }));
+        await page.waitForTimeout(900);
+        const colors = await page.evaluate(() => {
+            const rootStyle = getComputedStyle(document.documentElement);
+            const bodyStyle = getComputedStyle(document.body);
+            const titleStyle = getComputedStyle(document.querySelector('.prescription-action-main strong'));
+            return {
+                body: bodyStyle.color,
+                title: titleStyle.color,
+                background: bodyStyle.backgroundColor,
+                onSurface: rootStyle.getPropertyValue('--md-sys-on-surface').trim(),
+                surface: rootStyle.getPropertyValue('--md-sys-surface').trim(),
+            };
+        });
+        const expectedText = await page.evaluate(color => {
+            const probe = document.createElement('span');
+            probe.style.color = color;
+            document.body.append(probe);
+            const value = getComputedStyle(probe).color;
+            probe.remove();
+            return value;
+        }, colors.onSurface);
+        const expectedSurface = await page.evaluate(color => {
+            const probe = document.createElement('span');
+            probe.style.backgroundColor = color;
+            document.body.append(probe);
+            const value = getComputedStyle(probe).backgroundColor;
+            probe.remove();
+            return value;
+        }, colors.surface);
+        assert.equal(colors.body, expectedText);
+        assert.equal(colors.title, expectedText);
+        assert.equal(colors.background, expectedSurface);
+    });
+});
+
+
+
+test('dark workout timer keeps readable text when on-primary is dark', async () => {
+    await withPage({ width: 390, height: 844 }, async (page, _context, base) => {
+        await page.setContent(`<!doctype html><html data-theme-mode="dark" style="--md-sys-on-primary:#001122"><head><link rel="stylesheet" href="${base}/build/generated.css"></head><body>
+            <section id="workout" class="page">
+                <div class="md-card timer-panel">
+                    <div id="statusText">READY</div>
+                    <div id="mainTime">00</div>
+                    <div id="subText">计划 · 康复 · 侧卧髋外展基础</div>
+                    <div class="timer-stats">
+                        <div class="stat-item"><span class="stat-label">总用时</span><b>00:00</b></div>
+                        <div class="stat-item"><span class="stat-label">组数</span><b>0/0</b></div>
+                        <div class="stat-item"><span class="stat-label">次数</span><b>0/0</b></div>
+                    </div>
+                </div>
+                <div class="mode-tabs"><button class="mode-tab">有氧</button><button class="mode-tab active">力量</button></div>
+            </section>
+        </body></html>`);
+        await page.waitForFunction(() => [...document.styleSheets].some(sheet => {
+            try { return sheet.href?.includes('/build/generated.css') && sheet.cssRules.length > 0; } catch { return false; }
+        }));
+        const result = await page.evaluate(() => {
+            const read = selector => {
+                const style = getComputedStyle(document.querySelector(selector));
+                return { color: style.color, opacity: Number(style.opacity) };
+            };
+            return {
+                status: read('#statusText'),
+                time: read('#mainTime'),
+                sub: read('#subText'),
+                label: read('.stat-label'),
+                value: read('.stat-item b'),
+            };
+        });
+        for (const key of ['status', 'time', 'sub', 'label', 'value']) {
+            assert.equal(result[key].opacity, 1, `${key}: ${JSON.stringify(result[key])}`);
+            const channels = (result[key].color.match(/[\d.]+/g) || []).slice(0, 3).map(Number);
+            assert.ok(channels.length === 3 && Math.min(...channels) >= 180, `${key}: ${JSON.stringify(result[key])}`);
+        }
+    });
+});
+
+test('search provider order controls render versioned arrow ligatures', async () => {
+    await withPage({ width: 390, height: 844 }, async (page, _context, base) => {
+        const fontRequests = [];
+        page.on('request', request => {
+            if (request.url().includes('material-symbols-rounded.woff2')) fontRequests.push(request.url());
+        });
+        await page.setContent(shell(base));
+        await page.waitForFunction(() => [...document.styleSheets].some(sheet => {
+            try { return sheet.href?.includes('/build/generated.css') && sheet.cssRules.length > 0; } catch { return false; }
+        }));
+        await page.evaluate(() => {
+            const providers = [
+                { id: 'one', name: 'Tavily', type: 'tavily', enabled: true, archived: false },
+                { id: 'two', name: 'Exa', type: 'exa', enabled: true, archived: false },
+            ];
+            window.searchStore = {
+                async init() {}, getProviders: () => providers, apiKeyFor: () => '',
+                async saveProvider() {}, async archiveProvider() {}, async removeProvider() {}, async moveProvider() {},
+            };
+            window.searchRegistry = { nativeCapabilityState: () => ({ usable: false, reason: 'test', actions: [] }) };
+            window.searchAdapters = { async test() {} };
+            window.ai = {};
+        });
+        await loadModules(page, base, ['search-policy-pure.mjs', 'search-settings.js']);
+        await page.evaluate(async () => {
+            window.searchSettings.open();
+            await document.fonts.load('24px "Material Symbols Rounded"');
+            await document.fonts.ready;
+        });
+        const icons = await page.locator('.search-provider-order-btn .material-symbols-rounded').evaluateAll(nodes => nodes.map(node => {
+            const style = getComputedStyle(node);
+            const rect = node.getBoundingClientRect();
+            return { text: node.textContent, fontFamily: style.fontFamily, width: rect.width, scrollWidth: node.scrollWidth };
+        }));
+        assert.deepEqual(new Set(icons.map(icon => icon.text)), new Set(['arrow_upward', 'arrow_downward']));
+        assert.ok(icons.every(icon => /Material Symbols Rounded/i.test(icon.fontFamily)), JSON.stringify(icons));
+        assert.ok(icons.every(icon => icon.width <= 24 && icon.scrollWidth <= 24), JSON.stringify(icons));
+        assert.ok(fontRequests.some(url => new URL(url).searchParams.get('v') === releaseVersion), JSON.stringify(fontRequests));
     });
 });

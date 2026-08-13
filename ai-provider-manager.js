@@ -69,11 +69,39 @@
             byId('aiProviderManager')?.classList.remove('hidden');
             byId('aiProviderManager')?.setAttribute('aria-hidden', 'false');
             this.render();
+            root.navStack?.open?.('modal', 'aiProviderManager', () => this.close(true));
+            if (this.panel !== 'list') root.navStack?.open?.('panel', 'aiProviderManagerPanel', () => this.showList(true));
         },
 
-        close() {
+        close(direct) {
+            if (!direct && root.navStack?.close?.('modal', 'aiProviderManager', () => this.close(true))) return;
             byId('aiProviderManager')?.classList.add('hidden');
             byId('aiProviderManager')?.setAttribute('aria-hidden', 'true');
+            this.panel = 'list';
+            this.profileId = '';
+            this.detailTab = 'config';
+            return true;
+        },
+
+        back() {
+            return this.panel === 'list' ? this.close() : this.showList();
+        },
+
+        openPanel(panel, profileId = '') {
+            this.panel = panel === 'migration' ? 'migration' : 'detail';
+            this.profileId = this.panel === 'detail' ? text(profileId) : '';
+            this.detailTab = 'config';
+            this.render();
+            root.navStack?.open?.('panel', 'aiProviderManagerPanel', () => this.showList(true));
+        },
+
+        showList(direct) {
+            if (!direct && root.navStack?.requestClose?.('panel', 'aiProviderManagerPanel')) return;
+            this.panel = 'list';
+            this.profileId = '';
+            this.detailTab = 'config';
+            this.render();
+            return true;
         },
 
         async persist() {
@@ -120,7 +148,7 @@
             archived.addEventListener('click', () => { this.showArchived = !this.showArchived; this.render(); });
             const pending = button('', 'rule', 'ai-icon-btn');
             pending.title = `待确认模型 (${pendingModels().length})`;
-            pending.addEventListener('click', () => { this.panel = 'migration'; this.render(); });
+            pending.addEventListener('click', () => this.openPanel('migration'));
             const add = button('', 'add', 'ai-icon-btn');
             add.title = '添加供应商';
             add.addEventListener('click', () => this.startNew());
@@ -152,7 +180,7 @@
                     small.textContent = root.ai.providerLabel?.(profile.provider) || profile.provider;
                     labels.append(strong, small);
                     open.append(mark, labels);
-                    open.addEventListener('click', () => { this.profileId = profile.id; this.panel = 'detail'; this.detailTab = 'config'; this.render(); });
+                    open.addEventListener('click', () => this.openPanel('detail', profile.id));
                     const state = button(profile.archived ? '恢复' : (profile.enabled === false ? '已禁用' : '已启用'), '', `ai-provider-state ${profile.enabled === false ? 'is-off' : 'is-on'}`);
                     state.addEventListener('click', () => profile.archived ? this.restore(profile.id) : this.toggle(profile.id));
                     row.append(open, state, icon('chevron_right'));
@@ -236,10 +264,7 @@
         },
 
         startNew() {
-            this.profileId = '';
-            this.panel = 'detail';
-            this.detailTab = 'config';
-            this.render();
+            this.openPanel('detail', '');
         },
 
         field(labelText, value = '', type = 'text') {
@@ -587,7 +612,7 @@
             const profile = root.ai.findProfile(profileId); if (!profile) return;
             profile.enabledBeforeArchive = profile.enabled !== false;
             profile.archived = true; profile.enabled = false;
-            this.panel = 'list'; this.profileId = '';
+            this.showList();
             await this.persist();
         },
 
@@ -597,8 +622,7 @@
             profile.enabled = profile.enabledBeforeArchive !== false;
             delete profile.enabledBeforeArchive;
             this.showArchived = false;
-            this.panel = 'list';
-            this.profileId = '';
+            this.showList();
             await this.persist();
         },
 
@@ -618,7 +642,7 @@
                 root.ai.loadActiveProfileToForm();
             }
             await Promise.all([root.ai.persistKeyMap(), root.ai.persistModelCache(), root.ai.persistModelCandidates()]);
-            this.panel = 'list'; this.profileId = '';
+            this.showList();
             await this.persist();
         },
 

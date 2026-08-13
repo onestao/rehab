@@ -214,8 +214,8 @@
     gap: 8px;
 }
 .advice-search-toggle {
-    width: 34px;
-    height: 34px;
+    width: 44px;
+    height: 44px;
     border: none;
     border-radius: var(--md-sys-shape-full);
     background: var(--md-sys-surface-container);
@@ -245,7 +245,7 @@
 .advice-search-toggle .material-symbols-rounded { font-size: 18px; }
 .advice-search-panel { display: grid; gap: 8px; }
 .advice-search-row {
-    min-height: 38px;
+    min-height: 44px;
     display: grid;
     grid-template-columns: auto minmax(0, 1fr) auto;
     align-items: center;
@@ -263,12 +263,12 @@
     background: transparent;
     color: var(--md-sys-on-surface);
     font: inherit;
-    font-size: 13px;
+    font-size: 16px;
 }
 .advice-search-row input::placeholder { color: var(--md-sys-on-surface-variant); opacity: 0.72; }
 .advice-search-row button {
-    width: 28px;
-    height: 28px;
+    width: 44px;
+    height: 44px;
     border: none;
     border-radius: var(--md-sys-shape-full);
     background: transparent;
@@ -283,7 +283,7 @@
     align-items: center;
     gap: 6px;
     width: fit-content;
-    min-height: 32px;
+    min-height: 44px;
     padding: 0 10px;
     border-radius: var(--md-sys-shape-full);
     background: var(--md-sys-surface-container-low);
@@ -319,7 +319,7 @@
 .advice-quick-prompts button {
     border: none;
     border-radius: var(--md-sys-shape-full);
-    min-height: 32px;
+    min-height: 44px;
     padding: 0 12px;
     background: var(--md-sys-surface-container);
     color: var(--md-sys-on-surface-variant);

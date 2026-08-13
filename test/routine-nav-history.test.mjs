@@ -13,9 +13,9 @@ function loadDataUiState(navStack) {
 test('routine subpages push one back-stack level and close to home', () => {
     const calls = [];
     const navStack = {
-        replaceOrPush(entry) {
-            calls.push(['replaceOrPush', entry.type, entry.id]);
-            this.entry = entry;
+        open(type, id, close) {
+            calls.push(['open', type, id]);
+            this.entry = { type, id, close };
         },
         popType(type) {
             calls.push(['popType', type]);
@@ -32,12 +32,12 @@ test('routine subpages push one back-stack level and close to home', () => {
 
     data.setRoutineView('library');
     assert.equal(data.routineView, 'library');
-    assert.deepEqual(calls[0], ['replaceOrPush', 'subtab', 'routine']);
+    assert.deepEqual(calls[0], ['open', 'subtab', 'routine']);
 
     assert.equal(navStack.entry.close(), true);
     assert.equal(data.routineView, 'home');
     assert.equal(data.renderRoutinesCount, 2);
-    assert.deepEqual(calls, [['replaceOrPush', 'subtab', 'routine']]);
+    assert.deepEqual(calls, [['open', 'subtab', 'routine']]);
 
     data.setRoutineView('home');
     assert.deepEqual(calls[1], ['popType', 'subtab']);

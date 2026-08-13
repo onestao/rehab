@@ -4,7 +4,7 @@
     font-style: normal;
     font-weight: 400;
     font-display: block;
-    src: url("../assets/material-symbols-rounded.woff2") format("woff2");
+    src: url("../assets/material-symbols-rounded.woff2?v=424") format("woff2");
 }
 
 .material-symbols-rounded {
@@ -25,6 +25,11 @@
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; }
+
+button, input, select, textarea {
+    font: inherit;
+    color: inherit;
+}
 
 body {
     background: #dde1ea;

@@ -43,7 +43,8 @@ module.exports = [
   { name: 'profile-credentials', path: 'credential-fields.js', limit: '1.2 KB' },
   { name: 'generated-css', path: 'build/generated.css', limit: '80 KB' },
   { name: 'workout-bundle', path: ['workout-*.js', 'strength-form.js', 'swipe-actions.js', 'weekly-plan.js'], limit: '50 KB' },
-  { name: 'ai-bundle', path: ['ai-*.js', 'ai-*.mjs', 'advice-*.js', 'coach-context.js', 'lib/virtual-core.umd.js', 'lib/flexsearch.light.js'], limit: '144 KB' },
+  // Nested AI settings, model pickers and provider editors participate in the Android back stack.
+  { name: 'ai-bundle', path: ['ai-*.js', 'ai-*.mjs', 'advice-*.js', 'coach-context.js', 'lib/virtual-core.umd.js', 'lib/flexsearch.light.js'], limit: '144.5 KB' },
   { name: 'rehab-policy', path: 'rehab-policy.js', limit: '12 KB' },
   { name: 'rehab-progression-pure', path: 'rehab-progression-pure.js', limit: '4 KB' },
   // Plan is intentionally tight; keep UI growth lazy and move parser/spec logic into exported pure modules.
@@ -66,8 +67,8 @@ module.exports = [
       'volume-heatmap.js',
       'action-history.js'
     ],
-    // Food evidence now includes the required post-photo verification adapter.
-    limit: '94.1 KB'
+    // Includes evidence adapters plus history-aware summary/action sheets.
+    limit: '94.2 KB'
   },
   {
     name: 'today-view-core',

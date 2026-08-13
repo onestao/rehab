@@ -102,13 +102,15 @@
 
         toggleTemplateManager() {
             this._templateManagerOpen = !this._templateManagerOpen;
+            if (!this._templateManagerOpen) return this.closeTemplateManager();
             const sheet = document.getElementById('aiTemplateManagerSheet');
             const content = document.getElementById('aiTemplateManagerContent');
             if (!sheet || !content) return;
             content.innerHTML = this.renderTemplateManagerContent();
             this.bindTemplateManagerActions(content);
-            sheet.classList.toggle('hidden', !this._templateManagerOpen);
-            sheet.setAttribute('aria-hidden', this._templateManagerOpen ? 'false' : 'true');
+            sheet.classList.remove('hidden');
+            sheet.setAttribute('aria-hidden', 'false');
+            window.navStack?.open?.('modal', 'aiTemplateManagerSheet', () => this.closeTemplateManager(true));
         },
 
         bindTemplateManagerActions(root) {
@@ -132,10 +134,11 @@
             });
         },
 
-        closeTemplateManager() {
+        closeTemplateManager(direct) {
+            if (!direct && window.navStack?.requestClose?.('modal', 'aiTemplateManagerSheet')) return;
             this._templateManagerOpen = false;
             const sheet = document.getElementById('aiTemplateManagerSheet');
-            if (!sheet) return;
+            if (!sheet) return true;
             sheet.classList.add('hidden');
             sheet.setAttribute('aria-hidden', 'true');
         },

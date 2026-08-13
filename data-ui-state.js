@@ -304,17 +304,13 @@
                 window.navStack?.popType?.('subtab');
                 return;
             }
-            window.navStack?.replaceOrPush?.({
-                type: 'subtab',
-                id: 'routine',
-                close: () => {
+            window.navStack?.open?.('subtab', 'routine', () => {
                     this._closingRoutineSubpage = true;
                     this.routineView = 'home';
                     this.renderRoutines?.();
                     this._closingRoutineSubpage = false;
                     return true;
-                }
-            });
+                });
         },
 
         routineViewOrder() {
@@ -596,11 +592,7 @@
                 scanBtn.style.display = this.isMiScaleExperimentEnabled?.() ? '' : 'none';
                 scanBtn.disabled = false;
             }
-            window.navStack?.replaceOrPush?.({
-                type: 'modal',
-                id: 'weightModal',
-                close: () => this.closeWeightModalInternal()
-            });
+            window.navStack?.open?.('modal', 'weightModal', () => this.closeWeightModalInternal());
             const modal = document.getElementById('weightModal');
             modal?.classList.remove('hidden');
             modal?.setAttribute('aria-hidden', 'false');
@@ -624,11 +616,7 @@
             this._foodCalUnit = 'kj';
             this.syncFoodCalLabel?.();
             this.setFoodSource('');
-            window.navStack?.replaceOrPush?.({
-                type: 'modal',
-                id: 'dietModal',
-                close: () => this.closeDietModalInternal()
-            });
+            window.navStack?.open?.('modal', 'dietModal', () => this.closeDietModalInternal());
             const modal = document.getElementById('dietModal');
             modal?.classList.remove('hidden');
             modal?.setAttribute('aria-hidden', 'false');
@@ -676,11 +664,7 @@
         openExerciseModal() {
             const el = document.getElementById('exerciseModalContent');
             if (el) el.innerHTML = this.renderExerciseModalContent();
-            window.navStack?.replaceOrPush?.({
-                type: 'modal',
-                id: 'exerciseModal',
-                close: () => this.closeExerciseModalInternal()
-            });
+            window.navStack?.open?.('modal', 'exerciseModal', () => this.closeExerciseModalInternal());
             const modal = document.getElementById('exerciseModal');
             modal?.classList.remove('hidden');
             modal?.setAttribute('aria-hidden', 'false');
@@ -792,17 +776,13 @@
                 window.navStack?.popType?.('subtab');
                 return;
             }
-            window.navStack?.replaceOrPush?.({
-                type: 'subtab',
-                id: 'health',
-                close: () => {
+            window.navStack?.open?.('subtab', 'health', () => {
                     this._closingHealthSubtab = true;
                     this.healthView = 'diet';
                     this.renderHistory();
                     this._closingHealthSubtab = false;
                     return true;
-                }
-            });
+                });
         },
 
         syncHealthDeckPosition(smooth = false) {

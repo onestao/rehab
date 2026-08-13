@@ -332,6 +332,28 @@ test('fooddb failure keeps food-log unloadable and retryable', async () => {
     assert.equal(harness.api._loaded.has('food-log'), true);
 });
 
+test('plan-ui waits for routine-plan before replaying a cold-start task tap', async () => {
+    const harness = createLoaderHarnessWithRealPrerequisites();
+    const load = harness.api.loadScript('plan-ui');
+    await flushMicrotasks();
+
+    assert.equal(
+        harness.nodesFor('routine-plan').length,
+        1,
+        'plan task replay needs _replacePlanActions before plan-ui can execute'
+    );
+    assert.equal(harness.nodesFor('plan-ui').length, 0);
+
+    for (let pass = 0; pass < 20 && !harness.api._loaded.has('plan-ui'); pass += 1) {
+        for (const node of harness.appended) node.onload?.();
+        await flushMicrotasks();
+    }
+    await load;
+
+    assert.equal(harness.api._loaded.has('routine-plan'), true);
+    assert.equal(harness.api._loaded.has('plan-ui'), true);
+});
+
 test('runWhenIdle without requestIdleCallback yields once through a zero-delay timer', () => {
     const harness = createLoaderHarness();
     /** @type {any} */

@@ -188,14 +188,16 @@
             if (!sheet) return;
             sheet.classList.remove('hidden');
             sheet.setAttribute('aria-hidden', 'false');
+            window.navStack?.open?.('modal', 'voiceSettingsSheet', () => this.closeSettingsInternal());
             if (window.focusTrap?.trap) window.focusTrap.trap(sheet);
         },
 
         openImportDialog() {
             const dialog = document.getElementById('voiceImportDialog');
-            if (!dialog) return;
+            if (!dialog) return true;
             dialog.classList.remove('hidden');
             dialog.setAttribute('aria-hidden', 'false');
+            window.navStack?.open?.('modal', 'voiceImportDialog', () => this.closeImportDialogInternal());
             this.setStatus('', '');
             if (window.focusTrap?.trap) window.focusTrap.trap(dialog);
             const input = document.getElementById('voiceLegadoJson');
@@ -204,8 +206,12 @@
         },
 
         closeImportDialog(options = {}) {
+            return window.navStack?.requestClose?.('modal', 'voiceImportDialog') || this.closeImportDialogInternal(options);
+        },
+
+        closeImportDialogInternal(options = {}) {
             const dialog = document.getElementById('voiceImportDialog');
-            if (!dialog) return;
+            if (!dialog) return true;
             dialog.classList.add('hidden');
             dialog.setAttribute('aria-hidden', 'true');
             if (window.focusTrap?.release) window.focusTrap.release();
@@ -214,16 +220,22 @@
             if (shouldRestoreSettings && sheet && !sheet.classList.contains('hidden') && window.focusTrap?.trap) {
                 window.focusTrap.trap(sheet);
             }
+            return true;
         },
 
         closeSettings() {
+            return window.navStack?.requestClose?.('modal', 'voiceSettingsSheet') || this.closeSettingsInternal();
+        },
+
+        closeSettingsInternal() {
             const sheet = document.getElementById('voiceSettingsSheet');
-            if (!sheet) return;
-            this.closeImportDialog({ restoreSettings: false });
+            if (!sheet) return true;
+            this.closeImportDialogInternal({ restoreSettings: false });
             sheet.classList.add('hidden');
             sheet.setAttribute('aria-hidden', 'true');
-            this.cancelEngineEdit();
+            this.cancelEngineEditInternal();
             if (window.focusTrap?.release) window.focusTrap.release();
+            return true;
         },
 
         voiceModeMeta(voice = this.ensureVoiceDb()) {
@@ -366,17 +378,23 @@
                 ? JSON.stringify(engine.header, null, 2)
                 : '';
             editor.classList.remove('hidden');
+            window.navStack?.open?.('panel', 'voiceEngineEditor', () => this.cancelEngineEditInternal());
             name.focus?.();
         },
 
         cancelEngineEdit() {
+            return window.navStack?.requestClose?.('panel', 'voiceEngineEditor') || this.cancelEngineEditInternal();
+        },
+
+        cancelEngineEditInternal() {
             const editor = document.getElementById('voiceEngineEditor');
-            if (!editor) return;
+            if (!editor) return true;
             editor.classList.add('hidden');
             ['voiceEditingIndex', 'voiceEditName', 'voiceEditUrl', 'voiceEditSpeedParam', 'voiceEditSpeedExpr', 'voiceEditContentType', 'voiceEditHeader'].forEach(id => {
                 const el = document.getElementById(id);
                 if (el) el.value = '';
             });
+            return true;
         },
 
         saveEngineEdit() {

@@ -476,7 +476,7 @@
                 </div>
             </div>`;
             document.body.insertAdjacentHTML('beforeend', html);
-            window.navStack?.replaceOrPush?.({ type: 'modal', id: 'profileModal', close: () => this.closeProfileModalInternal() });
+            window.navStack?.open?.('modal', 'profileModal', () => this.closeProfileModalInternal());
             window.focusTrap?.trap?.(document.getElementById('profileModal'));
             this.autoResizeProfileTextareas(document.getElementById('profileModal'));
         },
@@ -643,7 +643,7 @@
                 </div>
             </div>`;
             document.body.insertAdjacentHTML('beforeend', html);
-            window.navStack?.replaceOrPush?.({ type: 'modal', id: 'rehabWeeklySheet', close: () => this.closeRehabWeeklySheetInternal() });
+            window.navStack?.open?.('modal', 'rehabWeeklySheet', () => this.closeRehabWeeklySheetInternal());
             window.focusTrap?.trap?.(document.getElementById('rehabWeeklySheet'));
             window.aiTaskSettings?.mountInlinePickers?.(document.getElementById('rehabWeeklySheet'));
             if (existingRecord) {

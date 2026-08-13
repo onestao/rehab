@@ -47,7 +47,7 @@
 }
 .strength-presets .md-chip {
     flex: none;
-    min-height: 36px;
+    min-height: 44px;
     font-size: 12px;
     font-weight: 800;
 }
@@ -167,4 +167,3 @@
     .input-card-lib-btn { width: 44px; min-width: 44px; height: 44px; }
     .input-card-actions .md-btn-filled { height: 44px; font-size: 14px; }
 }
-

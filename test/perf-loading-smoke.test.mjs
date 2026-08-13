@@ -77,7 +77,7 @@ test('material symbols use a preloaded local font without a delayed remote swap'
     const css = readRootFile('css-src/02-base.css');
 
     assert.doesNotMatch(html, /fonts\.googleapis\.com|scheduleMaterialSymbolsLoad/);
-    assert.match(head, /rel="preload" href="assets\/material-symbols-rounded\.woff2" as="font"/);
+    assert.match(head, /rel="preload"[^>]+data-rehab-font-preload[^>]+data-href="assets\/material-symbols-rounded\.woff2\?v=\d+"[^>]+as="font"/);
     assert.match(css, /@font-face[\s\S]*material-symbols-rounded\.woff2/);
     assert.equal(
         readRootFile('assets/material-symbols-icons.txt').trim(),

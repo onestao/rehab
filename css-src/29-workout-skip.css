@@ -2,11 +2,11 @@
 .skip-btn {
     position: absolute;
     right: 12px;
-    top: 19px;
-    width: 34px;
-    height: 34px;
+    top: 13px;
+    width: 44px;
+    height: 44px;
     opacity: 0.4;
-    color: white;
+    color: var(--timer-foreground);
     cursor: pointer;
     padding: 0;
     border: none;
@@ -43,4 +43,3 @@
     outline-offset: 2px;
     opacity: 0.7;
 }
-

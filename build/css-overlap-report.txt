@@ -1,48 +1,7 @@
 # css overlap report
 # real-conflict threshold: 220
 
-## REAL CONFLICTS (same selector + same property, different value): 219
-:root
-  files: 01-vars.css, 37-dark-mode.css, 49-plan.css, 41-m3e-effects.css
-    --md-sys-primary: #0061a4 | #a0cafd (01-vars.css / 37-dark-mode.css)
-    --md-sys-on-primary: #ffffff | #003258 (01-vars.css / 37-dark-mode.css)
-    --md-sys-primary-container: #d1e4ff | #00497d (01-vars.css / 37-dark-mode.css)
-    --md-sys-on-primary-container: #001d36 | #d1e4ff (01-vars.css / 37-dark-mode.css)
-    --md-sys-secondary: #535f70 | #bbc7db (01-vars.css / 37-dark-mode.css)
-    --md-sys-on-secondary: #ffffff | #253141 (01-vars.css / 37-dark-mode.css)
-    --md-sys-secondary-container: #d7e3f8 | #3b4858 (01-vars.css / 37-dark-mode.css)
-    --md-sys-on-secondary-container: #101c2b | #d7e3f8 (01-vars.css / 37-dark-mode.css)
-    --md-sys-tertiary: #6b5778 | #d6bee4 (01-vars.css / 37-dark-mode.css)
-    --md-sys-on-tertiary: #ffffff | #3b2948 (01-vars.css / 37-dark-mode.css)
-    --md-sys-tertiary-container: #f2daff | #523f5f (01-vars.css / 37-dark-mode.css)
-    --md-sys-on-tertiary-container: #251431 | #f2daff (01-vars.css / 37-dark-mode.css)
-    --md-sys-amber: #f59e0b | #fbbf24 (01-vars.css / 37-dark-mode.css)
-    --md-sys-amber-container: #fef3c7 | #78350f (01-vars.css / 37-dark-mode.css)
-    --md-sys-surface: #fdfcff | #111418 (01-vars.css / 37-dark-mode.css)
-    --md-sys-surface-dim: #d9d9e0 | #111418 (01-vars.css / 37-dark-mode.css)
-    --md-sys-surface-container-lowest: #ffffff | #0b0e12 (01-vars.css / 37-dark-mode.css)
-    --md-sys-surface-container-low: #f4f3fa | #1a1c20 (01-vars.css / 37-dark-mode.css)
-    --md-sys-surface-container: #eeedf4 | #1e2024 (01-vars.css / 37-dark-mode.css)
-    --md-sys-surface-container-high: #e8e7ef | #282a2f (01-vars.css / 37-dark-mode.css)
-    --md-sys-surface-container-highest: #e2e2e9 | #33353a (01-vars.css / 37-dark-mode.css)
-    --md-sys-on-surface: #1a1c1e | #e3e2e6 (01-vars.css / 37-dark-mode.css)
-    --md-sys-on-surface-variant: #43474e | #c3c7cf (01-vars.css / 37-dark-mode.css)
-    --md-sys-inverse-surface: #30322e | #e1e4db (01-vars.css / 37-dark-mode.css)
-    --md-sys-inverse-on-surface: #f1f1ea | #30322e (01-vars.css / 37-dark-mode.css)
-    --md-sys-outline: #73777f | #8d9199 (01-vars.css / 37-dark-mode.css)
-    --md-sys-outline-variant: #c3c7cf | #43474e (01-vars.css / 37-dark-mode.css)
-    --timer-gradient-mid: #0061a4 | #00497d (01-vars.css / 37-dark-mode.css)
-    --timer-gradient-end: #2f7cbd | #0061a4 (01-vars.css / 37-dark-mode.css)
-    --timer-orb: rgba(209, 228, 255, 0.15) | rgba(209, 228, 255, 0.12) (01-vars.css / 37-dark-mode.css)
-    --md-sys-error: #ba1a1a | #ffb4ab (01-vars.css / 37-dark-mode.css)
-    --md-sys-error-container: #ffdad6 | #93000a (01-vars.css / 37-dark-mode.css)
-    --md-sys-on-error-container: #410002 | #ffdad6 (01-vars.css / 37-dark-mode.css)
-    --glass-bg: color-mix(in srgb, var(--md-sys-surface-container-lowest) 58%, transparent) | color-mix(in srgb, var(--md-sys-surface-container-high) 62%, transparent) (01-vars.css / 37-dark-mode.css)
-    --glass-bg-strong: color-mix(in srgb, var(--md-sys-surface-container-lowest) 72%, transparent) | color-mix(in srgb, var(--md-sys-surface-container-highest) 78%, transparent) (01-vars.css / 37-dark-mode.css)
-    --glass-border: color-mix(in srgb, var(--md-sys-surface-container-lowest) 64%, transparent) | color-mix(in srgb, var(--md-sys-on-surface) 14%, transparent) (01-vars.css / 37-dark-mode.css)
-    --glass-shadow-inset: inset 0 1px 0 color-mix(in srgb, var(--md-sys-surface-container-lowest) 70%, transparent) | inset 0 1px 0 color-mix(in srgb, var(--md-sys-on-surface) 8%, transparent) (01-vars.css / 37-dark-mode.css)
-    --glass-shadow-out: 0 2px 10px color-mix(in srgb, var(--md-sys-on-surface) 6%, transparent) | 0 2px 14px rgba(0,0,0,0.42) (01-vars.css / 37-dark-mode.css)
-
+## REAL CONFLICTS (same selector + same property, different value): 194
 *
   files: 02-base.css, 36-responsive.css, 50-v6-ui.css, 40-a11y.css
     animation-duration: 1ms !important | 0.001ms !important (36-responsive.css / 50-v6-ui.css / 40-a11y.css)
@@ -59,20 +18,8 @@
     transition-duration: 1ms !important | 0.001ms !important (36-responsive.css / 50-v6-ui.css / 40-a11y.css)
 
 body
-  files: 02-base.css, 06-layout-page.css, 37-dark-mode.css
-    background: #dde1ea | var(--md-sys-surface) (02-base.css / 37-dark-mode.css)
+  files: 02-base.css, 06-layout-page.css
     padding: 0 | 24px (02-base.css / 06-layout-page.css)
-
-.md-chip
-  files: 05-layout-chip.css, 50-v6-ui.css, 52-v6-workout.css, 41-m3e-effects.css
-    padding: 4px 12px | 6px 12px (05-layout-chip.css / 52-v6-workout.css)
-    border-radius: var(--md-sys-shape-full) | 999px (05-layout-chip.css / 52-v6-workout.css)
-    background: var(--md-sys-surface-container-high) | var(--glass-bg) (05-layout-chip.css / 52-v6-workout.css)
-    color: var(--md-sys-on-surface-variant) | var(--md-sys-on-primary-container) (05-layout-chip.css / 52-v6-workout.css)
-    transition: transform 0.15s var(--md-sys-motion-spring) | background .6s var(--md-sys-motion-emphasized),
-        color .35s ease,
-        border-color .35s ease,
-        box-shadow .6s var(--md-sys-motion-emphasized) (52-v6-workout.css / 41-m3e-effects.css)
 
 .app-shell-v6
   files: 06-layout-page.css
@@ -90,7 +37,7 @@ to
     transform: rotate(360deg) | translateY(0) | translateX(0) scale(1) | none | scale(1.2) | translate3d(0,0,0) scale(1) | translateY(0) scale(1) | translate(-50%, -50%) scale(20) (18-health-diet.css / 38-record-page.css / 43-identity-card.css / 43-identity-card.css / 46-advice-ai.css / 46-advice-ai.css / 54-v6-ai.css / 57-weight-report.css / 57-weight-report.css / 41-m3e-effects.css / 41-m3e-effects.css / 41-m3e-effects.css)
 
 .md-card
-  files: 08-components-cards.css, 36-responsive.css, 37-dark-mode.css, 50-v6-ui.css, 41-m3e-effects.css
+  files: 08-components-cards.css, 36-responsive.css, 50-v6-ui.css, 41-m3e-effects.css
     margin: 8px 16px | 4px 8px | 3px 6px (08-components-cards.css / 36-responsive.css / 36-responsive.css)
     padding: 16px | 12px | 10px (08-components-cards.css / 36-responsive.css / 36-responsive.css)
     transition: box-shadow var(--md-sys-motion-duration-short) var(--md-sys-motion-emphasized),
@@ -100,15 +47,9 @@ to
         border-color .35s ease,
         box-shadow .6s var(--md-sys-motion-emphasized) (08-components-cards.css / 50-v6-ui.css / 41-m3e-effects.css)
 
-mark.ai-hit
-  files: 08-components-cards.css
-    background: var(--md-sys-color-tertiary-container, #ffe08a) | var(--md-sys-color-tertiary, #ffb866) (08-components-cards.css / 08-components-cards.css)
-    color: var(--md-sys-color-on-tertiary-container, #2a1a00) | #1a1200 (08-components-cards.css / 08-components-cards.css)
-
 .timer-panel
-  files: 09-workout-timer.css, 37-dark-mode.css, 50-v6-ui.css, 52-v6-workout.css, 41-m3e-effects.css
-    background: linear-gradient(145deg, var(--timer-gradient-start), var(--timer-gradient-mid) 42%, var(--timer-gradient-end) 100%) | linear-gradient(160deg, color-mix(in srgb, var(--md-sys-primary) 90%, #000) 0%, var(--md-sys-primary) 40%, var(--md-sys-primary-container) 100%) (09-workout-timer.css / 37-dark-mode.css / 52-v6-workout.css)
-    color: white | var(--md-sys-on-primary) (09-workout-timer.css / 52-v6-workout.css)
+  files: 09-workout-timer.css, 50-v6-ui.css, 52-v6-workout.css, 41-m3e-effects.css
+    background: linear-gradient(145deg, var(--timer-gradient-start), var(--timer-gradient-mid) 42%, var(--timer-gradient-end) 100%) | linear-gradient(160deg, color-mix(in srgb, var(--md-sys-primary) 90%, #000) 0%, var(--md-sys-primary) 40%, var(--md-sys-primary-container) 100%) (09-workout-timer.css / 52-v6-workout.css)
     padding: 32px 16px 18px | 24px 20px | 20px 16px (09-workout-timer.css / 52-v6-workout.css / 52-v6-workout.css)
     transition: background 0.6s var(--md-sys-motion-emphasized) | background .6s var(--md-sys-motion-emphasized),
         color .35s ease,
@@ -117,7 +58,7 @@ mark.ai-hit
 
 .timer-panel::after
   files: 09-workout-timer.css, 52-v6-workout.css
-    background: linear-gradient(115deg, transparent 0%, rgba(255,255,255,0.12) 46%, transparent 78%) | color-mix(in srgb, var(--md-sys-on-primary) 6%, transparent) (09-workout-timer.css / 52-v6-workout.css)
+    background: linear-gradient(115deg, transparent 0%, rgba(255,255,255,0.12) 46%, transparent 78%) | color-mix(in srgb, var(--timer-foreground) 6%, transparent) (09-workout-timer.css / 52-v6-workout.css)
 
 .timer-panel::before
   files: 09-workout-timer.css, 52-v6-workout.css
@@ -125,36 +66,21 @@ mark.ai-hit
     right: -20% | -20px (09-workout-timer.css / 52-v6-workout.css)
     width: 200px | 120px (09-workout-timer.css / 52-v6-workout.css)
     height: 200px | 120px (09-workout-timer.css / 52-v6-workout.css)
-    background: radial-gradient(circle, var(--timer-orb) 0%, transparent 70%) | color-mix(in srgb, var(--md-sys-on-primary) 8%, transparent) (09-workout-timer.css / 52-v6-workout.css)
-
-#mainTime
-  files: 09-workout-timer.css, 37-dark-mode.css
-    text-shadow: 0 2px 20px rgba(209, 228, 255, 0.32) | 0 2px 20px rgba(160, 202, 253, 0.26) (09-workout-timer.css / 37-dark-mode.css)
-
-.stat-label
-  files: 09-workout-timer.css, 52-v6-workout.css
-    font-size: 11px | 10px (09-workout-timer.css / 52-v6-workout.css)
+    background: radial-gradient(circle, var(--timer-orb) 0%, transparent 70%) | color-mix(in srgb, var(--timer-foreground) 8%, transparent) (09-workout-timer.css / 52-v6-workout.css)
 
 .timer-stats b
   files: 09-workout-timer.css, 36-responsive.css
     font-size: 16px | 14px (09-workout-timer.css / 36-responsive.css)
 
-.session-time
-  files: 09-workout-timer.css, 37-dark-mode.css
-    color: var(--md-sys-amber) !important | #fbbf24 !important (09-workout-timer.css / 37-dark-mode.css)
-    text-shadow: 0 0 12px rgba(245,158,11,0.35) | 0 0 12px rgba(251,191,36,0.25) !important (09-workout-timer.css / 37-dark-mode.css)
-
 .md-field input
-  files: 10-components-fields.css, 37-dark-mode.css, 52-v6-workout.css
+  files: 10-components-fields.css, 52-v6-workout.css
     border: 1.5px solid var(--md-sys-outline-variant) | none (10-components-fields.css / 52-v6-workout.css)
-    background: var(--md-sys-surface-container-lowest) | var(--md-sys-surface-container-high) | transparent (10-components-fields.css / 37-dark-mode.css / 52-v6-workout.css)
-    font-size: 16px | 14px (10-components-fields.css / 52-v6-workout.css)
+    background: var(--md-sys-surface-container-lowest) | transparent (10-components-fields.css / 52-v6-workout.css)
 
 .md-field select
-  files: 10-components-fields.css, 37-dark-mode.css, 52-v6-workout.css
+  files: 10-components-fields.css, 52-v6-workout.css
     border: 1.5px solid var(--md-sys-outline-variant) | none (10-components-fields.css / 52-v6-workout.css)
-    background: var(--md-sys-surface-container-lowest) | var(--md-sys-surface-container-high) | transparent (10-components-fields.css / 37-dark-mode.css / 52-v6-workout.css)
-    font-size: 16px | 14px (10-components-fields.css / 52-v6-workout.css)
+    background: var(--md-sys-surface-container-lowest) | transparent (10-components-fields.css / 52-v6-workout.css)
 
 .md-field label
   files: 10-components-fields.css, 52-v6-workout.css
@@ -173,18 +99,13 @@ mark.ai-hit
         box-shadow .6s var(--md-sys-motion-emphasized) (14-components-buttons.css / 41-m3e-effects.css)
 
 .list-item
-  files: 15-components-lists.css, 36-responsive.css, 37-dark-mode.css, 41-m3e-effects.css
-    background: var(--md-sys-surface-container-lowest) | var(--md-sys-surface-container-high) (15-components-lists.css / 37-dark-mode.css)
+  files: 15-components-lists.css, 36-responsive.css, 41-m3e-effects.css
     padding: 14px 16px | 8px 10px (15-components-lists.css / 36-responsive.css)
     margin: 6px 16px | 4px 8px (15-components-lists.css / 36-responsive.css)
     transition: all var(--md-sys-motion-duration-short) var(--md-sys-motion-emphasized) | transform .28s var(--md-expressive-spring) | background .6s var(--md-sys-motion-emphasized),
         color .35s ease,
         border-color .35s ease,
         box-shadow .6s var(--md-sys-motion-emphasized) (15-components-lists.css / 15-components-lists.css / 41-m3e-effects.css)
-
-.list-item:active
-  files: 15-components-lists.css, 37-dark-mode.css
-    background: var(--md-sys-surface-container) | var(--md-sys-surface-container-highest) (15-components-lists.css / 37-dark-mode.css)
 
 .record-section-title
   files: 16-history-hero-calendar.css, 36-responsive.css
@@ -208,26 +129,18 @@ mark.ai-hit
     padding: 10px 8px | 8px 6px (16-history-hero-calendar.css / 36-responsive.css)
 
 .calendar-card
-  files: 16-history-hero-calendar.css, 19-health-weightloss-ai.css, 36-responsive.css, 37-dark-mode.css
+  files: 16-history-hero-calendar.css, 19-health-weightloss-ai.css, 36-responsive.css
     padding: 14px | 10px (16-history-hero-calendar.css / 36-responsive.css)
-    background: linear-gradient(180deg, rgba(255,255,255,0.68), rgba(255,255,255,0.2)),
-        var(--md-sys-surface-container-low) | linear-gradient(180deg, rgba(51,53,58,0.62), rgba(30,32,36,0.22)),
-            var(--md-sys-surface-container-low) (16-history-hero-calendar.css / 37-dark-mode.css)
 
 .calendar-toolbar
   files: 16-history-hero-calendar.css, 36-responsive.css
     margin-bottom: 10px | 6px (16-history-hero-calendar.css / 36-responsive.css)
 
 .calendar-day
-  files: 16-history-hero-calendar.css, 17-record-tabs-health.css, 36-responsive.css, 37-dark-mode.css, 41-m3e-effects.css
+  files: 16-history-hero-calendar.css, 17-record-tabs-health.css, 36-responsive.css, 41-m3e-effects.css
     min-height: 62px | 54px | 48px (16-history-hero-calendar.css / 36-responsive.css / 36-responsive.css)
     max-height: 62px | 54px | 48px (16-history-hero-calendar.css / 36-responsive.css / 36-responsive.css)
     padding: 5px 4px | 4px 3px (16-history-hero-calendar.css / 36-responsive.css)
-    background: var(--md-sys-surface-container-lowest) | var(--md-sys-surface-container-high) (16-history-hero-calendar.css / 37-dark-mode.css)
-
-.calendar-day.has-record
-  files: 16-history-hero-calendar.css, 37-dark-mode.css
-    background: color-mix(in srgb, var(--md-sys-primary-container) 30%, var(--md-sys-surface-container-lowest)) | color-mix(in srgb, var(--md-sys-primary-container) 28%, var(--md-sys-surface-container-high)) (16-history-hero-calendar.css / 37-dark-mode.css)
 
 .calendar-day-head
   files: 16-history-hero-calendar.css, 36-responsive.css
@@ -243,10 +156,8 @@ mark.ai-hit
     margin-top: 3px | 2px (16-history-hero-calendar.css / 36-responsive.css)
 
 .calendar-event
-  files: 16-history-hero-calendar.css, 36-responsive.css, 37-dark-mode.css
+  files: 16-history-hero-calendar.css, 36-responsive.css
     padding: 0 2px | 0 1px (16-history-hero-calendar.css / 36-responsive.css / 36-responsive.css)
-    background: color-mix(in srgb, var(--event-color) 18%, white) | color-mix(in srgb, var(--event-color) 18%, var(--md-sys-surface-container-highest)) (16-history-hero-calendar.css / 16-history-hero-calendar.css / 37-dark-mode.css)
-    color: color-mix(in srgb, var(--event-color) 65%, var(--md-sys-on-surface)) | color-mix(in srgb, var(--event-color) 35%, var(--md-sys-on-surface)) (16-history-hero-calendar.css / 16-history-hero-calendar.css / 37-dark-mode.css)
     font-size: 9px | clamp(8.5px, 2.4vw, 10px) | 8px (16-history-hero-calendar.css / 36-responsive.css / 36-responsive.css)
     line-height: 1.1 | 1 (16-history-hero-calendar.css / 36-responsive.css / 36-responsive.css)
     gap: 2px | 1px (16-history-hero-calendar.css / 36-responsive.css)
@@ -268,23 +179,23 @@ mark.ai-hit
     margin-top: 12px | 8px (16-history-hero-calendar.css / 36-responsive.css)
 
 0%
-  files: 16-history-hero-calendar.css, 50-v6-ui.css, 51-v6-today.css, 52-v6-workout.css, 54-v6-ai.css, 58-skeleton.css, 41-m3e-effects.css
-    transform: scale(1) | translate(0, 0) scale(1) | scale(1) rotate(-3deg) | scaleX(0.35) | scale(0.96) | scale(0.92) (16-history-hero-calendar.css / 50-v6-ui.css / 50-v6-ui.css / 50-v6-ui.css / 50-v6-ui.css / 51-v6-today.css / 51-v6-today.css / 52-v6-workout.css / 41-m3e-effects.css)
+  files: 16-history-hero-calendar.css, 50-v6-ui.css, 54-v6-ai.css, 58-skeleton.css, 41-m3e-effects.css
+    transform: scale(1) | translate(0, 0) scale(1) | scale(1) rotate(-3deg) | scaleX(0.35) (16-history-hero-calendar.css / 50-v6-ui.css / 50-v6-ui.css / 50-v6-ui.css / 50-v6-ui.css / 41-m3e-effects.css)
     box-shadow: inset 0 1px 0 rgba(255,255,255,0.72), inset 0 -1px 2px rgba(0,29,54,0.06), 0 10px 28px color-mix(in srgb, var(--md-sys-primary) 16%, transparent) | 0 6px 18px color-mix(in srgb, var(--md-sys-primary) 35%, transparent) | 0 0 0 4px color-mix(in srgb, var(--md-sys-primary) 18%, transparent) | var(--md-sys-elevation-1) (50-v6-ui.css / 50-v6-ui.css / 50-v6-ui.css / 50-v6-ui.css / 54-v6-ai.css)
-    opacity: 0.55 | 0.3 | 0 | .35 (50-v6-ui.css / 50-v6-ui.css / 51-v6-today.css / 51-v6-today.css / 51-v6-today.css / 52-v6-workout.css / 54-v6-ai.css)
+    opacity: 0.55 | 0.3 | .35 (50-v6-ui.css / 50-v6-ui.css / 54-v6-ai.css)
 
 100%
-  files: 16-history-hero-calendar.css, 50-v6-ui.css, 51-v6-today.css, 52-v6-workout.css, 54-v6-ai.css, 58-skeleton.css, 41-m3e-effects.css
-    transform: scale(1) | translate(0, 0) scale(1) | scale(1) rotate(-3deg) | scaleX(0.35) | scale(0.96) | scale(0.92) (16-history-hero-calendar.css / 50-v6-ui.css / 50-v6-ui.css / 50-v6-ui.css / 50-v6-ui.css / 51-v6-today.css / 51-v6-today.css / 52-v6-workout.css / 41-m3e-effects.css)
+  files: 16-history-hero-calendar.css, 50-v6-ui.css, 54-v6-ai.css, 58-skeleton.css, 41-m3e-effects.css
+    transform: scale(1) | translate(0, 0) scale(1) | scale(1) rotate(-3deg) | scaleX(0.35) (16-history-hero-calendar.css / 50-v6-ui.css / 50-v6-ui.css / 50-v6-ui.css / 50-v6-ui.css / 41-m3e-effects.css)
     box-shadow: inset 0 1px 0 rgba(255,255,255,0.72), inset 0 -1px 2px rgba(0,29,54,0.06), 0 10px 28px color-mix(in srgb, var(--md-sys-primary) 16%, transparent) | 0 6px 18px color-mix(in srgb, var(--md-sys-primary) 35%, transparent) | 0 0 0 4px color-mix(in srgb, var(--md-sys-primary) 18%, transparent) | var(--md-sys-elevation-1) (50-v6-ui.css / 50-v6-ui.css / 50-v6-ui.css / 50-v6-ui.css / 54-v6-ai.css)
-    opacity: 0.55 | 0.3 | 0 | .35 (50-v6-ui.css / 50-v6-ui.css / 51-v6-today.css / 51-v6-today.css / 51-v6-today.css / 52-v6-workout.css / 54-v6-ai.css)
+    opacity: 0.55 | 0.3 | .35 (50-v6-ui.css / 50-v6-ui.css / 54-v6-ai.css)
 
 50%
-  files: 16-history-hero-calendar.css, 50-v6-ui.css, 51-v6-today.css, 52-v6-workout.css, 54-v6-ai.css
-    transform: scale(1.03) | translate(8px, -12px) scale(1.08) | scale(1.15) rotate(3deg) | scaleX(0.85) | scale(1.05) | scale(1) | scale(1.02) (16-history-hero-calendar.css / 50-v6-ui.css / 50-v6-ui.css / 50-v6-ui.css / 50-v6-ui.css / 51-v6-today.css / 51-v6-today.css / 52-v6-workout.css)
+  files: 16-history-hero-calendar.css, 50-v6-ui.css, 54-v6-ai.css
+    transform: scale(1.03) | translate(8px, -12px) scale(1.08) | scale(1.15) rotate(3deg) | scaleX(0.85) | scale(1.05) (16-history-hero-calendar.css / 50-v6-ui.css / 50-v6-ui.css / 50-v6-ui.css / 50-v6-ui.css)
     filter: saturate(1.15) drop-shadow(0 6px 18px var(--md-sys-primary-container)) | saturate(1.12) drop-shadow(0 6px 16px color-mix(in srgb, var(--md-sys-primary) 18%, transparent)) (16-history-hero-calendar.css / 50-v6-ui.css)
     box-shadow: inset 0 1px 0 rgba(255,255,255,0.86), inset 0 -1px 2px rgba(0,29,54,0.05), 0 14px 34px color-mix(in srgb, var(--md-sys-primary) 24%, transparent) | 0 8px 28px color-mix(in srgb, var(--md-sys-primary) 55%, transparent) | 0 0 0 9px color-mix(in srgb, var(--md-sys-primary) 6%, transparent) | 0 8px 24px color-mix(in srgb, var(--md-sys-primary) 55%, transparent) | 0 0 0 6px color-mix(in srgb, var(--md-sys-error) 18%, transparent) (50-v6-ui.css / 50-v6-ui.css / 50-v6-ui.css / 50-v6-ui.css / 54-v6-ai.css)
-    opacity: 0.95 | 1 (50-v6-ui.css / 51-v6-today.css / 51-v6-today.css / 51-v6-today.css / 52-v6-workout.css / 54-v6-ai.css)
+    opacity: 0.95 | 1 (50-v6-ui.css / 54-v6-ai.css)
 
 .record-tabs
   files: 17-record-tabs-health.css, 53-v6-records.css, 41-m3e-effects.css
@@ -336,11 +247,6 @@ mark.ai-hit
     display: grid | flex (17-record-tabs-health.css / 35-components-modal.css)
     gap: 8px | 4px (17-record-tabs-health.css / 35-components-modal.css)
 
-.calendar-day.selected
-  files: 17-record-tabs-health.css, 37-dark-mode.css
-    box-shadow: 0 0 0 2px var(--md-sys-primary-container) | 0 0 0 2px var(--md-sys-primary) (17-record-tabs-health.css / 37-dark-mode.css)
-    background: color-mix(in srgb, var(--md-sys-primary-container) 20%, var(--md-sys-surface-container-lowest)) | color-mix(in srgb, var(--md-sys-primary-container) 25%, var(--md-sys-surface-container-high)) (17-record-tabs-health.css / 37-dark-mode.css)
-
 .day-detail-item
   files: 17-record-tabs-health.css, 41-m3e-effects.css
     transition: transform .28s var(--md-expressive-spring) | background .6s var(--md-sys-motion-emphasized),
@@ -355,18 +261,6 @@ mark.ai-hit
 .food-edit-actions .md-btn-tonal
   files: 18-health-diet.css
     min-width: 0 | 76px (18-health-diet.css / 18-health-diet.css)
-
-.food-result-item
-  files: 18-health-diet.css, 37-dark-mode.css
-    background: var(--md-sys-surface-container-lowest) | var(--md-sys-surface-container-high) (18-health-diet.css / 37-dark-mode.css)
-
-.food-result-item:active
-  files: 18-health-diet.css, 37-dark-mode.css
-    background: var(--md-sys-surface-container) | var(--md-sys-surface-container-highest) (18-health-diet.css / 37-dark-mode.css)
-
-.diet-log-item
-  files: 18-health-diet.css, 37-dark-mode.css
-    background: var(--md-sys-surface-container-lowest) | var(--md-sys-surface-container-high) (18-health-diet.css / 37-dark-mode.css)
 
 .weightloss-card
   files: 19-health-weightloss-ai.css
@@ -392,12 +286,8 @@ mark.ai-hit
     grid-template-columns: repeat(2, minmax(0, 1fr)) | 1fr (19-health-weightloss-ai.css / 19-health-weightloss-ai.css)
 
 .weightloss-option
-  files: 19-health-weightloss-ai.css, 37-dark-mode.css
+  files: 19-health-weightloss-ai.css
     padding: 12px | 10px (19-health-weightloss-ai.css / 19-health-weightloss-ai.css)
-
-.weightloss-option.active
-  files: 19-health-weightloss-ai.css, 37-dark-mode.css
-    background: color-mix(in srgb, var(--md-sys-primary-container) 18%, var(--md-sys-surface-container-lowest)) | color-mix(in srgb, var(--md-sys-primary-container) 18%, var(--md-sys-surface-container-high)) (19-health-weightloss-ai.css / 37-dark-mode.css)
 
 .weightloss-option-head b
   files: 19-health-weightloss-ai.css
@@ -412,10 +302,6 @@ mark.ai-hit
   files: 19-health-weightloss-ai.css
     font-size: 16px | 15px (19-health-weightloss-ai.css / 19-health-weightloss-ai.css)
     margin-left: auto | 0 (19-health-weightloss-ai.css / 19-health-weightloss-ai.css)
-
-.weightloss-tips
-  files: 19-health-weightloss-ai.css, 37-dark-mode.css
-    background: var(--md-sys-surface-container) | var(--md-sys-surface-container-high) (19-health-weightloss-ai.css / 37-dark-mode.css)
 
 .goal-mode-tabs
   files: 19-health-weightloss-ai.css
@@ -444,6 +330,11 @@ mark.ai-hit
   files: 20-settings-ai.css, 36-responsive.css
     font-size: 18px | 16px (20-settings-ai.css / 36-responsive.css)
 
+.search-provider-manage-btn
+  files: 20-settings-ai.css
+    min-width: 0 | 40px (20-settings-ai.css / 20-settings-ai.css)
+    padding: 0 12px | 0 (20-settings-ai.css / 20-settings-ai.css)
+
 .pref-card[open]
   files: 20-settings-ai.css
     padding: 14px | 10px (20-settings-ai.css / 20-settings-ai.css)
@@ -471,7 +362,6 @@ mark.ai-hit
 
 .mode-tab
   files: 22-workout-mode-tabs.css, 50-v6-ui.css, 52-v6-workout.css
-    height: 44px | 38px (22-workout-mode-tabs.css / 22-workout-mode-tabs.css)
     border-radius: 18px | 999px (22-workout-mode-tabs.css / 52-v6-workout.css)
     display: inline-flex | flex (22-workout-mode-tabs.css / 52-v6-workout.css)
     gap: 6px | 4px | 2px (22-workout-mode-tabs.css / 22-workout-mode-tabs.css / 52-v6-workout.css / 52-v6-workout.css)
@@ -537,18 +427,18 @@ mark.ai-hit
     grid-template-columns: minmax(110px, 0.6fr) minmax(0, 1.4fr) | 1fr (26-settings-sync.css / 26-settings-sync.css)
 
 .md-nav-rail
-  files: 27-layout-nav.css, 36-responsive.css, 37-dark-mode.css, 56-v6-nav.css
+  files: 27-layout-nav.css, 36-responsive.css, 56-v6-nav.css
     width: 100% | calc(100% - 16px) (27-layout-nav.css / 27-layout-nav.css)
     height: calc(76px + env(safe-area-inset-bottom)) | 68px (27-layout-nav.css / 27-layout-nav.css)
-    background: color-mix(in srgb, var(--md-sys-surface-container) 80%, transparent) | color-mix(in srgb, var(--glass-bg-strong) 88%, transparent) | var(--md-sys-surface-container) (27-layout-nav.css / 27-layout-nav.css / 37-dark-mode.css / 56-v6-nav.css)
+    background: color-mix(in srgb, var(--md-sys-surface-container) 80%, transparent) | color-mix(in srgb, var(--glass-bg-strong) 88%, transparent) (27-layout-nav.css / 27-layout-nav.css / 56-v6-nav.css)
     padding: 6px 8px calc(6px + env(safe-area-inset-bottom)) | 6px (27-layout-nav.css / 27-layout-nav.css)
-    backdrop-filter: blur(20px) | var(--glass-blur, blur(22px)) saturate(1.18) | blur(24px) saturate(180%) (27-layout-nav.css / 27-layout-nav.css / 37-dark-mode.css / 56-v6-nav.css)
+    backdrop-filter: blur(20px) | var(--glass-blur, blur(22px)) saturate(1.18) | blur(24px) saturate(180%) (27-layout-nav.css / 27-layout-nav.css / 56-v6-nav.css)
     -webkit-backdrop-filter: blur(20px) | var(--glass-blur, blur(22px)) saturate(1.18) | blur(24px) saturate(180%) (27-layout-nav.css / 27-layout-nav.css / 56-v6-nav.css)
     box-shadow: 0 -1px 0 var(--md-sys-outline-variant) | var(--glass-shadow-inset), 0 10px 28px color-mix(in srgb, var(--md-sys-on-surface) 11%, transparent) (27-layout-nav.css / 27-layout-nav.css / 56-v6-nav.css)
     border-radius: 22px | 0 (27-layout-nav.css / 36-responsive.css)
 
 .workout-controls
-  files: 28-workout-fab.css, 37-dark-mode.css, 52-v6-workout.css
+  files: 28-workout-fab.css, 52-v6-workout.css
     display: flex | inline-flex (28-workout-fab.css / 52-v6-workout.css)
     gap: 14px | 10px (28-workout-fab.css / 52-v6-workout.css / 52-v6-workout.css)
     margin: 0 | 12px auto (28-workout-fab.css / 52-v6-workout.css)
@@ -556,11 +446,9 @@ mark.ai-hit
     border: none | 1px solid var(--glass-border) (28-workout-fab.css / 52-v6-workout.css)
     border-radius: 34px | 999px (28-workout-fab.css / 52-v6-workout.css)
     background: linear-gradient(135deg, rgba(255,255,255,0.72), rgba(244,243,250,0.42)),
-        color-mix(in srgb, var(--md-sys-primary-container) 18%, transparent) | linear-gradient(135deg, rgba(51,53,58,0.74), rgba(30,32,36,0.44)),
-            color-mix(in srgb, var(--md-sys-primary-container) 14%, transparent) | var(--glass-bg) (28-workout-fab.css / 37-dark-mode.css / 52-v6-workout.css)
+        color-mix(in srgb, var(--md-sys-primary-container) 18%, transparent) | var(--glass-bg) (28-workout-fab.css / 52-v6-workout.css)
     box-shadow: 0 14px 36px rgba(0, 29, 54, 0.18),
-        0 4px 12px rgba(0, 0, 0, 0.12) | 0 16px 40px rgba(0, 0, 0, 0.42),
-            0 4px 14px rgba(0, 0, 0, 0.28) | var(--glass-shadow-inset) (28-workout-fab.css / 37-dark-mode.css / 52-v6-workout.css)
+        0 4px 12px rgba(0, 0, 0, 0.12) | var(--glass-shadow-inset) (28-workout-fab.css / 52-v6-workout.css)
     backdrop-filter: blur(22px) saturate(1.35) | blur(18px) saturate(1.45) (28-workout-fab.css / 52-v6-workout.css)
     -webkit-backdrop-filter: blur(22px) saturate(1.35) | blur(18px) saturate(1.45) (28-workout-fab.css / 52-v6-workout.css)
 
@@ -779,74 +667,9 @@ mark.ai-hit
     font-size: 13.5px | 14px (36-responsive.css / 46-advice-ai.css)
     line-height: 1.64 | 1.68 (36-responsive.css / 46-advice-ai.css)
 
-.advice-model-openai
-  files: 37-dark-mode.css, 46-advice-ai.css
-    --advice-model-bg: linear-gradient(135deg, #022c22, #064e3b) | linear-gradient(135deg, #e7faed, #c7f2d8) (37-dark-mode.css / 46-advice-ai.css)
-    --advice-model-color: #a7f3d0 | #064e3b (37-dark-mode.css / 46-advice-ai.css)
-    --advice-model-mark-bg: rgba(167, 243, 208, 0.14) | rgba(6, 78, 59, 0.12) (37-dark-mode.css / 46-advice-ai.css)
-
-.advice-model-gemini
-  files: 37-dark-mode.css, 46-advice-ai.css
-    --advice-model-bg: linear-gradient(135deg, #121b4b, #1d2563) | linear-gradient(135deg, #e3ecff, #eceaff) (37-dark-mode.css / 46-advice-ai.css)
-    --advice-model-color: #c7d2fe | #2330a3 (37-dark-mode.css / 46-advice-ai.css)
-    --advice-model-mark-bg: rgba(199, 210, 254, 0.14) | rgba(35, 48, 163, 0.12) (37-dark-mode.css / 46-advice-ai.css)
-
-.advice-model-grok
-  files: 37-dark-mode.css, 46-advice-ai.css, 54-v6-ai.css
-    --advice-model-bg: linear-gradient(135deg, #0b1120, #1f2937) | linear-gradient(135deg, #111827, #475569) (37-dark-mode.css / 46-advice-ai.css)
-    --advice-model-mark-bg: rgba(248, 250, 252, 0.12) | rgba(255, 255, 255, 0.14) (37-dark-mode.css / 46-advice-ai.css)
-
-.advice-model-deepseek
-  files: 37-dark-mode.css, 46-advice-ai.css
-    --advice-model-bg: linear-gradient(135deg, #0b172d, #1e3a8a) | linear-gradient(135deg, #e2ecff, #bfd5fe) (37-dark-mode.css / 46-advice-ai.css)
-    --advice-model-color: #bfdbfe | #1e3a8a (37-dark-mode.css / 46-advice-ai.css)
-    --advice-model-mark-bg: rgba(191, 213, 254, 0.14) | rgba(30, 58, 138, 0.12) (37-dark-mode.css / 46-advice-ai.css)
-
-.advice-model-claude
-  files: 37-dark-mode.css, 46-advice-ai.css
-    --advice-model-bg: linear-gradient(135deg, #2a1800, #3b2200) | linear-gradient(135deg, #fff5d6, #ffefb8) (37-dark-mode.css / 46-advice-ai.css)
-    --advice-model-color: #fde68a | #7c2d12 (37-dark-mode.css / 46-advice-ai.css)
-    --advice-model-mark-bg: rgba(253, 230, 138, 0.12) | rgba(124, 45, 18, 0.10) (37-dark-mode.css / 46-advice-ai.css)
-
-.advice-model-qwen
-  files: 37-dark-mode.css, 46-advice-ai.css
-    --advice-model-bg: linear-gradient(135deg, #121146, #161a5b) | linear-gradient(135deg, #dfe8ff, #d6f4fb) (37-dark-mode.css / 46-advice-ai.css)
-    --advice-model-color: #d6f4fb | #25248b (37-dark-mode.css / 46-advice-ai.css)
-    --advice-model-mark-bg: rgba(214, 244, 251, 0.14) | rgba(37, 36, 139, 0.12) (37-dark-mode.css / 46-advice-ai.css)
-
-.advice-model-doubao
-  files: 37-dark-mode.css, 46-advice-ai.css
-    --advice-model-bg: linear-gradient(135deg, #2b0f0f, #3b1a0a) | linear-gradient(135deg, #fee5e4, #ffdcab) (37-dark-mode.css / 46-advice-ai.css)
-    --advice-model-color: #fed7aa | #7c2412 (37-dark-mode.css / 46-advice-ai.css)
-    --advice-model-mark-bg: rgba(254, 215, 170, 0.12) | rgba(124, 36, 18, 0.10) (37-dark-mode.css / 46-advice-ai.css)
-
-.advice-model-kimi
-  files: 37-dark-mode.css, 46-advice-ai.css, 54-v6-ai.css
-    --advice-model-bg: linear-gradient(135deg, #0b1437, #122266) | linear-gradient(135deg, #dbeafe, #e7eaff) (37-dark-mode.css / 46-advice-ai.css)
-    --advice-model-color: #e0eaff | #17397b (37-dark-mode.css / 46-advice-ai.css)
-    --advice-model-mark-bg: rgba(224, 234, 255, 0.12) | rgba(23, 57, 123, 0.10) (37-dark-mode.css / 46-advice-ai.css)
-
-.advice-model-minimax
-  files: 37-dark-mode.css, 46-advice-ai.css
-    --advice-model-bg: linear-gradient(135deg, #052e27, #073f2f) | linear-gradient(135deg, #c9f7ef, #dcfad4) (37-dark-mode.css / 46-advice-ai.css)
-    --advice-model-color: #ccfbf1 | #0f5132 (37-dark-mode.css / 46-advice-ai.css)
-    --advice-model-mark-bg: rgba(204, 251, 241, 0.14) | rgba(15, 81, 50, 0.12) (37-dark-mode.css / 46-advice-ai.css)
-
-.advice-model-mimo
-  files: 37-dark-mode.css, 46-advice-ai.css, 54-v6-ai.css
-    --advice-model-bg: linear-gradient(135deg, #230b23, #2c0e2e) | linear-gradient(135deg, #fbeefe, #eceaff) (37-dark-mode.css / 46-advice-ai.css)
-    --advice-model-color: #f5d0fe | #6b1068 (37-dark-mode.css / 46-advice-ai.css)
-    --advice-model-mark-bg: rgba(245, 208, 254, 0.14) | rgba(107, 16, 104, 0.12) (37-dark-mode.css / 46-advice-ai.css)
-
-.advice-model-glm
-  files: 37-dark-mode.css, 46-advice-ai.css
-    --advice-model-bg: linear-gradient(135deg, #101445, #161b63) | linear-gradient(135deg, #e3ecff, #d6cdfb) (37-dark-mode.css / 46-advice-ai.css)
-    --advice-model-color: #c7d2fe | #232882 (37-dark-mode.css / 46-advice-ai.css)
-    --advice-model-mark-bg: rgba(199, 210, 254, 0.14) | rgba(35, 40, 130, 0.12) (37-dark-mode.css / 46-advice-ai.css)
-
-.advice-model-mark
-  files: 37-dark-mode.css, 46-advice-ai.css
-    background: var(--advice-model-mark-bg, color-mix(in srgb, var(--md-sys-surface-container-highest) 60%, transparent)) | var(--advice-model-mark-bg, color-mix(in srgb, var(--md-sys-surface-container-highest) 68%, transparent)) (37-dark-mode.css / 46-advice-ai.css)
+[data-theme-mode="dark"] .md-nav-rail
+  files: 37-dark-mode.css, 56-v6-nav.css
+    background: var(--md-sys-surface-container) | color-mix(in srgb, var(--md-sys-surface-container-high) 85%, transparent) (37-dark-mode.css / 56-v6-nav.css)
 
 .identity-card
   files: 43-identity-card.css
@@ -1126,11 +949,6 @@ mark.ai-hit
     right: 6px | 4px (54-v6-ai.css / 54-v6-ai.css)
     gap: 6px | 4px (54-v6-ai.css / 54-v6-ai.css)
 
-.advice-rail-btn
-  files: 54-v6-ai.css
-    width: 38px | 34px (54-v6-ai.css / 54-v6-ai.css)
-    height: 38px | 34px (54-v6-ai.css / 54-v6-ai.css)
-
 .advice-rail-btn .material-symbols-rounded
   files: 54-v6-ai.css
     font-size: 20px | 18px (54-v6-ai.css / 54-v6-ai.css)
@@ -1169,11 +987,7 @@ mark.ai-hit
   files: 57-weight-report.css
     animation: none | weight-chart-range-zoom var(--md-sys-motion-duration-medium, 220ms) var(--md-sys-motion-emphasized, cubic-bezier(0.2, 0, 0, 1)) both (57-weight-report.css / 57-weight-report.css)
 
-## DUPLICATES (same selector + same property + same value): 35
-.md-top-app-bar
-  files: 04-layout-appbar.css, 37-dark-mode.css
-    background: transparent (04-layout-appbar.css / 37-dark-mode.css)
-
+## DUPLICATES (same selector + same property + same value): 30
 .timer-stats
   files: 09-workout-timer.css, 52-v6-workout.css
     display: flex (09-workout-timer.css / 52-v6-workout.css)
@@ -1185,31 +999,6 @@ mark.ai-hit
 .md-field
   files: 10-components-fields.css, 50-v6-ui.css, 52-v6-workout.css, 41-m3e-effects.css
     position: relative (10-components-fields.css / 52-v6-workout.css)
-
-.md-field input:focus + label
-  files: 10-components-fields.css, 37-dark-mode.css
-    color: var(--md-sys-primary) (10-components-fields.css / 37-dark-mode.css)
-
-.md-field input:not(:placeholder-shown) + label
-  files: 10-components-fields.css, 37-dark-mode.css
-    color: var(--md-sys-primary) (10-components-fields.css / 37-dark-mode.css)
-
-.md-field select:focus + label
-  files: 10-components-fields.css, 37-dark-mode.css
-    color: var(--md-sys-primary) (10-components-fields.css / 37-dark-mode.css)
-
-.md-field input:focus
-  files: 10-components-fields.css, 37-dark-mode.css
-    border-color: var(--md-sys-primary) (10-components-fields.css / 37-dark-mode.css)
-
-.md-field select:focus
-  files: 10-components-fields.css, 37-dark-mode.css
-    border-color: var(--md-sys-primary) (10-components-fields.css / 37-dark-mode.css)
-
-.md-btn-tonal
-  files: 14-components-buttons.css, 37-dark-mode.css
-    background: var(--md-sys-secondary-container) (14-components-buttons.css / 37-dark-mode.css)
-    color: var(--md-sys-on-secondary-container) (14-components-buttons.css / 37-dark-mode.css)
 
 .record-icon
   files: 15-components-lists.css, 17-record-tabs-health.css
@@ -1225,9 +1014,15 @@ mark.ai-hit
     font-variation-settings: 'FILL' 1 (15-components-lists.css / 17-record-tabs-health.css)
     flex: none (15-components-lists.css / 17-record-tabs-health.css)
 
-.calendar-day.empty
+:root:not([data-theme-mode="light"]) .calendar-event
   files: 16-history-hero-calendar.css, 37-dark-mode.css
-    background: transparent (16-history-hero-calendar.css / 37-dark-mode.css)
+    background: color-mix(in srgb, var(--event-color) 18%, var(--md-sys-surface-container-highest)) (16-history-hero-calendar.css / 37-dark-mode.css)
+    color: color-mix(in srgb, var(--event-color) 35%, var(--md-sys-on-surface)) (16-history-hero-calendar.css / 37-dark-mode.css)
+
+[data-theme-mode="dark"] .calendar-event
+  files: 16-history-hero-calendar.css, 37-dark-mode.css
+    background: color-mix(in srgb, var(--event-color) 18%, var(--md-sys-surface-container-highest)) (16-history-hero-calendar.css / 37-dark-mode.css)
+    color: color-mix(in srgb, var(--event-color) 35%, var(--md-sys-on-surface)) (16-history-hero-calendar.css / 37-dark-mode.css)
 
 .weight-range.active
   files: 17-record-tabs-health.css, 57-weight-report.css
@@ -1257,17 +1052,9 @@ mark.ai-hit
   files: 27-layout-nav.css, 50-v6-ui.css, 41-m3e-effects.css
     min-width: 0 (27-layout-nav.css / 50-v6-ui.css)
 
-.nav-indicator
-  files: 27-layout-nav.css, 37-dark-mode.css
-    background: var(--md-sys-secondary-container) (27-layout-nav.css / 37-dark-mode.css)
-
 .nav-item small
   files: 27-layout-nav.css, 50-v6-ui.css
     white-space: nowrap (27-layout-nav.css / 50-v6-ui.css)
-
-.nav-item.active .material-symbols-rounded
-  files: 27-layout-nav.css, 37-dark-mode.css
-    color: var(--md-sys-on-secondary-container) (27-layout-nav.css / 37-dark-mode.css)
 
 .strength-presets
   files: 33-workout-input-card.css, 52-v6-workout.css
@@ -1301,12 +1088,6 @@ mark.ai-hit
   files: 38-record-page.css, 53-v6-records.css
     animation: none !important (38-record-page.css / 53-v6-records.css)
 
-.advice-model-generic
-  files: 37-dark-mode.css, 46-advice-ai.css
-    --advice-model-bg: linear-gradient(135deg, var(--md-sys-secondary-container), var(--md-sys-tertiary-container)) (37-dark-mode.css / 46-advice-ai.css)
-    --advice-model-color: var(--md-sys-on-secondary-container) (37-dark-mode.css / 46-advice-ai.css)
-    --advice-model-mark-bg: var(--md-sys-surface-container-highest) (37-dark-mode.css / 46-advice-ai.css)
-
 .library-swipe-page
   files: 45-library-segment.css, 53-v6-records.css
     min-width: 0 (45-library-segment.css / 53-v6-records.css)
@@ -1318,6 +1099,18 @@ mark.ai-hit
 .advice-bubble.user .advice-bubble-content
   files: 46-advice-ai.css
     color: var(--md-sys-on-primary-container) (46-advice-ai.css / 46-advice-ai.css)
+
+.advice-model-grok
+  files: 46-advice-ai.css, 54-v6-ai.css
+    filter: invert(1) (54-v6-ai.css / 54-v6-ai.css)
+
+.advice-model-kimi
+  files: 46-advice-ai.css, 54-v6-ai.css
+    filter: invert(1) (54-v6-ai.css / 54-v6-ai.css)
+
+.advice-model-mimo
+  files: 46-advice-ai.css, 54-v6-ai.css
+    filter: invert(1) (54-v6-ai.css / 54-v6-ai.css)
 
 .plan-current-actions
   files: 49-plan.css
@@ -1335,7 +1128,15 @@ mark.ai-hit
   files: 54-v6-ai.css
     filter: invert(1) (54-v6-ai.css / 54-v6-ai.css)
 
-## COMPLEMENTS (same selector, disjoint properties): 129
+.advice-rail-btn
+  files: 54-v6-ai.css
+    width: 44px (54-v6-ai.css / 54-v6-ai.css)
+    height: 44px (54-v6-ai.css / 54-v6-ai.css)
+
+## COMPLEMENTS (same selector, disjoint properties): 133
+:root
+  files: 01-vars.css, 49-plan.css, 41-m3e-effects.css
+
 .bar-leading
   files: 04-layout-appbar.css, 50-v6-ui.css
 
@@ -1344,6 +1145,9 @@ mark.ai-hit
 
 .bar-trailing
   files: 04-layout-appbar.css, 50-v6-ui.css
+
+.md-chip
+  files: 05-layout-chip.css, 50-v6-ui.css, 41-m3e-effects.css
 
 #app
   files: 06-layout-page.css, 36-responsive.css
@@ -1402,6 +1206,12 @@ mark.ai-hit
 .goal-safety-metrics small
   files: 19-health-weightloss-ai.css
 
+.search-provider-enabled
+  files: 20-settings-ai.css
+
+.search-provider-form-actions
+  files: 20-settings-ai.css
+
 .ai-task-utility-controls > button
   files: 20-settings-ai.css
 
@@ -1446,6 +1256,9 @@ mark.ai-hit
 
 .nav-content
   files: 27-layout-nav.css, 50-v6-ui.css
+
+.nav-item.active .material-symbols-rounded
+  files: 27-layout-nav.css
 
 .nav-item.active small
   files: 27-layout-nav.css
@@ -1662,9 +1475,6 @@ body.is-paused .fab-play
 
 .timer-panel .timer-wakelock-btn
   files: 52-v6-workout.css
-
-.md-chip:active
-  files: 52-v6-workout.css, 41-m3e-effects.css
 
 .ai-msg.ai
   files: 54-v6-ai.css, 41-m3e-effects.css

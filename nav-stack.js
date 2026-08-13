@@ -15,7 +15,6 @@
         stack: [ROOT],
         _bound: false,
         _suppress: false,
-        /** Product: standalone/PWA uses layered back; plain browser bookmark may leave site. */
         mode: 'browser',
 
         init() {
@@ -55,23 +54,12 @@
             } catch {}
         },
 
-        replaceOrPush(entry) {
-            if (!entry?.type || !entry?.id || typeof entry.close !== 'function') return;
+        open(type, id, close) {
+            if (!type || !id || typeof close !== 'function') return;
+            const entry = { type, id, close };
             const top = this.top();
-            if (top.type === entry.type && top.id === entry.id) {
-                this.stack[this.stack.length - 1] = entry;
-                try {
-                    history.replaceState({
-                        navIndex: this.stack.length - 1,
-                        type: entry.type,
-                        id: entry.id,
-                        rehabNav: true,
-                        mode: this.mode
-                    }, '');
-                } catch {}
-                return;
-            }
-            this.push(entry);
+            if (top.type === type && top.id === id) this.stack[this.stack.length - 1] = entry;
+            else this.push(entry);
         },
 
         replaceTopOrPushTab(id) {
@@ -125,10 +113,13 @@
             } catch {}
         },
 
-        popType(type) {
-            if (!type) return false;
-            const idx = this.stack.map(e => e.type).lastIndexOf(type);
-            if (idx <= 0) return false;
+        find(type, id = '') {
+            return this.stack.map(entry => entry?.type === type && (!id || entry.id === id)).lastIndexOf(true);
+        },
+
+        popType(type, id = '') {
+            const idx = this.find(type, id);
+            if (idx < 1) return false;
             this.stack.splice(idx, 1);
             try {
                 history.replaceState({
@@ -140,31 +131,35 @@
             return true;
         },
 
-        requestClose(type) {
-            const top = this.top();
-            if (type && top.type !== type) return false;
-            if (!top || top === ROOT) return false;
-            const closed = top.close?.() !== false;
-            if (!closed) return false;
-            this.stack.pop();
+        rewind(count = 1) {
             this._suppress = true;
-            try { history.back(); } catch {}
+            try { history.go(-count); } catch {}
             setTimeout(() => { this._suppress = false; }, 120);
+        },
+
+        close(type, id, fn) {
+            const idx = this.find(type, id);
+            if (idx < 1) return fn ? fn() !== false : false;
+            if ((fn || this.stack[idx].close)() === false) return false;
+            const count = this.stack.length - idx;
+            this.stack.splice(idx);
+            this.rewind(count);
             return true;
         },
 
-        /**
-         * H2: System/browser back.
-         * - Always close modal/drawer first.
-         * - PWA/standalone: walk subroute → tab → Today; exit only at root.
-         * - Plain browser cold bookmark with only root: allow leaving the site (no infinite trap).
-         */
+        requestClose(type, id = '') {
+            const top = this.top();
+            if ((type && top.type !== type) || (id && top.id !== id) || top === ROOT || top.close?.() === false) return false;
+            this.stack.pop();
+            this.rewind();
+            return true;
+        },
+
         _onPopState(event) {
             if (this._suppress) return;
             const workoutGuard = window.workoutSystem || window.workout;
             if (workoutGuard?.isPlaying) {
                 workoutGuard.handleBackGuard?.();
-                // Re-assert current stack frame so a playing workout is not abandoned silently.
                 try {
                     history.pushState({
                         navIndex: this.stack.length - 1,
@@ -178,7 +173,6 @@
             }
             const top = this.top();
             if (!top || top === ROOT || (top.type === 'tab' && top.id === 'today' && this.stack.length <= 1)) {
-                // Root: plain browser may leave; PWA re-pushes root so system back does not dump blank.
                 if (this.mode === 'pwa' || isStandaloneDisplay()) {
                     try {
                         history.pushState({
@@ -194,7 +188,6 @@
             const closed = top.close?.() !== false;
             if (closed) {
                 this.stack.pop();
-                // Keep history index aligned with remaining stack when browser already popped.
                 try {
                     history.replaceState({
                         navIndex: Math.max(0, this.stack.length - 1),
@@ -205,7 +198,6 @@
                     }, '');
                 } catch {}
             } else {
-                // close refused: restore state so user is not stuck off-stack.
                 try {
                     history.pushState({
                         navIndex: this.stack.length - 1,

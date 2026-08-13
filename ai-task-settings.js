@@ -196,9 +196,10 @@
         return ai[method](...args);
     }
 
-    function closeQuickSheet() {
+    function closeQuickSheet(direct) {
+        if (!direct && root.navStack?.requestClose?.('modal', 'aiModelPickerSheet')) return;
         const modal = document.getElementById('aiModelPickerSheet');
-        if (!modal) return;
+        if (!modal) return true;
         modal.classList.add('hidden');
         modal.classList.remove('ai-task-quick-sheet');
         modal.classList.remove('advice-model-picker-sheet');
@@ -213,7 +214,7 @@
     }
 
     function openQuickSheet(title, build) {
-        closeQuickSheet();
+        closeQuickSheet(true);
         const modal = document.getElementById('aiModelPickerSheet');
         const body = document.getElementById('aiModelPickerContent');
         const card = modal?.querySelector('.md-modal-sheet-card');
@@ -226,6 +227,7 @@
         build(body);
         modal.classList.remove('hidden');
         modal.setAttribute('aria-hidden', 'false');
+        root.navStack?.open?.('modal', 'aiModelPickerSheet', () => closeQuickSheet(true));
         modal.querySelector('[data-modal-close]')?.focus();
     }
 

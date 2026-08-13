@@ -142,11 +142,7 @@
             this.bindDietPhotoControls?.();
             modal.classList.remove('hidden');
             modal.setAttribute('aria-hidden', 'false');
-            window.navStack?.replaceOrPush?.({
-                type: 'modal',
-                id: 'dietModal',
-                close: () => this.closeDietModalInternal()
-            });
+            window.navStack?.open?.('modal', 'dietModal', () => this.closeDietModalInternal());
             void this.mountDietAiPickers?.(content);
             window.ai?.loadVisionWhitelist?.().then(() => {
                 const button = document.getElementById('dietPhotoButton');

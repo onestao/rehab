@@ -379,11 +379,7 @@ Object.assign(workout, {
         this.setReviewRpe('');
         this.setReviewRir('');
         const modal = document.getElementById('setReviewModal');
-        window.navStack?.replaceOrPush?.({
-            type: 'modal',
-            id: 'setReviewModal',
-            close: () => this.closeSetReviewInternal()
-        });
+        window.navStack?.open?.('modal', 'setReviewModal', () => this.closeSetReviewInternal());
         modal.classList.remove('hidden');
         modal.setAttribute('aria-hidden', 'false');
     },

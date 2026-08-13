@@ -58,7 +58,7 @@ const theme = {
     },
 
     setCustom(seed) {
-        this.cfg = { mode: 'custom', seed };
+        this.cfg = { ...this.cfg, mode: 'custom', seed };
         this.persist();
         this.apply(seed);
         this.syncUI();
@@ -67,7 +67,7 @@ const theme = {
 
     useMonet() {
         const seed = this.pickMonetSeed();
-        this.cfg = { mode: 'monet', seed };
+        this.cfg = { ...this.cfg, mode: 'monet', seed };
         this.persist();
         this.apply(seed);
         this.syncUI();
@@ -224,6 +224,7 @@ const theme = {
         if (locale && window.i18n) locale.value = i18n.currentLocale || 'auto';
         sheet.classList.remove('hidden');
         sheet.setAttribute('aria-hidden', 'false');
+        window.navStack?.open?.('modal', 'themeSheet', () => this.closeSheetInternal());
         // focusTrap (when available) handles Escape via [data-modal-close] and
         // restores focus to the previously active element on release.
         if (window.focusTrap?.trap) {
@@ -235,8 +236,12 @@ const theme = {
     },
 
     closeSheet() {
+        return window.navStack?.requestClose?.('modal', 'themeSheet') || this.closeSheetInternal();
+    },
+
+    closeSheetInternal() {
         const sheet = document.getElementById('themeSheet');
-        if (!sheet) return;
+        if (!sheet) return true;
         sheet.classList.add('hidden');
         sheet.setAttribute('aria-hidden', 'true');
         if (window.focusTrap?.release) {
@@ -244,6 +249,7 @@ const theme = {
         } else {
             document.removeEventListener('keydown', this._onSheetKey);
         }
+        return true;
     },
 
     _onSheetKey(e) {
