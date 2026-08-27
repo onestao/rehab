@@ -15,7 +15,7 @@ import test from 'node:test';
 const __filename = fileURLToPath(import.meta.url);
 const root = path.resolve(path.dirname(__filename), '..');
 const repoRoot = path.resolve(root, '../../..');
-const evidenceRoot = path.join(repoRoot, '.tmp', 'today-ai-picker-v343', 'playwright');
+const evidenceRoot = path.join(root, '.tmp', 'today-ai-picker-v343', 'playwright');
 
 const AI_SEED = {
     KEY: 'rehab_pro_ai_cfg',

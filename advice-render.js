@@ -327,31 +327,27 @@ Object.assign(advicePanel, {
                 ? '<div class="empty-state advice-empty"><span class="material-symbols-rounded">search_off</span><p>没有匹配的聊天记录</p></div>'
                 : '<div class="empty-state advice-empty"><span class="material-symbols-rounded">forum</span><p>还没有 AI 建议，选择下方快捷问题开始</p></div>';
         }
-        const olderNotice = hiddenCount > 0
-            ? `<div class="advice-history-window"><button type="button" onclick="data.expandAdviceRenderWindow?.()"><span class="material-symbols-rounded">expand_less</span> 加载更早 ${hiddenCount} 条消息</button><button type="button" onclick="data.toggleAdviceSearch?.()"><span class="material-symbols-rounded">manage_search</span> 搜索归档</button></div>`
+        const olderNotice = hiddenCount
+            ? `<div class="advice-history-window"><button type="button" onclick="data.expandAdviceRenderWindow()"><span class="material-symbols-rounded">expand_less</span> 加载更早 ${Math.min(20, hiddenCount)} 条</button></div>`
             : '';
         const groups = messages.reduce((acc, msg, idx) => {
             const date = this.logicalDateKey(this.parseHistoryDate(msg.at));
-            if (!acc[date]) acc[date] = [];
-            acc[date].push({ ...msg, idx: Number.isInteger(msg.idx) ? msg.idx : idx });
+            const month = date.slice(0, 7);
+            acc[month] ||= {};
+            (acc[month][date] ||= []).push({ idx, ...msg });
             return acc;
         }, {});
-        const lastVisibleIdx = messages[messages.length - 1]?.idx ?? messages.length - 1;
-        return olderNotice + Object.keys(groups).sort((a, b) => a.localeCompare(b)).map(date => {
-            const list = groups[date];
-            const today = date === this.logicalDateKey();
-            const collapsed = this.isCollapsed(`advice_${date}`, !today && list.every(msg => msg.idx < lastVisibleIdx - 4));
-            return `<section class="advice-date-group ${collapsed ? 'collapsed' : ''}">
-                <button class="advice-date-head" onclick="data.toggleCollapse('advice_${date}')" type="button">
-                    <span class="material-symbols-rounded">event_note</span>
-                    <strong>${highlightKeyword(date, currentKeyword)}</strong>
-                    <small>${list.length} 条</small>
-                    <span class="material-symbols-rounded">${collapsed ? 'expand_more' : 'expand_less'}</span>
-                </button>
-                <div class="advice-date-content">
-                    ${list.map(msg => this.renderAdviceMessage(msg, msg.idx === lastVisibleIdx, currentKeyword)).join('')}
-                </div>
-            </section>`;
+        const latestId = messages.at(-1)?.id;
+        const monthKeys = Object.keys(groups).sort();
+        return olderNotice + monthKeys.map(month => {
+            const dateGroups = groups[month];
+            const dateKeys = Object.keys(dateGroups).sort();
+            const monthCollapsed = this.isCollapsed(`advice_month_${month}`, !currentKeyword && month !== monthKeys.at(-1));
+            return `<section class="advice-month-group ${monthCollapsed ? 'collapsed' : ''}"><button class="advice-month-head" onclick="data.toggleCollapse('advice_month_${month}')" type="button" aria-expanded="${!monthCollapsed}"><strong>${month.slice(0, 4)}年${+month.slice(5)}月</strong><span class="material-symbols-rounded">${monthCollapsed ? 'expand_more' : 'expand_less'}</span></button><div class="advice-month-content">${dateKeys.map(date => {
+                const list = dateGroups[date];
+                const collapsed = this.isCollapsed(`advice_${date}`, !currentKeyword && date !== dateKeys.at(-1));
+                return `<section class="advice-date-group ${collapsed ? 'collapsed' : ''}"><button class="advice-date-head" onclick="data.toggleCollapse('advice_${date}')" type="button" aria-expanded="${!collapsed}"><strong>${date}</strong><small>${list.length} 条</small><span class="material-symbols-rounded">${collapsed ? 'expand_more' : 'expand_less'}</span></button><div class="advice-date-content">${list.map(msg => this.renderAdviceMessage(msg, msg.id === latestId, currentKeyword)).join('')}</div></section>`;
+            }).join('')}</div></section>`;
         }).join('');
     },
 
@@ -364,7 +360,7 @@ Object.assign(advicePanel, {
             `${dateMeta}${timeText}`,
             currentKeyword
         );
-        const model = msg.model ? ` · ${highlightKeyword(msg.model, currentKeyword)}${msg.temporaryModel ? ' · <span class="advice-temp-model">临时模型</span>' : ''}` : '';
+        const model = msg.model ? ` · ${highlightKeyword(msg.model, currentKeyword)}` : '';
         const usage = msg.tokenUsage && (msg.tokenUsage.in || msg.tokenUsage.out)
             ? ` · ${highlightKeyword(String(msg.tokenUsage.in || 0), currentKeyword)}→${highlightKeyword(String(msg.tokenUsage.out || 0), currentKeyword)} tok`
             : '';

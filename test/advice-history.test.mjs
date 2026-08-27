@@ -256,3 +256,61 @@ test('opening search refreshes all-history scope when it is already selected', (
     assert.equal(host.adviceSearchOpen, true);
     assert.equal(refreshed, 1);
 });
+
+test('all-history view renders the latest 20 messages and loads 20 older messages at a time', async () => {
+    const records = Array.from({ length: 60 }, (_, index) => ({
+        id: `m-${index}`,
+        role: index % 2 ? 'assistant' : 'user',
+        content: `message ${index}`,
+        at: new Date(Date.UTC(2026, 5, 1, 0, index)).toISOString(),
+        updatedAt: index + 1
+    }));
+    const host = buildHost(records);
+    const list = { innerHTML: '', dataset: {}, scrollTop: 0, scrollHeight: 0, clientHeight: 0 };
+    const summary = { textContent: '' };
+    let renderedIds = [];
+    let hiddenCount = -1;
+    let activeMode = '';
+    host._adviceMessageList = () => list;
+    host.__context.document.getElementById = () => summary;
+    host.adviceRange = 'all';
+    host.adviceSearchQuery = '';
+    host.renderAdviceMessages = (messages, hidden) => {
+        renderedIds = messages.map(msg => msg.id);
+        hiddenCount = hidden;
+        return renderedIds.join(',');
+    };
+    host.renderAdviceMessage = (msg) => msg.id;
+    host.preserveAdviceScroll = (fn) => fn();
+    host.advice = {
+        activeIdsRef: [],
+        mode: 'recent',
+        getAllIds: async () => records.map(record => record.id),
+        getByIds: async (ids) => ids.map(id => records.find(record => record.id === id)).filter(Boolean),
+        setActiveIds(ids, mode) {
+            this.activeIdsRef = ids.slice();
+            this.mode = mode;
+            activeMode = mode;
+            return { activeIdsRef: this.activeIdsRef, mode, version: 1 };
+        },
+        setActiveRecords(items, mode) {
+            return this.setActiveIds(items.map(item => item.id), mode);
+        }
+    };
+
+    host.resetAdviceRenderWindow();
+    await host.refreshAdviceSearchResults();
+
+    assert.deepEqual(renderedIds, records.slice(40).map(record => record.id));
+    assert.equal(hiddenCount, 40);
+    assert.equal(activeMode, 'window');
+    assert.equal(summary.textContent, '全部最新显示 10 / 共 30 轮建议');
+    assert.equal(host.db.health.aiAdviceChat.length, 60);
+
+    await host.expandAdviceRenderWindow();
+
+    assert.deepEqual(renderedIds, records.slice(20).map(record => record.id));
+    assert.equal(hiddenCount, 20);
+    assert.equal(host._adviceRenderLimit, 40);
+    assert.equal(host.db.health.aiAdviceChat.length, 60);
+});

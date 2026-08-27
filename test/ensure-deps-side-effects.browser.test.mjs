@@ -14,7 +14,7 @@ import test from 'node:test';
 const __filename = fileURLToPath(import.meta.url);
 const root = path.resolve(path.dirname(__filename), '..');
 const repoRoot = path.resolve(root, '../../..');
-const evidenceRoot = path.join(repoRoot, '.tmp', 'lazyload-repair', 'playwright', 'ensure-deps-side-effects');
+const evidenceRoot = path.join(root, '.tmp', 'lazyload-repair', 'playwright', 'ensure-deps-side-effects');
 
 function delay(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));

@@ -177,6 +177,23 @@ test('renderAdviceMessage renders escaped safe failure details', () => {
     assert.doesNotMatch(html, /<script>secret<\/script>/);
 });
 
+test('renderAdviceMessage does not show the legacy temporary model label', () => {
+    const panel = loadAdvicePanel();
+
+    const html = panel.renderAdviceMessage({
+        id: 'temporary-model-1',
+        role: 'assistant',
+        content: '建议',
+        at: '2026-05-30T00:00:00.000Z',
+        model: 'gpt-test',
+        temporaryModel: true
+    }, true, '');
+
+    assert.match(html, /gpt-test/);
+    assert.doesNotMatch(html, /临时模型/);
+    assert.doesNotMatch(html, /advice-temp-model/);
+});
+
 test('renderAdviceMessage renders a persistent safe citation trail', () => {
     const panel = loadAdvicePanel();
     const html = panel.renderAdviceMessage({
@@ -187,4 +204,23 @@ test('renderAdviceMessage renders a persistent safe citation trail', () => {
     assert.match(html, /https:\/\/example\.com\/guide/);
     assert.match(html, /&lt;官方指南&gt;/);
     assert.doesNotMatch(html, /http:\/\/example\.com/);
+});
+
+test('renderAdviceMessages groups history by collapsible month and date', () => {
+    const panel = loadAdvicePanel();
+    panel.renderAdviceMessage = (msg, latest) => `<div data-id="${msg.id}" data-latest="${latest}">${msg.content}</div>`;
+    panel.isCollapsed = (_id, defaultState) => defaultState;
+
+    const html = panel.renderAdviceMessages([
+        { id: 'jan', role: 'user', content: 'January', at: '2026-01-03T08:00:00.000Z' },
+        { id: 'aug-old', role: 'user', content: 'August old', at: '2026-08-20T08:00:00.000Z' },
+        { id: 'aug-new', role: 'assistant', content: 'August new', at: '2026-08-26T08:00:00.000Z' }
+    ], 37);
+
+    assert.match(html, /加载更早 20 条/);
+    assert.match(html, /advice-month-group collapsed[\s\S]*2026年1月/);
+    assert.match(html, /advice-month-group [^>]*[\s\S]*2026年8月/);
+    assert.match(html, /advice-date-group collapsed[\s\S]*2026-08-20/);
+    assert.match(html, /aria-expanded="true"[\s\S]*2026-08-26/);
+    assert.match(html, /data-id="aug-new" data-latest="true"/);
 });

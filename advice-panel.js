@@ -1722,7 +1722,7 @@ const advicePanel = {
         const searchLimit = 20;
         const store = window.dataStore?.advice || this.advice;
         this._adviceSearchRequestId = requestId;
-        let messages = [];
+        let messages;
         let visibleMessages = [];
         let total = 0;
 
@@ -1765,33 +1765,35 @@ const advicePanel = {
             this.prepareAdviceVirtualState(visibleMessages, 'search', { list, emptyHtml: this.renderAdviceMessages([], 0) });
         } else {
             const isAllRange = (this.adviceRange || 'today') === 'all';
+            const limit = this._adviceRenderLimit || 20;
+            let hiddenCount;
             if (isAllRange && store?.getAllIds) {
                 try {
                     const ids = await store.getAllIds();
                     if (requestId !== this._adviceSearchRequestId || query !== String(this.adviceSearchQuery || '').trim()) return;
-                    messages = this.activeRecords(this.db.health.aiAdviceChat || []);
-                    const seedRecords = this.visibleAdviceMessages(messages, false);
                     total = ids.length;
-                    visibleMessages = seedRecords;
-                    this.prepareAdviceVirtualState(seedRecords, 'all', {
-                        list,
-                        ids,
-                        seedRecords,
-                        emptyHtml: this.renderAdviceMessages([], 0)
-                    });
+                    const windowIds = ids.slice(-limit);
+                    hiddenCount = total - windowIds.length;
+                    messages = await this.resolveAdviceRecordsByIds(windowIds);
                 } catch (e) {
                     console.error('Failed to load advice history ids', e);
                     messages = this.activeRecords(this.db.health.aiAdviceChat || []);
-                    visibleMessages = this.visibleAdviceMessages(messages, false);
-                    total = visibleMessages.length;
-                    this.prepareAdviceVirtualState(visibleMessages, 'all-fallback', { list, emptyHtml: this.renderAdviceMessages([], 0) });
                 }
             } else {
                 messages = this.activeRecords(this.db.health.aiAdviceChat || []);
-                visibleMessages = this.visibleAdviceMessages(messages, false);
-                total = visibleMessages.length;
-                this.prepareAdviceVirtualState(visibleMessages, this.adviceRange || 'today', { list, emptyHtml: this.renderAdviceMessages([], 0) });
             }
+            visibleMessages = this.visibleAdviceMessages(messages);
+            if (isAllRange && hiddenCount == null) {
+                total = visibleMessages.length;
+                visibleMessages = visibleMessages.slice(-limit);
+                hiddenCount = total - visibleMessages.length;
+            }
+            if (!isAllRange) total = visibleMessages.length;
+            this.prepareAdviceVirtualState(visibleMessages, isAllRange ? 'window' : this.adviceRange || 'today', {
+                list,
+                hiddenCount,
+                emptyHtml: this.renderAdviceMessages([])
+            });
         }
 
         if (requestId !== this._adviceSearchRequestId || query !== String(this.adviceSearchQuery || '').trim()) return;
@@ -1800,8 +1802,7 @@ const advicePanel = {
             else if (!total) summary.textContent = '像聊天一样提问，AI 会结合你的记录分析';
             else {
                 const rangeLabel = { today: '今日', week: '最近7天', month: '最近30天', all: '全部' }[this.adviceRange || 'today'] || '今日';
-                const visibleCount = (this.adviceRange || 'today') === 'all' ? total : visibleMessages.length;
-                summary.textContent = `${rangeLabel}显示 ${Math.floor(visibleCount / 2)} / 共 ${Math.floor(total / 2)} 轮建议`;
+                summary.textContent = `${rangeLabel}${(this.adviceRange || 'today') === 'all' ? '最新' : ''}显示 ${Math.floor(visibleMessages.length / 2)} / 共 ${Math.floor(total / 2)} 轮建议`;
             }
         }
     },
@@ -1859,10 +1860,10 @@ const advicePanel = {
     },
 
     adviceRangeStart(range = this.adviceRange || 'today') {
+        if (range === 'all') return null;
         const start = this.logicalDayStart();
         if (range === 'week') start.setDate(start.getDate() - 6);
         if (range === 'month') start.setDate(start.getDate() - 29);
-        if (range === 'all') return null;
         return start;
     },
 
@@ -1909,6 +1910,7 @@ const advicePanel = {
         const emptyHtml = options.emptyHtml || this.renderAdviceMessages?.([], 0) || '';
         this._adviceVirtualEmptyHtml = emptyHtml;
         this._adviceVirtualFallbackRecords = Array.isArray(records) ? records : [];
+        this._adviceHistoryHiddenCount = options.hiddenCount || 0;
         let snapshot = null;
         if (store && typeof store.setActiveIds === 'function' && Array.isArray(options.ids)) {
             snapshot = store.setActiveIds(options.ids, mode, options.seedRecords || records || []);
@@ -1971,7 +1973,7 @@ const advicePanel = {
             };
         });
         list.innerHTML = renderRecords.length
-            ? (this.renderAdviceMessages?.(renderRecords, 0) || renderRecords.map((msg, index) => renderItem(msg, index, index === renderRecords.length - 1, keyword)).join(''))
+            ? (this.renderAdviceMessages?.(renderRecords, this._adviceHistoryHiddenCount) || renderRecords.map((msg, index) => renderItem(msg, index, index === renderRecords.length - 1, keyword)).join(''))
             : emptyHtml;
         return null;
     },
@@ -2011,7 +2013,7 @@ const advicePanel = {
     },
 
     resetAdviceRenderWindow() {
-        this._adviceRenderLimit = 0;
+        this._adviceRenderLimit = 20;
         this._adviceVirtualSnapshot = null;
     },
 
@@ -2028,15 +2030,14 @@ const advicePanel = {
     },
 
     async expandAdviceRenderWindow() {
-        const store = window.dataStore?.advice || this.advice;
-        const controller = this._adviceMessageList?.()?._adviceVirtualController || this._adviceVirtualController;
-        const rows = controller?.virtualizer?.getVirtualItems?.() || [];
-        const count = store?.activeIdsRef?.length || 0;
-        const range = rows.length
-            ? { startIndex: rows[0].index, endIndex: rows[rows.length - 1].index }
-            : { startIndex: Math.max(0, count - 1), endIndex: Math.max(0, count - 1) };
-        await store?.prefetchAround?.(range, 2, 'manual');
-        this.mountAdviceVirtualList?.();
+        if (this._adviceLoadingOlder || this.adviceRange !== 'all' || String(this.adviceSearchQuery || '').trim()) return;
+        this._adviceLoadingOlder = true;
+        this._adviceRenderLimit = (this._adviceRenderLimit || 20) + 20;
+        try {
+            await this.preserveAdviceScroll(() => this.refreshAdviceSearchResults());
+        } finally {
+            this._adviceLoadingOlder = false;
+        }
     },
 
     adviceMessageSummary(messages, visibleMessages) {

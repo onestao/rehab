@@ -152,6 +152,8 @@
 .ai-msg.ai { background: var(--glass-bg-strong); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border: 1px solid var(--glass-border); color: var(--md-sys-on-surface); margin-right: auto; border-bottom-left-radius: 4px; box-shadow: var(--glass-shadow-inset); }
 [data-theme-mode="dark"] .ai-msg.ai { background: var(--glass-bg); }
 .ai-msg.ai.typing::after { content: ''; display: inline-block; width: 20px; text-align: left; animation: typing 1.4s infinite; }
+.advice-v6-page .advice-month-group,
+.advice-v6-page .advice-month-content,
 .advice-v6-page .advice-date-group,
 .advice-v6-page .advice-date-content,
 .advice-v6-page .advice-bubble,
@@ -162,6 +164,7 @@
 .advice-v6-page .advice-bubble-actions {
     min-width: 0;
 }
+.advice-v6-page .advice-month-head,
 .advice-v6-page .advice-date-head,
 .advice-v6-page .advice-bubble b,
 .advice-v6-page .advice-bubble b small,
@@ -173,6 +176,8 @@
 .advice-v6-page .advice-bubble-actions button {
     overflow-wrap: anywhere;
 }
+.advice-v6-page .advice-month-head strong,
+.advice-v6-page .advice-month-head small,
 .advice-v6-page .advice-date-head strong,
 .advice-v6-page .advice-date-head small,
 .advice-v6-page .advice-bubble b small,

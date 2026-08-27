@@ -238,7 +238,7 @@
             const button = this.findCollapseButton(id);
             const collapsed = !!this._collapse?.[id];
             container.classList.toggle('collapsed', collapsed);
-            if (button?.classList.contains('collapsible-head-btn')) button.setAttribute('aria-expanded', String(!collapsed));
+            button?.setAttribute('aria-expanded', String(!collapsed));
             const icons = Array.from(button?.querySelectorAll('.material-symbols-rounded') || []);
             const icon = icons.findLast?.((element) => /^expand_(more|less)$/.test(element.textContent.trim()))
                 || icons.reverse().find((element) => /^expand_(more|less)$/.test(element.textContent.trim()));
@@ -248,7 +248,7 @@
 
         findCollapseContainer(id) {
             const button = this.findCollapseButton(id);
-            return button?.closest('.pr-board-item, .collapsible-card, .diet-meal-group, .history-month-group, .history-older-group, .weight-history-card') || null;
+            return button?.closest('.pr-board-item, .collapsible-card, .diet-meal-group, .history-month-group, .history-older-group, .weight-history-card, .advice-month-group, .advice-date-group') || null;
         },
 
         findCollapseButton(id) {

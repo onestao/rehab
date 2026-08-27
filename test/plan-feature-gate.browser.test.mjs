@@ -16,7 +16,7 @@ const __filename = fileURLToPath(import.meta.url);
 const root = path.resolve(path.dirname(__filename), '..');
 // worktree: G:/LLM/rehab/.claude/worktrees/lazy-integration → repo root is 3 levels up
 const repoRoot = path.resolve(root, '../../..');
-const evidenceRoot = path.join(repoRoot, '.tmp', 'lazyload-repair', 'playwright', 'plan-feature-gate');
+const evidenceRoot = path.join(root, '.tmp', 'lazyload-repair', 'playwright', 'plan-feature-gate');
 
 function delay(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));

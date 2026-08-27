@@ -1,7 +1,7 @@
 # css overlap report
 # real-conflict threshold: 220
 
-## REAL CONFLICTS (same selector + same property, different value): 194
+## REAL CONFLICTS (same selector + same property, different value): 195
 *
   files: 02-base.css, 36-responsive.css, 50-v6-ui.css, 40-a11y.css
     animation-duration: 1ms !important | 0.001ms !important (36-responsive.css / 50-v6-ui.css / 40-a11y.css)
@@ -713,6 +713,12 @@ to
   files: 46-advice-ai.css
     display: flex | flex !important (46-advice-ai.css / 46-advice-ai.css)
     gap: 6px | 8px (46-advice-ai.css / 46-advice-ai.css)
+
+.advice-month-head
+  files: 46-advice-ai.css
+    padding: 8px 10px | 10px 12px (46-advice-ai.css / 46-advice-ai.css)
+    background: var(--md-sys-surface-container) | color-mix(in srgb, var(--md-sys-primary-container) 58%, var(--md-sys-surface-container)) (46-advice-ai.css / 46-advice-ai.css)
+    color: var(--md-sys-on-surface) | var(--md-sys-on-primary-container) (46-advice-ai.css / 46-advice-ai.css)
 
 .weekly-plan-strip
   files: 49-action-history-weekly.css
